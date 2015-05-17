@@ -559,7 +559,7 @@ function RankDefendTargets()
 		end
 	end]]
 	
-	--[[if s_selfplayerid-999 == 1 or s_selfplayerid-999 == 3 then
+	if s_selfplayerid-999 == 2 then
 		
 		local wWidth = World_GetWidth()
 		local wHeight = World_GetLength()
@@ -588,16 +588,13 @@ function RankDefendTargets()
 									0.005 + 0.6*(1 - (entityPos.z+wHalfHeight) / (wHeight+1)),
 									string.format("%.0f", entry.PriorityValue),
 									15+math.ceil(color/3), color, 15+math.ceil(color/3))
-								--[ [dr_text3d("aicustomdebug2"..s_selfplayerid, entityPos.x, entityPos.y+15, entityPos.z,
-									string.format("%.0f", entry.PriorityValue),
-									15+math.ceil(color/3), color, 15+math.ceil(color/3))] ]
 							end
 						end
 					end
 				end
 			end
 		end
-	end]]
+	end
 end
 
 function Target_CalcAttackPriority(militaryPoint, is_neutral)
@@ -670,7 +667,7 @@ function RankAttackTargets()
 		end
 	end]]
 	
-	--[[if s_selfplayerid-999 == 2 then
+	if s_selfplayerid-999 == 2 then
 		
 		local wWidth = World_GetWidth()
 		local wHeight = World_GetLength()
@@ -701,7 +698,7 @@ function RankAttackTargets()
 				end
 			end
 		end
-	end]]
+	end
 end
 
 function Target_CalcCapturePriority(capturePoint, vp_mult, fuel_mult, mt_mult)
