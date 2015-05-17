@@ -1,0 +1,1234 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+--
+-- Script File for TUTORIAL
+--
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+-- World Builder Markers - Colour Key:
+--	Cyan		Camera Restrictors
+--	Blue		Courtyard
+--	Orange		Infantry Tutorial
+--	Yellow		Basic Tutorial
+--	Green		Resourcing Tutorial
+--	Grey		Armour Tutorial
+--	Magenta		Base Building Tutorial
+
+
+import("ScarUtil.scar")
+
+import("Tutorial-Basic.scar")
+import("Tutorial-Infantry.scar")
+import("Tutorial-Armour.scar")
+import("Tutorial-Building.scar")
+import("Tutorial-CW.scar")
+import("Tutorial-PE.scar")
+
+
+
+function OnGameSetup()
+	player1 = Setup_Player(1, 409005, TRACE_ALLIES, 1)
+	player2 = Setup_Player(2, 409006, TRACE_AXIS, 2)
+	player3 = Setup_Player(3, 409005, TRACE_ALLIES, 1)
+	player4 = Setup_Player(4, 409005, TRACE_ALLIES, 1)
+	player5 = Setup_Player(5, 409008, TRACE_ALLIES_COMMONWEALTH, 3)
+	player6 = Setup_Player(6, 409009, TRACE_AXIS_PANZER_ELITE, 4)
+end
+
+function OnGameRestore()
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+	player3 = World_GetPlayerAt(3)
+	player4 = World_GetPlayerAt(4)
+	player5 = World_GetPlayerAt(5)
+	player6 = World_GetPlayerAt(6)
+end
+
+
+
+function OnInit()
+	print ("------------------------------------------------------------------------------------------")
+	print ("-------------------------------- NOT YOUR DADDY's TUTORIAL -------------------------------")
+	print ("------------------------------------------------------------------------------------------")
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	g_ATC_Enable = false
+	
+	MISSION_NUMBER = 0020
+	Setup_MissionPreset(MISSION_NUMBER)
+	
+	DELAY_POST = 2
+	TIMING_FADE_OUT = 0.3
+	TIMING_FADE_IN = 0.2
+	TIMING_BLACK = 0.3
+	
+	
+	-- cost of items: KEEP THIS UP TO DATE!!
+	cost = {}
+	cost.riflemen = {mp = 270, mn = 0, fu = 0} -- brw 08/01/07 verified
+	cost.engineers = {mp = 140, mn = 0, fu = 0} -- brw 08/01/07 verified
+	cost.paratroopers = {mp = 375, mn = 0, fu = 0} -- brw 08/01/07 verified
+	cost.barracks = {mp = 160, mn = 0, fu = 15} -- brw 08/01/07 verified
+	cost.mgnest = {mp = 240, mn = 0, fu = 25}-- brw 08/01/07 verified
+	cost.recoilless = {mp = 0, mn = 125, fu = 0}-- brw 08/01/07 verified
+	cost.observationpost = {mp = 200, mn = 0, fu = 0} -- brw 08/01/07 verified
+	cost.ambientupgrade = {mp = 260, mn = 0, fu = 0} -- brw 08/01/07 verified
+	cost.artillery = {mp = 0, mn = 150, fu = 0} -- brw 08/01/07 verified
+	cost.bulldozer = {mp = 0, mn = 75, fu = 0}-- brw 08/01/07 verified
+	cost.sherman50cal = {mp = 0, mn = 100, fu = 0}-- brw 08/01/07 verified
+	cost.cw = {}
+	cost.cw.lieutenant = {mp = 250, mn = 0, fu = 15}
+	cost.cw.mgnest = {mp = 280, mn = 0, fu = 0}
+	cost.cw.slittrench = {mp = 0, mn = 0, fu = 0}
+	cost.cw.glider = {mp = 0, mn = 100, fu = 0}
+	cost.pe = {}
+	cost.pe.logistik = {mp = 0, mn = 40, fu = 0}
+	cost.pe.incendiarymortarround = {mp = 0, mn = 25, fu = 0}
+	
+	-- some other important balance figures
+	munitionshalftrack_range = 20
+	
+	-- Set up sound path
+	g_MissionSpeechPath = "Tutorial"
+	Sound_PreCacheSinglePlayerSpeech(g_MissionSpeechPath)
+
+	-- start the opening NIS
+	Game_FadeToBlack(FADE_OUT, 0)
+	
+	-- create some groups for lesson units
+	sg_group1 = SGroup_CreateIfNotFound("sg_group1")
+	sg_group2 = SGroup_CreateIfNotFound("sg_group2")
+	sg_group3 = SGroup_CreateIfNotFound("sg_group3")
+	sg_group4 = SGroup_CreateIfNotFound("sg_group4")
+	sg_group5 = SGroup_CreateIfNotFound("sg_group5")
+	sg_group6 = SGroup_CreateIfNotFound("sg_group6")
+	sg_group7 = SGroup_CreateIfNotFound("sg_group7")
+	sg_group8 = SGroup_CreateIfNotFound("sg_group8")
+	sg_group9 = SGroup_CreateIfNotFound("sg_group9")
+	sg_playerunits = SGroup_CreateIfNotFound("sg_playerunits")
+	sg_friends = SGroup_CreateIfNotFound("sg_friends")
+	sg_engineer = SGroup_CreateIfNotFound("sg_engineer")
+	sg_convoy = SGroup_CreateIfNotFound("sg_convoy")
+	
+	eg_player3barracks = EGroup_CreateIfNotFound("eg_player3barracks")
+	eg_player3motorpool = EGroup_CreateIfNotFound("eg_player3motorpool")
+	eg_player3op = EGroup_CreateIfNotFound("eg_player3op")
+	eg_player3mgnest = EGroup_CreateIfNotFound("eg_player3mgnest")
+	
+	
+	-- create some temporary groups for miscellaneous use
+	sg_blah = SGroup_CreateIfNotFound("sg_blah")				-- when you need to specify a group but really don't care
+	eg_blah = EGroup_CreateIfNotFound("eg_blah")
+	sg_temp = SGroup_CreateIfNotFound("sg_temp")				-- quick temporary groups
+	eg_temp = EGroup_CreateIfNotFound("eg_temp")
+	sg_single = SGroup_CreateIfNotFound("sg_single")			-- used for stuffing a single squad into
+	eg_single = EGroup_CreateIfNotFound("eg_single")
+	sg_nis = SGroup_CreateIfNotFound("sg_nis")
+	eg_nis = EGroup_CreateIfNotFound("eg_nis")
+
+	
+	-- set up special tutorial pause menu
+	tutorial_basic_available = true
+	tutorial_infantry_available = true
+	tutorial_armour_available = true
+	tutorial_building_available = true
+	tutorial_commonwealth_available = License_CanPlayRace(TRACE_ALLIES_COMMONWEALTH)
+	tutorial_panzerelite_available = License_CanPlayRace(TRACE_AXIS_PANZER_ELITE)
+	Game_SetTutorialMode()
+	TutorialMenu_UpdateAvailability()
+	
+	-- debug - deg
+	-- this crashes and there does not seem to be a way to 
+	-- to set an entity to world owned?
+	-- EGroup_SetStrategicPointNeutral(eg_player3hq)
+
+	-- get id's for all territory sectors
+	sector_01 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_resourcing_munitionspoint))
+	sector_02 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_resourcing_fuelpoint))
+	sector_03 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_resourcing_nullpoint))
+	sector_04 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_player1hq))
+	sector_05 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_player3hq))
+	sector_06 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_armour_backresourcepoint))
+	sector_07 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_armour_forwardresourcepoint))
+	sector_08 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_infantry_connectingpoint))
+	sector_09 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_player2hq))
+	sector_10 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_vp_infantry))
+	sector_11 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_vp_basic))
+	sector_12 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_building_squadcappoint1))
+	sector_13 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_building_squadcappoint2))
+	sector_14 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_infantry_startpoint1))
+	sector_15 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_infantry_startpoint2))
+	sector_16 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(eg_infantry_barnpoint))
+	
+	check_objective_mouseover = false
+	check_squadcontrol_mouseover = false
+	
+	-- some variables
+	gamepause = true								-- used for the "Press SPACE to start" message
+	
+	-- set up all of the objectives
+	Basic_Init()
+	Infantry_Init()
+	Armour_Init()
+	Building_Init()
+	CW_Init()
+	PE_Init()
+	
+	-- set difficulty mode to easy
+	Setup_Difficulty(player1, 1)
+	
+	-- switch off resource income
+	Resources_Disable()
+
+	-- set up resources
+	Player_SetResource(player1, RT_Manpower, 1500)
+	Player_SetResource(player1, RT_Munition, 1000)
+	Player_SetResource(player1, RT_Fuel, 1000)
+	
+	-- do the mission restrictions
+	Mission_Restrictions()
+	
+	-- make buildings non-selectable and invincible
+	EGroup_SetSelectable(eg_player1base, false)
+	EGroup_SetInvulnerable(eg_player1base, true)
+	EGroup_SetInvulnerable(eg_player3base, true)
+	
+	-- kick off the mission proper
+	Rule_AddOneShot(Rule_StartMission, 1)
+end
+
+Scar_AddInit(OnInit)
+
+
+--
+-- Player restrictions for this mission
+--
+function Mission_Restrictions()
+	World_EnablePlayerToPlayerFOW(player1, player4, true)
+	
+	--------------------------------------------------------------------------------
+	-- speed ups
+	--------------------------------------------------------------------------------
+	
+	Modify_PlayerProductionRate(player1, 2)
+	Modify_PlayerProductionRate(player5, 2)
+	Modify_PlayerProductionRate(player6, 2)
+	Modify_VehicleRepairRate(player1, 2.5)
+	Modify_CaptureTime(eg_flags_all, 0.6)
+	Modify_ProductionRate(eg_building_house, 1.5)
+	Modify_EntityBuildTime(player1, EBP.ALLIES.BARRACKS, 0.5)
+	Modify_EntityBuildTime(player1, EBP.ALLIES.MG_NEST, 0.5)
+	Modify_EntityBuildTime(player1, EBP.ALLIES.SANDBAG_RIFLEMEN, 0.5)
+	Modify_EntityBuildTime(player5, EBP.CW.MG_NEST, 0.5)	
+	Modify_EntityBuildTime(player5, EBP.CW.SLITTRENCH_NEST, 0.5)	
+
+	--------------------------------------------------------------------------------
+	-- resources
+	--------------------------------------------------------------------------------
+	
+	Player_SetResource(player1, RT_Manpower, 0)
+	Player_SetResource(player1, RT_Munition, 100)
+	Player_SetResource(player1, RT_Fuel, 0)
+	Modify_PlayerExperienceReceived(player2, 0)
+	Modify_PlayerExperienceReceived(player6, 0)
+  	
+	--------------------------------------------------------------------------------
+	-- availability fixes
+	--------------------------------------------------------------------------------
+	
+	-- company commander
+	Player_SetUpgradeAvailability(player1, UPG.COMMANDER_TREE.ALLIES.AIRBORNE, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.COMMANDER_TREE.ALLIES.ARMOR, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.COMMANDER_TREE.ALLIES.INFANTRY_00, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.COMMANDER_TREE.ALLIES.INFANTRY_01, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.COMMANDER_TREE.ALLIES.INFANTRY_02, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.COMMANDER_TREE.ALLIES.INFANTRY_10, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.COMMANDER_TREE.ALLIES.INFANTRY_11, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.COMMANDER_TREE.ALLIES.INFANTRY_12, ITEM_LOCKED)
+	
+	-- commands
+	Player_SetCommandAvailability(player1, SCMD_Load, ITEM_LOCKED)
+	Player_SetCommandAvailability(player1, SCMD_Retreat, ITEM_LOCKED)
+	Player_SetCommandAvailability(player1, SCMD_Capture, ITEM_LOCKED)
+	-- commonwealth commands
+	Player_SetCommandAvailability(player5, SCMD_Load, ITEM_LOCKED)
+	Player_SetCommandAvailability(player5, SCMD_Retreat, ITEM_LOCKED)
+	-- panzer elite commands
+	Player_SetCommandAvailability(player6, SCMD_Load, ITEM_LOCKED)
+	Player_SetCommandAvailability(player6, SCMD_Retreat, ITEM_LOCKED)
+	
+	-- abilities
+	Player_SetAbilityAvailability(player1, ABILITY.ALLIES.GRENADE, ITEM_LOCKED)
+	Player_SetAbilityAvailability(player1, ABILITY.ALLIES.SATCHEL_CHARGE, ITEM_LOCKED)
+	Player_SetAbilityAvailability(player1, ABILITY.ALLIES.CUT_WIRES, ITEM_LOCKED)
+	Player_SetAbilityAvailability(player1, ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_PARADROP, ITEM_LOCKED)
+	Player_SetAbilityAvailability(player1, ABILITY.ALLIES.FIREUP, ITEM_LOCKED)
+	-- commonwealth abilities
+	Player_SetAbilityAvailability(player5, ABILITY.CW.HQ_SETUP_MAINHQ, ITEM_LOCKED)
+	Player_SetAbilityAvailability(player5, ABILITY.CW.HQ_SETUP, ITEM_LOCKED)
+	-- panzer elite abilities
+	Player_SetAbilityAvailability(player6, ABILITY.ELITE.MORTAR_BARRAGE, ITEM_LOCKED)
+	Player_SetAbilityAvailability(player6, ABILITY.ELITE.INCENDIARY_MORTAR, ITEM_LOCKED)
+	Player_SetAbilityAvailability(player6, ABILITY.ELITE.MUNITIONPANZER_GOLIATH, ITEM_LOCKED)
+	Player_SetAbilityAvailability(player6, ABILITY.ELITE.PANZER_RAPIDFIRE, ITEM_LOCKED)
+	Player_SetAbilityAvailability(player6, ABILITY.ELITE.SCOUT_CAR_SETUP, ITEM_LOCKED)
+	Player_SetAbilityAvailability(player6, ABILITY.COMMANDER_TREE.ELITE.AIR_DROPPED_MINES, ITEM_LOCKED)
+	Player_SetAbilityAvailability(player6, ABILITY.COMMANDER_TREE.ELITE.RECRUIT_FALLSHIRMAJAGER, ITEM_LOCKED)
+	
+	-- upgrades
+	Player_SetUpgradeAvailability(player1, UPG.ALLIES.SHERMAN_MG, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.ALLIES.SHERMAN_CRAB, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.ALLIES.PARATROOPER_AT, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.ALLIES.DEMOLITION, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.ALLIES.WIRE_CUTTER, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.ALLIES.ENGINEER_MINESWEEPER, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.ALLIES.ENGINEER_FLAMETHROWER, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.ALLIES.GRENADE, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.ALLIES.STICKY_BOMB, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.ALLIES.BAR, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player1, UPG.ALLIES.CONVERT_AMBIENT_BUILDING, ITEM_LOCKED)
+	-- commonwealth upgrades
+	Player_SetUpgradeAvailability(player5, UPG.CW.MOBILEHQ, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player5, UPG.CW.ENABLE_MOBILE_HQ, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player5, UPG.CW.RECON_TEAM, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player5, UPG.CW.RIFLE_GRENADE, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player5, UPG.CW.BREN, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player5, UPG.CW.HQ_ECONOMY_BONUS, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player5, UPG.CW.HQ_SPEED, ITEM_LOCKED)
+	-- panzer elite upgrades
+	Player_SetUpgradeAvailability(player6, UPG.ELITE.STUBBYARMORSKIRTS, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player6, UPG.ELITE.STUBBYMG42, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player6, UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_00, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player6, UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_01, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player6, UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_10, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player6, UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_11, ITEM_LOCKED)
+	Player_SetUpgradeAvailability(player6, UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_12, ITEM_LOCKED)
+	
+
+	-- base buildings
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.BARRACKS, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.ARMORY, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.MOTORPOOL, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.TANK_DEPOT, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.QUARTER_MASTER, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.TRIAGE, ITEM_LOCKED)
+	
+	-- field emplacements
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.MG_NEST, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.OBSERVATION_POST, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.MEDIC_STATION, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.BARBED_WIRE, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.BARBED_WIRE_RIFLEMEN, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.SANDBAG, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.SANDBAG_RIFLEMEN, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.TANK_TRAP, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.TANK_TRAP_RIFLEMEN, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.MINES, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.ALLIES.MINES_RIFLEMEN, ITEM_LOCKED)
+	-- commonwealth emplacements
+	Player_SetEntityProductionAvailability(player5, EBP.CW.MG_NEST, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player5, EBP.CW.SLITTRENCH_NEST, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player5, EBP.CW.MORTAR_NEST, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player5, EBP.CW.CASUALTY_CLEARING, ITEM_LOCKED)
+	-- panzer elite buildings
+	Player_SetEntityProductionAvailability(player6, EBP.ELITE.LOGISTIK, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player6, EBP.ELITE.KAMPFGRUPPE, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player6, EBP.ELITE.PANZERJAGER, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player6, EBP.ELITE.PANZER_ARTILLERIE, ITEM_LOCKED)
+	
+	
+	-- squads
+	Player_SetSquadProductionAvailability(player1, SBP.ALLIES.RIFLEMEN, ITEM_LOCKED)
+	Player_SetSquadProductionAvailability(player1, SBP.ALLIES.ENGINEER, ITEM_LOCKED)
+	Player_SetSquadProductionAvailability(player1, SBP.ALLIES.JEEP, ITEM_LOCKED)
+	-- commonwealth squads
+	Player_SetSquadProductionAvailability(player5, SBP.CW.TOMMIES, ITEM_LOCKED)
+	Player_SetSquadProductionAvailability(player5, SBP.CW.LIEUTENANT, ITEM_LOCKED)
+	Player_SetSquadProductionAvailability(player5, SBP.CW.BREN_CARRIER, ITEM_LOCKED)
+	Player_SetSquadProductionAvailability(player5, SBP.CW.INFANTRY_HQ, ITEM_LOCKED)
+	Player_SetSquadProductionAvailability(player5, SBP.CW.ARMOUR_HQ, ITEM_LOCKED)
+	-- panzer elite squads 
+	Player_SetSquadProductionAvailability(player6, SBP.ELITE.GOLIATH, ITEM_LOCKED)
+
+	-- construction menus
+	Player_SetConstructionMenuAvailability(player1, "tp_construction_rifleman_basic", ITEM_LOCKED)
+	Player_SetConstructionMenuAvailability(player1, "tp_construction_allied_hq", ITEM_LOCKED)
+	Player_SetConstructionMenuAvailability(player1, "tp_construction_engineer_basic", ITEM_LOCKED)
+	-- commonwealth menus
+	Player_SetConstructionMenuAvailability(player5, "tp_construction_commonwealth_infantry", ITEM_LOCKED)
+	Player_SetConstructionMenuAvailability(player5, "tp_construction_commonwealth_hq", ITEM_LOCKED)
+	-- panzer elite menus
+	Player_SetConstructionMenuAvailability(player6, "tp_construction_panzer_elite_basic", ITEM_LOCKED)
+	
+	Modify_DisableHold(eg_all_buildings, true)
+	
+	-- force event cues always on. the override lasts for the current game only
+	UI_SetOptionOverride(OPTION_EVENT_CUES, 1)
+end
+
+
+
+--
+-- Start the Mission proper
+--
+function Rule_StartMission()
+	-- remove all of the perimeters (leaving just the courtyard one in place)
+	EGroup_DeSpawn(LAYER_perimeter_basic)
+	EGroup_DeSpawn(LAYER_perimeter_armour)
+	EGroup_DeSpawn(eg_infantry_hmgpen)	
+	
+	-- debug - deg
+	-- these two still exist in the WB 
+	-- but for some reason don't register
+	-- EGroup_DeSpawn(LAYER_perimeter_infantry)
+	-- EGroup_DeSpawn(LAYER_perimeter_base)
+	
+	-- flatten the direction arrows
+	EGroup_SetAnimatorState(eg_building_mgnestfacing, "arrow_state", "flat")
+	EGroup_SetAnimatorState(eg_infantry_facingdirection, "arrow_state", "flat")
+	EGroup_SetAnimatorState(eg_cw_gliderfacing, "arrow_state", "flat")
+	EGroup_SetAnimatorState(eg_cw_mgnestfacing, "arrow_state", "flat")
+	EGroup_SetAnimatorState(eg_cw_slittrenchfacing, "arrow_state", "flat")
+	EGroup_DeSpawn(eg_building_mgnestfacing)
+	EGroup_DeSpawn(eg_infantry_facingdirection)
+	EGroup_DeSpawn(eg_cw_gliderfacing)
+	EGroup_DeSpawn(eg_cw_mgnestfacing)
+	EGroup_DeSpawn(eg_cw_slittrenchfacing)
+
+	-- lock the camera
+	Camera_ClampToMarker(mkr_courtyard_centre)
+	Camera_FocusOnPosition(Marker_GetPosition(mkr_courtyard_centre), false)
+	Camera_ResetToDefault()
+	
+	-- set state of UI indicators according to the player profile
+	if PlayerProfile_GetVar("Tutorial_EnableCoverIndicators") ~= "true" then
+		UI_CoverPreviewHide()
+	end
+	if PlayerProfile_GetVar("Tutorial_EnableActionPointKickers") ~= "true" then
+		UI_EnableResourceTypeKicker(RT_Action, false)
+	end
+	
+	-- set other UI fixes
+	UI_BindingSetEnabled("manpower", false)
+	UI_BindingSetEnabled("manpower_rate", false)
+	UI_BindingSetEnabled("munition", false)
+	UI_BindingSetEnabled("munition_rate", false)
+	UI_BindingSetEnabled("fuel", false)
+	UI_BindingSetEnabled("fuel_rate", false)
+	UI_BindingSetEnabled("squadcap", false)
+	UI_BindingSetEnabled("tacmap_button", false)
+	UI_BindingSetEnabled("company_commander", false)
+	UI_BindingSetEnabled("manage_hq", false)
+	UI_BindingSetEnabled("manage_barracks", false)
+	UI_BindingSetEnabled("command_retire", false)
+	UI_BindingSetEnabled("command_retire_squad", false)
+
+	UI_SetSubtitleBackgroundAlpha(0.5)
+	UI_EnableEventSkip(false)
+	
+	-- start the music
+	Util_PlayMusic("Sound/Music/sp/Tutorial/Tutorial_Music", 5, 0)
+
+	-- fade in
+	Game_FadeToBlack(FADE_IN, TIMING_FADE_IN)
+	
+	-- introduction goes here
+	-- brw 12/22/08 - removing Opposing Fronts introduction,
+	-- since it is not correct for Tales of Valor 100%.
+--~ 	if License_CanPlayRace(TRACE_ALLIES_COMMONWEALTH) == true then
+--~ 		Util_StartIntel(EVENTS.CXPNIS)								
+--~ 	else
+		Util_StartIntel(EVENTS.IntroPart1)-- brw 08/01/07 - using StartIntel function because StartNIS causes the sound to duck the speech out.
+--~ 	end
+	
+	Rule_Add(Courtyard_AskAboutBasicTutorial)
+end
+
+
+--
+-- Ask about the Basic Tutorial
+--
+function Courtyard_AskAboutBasicTutorial()
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		-- ask about basic tutorial or go straight to menu depending on player profile
+		if PlayerProfile_GetVar("BasicTutorial_Completed") == "true" or	
+		   PlayerProfile_GetVar("InfantryTutorial_Completed") == "true" or	
+		   PlayerProfile_GetVar("BuildingTutorial_Completed") == "true" or	
+		   PlayerProfile_GetVar("ArmourTutorial_Completed") == "true" or
+		   PlayerProfile_GetVar("CommonwealthTutorial_Completed") == "true" or
+		   PlayerProfile_GetVar("PanzerEliteTutorial_Completed") == "true" then
+			
+			Courtyard_Start()
+			
+		else
+			
+			UI_MessageBoxSetText(409020, 409021)
+			UI_MessageBoxSetButton(DB_Button1, 409022, 409012, true)	-- Play Basic Training
+			UI_MessageBoxSetButton(DB_Button2, 409023, 409012, true)	-- Skip
+			UI_MessageBoxSetButton(DB_Button3, 409012, 409012, false)	-- Disabled
+			UI_MessageBoxSetButton(DB_Close, 409012, 409012, false)		-- Disabled
+			UI_MessageBoxShow(Courtyard_AskAboutBasicTutorialB)
+			
+		end
+		
+	end
+end
+
+function Courtyard_AskAboutBasicTutorialB(button)
+	if button == DB_Button1 then
+		Basic_Start()
+	else
+		Courtyard_Start()
+	end
+end
+
+
+
+--
+-- Courtyard / Tutorial Selection
+--
+function Courtyard_Start()
+	tutorial_currentsection = "courtyard"
+	
+	Rule_RemoveAll(0)
+	HintPoint_RemoveAll()
+
+	-- if we have a preselected area to go to, head to that...
+	if tutorial_requestedsection == "basic" then
+		tutorial_requestedsection = ""
+		Basic_Start()
+	elseif tutorial_requestedsection == "infantry" then
+		tutorial_requestedsection = ""
+		Infantry_Start()
+	elseif tutorial_requestedsection == "building" then
+		tutorial_requestedsection = ""
+		Building_Start()
+	elseif tutorial_requestedsection == "armour" then
+		tutorial_requestedsection = ""
+		Armour_Start()
+	elseif tutorial_requestedsection == "commonwealth" then
+		tutorial_requestedsection = ""
+		--Commonwealth_Start()
+		CW_Start()
+	elseif tutorial_requestedsection == "panzerelite" then
+		tutorial_requestedsection = ""
+		--PanzerElite_Start()
+		PE_Start()
+	else
+		-- no preselected area, so pop up the menu...
+		
+		Camera_SetInputEnabled(false)
+		
+		-- remove all player 1 units
+		Player_GetAll(player1)
+		SGroup_DestroyAllSquads(sg_allsquads)
+		
+		-- show the selection menu
+		TutorialMenu_UpdateAvailability()
+		TutorialMenu_EnableResumeButton(false)
+		Game_ShowPauseMenu()
+		
+	end
+end
+
+
+
+function TutorialMenu_ProcessResult(button)
+	TutorialMenu_EnableResumeButton(true)
+	
+	if tutorial_currentsection == "courtyard" then
+		
+		if button == 1 then
+			Basic_Start()
+		elseif button == 2 then
+			Infantry_Start()
+		elseif button == 3 then
+			Building_Start()
+		elseif button == 4 then
+			Armour_Start()
+		elseif button == 5 then
+			--Commonwealth_Start()
+			CW_Start()
+		elseif button == 6 then
+			--PanzerElite_Start()
+			PE_Start()
+		end
+		
+	else
+		
+		if button == 1 then
+			if tutorial_currentsection == "basic" then
+				tutorial_requestedsection = "basic"
+				TutorialMenu_RestartCurrent()
+			else
+				tutorial_requestedsection = "basic"
+				TutorialMenu_ExitCurrent()
+			end
+		elseif button == 2 then
+			if tutorial_currentsection == "infantry" then
+				tutorial_requestedsection = "infantry"
+				TutorialMenu_RestartCurrent()
+			else
+				tutorial_requestedsection = "infantry"
+				TutorialMenu_ExitCurrent()
+			end
+		elseif button == 3 then
+			if tutorial_currentsection == "building" then
+				tutorial_requestedsection = "building"
+				TutorialMenu_RestartCurrent()
+			else
+				tutorial_requestedsection = "building"
+				TutorialMenu_ExitCurrent()
+			end
+		elseif button == 4 then
+			if tutorial_currentsection == "armour" then
+				tutorial_requestedsection = "armour"
+				TutorialMenu_RestartCurrent()
+			else
+				tutorial_requestedsection = "armour"
+				TutorialMenu_ExitCurrent()
+			end
+		elseif button == 5 then
+			if tutorial_currentsection == "commonwealth" then
+				tutorial_requestedsection = "commonwealth"
+				TutorialMenu_RestartCurrent()
+			else
+				tutorial_requestedsection = "commonwealth"
+				TutorialMenu_ExitCurrent()
+			end
+		elseif button == 6 then
+			if tutorial_currentsection == "panzerelite" then
+				tutorial_requestedsection = "panzerelite"
+				TutorialMenu_RestartCurrent()
+			else
+				tutorial_requestedsection = "panzerelite"
+				TutorialMenu_ExitCurrent()
+			end
+		end
+		
+	end
+end
+
+
+
+
+function TutorialMenu_ExitCurrent()
+	UI_MessageBoxSetText(409030, 409031)
+	UI_MessageBoxSetButton(DB_Button1, 409010, 409012, true)	-- OK
+	UI_MessageBoxSetButton(DB_Button2, 409011, 409012, true)	-- Cancel
+	UI_MessageBoxSetButton(DB_Button3, 409012, 409012, false)	-- Disabled
+	UI_MessageBoxSetButton(DB_Close, 409012, 409012, false)		-- Disabled
+	UI_MessageBoxShow(TutorialMenu_ExitCurrentCallback)
+end
+
+function TutorialMenu_RestartCurrent()
+	UI_MessageBoxSetText(409032, 409033)
+	UI_MessageBoxSetButton(DB_Button1, 409010, 409012, true)	-- OK
+	UI_MessageBoxSetButton(DB_Button2, 409011, 409012, true)	-- Cancel
+	UI_MessageBoxSetButton(DB_Button3, 409012, 409012, false)	-- Disabled
+	UI_MessageBoxSetButton(DB_Close, 409012, 409012, false)		-- Disabled
+	UI_MessageBoxShow(TutorialMenu_ExitCurrentCallback)
+end
+
+function TutorialMenu_ExitCurrentCallback(button)
+	if button == DB_Button1 then
+		if tutorial_currentsection == "basic" then
+			Basic_EndTutorial()
+		elseif tutorial_currentsection == "infantry" then
+			Infantry_EndTutorial()
+		elseif tutorial_currentsection == "building" then
+			Building_EndTutorial()
+		elseif tutorial_currentsection == "armour" then
+			Armour_EndTutorial()
+		elseif tutorial_currentsection == "commonwealth" then
+			CW_EndTutorial()
+		elseif tutorial_currentsection == "panzerelite" then
+			PE_EndTutorial()
+		end
+	else
+		tutorial_requestedsection = ""
+	end
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--
+--
+--
+function SGroup_HasDestination(sgroup, pos, all, range)
+
+	-- if pos is a marker, change it to a position and range
+	if scartype(pos) == ST_MARKER then
+		if range == nil then
+			range = Marker_GetProximityRadius(pos)
+		end
+		pos = Marker_GetPosition(pos)
+	end
+	
+	-- check each squad, and see if it's destination (if it has one) is in the desired area
+	local _CheckSquad = function (gid, idx, sid)
+		if Squad_HasDestination(sid) then
+			if World_DistancePointToPoint(pos, Squad_GetDestination(sid)) <= range then
+				return true
+			else
+				return false
+			end
+		else
+			return false
+		end
+	end
+	
+	return SGroup_ForEachAllOrAny(sgroup, all, _CheckSquad)
+end
+
+
+
+function EGroup_IsProducingUpgrade(egroup, item, all)
+
+	local _CheckEntity = function(gid, idx, eid)
+		if Entity_HasProductionQueue(eid) then
+			for n = 0, (Entity_GetProductionQueueSize(eid)-1) do
+				if Entity_GetProductionQueueItemType(eid, n) == PITEM_Upgrade then
+					if Entity_GetProductionQueueItem(eid, n) == item then
+						return true
+					end
+				end
+			end
+			return false
+		else
+			return false
+		end
+	end
+	
+	return EGroup_ForEachAllOrAny(egroup, all, _CheckEntity) 
+
+end
+
+
+
+function EGroup_IsProducingSquad(egroup, item, all, num)
+
+	if num == nil then 
+		num = 1
+	end
+	
+	local _CheckEntity = function(gid, idx, eid)
+		if Entity_HasProductionQueue(eid) then
+			local total = 0
+			for n = 0, (Entity_GetProductionQueueSize(eid)-1) do
+				if Entity_GetProductionQueueItemType(eid, n) == PITEM_Spawn then
+					if Entity_GetProductionQueueItem(eid, n) == item then
+						total = total + 1
+					end
+				end
+			end
+			if total >= num then
+				return true
+			else
+				return false
+			end
+		else
+			return false
+		end
+	end
+	
+	return EGroup_ForEachAllOrAny(egroup, all, _CheckEntity) 
+
+end
+
+
+
+function SGroup_IsProducingSquad(sgroup, item, all, num)
+
+	if num == nil then 
+		num = 1
+	end
+	
+	local _CheckSquad = function(gid, idx, sid)
+		if Squad_HasProductionQueue(sid) then
+			local total = 0
+			for n = 0, (Squad_GetProductionQueueSize(sid)-1) do
+				if Squad_GetProductionQueueItemType(sid, n) == PITEM_Spawn then
+					if Squad_GetProductionQueueItem(sid, n) == item then
+						total = total + 1
+					end
+				end
+			end
+			if total >= num then
+				return true
+			else
+				return false
+			end
+		else
+			return false
+		end
+	end
+	
+	return SGroup_ForEachAllOrAny(sgroup, all, _CheckSquad) 
+
+end
+
+
+
+function SGroup_ContainsEntity(group, entity)
+
+	local squad = Entity_GetSquad(entity)
+	
+	if squad ~= nil then
+		return SGroup_ContainsSquad(group, Squad_GetGameID(squad))
+	end
+	
+	return false
+end
+
+
+
+function SelectionCheck_Start()
+	if Rule_Exists(SelectionCheck_Manager) == false then
+		selectioncheckticker = 24
+		Rule_Add(SelectionCheck_Manager)
+	end
+end
+
+function SelectionCheck_Stop()
+	if Rule_Exists(SelectionCheck_Manager) == true then
+		Rule_Remove(SelectionCheck_Manager)
+	end
+end
+
+
+
+function SelectionCheck_Manager()
+	Misc_GetSelectedSquads(sg_temp, false)
+	
+	if SGroup_Count(sg_temp) == 0 or Player_OwnsSGroup(player1, sg_temp) == false then
+		
+		selectioncheckticker = selectioncheckticker - 1
+		
+	else	
+		
+		selectioncheckticker = 24
+		
+	end
+
+	if selectioncheckticker == 0 then
+		
+		UIWarning_Show(409930)
+		selectioncheckticker = 10
+		
+	end
+end
+
+
+function __OnObjectiveIconMouseover(id)
+	if check_objective_mouseover == true then
+		check_objective_mouseover = false
+	end
+end
+
+function __OnUnitManagementMouseover(id)
+	if check_squadcontrol_mouseover == true then
+		check_squadcontrol_mouseover = false
+	end
+end
+
+
+
+
+-- update the menu state
+function TutorialMenu_UpdateAvailability()
+	-- Reset total number of completed tutorials
+	tutorial_totalsectionscompleted = 0
+
+	
+	-- Basic Tutorial
+	if PlayerProfile_GetVar("BasicTutorial_Completed") == "true" then					-- set checkmark appearance
+		tutorial_totalsectionscompleted = tutorial_totalsectionscompleted + 1
+		tutorial_basic_completed = "data:art/ui/textures/cb_button_pointbox_check"
+	else
+		tutorial_basic_completed = ""
+	end
+	
+	if tutorial_basic_available == true then											-- set description message
+		tutorial_basic_description = 409051
+	else
+		tutorial_basic_description = 409052
+	end
+
+	
+	-- Infantry
+	if PlayerProfile_GetVar("InfantryTutorial_Completed") == "true" then				-- set checkmark appearance
+		tutorial_totalsectionscompleted = tutorial_totalsectionscompleted + 1
+		tutorial_infantry_completed = "data:art/ui/textures/cb_button_pointbox_check"
+	else
+		tutorial_infantry_completed = ""
+	end
+	
+	if tutorial_infantry_available == true then											-- set description message
+		tutorial_infantry_description = 409054
+	else
+		tutorial_infantry_description = 409055
+	end
+
+	
+	-- Building
+	if PlayerProfile_GetVar("BuildingTutorial_Completed") == "true" then				-- set checkmark appearance
+		tutorial_totalsectionscompleted = tutorial_totalsectionscompleted + 1
+		tutorial_building_completed = "data:art/ui/textures/cb_button_pointbox_check"
+	else
+		tutorial_building_completed = ""
+	end
+	
+	if tutorial_building_available == true then											-- set description message
+		tutorial_building_description = 409057
+	else
+		tutorial_building_description = 409058
+	end
+
+	
+	-- Armour
+	if PlayerProfile_GetVar("ArmourTutorial_Completed") == "true" then					-- set checkmark appearance
+		tutorial_totalsectionscompleted = tutorial_totalsectionscompleted + 1
+		tutorial_armour_completed = "data:art/ui/textures/cb_button_pointbox_check"
+	else
+		tutorial_armour_completed = ""
+	end
+
+	if tutorial_armour_available == true then											-- set description message
+		tutorial_armour_description = 409060
+	else
+		tutorial_armour_description = 409061
+	end
+
+	
+	-- Commonwealth
+	if PlayerProfile_GetVar("CommonwealthTutorial_Completed") == "true" then				-- set checkmark appearance
+		tutorial_totalsectionscompleted = tutorial_totalsectionscompleted + 1
+		tutorial_commonwealth_completed = "data:art/ui/textures/cb_button_pointbox_check"
+	else
+		tutorial_commonwealth_completed = ""
+	end
+
+	if tutorial_commonwealth_available == true then											-- set description message
+		tutorial_commonwealth_description = 409066
+	else
+		tutorial_commonwealth_description = 409067
+	end
+	
+
+	-- PanzerElite
+	if PlayerProfile_GetVar("PanzerEliteTutorial_Completed") == "true" then					-- set checkmark appearance
+		tutorial_totalsectionscompleted = tutorial_totalsectionscompleted + 1
+		tutorial_panzerelite_completed = "data:art/ui/textures/cb_button_pointbox_check"
+	else
+		tutorial_panzerelite_completed = ""
+	end
+
+	if tutorial_panzerelite_available == true then											-- set description message
+		tutorial_panzerelite_description = 409071
+	else
+		tutorial_panzerelite_description = 409072
+	end
+
+
+	-- update menu state
+	TutorialMenu_SetButtonInfo(1, tutorial_basic_available, 409050, tutorial_basic_description, tutorial_basic_completed, TutorialMenu_ProcessResult)
+	TutorialMenu_SetButtonInfo(2, tutorial_infantry_available, 409053, tutorial_infantry_description, tutorial_infantry_completed, TutorialMenu_ProcessResult)
+	TutorialMenu_SetButtonInfo(3, tutorial_building_available, 409056, tutorial_building_description, tutorial_building_completed, TutorialMenu_ProcessResult)
+	TutorialMenu_SetButtonInfo(4, tutorial_armour_available, 409059, tutorial_armour_description, tutorial_armour_completed, TutorialMenu_ProcessResult)
+	TutorialMenu_SetButtonInfo(5, tutorial_commonwealth_available, 409065, tutorial_commonwealth_description, tutorial_commonwealth_completed, TutorialMenu_ProcessResult)
+	TutorialMenu_SetButtonInfo(6, tutorial_panzerelite_available, 409070, tutorial_panzerelite_description, tutorial_panzerelite_completed, TutorialMenu_ProcessResult)
+end
+
+
+function Tutorial_ResetProfile()
+	PlayerProfile_SetVar("BasicTutorial_Completed", "false")
+	PlayerProfile_SetVar("InfantryTutorial_Completed", "false")
+	PlayerProfile_SetVar("BuildingTutorial_Completed", "false")
+	PlayerProfile_SetVar("ArmourTutorial_Completed", "false")
+	PlayerProfile_SetVar("CommonwealthTutorial_Completed", "false")
+	PlayerProfile_SetVar("PanzerEliteTutorial_Completed", "false")
+	PlayerProfile_SetVar("Tutorial_EnableCoverIndicators", "false")
+	PlayerProfile_SetVar("Tutorial_EnableActionPointKickers", "false")
+end
+
+
+-- ensures that the player has AT LEAST the amount of resources requested
+function Tutorial_SafetySetResources(...)
+
+	local manpower = 0
+	local munitions = 0
+	local fuel = 0
+	
+	local player = player1
+	if tutorial_currentsection == "commonwealth" then
+		player = player5
+	elseif tutorial_currentsection == "panzerelite" then
+		player = player6
+	end
+	
+	for n = 1, table.getn(arg) do
+		manpower = manpower + arg[n].mp
+		munitions = munitions + arg[n].mn
+		fuel = fuel + arg[n].fu
+	end
+	
+	if Player_GetResource(player, RT_Manpower) < manpower then
+		Player_SetResource(player, RT_Manpower, manpower)
+	end
+	
+	if Player_GetResource(player, RT_Munition) < munitions then
+		Player_SetResource(player, RT_Munition, munitions)
+	end
+	
+	if Player_GetResource(player, RT_Fuel) < fuel then
+		Player_SetResource(player, RT_Fuel, fuel)
+	end
+end
+
+
+
+
+function UI_FlashEGroup(group, bool)
+
+	local action = "UI/entity_flash_on"
+	if bool == false then
+		action = "UI/entity_flash_off"
+	end
+	
+	local _FlashEntity = function (gid, idx, eid)
+		UI_FlashEntity(eid, action)
+	end
+	EGroup_ForEach(group, _FlashEntity)
+end
+
+
+
+function UI_FlashSGroup(group, bool)
+
+	local action = "UI/entity_flash_on"
+	if bool == false then
+		action = "UI/entity_flash_off"
+	end
+	
+	local _FlashSquad = function (gid, idx, sid)
+		for n = 1, Squad_Count(sid) do
+			UI_FlashEntity(Squad_EntityAt(sid, n-1), action)
+		end
+	end
+	SGroup_ForEach(group, _FlashSquad)
+end
+
+
+
+function Util_AddProdFlash(typeName, sbpName, clickBoolean, locID, pingName)
+
+	local temp = {}
+	temp.flash = UI_FlashProductionButton(typeName, sbpName, clickBoolean, pingName)
+	temp.hint = HintPoint_AddToProductionButton(typeName, sbpName, locID, clickBoolean)
+	
+	return temp
+end
+
+
+
+function Util_AddAbilityFlash(abilityName, clickBoolean, locID, pingName)
+
+	local temp = {}
+	temp.flash = UI_FlashAbilityButton(abilityName, clickBoolean, pingName)
+	temp.hint = HintPoint_AddToAbilityButton(abilityName, locID, clickBoolean)
+	
+	return temp
+end
+
+
+function Util_AddConstructionFlash(ebpName, clickBoolean, locID, pingName)
+
+	local temp = {}
+	temp.flash = UI_FlashConstructionButton(ebpName, clickBoolean, pingName)
+	temp.hint = HintPoint_AddToConstructionButton(ebpName, locID, clickBoolean)
+	
+	return temp
+end
+
+
+function Util_AddConstructionMenuFlash(menuName, clickBoolean, locID, pingName)
+
+	local temp = {}
+	temp.flash = UI_FlashConstructionMenu(menuName, clickBoolean, pingName)
+	temp.hint = HintPoint_AddToConstructionMenu(menuName, locID, clickBoolean)
+	
+	return temp
+end
+
+
+function Util_StopFlashing(this)
+	if this.flash ~= nil then
+		UI_StopFlashing(this.flash)
+	end
+	if this.hint ~= nil then
+		HintPoint_Remove(this.hint)
+	end
+end
+
+
+
+function Misc_SelectSGroup(group, bool)
+	
+	local _Squad = function (gid, idx, sid)
+		Misc_SelectSquad(sid, bool)
+	end
+	SGroup_ForEach(group, _Squad)
+end
+
+
+function Tutorial_WarpGuys(sgroup, dest)
+
+	if Rule_Exists(Tutorial_WarpGuysB) == false then
+		
+		if scartype(dest) == ST_MARKER then
+			dest = Marker_GetPosition(dest)
+		elseif scartype(dest) == ST_EGROUP then
+			dest = EGroup_GetPosition_EVEN_IF_EMPTY(dest)
+		end
+		
+		warpguys = sgroup
+		warpdest = dest
+		
+		Rule_AddOneShot(Tutorial_WarpGuysB, 1)
+		
+	end
+end
+function Tutorial_WarpGuysB()
+	local pos = World_GetHiddenPositionOnPath(player1, SGroup_GetPosition_EVEN_IF_EMPTY(warpguys), warpdest, CHECK_OFFCAMERA)
+	print(pos)
+	if pos ~= nil then
+		SGroup_WarpToPos(warpguys, pos)
+	end
+	
+	Cmd_AttackMove(warpguys, warpdest)
+end
+
+
+
+function Tutorial_RevealPos(tutorialName, position, radius)
+
+	-- reveal the fow
+	FOW_RevealArea(position, radius, -1)
+
+	-- store the value
+	if _FOW_Tut_Reveal == nil then
+		_FOW_Tut_Reveal = {}
+		table.insert(_FOW_Tut_Reveal, {tutorial = tutorialName, FOW = {}})
+		table.insert(_FOW_Tut_Reveal[1].FOW, {pos = position, radi = radius})
+	else
+		local new = true
+		for i = 1, table.getn(_FOW_Tut_Reveal) do 
+			if _FOW_Tut_Reveal[i].tutorial == tutorialName then
+				table.insert(_FOW_Tut_Reveal[i].FOW, {pos = position, radi = radius})
+				new = false
+				break
+			end
+		end
+		if new == true then
+			local n = table.getn(_FOW_Tut_Reveal)
+			table.insert(_FOW_Tut_Reveal, {tutorial = tutorialName, FOW = {}})
+			table.insert(_FOW_Tut_Reveal[n+1].FOW, {pos = position, radi = radius})
+		end
+	end
+end
+
+
+
+function Tutorial_UnRevealAll(tutorialName)
+	local count = table.getn(_FOW_Tut_Reveal)
+	if _FOW_Tut_Reveal ~= nil then
+		for i = 1, count do 
+			if _FOW_Tut_Reveal[i].tutorial == tutorialName then
+				for k,v in pairs(_FOW_Tut_Reveal[i].FOW) do 
+					FOW_UnRevealArea(v.pos, v.radi)
+				end
+				table.remove(_FOW_Tut_Reveal, i)
+				break
+			end
+		end
+	end
+end
+
+
+
+function Camera_SafetyDefault()
+	if Camera_IsDefault() == false then
+		Camera_ResetToDefault()
+	end
+end
+
+
+
+function RedoBindings()
+	UI_BindingSetEnabled("manpower", false)
+	UI_BindingSetEnabled("manpower_rate", false)
+	UI_BindingSetEnabled("munition", false)
+	UI_BindingSetEnabled("munition_rate", false)
+	UI_BindingSetEnabled("fuel", false)
+	UI_BindingSetEnabled("fuel_rate", false)
+	UI_BindingSetEnabled("squadcap", false)
+	UI_BindingSetEnabled("tacmap_button", false)
+	UI_BindingSetEnabled("company_commander", false)
+	UI_BindingSetEnabled("manage_hq", false)
+	UI_BindingSetEnabled("manage_barracks", false)
+	UI_BindingSetEnabled("command_retire", false)
+	UI_BindingSetEnabled("command_retire_squad", false)
+	UI_BindingSetEnabled("construction_cancel_button", false)
+end
+
+
+
+function Squad_IsConstructing(sid)
+	if Squad_HasActiveCommand(sid) then
+--		if Squad_GetActiveCommand(sid) == SQUADSTATEID_Construction then
+		if Squad_GetActiveCommand(sid) == 6 then
+			return true
+		end
+	end
+	
+	return false
+end
+
+
+
+function SGroup_IsConstructing(group, all)
+
+	local _CheckSquad = function (gid, idx, sid)
+		return Squad_IsConstructing(sid)
+	end
+	
+	return SGroup_ForEachAllOrAny(group, all, _CheckSquad)
+end
+
+
+
+function Tutorial_RemoveParatroopers()
+	Player_GetAll(player1)
+	SGroup_Filter(sg_allsquads, SBP.ALLIES.PARATROOPERS, FILTER_KEEP)
+	if SGroup_CountSpawned(sg_allsquads) >= 1 then
+		SGroup_DestroyAllSquads(sg_allsquads)
+	end
+	
+end

@@ -1,0 +1,635 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+-- Mission Name
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+import("DLC1Import.scar")
+import("VillersBocage_A_DestroyConvoy.scar")
+import("VillersBocage_A_ClearVillersBocage.scar")
+import("VillersBocage_A_ExitTown.scar")
+import("VillersBocage_A_Tutorial.scar")
+import("VillersBocage_A_Medal.scar")
+import("VillersBocage_RPGMechanics.scar")
+import("VillersBocage_RPGTracker.scar")
+import("VillersBocage_Bounty.scar")
+import("VillersBocage_TankHeal.scar")
+
+-------------------------------------------------------------------------
+-- [[ SETUP ]]
+-------------------------------------------------------------------------
+
+function OnGameSetup()
+	-- string numbers should reference dat files
+	-- "allies_commonwealth" "allies" "axis" "axis_panzer_elite"
+	player1 = Setup_Player(1, 6000100, TRACE_AXIS, 1)
+	player2 = Setup_Player(2, 6000110, TRACE_ALLIES_COMMONWEALTH, 2)
+	player3 = Setup_Player(3, 6000100, TRACE_AXIS, TEAM_NEUTRAL)
+	player4 = Setup_Player(4, 6000100, TRACE_AXIS_PANZER_ELITE, 1)
+end
+
+function OnGameRestore()
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+	player3 = World_GetPlayerAt(3)
+	player4 = World_GetPlayerAt(4)
+	
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+	
+	-- ensure that the victory points are still hidden
+	EGroup_Hide(LAYER_VillersCObjToShow, true)
+end
+
+
+-------------------------------------------------------------------------
+-- [[ ONINIT ]]
+-------------------------------------------------------------------------
+EVENTS = {}
+function OnInit()
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	-- a constant that stores the mission number for use with
+	-- setting the global speech paths, tech tree setup, and 
+	-- the player's starting resources
+	MISSION_NUMBER = 0301
+	
+	--[[ PRESET GAME STATE ]]
+	Setup_MissionPreset(MISSION_NUMBER)
+	
+	--[[ PRESET DEBUG CONDITIONS ]]
+	Villers_A_Debug()
+	
+	--[[ MOD INITIAL STATS ]]
+	Villers_A_ModifyStats()
+	
+	--[[ SET RESTRICTIONS ]]
+	Villers_A_Restrictions()
+	
+	--[[ SET AI ]]
+	Villers_A_CpuInit()
+	
+	--[[ SET DIFFICULTY ]]
+	Villers_A_Difficulty()
+	
+	--[[ MISSION PRESETS ]]
+	Villers_A_MissionPreset()
+	
+	-- NOTE, the NIS CANNOT START AT THE LOADING SCREEN
+	-- it needs to start after the loading of the mission has completed (thus it needs to be a Rule)
+	Rule_Add(Villers_A_NISStart)
+	
+end
+
+Scar_AddInit(OnInit)
+
+function Villers_A_Debug()
+	
+	-- looks for the command line option [-debug]
+	if Misc_IsCommandLineOptionSet("debug") then
+		
+		g_debug = true
+		
+		-- reveal FOW
+		FOW_Enable(false)
+		
+		Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('DestroyConvoy_Debug()')]])")
+		Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('ClearVillersBocage_Debug()')]])")
+		Scar_DebugConsoleExecute("bind([[ALT+3]], [[Scar_DoString('ExitTown_Debug()')]])")
+	elseif Misc_IsCommandLineOptionSet("demo") then
+		
+		Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Player_AddResource( player1, RT_Action, 4*60)')]])")
+	else
+		
+		-- set up bindings for NISes
+		Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(NIS_OPENING)')]])")
+		Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('Util_StartNIS(NIS_CLOSING_NO_BLACK)')]])")
+	end
+
+	
+	
+end
+
+function Villers_A_ModifyStats()
+	
+	--[[ saved as example - deg
+	Player_SetDefaultSquadMoodMode(player1, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player2, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player3, MM_ForceTense)
+	
+	-- shorten vision ranges
+	Modify_PlayerSightRadius(player1, 0.75)
+	]]	
+
+	-- mod resource rates
+	t_player1_res_mods= {}
+	t_player1_res_mods[1] = Modify_PlayerResourceRate(player1, RT_Manpower, 0)
+--~ 	t_player1_res_mods[2] = Modify_PlayerResourceRate(player1, RT_Munition, 2)
+--~ 	t_player1_res_mods[3] = Modify_PlayerResourceRate(player1, RT_Fuel, 1)
+	
+
+	
+end
+
+function Villers_A_Restrictions()
+
+	--[[ UN/RESTRICT UPGRADES 	]]	
+--~ 	UI_ForceCommanderTreeChoice(player1, UPG.SP.VILLERS_BOCAGE.COMMANDER_TREE)
+	Cmd_InstantUpgrade( player2, UPG.COMMANDER_TREE.CW.ENGINEERS_01 )
+	
+	--[[ RESOURCES 	]]
+	Player_SetResource(player1, RT_Manpower, 0)
+	Player_SetResource(player1, RT_Munition, 150)
+	Player_SetResource(player1, RT_Fuel, 0)
+
+	
+	--[[ UN/RESTRICT ABILITIES ]]
+	
+	
+	-- UN/RESTRICT POP CAP
+	Player_SetPopCapOverride(player1, 75)
+
+end
+
+
+
+function Villers_A_CpuInit()
+
+	--[[ left as an example
+	
+	-- set up Player3 AI  
+	Util_AI_Setup(player3, {Util_DifVar({10, 15, 20, 30}), 5}, player3, Game_GetSPDifficulty(), 7, Util_DifVar({1, 2, 3, 5}), 2, 3)
+	
+	-- Set up AI's resources
+	Player_SetResource(player3, RT_Manpower, 1000)
+	Player_SetResource(player3, RT_Munition, 100)
+	Player_SetResource(player3, RT_Fuel, 100)
+	
+	-- tell AI to go after strongest threat instead of the weakest
+	AI_DoString( player3, "s_personality.attack_prefer_threat = true" )
+	AI_DoString( player3, "s_personality.defend_prefer_threat = true" )
+
+	-- tell AI not to "defend" territories outside of the ring around its base
+	AI_EnableComponent(player3, false, COMPONENT_ForwardDefending)
+	
+	-- disable use of comapny commander menu and abilities
+	AI_DoString( player3, "s_commandtree_enabled = false" )
+	AI_DoString( player3, "s_playerabilities_enabled = false" )
+	
+	AI_EnableComponent(player3, false, COMPONENT_Attacking)
+	
+	]]
+
+end
+
+
+
+function Villers_A_Difficulty()
+
+	-- get the difficulty
+	g_difficulty = Game_GetSPDifficulty()  -- set a global difficulty variable
+	print("********* DIFFICULTY: "..g_difficulty)
+	
+	-- set health bonus for player 1
+	Setup_Difficulty(player1, g_difficulty) -- pass the player and difficulty global variable into the Set Health function
+	Setup_Difficulty(player2, g_difficulty) -- do it for each player that you have defined
+	
+	t_difficulty = {
+		tigerVulnerability 			= Util_DifVar( {1.1, 1.15, 1.35, 1.5} ),	-- vulnerability of the Tiger,
+		repairRecharge	 			= Util_DifVar( {0.9, 1, 1.5, 2} ),			-- repair recharge rate of the Tiger's self-repair,
+	}
+	
+	-- modify the recharge time for the player
+	Modify_AbilityRechargeTime( player1, ABILITY.SP.VILLERS_BOCAGE.TIGER_REPAIR, t_difficulty.repairRecharge)
+	
+	-- remove the self-repair ability while in Expert mode
+	if g_difficulty == GD_EXPERT then
+		Player_SetAbilityAvailability( player1, ABILITY.SP.VILLERS_BOCAGE.TIGER_REPAIR, ITEM_REMOVED)
+	end
+	
+end
+
+
+-------------------------------------------------------------------------
+
+-- MISSION Preset 
+
+-------------------------------------------------------------------------
+
+function Villers_A_MissionPreset()
+
+	sg_KillCount = SGroup_CreateIfNotFound("sg_KillCount")
+	teg_Car = EGroup_GetWBTable("eg_Car%d")
+
+	-- hide the barbed wire for this mission
+	EGroup_Hide(LAYER_VillersCObjToShow, true)
+--~ 	Camera_ResetToDefault()
+	
+	eg_MapEntry = EGroup_CreateIfNotFound("eg_MapEntry")
+	if EGroup_IsEmpty(eg_MapEntry) == false then
+		EGroup_DestroyAllEntities(eg_MapEntry)
+	end
+	Util_CreateEntities(player1, eg_MapEntry, EBP.STRAT_POINT.ENTRY, mkr_Villers_A_MapEntry, 1)
+
+	local posStart = mkr_Villers_A_Start
+	local tiger_sbp = SBP.AXIS.TIGER
+	sg_Tiger = SGroup_CreateIfNotFound("sg_Tiger")
+	tiger_sbp = SBP.VILLERS_BOCAGE.AXIS.TIGER
+	g_CompleteMission = false
+	g_ExitTownStarted = false
+	
+	local t_PlayerSquads = {}
+	table.insert(t_PlayerSquads, 
+	{
+		pos 			= posStart,
+		sbp 			= tiger_sbp,
+		sgroup			= sg_Tiger,
+	})
+	
+	tsg_player = SGroup_CreateTable("sg_player%d", table.getn(t_PlayerSquads))
+	
+	if g_debug == true then
+		for k, this in pairs(t_PlayerSquads) do
+			if this.sbp ~= tiger_sbp then
+				this.sgroup = tsg_player[k]
+			end
+			
+			Util_CreateSquads(player1, this.sgroup, this.sbp, this.pos)
+		end
+		Camera_MoveToPosition(posStart)
+		Util_MuteAmbientSound(false)
+		-- turn off the shooting so that that the Tiger doesn't shoot at anything before the Sitrep.
+		SGroup_SetAutoTargetting(sg_Tiger, "hardpoint_01", false)
+	end
+	
+	-- Road Fog of War stuff
+	tmkr_FOW_Road = Marker_GetTable("mkr_FOW_Road%d")
+	tmkr_FOW_RoadA = Marker_GetTable("mkr_FOW_RoadA_%d")
+	
+	t_FOWRoad = {
+		{
+			tmkrRoad	= tmkr_FOW_Road,
+			oldIdx		= 1,
+			newIdx		= 1,
+		},
+		{
+			tmkrRoad	= tmkr_FOW_RoadA,
+			oldIdx		= 1,
+			newIdx		= 1,
+		},	
+	}
+
+	t_VillersASpeech = {
+		missionStart = {
+			{ ACTOR.VILLERS_BOCAGE.Voss, 	6010490 },
+		},
+		objDCOffRoadRand = {
+			{ ACTOR.VILLERS_BOCAGE.Voss, 	6011303 },
+			{ ACTOR.VILLERS_BOCAGE.Voss, 	6011304 },
+			{ ACTOR.VILLERS_BOCAGE.Voss, 	6011305 },
+			{ ACTOR.VILLERS_BOCAGE.Voss, 	6011306 },
+		},
+		
+		tmrFreeRide = "VILLERS A FREE RIDE TIMER",
+		freeRide = {
+			{{ ACTOR.VILLERS_BOCAGE.Voss, 	6012032 }},
+			{{ ACTOR.VILLERS_BOCAGE.Voss, 	6012033 }},
+		},
+	}
+	
+	Timer_Start( t_VillersASpeech.tmrFreeRide, 60)
+	
+	g_offTaskTimer = "DC OFF TASK TIMER"
+	g_KillCount = 0
+	t_VillersAVeh = {
+		SBP.CW.CROMWELL,
+		SBP.CW.FIREFLY,
+		SBP.ALLIES.AT_57MM,
+		SBP.CW.SIXPOUNDER,
+		SBP.CW.STUART,
+		SBP.CW.CHURCHILL,
+		SBP.CW.CHURCHILL_CROC,
+		SBP.ALLIES.M10,
+		SBP.ALLIES.SHERMAN,	
+	}
+	
+	-- fade the game to White for the special NIS stuff
+	Game_FadeToWhite(FADE_OUT, 0)
+	
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+
+-- MISSION START 
+
+-------------------------------------------------------------------------
+
+function Villers_A_NISStart()
+	Player_GetAll(player1, sg_temp)
+	SGroup_Hide(sg_temp, true)
+	Player_GetAll(player2, sg_temp)
+	SGroup_Hide(sg_temp, true)
+	
+	if g_debug ~= true then
+		Util_StartNIS(SPECIAL_WHITE_OPENING_BLEND, Villers_A_MissionStart)
+	else
+		Game_Letterbox(false, 0)
+		Game_FadeToBlack(FADE_IN, 0)
+		Villers_A_MissionStart()
+	end
+	
+	Rule_RemoveMe()
+
+end
+
+function Villers_A_MissionStart()
+
+--~ 	Camera_ResetToDefault()
+	Player_GetAll(player1, sg_temp)
+	SGroup_Hide(sg_temp, false)
+	Player_GetAll(player2, sg_temp)
+	SGroup_Hide(sg_temp, false)
+	
+	-- start the atmosphere change from A to B
+	Game_LoadAtmosphere("data:art/scenarios/presets/atmosphere/DLC1_VILLERS_BOCAGE_B_00.APS", 15*60)
+
+	-- delay first objective
+	Rule_AddOneShot(Villers_A_DelayStart, 3)
+	Util_AutoIntel(t_VillersASpeech.missionStart)
+	Sound_PlayMusic("Music/DLC/Villers_Bocage/M01/dlc_silent_decent.bsc",3,0)
+	Cmd_Move(sg_Tiger, mkr_Villers_A_CameraStart)
+	Misc_SetSquadControlGroup(SGroup_GetSpawnedSquadAt(sg_Tiger, 1), 1)
+	
+end
+
+
+function Villers_A_DelayStart()
+	
+	Objective_Start(OBJ_DestroyConvoy)
+	VBBounty_SetSGroupKicker(sg_Tiger)
+	Modify_Vulnerability(sg_Tiger, t_difficulty.tigerVulnerability)
+	Rule_AddInterval(Tutorial_CheckTankRepair, 1)
+	
+	TankHeal_AddSGroup(sg_Tiger)
+	VB_RPGMechanics_KickOff(sg_Tiger)
+	RPGTracker_SetSGroup(sg_Tiger)
+	SGroup_SetAutoTargetting(sg_Tiger, "hardpoint_01", true)
+	Rule_AddInterval(Villers_A_Rule_Main, 3)
+	Camera_MoveToPosition(mkr_Villers_A_CameraStart, true, 0.2)	
+	
+end
+
+
+function Villers_A_Rule_Main()
+
+	Villers_ClearInfantry()
+	Villers_Rule_RoadFOW()
+	Villers_A_FreeRide()
+	
+	if Player_HasLost(player1, CRITICAL_BUILDINGS.AXIS) == true
+	or Objective_IsFailed(OBJ_DestroyConvoy) or Objective_IsFailed(OBJ_ClearVillersBocage)	then
+		Game_EndSP(false)
+		Rule_RemoveMe()
+		return
+	end
+
+	-- update the position of the Tiger for the next mission
+	if SGroup_IsEmpty(sg_Tiger) == false then
+		g_TigerPosition = SGroup_GetPosition(sg_Tiger)
+	end
+
+	if Objective_IsComplete(OBJ_DestroyConvoy) == true then
+		if Objective_IsStarted(OBJ_ClearVillersBocage) == false then
+			Objective_Start(OBJ_ClearVillersBocage)
+		end 
+	else
+		return
+	end
+	
+	if Objective_IsComplete(OBJ_ClearVillersBocage) == true then
+		if g_ExitTownStarted == false then
+			Rule_Add(ExitTown_Kickoff)
+			-- tell the vehicles to bugger off 
+			Villers_ClearVehicles()
+			g_ExitTownStarted = true
+		end
+	else
+		return
+	end
+	
+	if g_CompleteMission == true then
+		RPGTracker_SaveXP()
+		
+		-- remove FOW along the roadway
+		for k, this in pairs( t_FOWRoad ) do
+			for n=1, table.getn(this.tmkrRoad) do
+				FOW_UnRevealMarker( this.tmkrRoad[n] )
+			end
+		end
+		SGroup_DestroyAllSquads(sg_villars_VehKill)
+		Game_EndSP(true)
+		Rule_RemoveMe()
+		return
+	end
+	
+
+end
+
+function Villers_ClearInfantry()
+
+	SGroup_Clear(sg_temp)
+	Player_GetAllSquadsNearMarker(player2, sg_temp, mkr_ConvoyRetreatDelete, 30)
+	SGroup_Filter(sg_temp, {SBP.CW.TOMMIES, SBP.CW.SAPPER, SBP.CW.VICKERS_MG_SP, SBP.CW.LIEUTENANT}, FILTER_KEEP)
+	
+	if SGroup_IsEmpty(sg_temp) == false then
+		Rule_RemoveSGroupEvent( VBBounty_DeathEvent, sg_temp )
+		SGroup_DestroyAllSquads( sg_temp )
+	end
+
+end
+
+-- send vehicles away from the Tiger at the end
+function Villers_ClearVehicles()
+
+	sg_villars_VehKill = SGroup_CreateIfNotFound("sg_villars_VehKill")
+	local pos = false
+	if SGroup_IsEmpty(sg_Tiger) then
+		UIWarning_Show(LOC("TIGER IS NOT HERE?"))
+	else
+		
+		-- remove all the squads from the breakdown
+		for k, this in pairs(t_CVB.t_Breakdown.t_Squads) do
+			CombatPlan_Remove(this.combatPlanId)
+			--UIWarning_Show(LOC("End Combat"))
+		end
+		
+		local pos = SGroup_GetPosition(sg_Tiger)
+		Player_GetAllSquadsNearMarker(player2, sg_villars_VehKill, pos, 60)
+		SGroup_Filter(sg_villars_VehKill, {SBP.CW.CROMWELL, SBP.CW.FIREFLY, SBP.CW.BREN_CARRIER, SBP.CW.STUART, SBP.CW.CHURCHILL, SBP.CW.CHURCHILL_CROC, SBP.CW.STAGHOUND}, FILTER_KEEP)
+		
+		if SGroup_IsEmpty(sg_villars_VehKill) == false then
+			UIWarning_Show(LOC("End Combat"))
+			Rule_RemoveSGroupEvent( VBBounty_DeathEvent, sg_villars_VehKill )
+			--Cmd_Stop(sg_villars_VehKill)
+			Modify_UnitSpeed(sg_villars_VehKill, 4)
+			Cmd_Move(sg_villars_VehKill, mkr_ConvoyExit)
+		end
+	end
+end
+
+
+
+
+-- this function reveals the FOW along the road depending on the player's
+-- location along the road to give him better sight lines down the road.
+function Villers_Rule_RoadFOW()
+
+	if SGroup_IsEmpty(sg_Tiger) == true then
+		return
+	end
+
+	local off_road = true
+	for k, this in pairs( t_FOWRoad ) do
+		local found = false
+		for i=1, table.getn(this.tmkrRoad) do
+			if Prox_AreSquadsNearMarker(sg_Tiger, this.tmkrRoad[i], ANY) then
+				off_road = false
+				this.newIdx = i
+				found = true
+				if this.newIdx ~= this.oldIdx then
+					Villers_RoadFOWUpdate(this.oldIdx, this.newIdx, this.tmkrRoad)
+					this.oldIdx = this.newIdx
+				end
+				break
+			end
+		end
+		
+		if found == false
+		and this.oldIdx ~= 0 then
+			for n=1, table.getn(this.tmkrRoad) do
+				FOW_UnRevealMarker( this.tmkrRoad[n] )
+			end
+			this.oldIdx = 0
+		end
+	end
+	
+	-- nagging speech to make sure that the player is attacking the convoy
+	-- on the road, and not just driving off on the side roads.
+	if off_road == true
+	and Objective_IsComplete(OBJ_DestroyConvoy) == false then
+		if SGroup_IsDoingAttack( sg_Tiger, ANY, 15) == false then
+			if Timer_Exists(g_offTaskTimer) == false then
+				Timer_Start( g_offTaskTimer, 45 )
+			elseif Timer_GetRemaining(g_offTaskTimer) == 0 then
+				Util_AutoIntel( t_VillersASpeech.objDCOffRoadRand, true )
+				Timer_Start( g_offTaskTimer, 45 )
+			end
+		elseif Timer_GetRemaining( g_offTaskTimer ) == 0 then
+			Timer_Start( g_offTaskTimer, 30 )
+		end
+	end
+
+end
+
+function Villers_RoadFOWUpdate(old, new, t_set)
+
+	local offset = 3
+	for n=old-offset, old+offset do
+		if t_set[n] ~= nil then
+			FOW_UnRevealMarker( t_set[n] )
+		end
+	end
+	
+	for n=new-offset, new+offset do
+		if t_set[n] ~= nil then
+			FOW_RevealMarker( t_set[n], -1 )
+		end
+	end
+
+end
+
+
+
+
+
+
+function Villers_A_FreeRide()
+
+	if g_FreeRide == true then
+		return
+	end
+
+	local all_destroyed = true
+	for i=table.getn(teg_Car), 1, -1 do 
+		if SGroup_IsEmpty(sg_Tiger) == false and EGroup_IsEmpty( teg_Car[i] ) == false then
+			if table.getn(t_VillersASpeech.freeRide) > 0
+			and Timer_GetRemaining( t_VillersASpeech.tmrFreeRide) == 0
+			and Prox_EGroupSGroup( teg_Car[i], sg_Tiger, PROX_CENTER) <= 20 then
+				local rand = World_GetRand(1, table.getn( t_VillersASpeech.freeRide ))
+				Util_AutoAmbient( t_VillersASpeech.freeRide[rand] )
+				table.remove(  t_VillersASpeech.freeRide, rand )
+				Timer_Start( t_VillersASpeech.tmrFreeRide, 60)
+			end
+			all_destroyed = false
+		else
+			table.remove(teg_Car, i)
+		end
+	end
+	
+	if all_destroyed == true then
+		g_FreeRide = true
+	end
+
+end
+
+
+function Villers_A_LogSyncW(sgroup)
+	if _KillSyncW == nil then
+		_KillSyncW = {}
+	end
+	local syncw = false
+	if SGroup_IsEmpty(sgroup) == false then
+		syncw = SyncWeapon_GetFromSGroup(sgroup)
+	end
+	if syncw ~= nil and syncw ~= false then
+		table.insert(_KillSyncW, syncw)
+		
+		if Rule_Exists(Villers_KillSyncW) == false then
+			Rule_AddInterval(Villers_KillSyncW, 1)
+		end
+	end
+end
+
+function Villers_KillSyncW()
+	local count = table.getn(_KillSyncW)
+	if count > 0 then
+		for i = count, 1, -1 do 
+			local syncw = _KillSyncW[i]
+			if SyncWeapon_IsOwnedByPlayer(syncw, nil) then
+				local entity = SyncWeapon_GetEntity(syncw)
+				local egroup = EGroup_CreateIfNotFound("eg_killentity"..i)
+				EGroup_Add(egroup, entity)
+				EGroup_DestroyAllEntities(egroup)
+				table.remove(_KillSyncW, i)
+			end
+		end
+	end	
+end

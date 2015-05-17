@@ -1,0 +1,1807 @@
+------------------------------------------------------------------------
+-------------------------------------------------------------------------
+--
+-- Script File for Mission 15 Cornered Tiger--
+-------------------------------------------------------------------------
+------------------------------------------------------------------------
+
+import("ScarUtil.scar")
+
+
+-------------------------------------------------------------------------
+-- GLOBAL VARIABLES
+-------------------------------------------------------------------------
+
+-------------------------------------------------------------------------
+-- STARTUP SCRIPTS
+-------------------------------------------------------------------------
+
+-- Called immediately on startup, this just sets out some parameters for the mission
+function OnGameSetup()
+	-- set up the players
+	player1 = Setup_Player(1, 359040,TRACE_ALLIES,1)
+	player2 = Setup_Player(2, 359041,TRACE_AXIS,2)
+end
+
+
+-- Called immediately on starting up a saved game
+function OnGameRestore()
+	-- assign player IDs again
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+	
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+end
+
+function Initialize_OBJECTIVE1 ()
+
+	OBJECTIVE1 =
+	{
+		SetupUI = function() end,
+		OnStart = function() 
+		Util_PlayMusic("SOUND/Music/genericmissionmusic_Legacy", 0, 0)
+		end,
+		OnComplete = function() end,
+		IsComplete = function()
+			return false
+		end,
+		OnFail = function() end,
+		
+		Title = 359020,
+		Description = 359030,
+		Type = OT_Primary,
+		SitRep =
+		{
+			Movie = "SR_15-01",
+			Force = true,
+				SpeechTiming =
+				{
+					{ 0.6, ACTOR.Conti, 350002 },
+					{ 5.2, ACTOR.Conti, 350010 },
+					{ 12.9, ACTOR.Conti, 350011 },
+					{ 14.5, ACTOR.Conti, 350020 },
+					{ 19.4, ACTOR.Conti, 350030 },
+				},
+		},
+	}
+
+	Objective_Register(OBJECTIVE1)
+	
+end
+
+function Initialize_MEDALOBJECTIVE ()
+
+	MEDALOBJECTIVE =
+	{
+		SetupUI = function() end,
+		OnStart = function() end,
+		OnComplete = function() end,
+		IsComplete = function()
+			return false
+		end,
+		OnFail = function()	end,
+		OnSitRep = function() end,
+		
+		Title = Loc_FormatText(359021, Loc_ConvertNumber(difficulty.medalop_target)),
+		Description = Loc_FormatText(359031, Loc_ConvertNumber(difficulty.medalop_target)),
+		Icon= IT_M_Default,
+		Type = OT_Medal,
+		MedalID = MEDALS.LEGION_OF_MERIT,
+	}
+	
+	Objective_Register(MEDALOBJECTIVE)
+	
+end
+
+
+
+
+-- Called once things have been initialised proper, and is used to trigger off the game script
+function OnInit()
+	g_MissionSpeechPath = "Mission15"
+	Sound_PreCacheSinglePlayerSpeech( g_MissionSpeechPath )	
+	-- mute the sound before the NIS plays
+	Util_MuteAmbientSound(true)
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	Game_Letterbox(true, 0)
+	Game_FadeToBlack(true, 0)
+	Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(EVENTS.Objective1)')]])")
+	Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('Util_StartNIS(EVENTS.Objective1Complete )')]])")
+
+
+	g_Tigerphase = 0
+	g_Tigermove = 0 
+	g_Tigerflag = 1  			-- 0 means it's retreating
+	g_Tigerpoint = 1
+
+	g_createdTiger1 = false		-- set to true when the tiger gets created
+	g_createdTiger2 = false	
+	g_createdHalftracks = false	-- set to true when the halftracks get created
+	g_total_car1 = 0
+	g_total_car2 = 0
+	
+	RP1 = {Marker_F1A1, Marker_F1A2, Marker_F1A3, Marker_F1A4}
+	RP2 = {Marker_F2A1, Marker_F2A2, Marker_F2A3, Marker_F2A4}
+	RP3 = {Marker_F3A1, Marker_F3A2, Marker_F3A3, Marker_F3A4}
+	RP4 = {Marker_F4A1, Marker_F4A2, Marker_F4A3, Marker_F4A4}
+	RP5 = {Marker_F5A1, Marker_F5A2, Marker_F5A3, Marker_F5A4}
+	RP6 = {Marker_F6A1, Marker_F6A2, Marker_F6A3, Marker_F6A4}
+	RP7 = {Marker_F7A1, Marker_F7A2, Marker_F7A3, Marker_F7A4}
+	RP8 = {Marker_F8A1, Marker_F8A2, Marker_F8A3, Marker_F8A4}
+	
+	sg_Tiger1 = SGroup_CreateIfNotFound("sg_Tiger1")
+	sg_Tiger2 = SGroup_CreateIfNotFound("sg_Tiger2")
+	car1 = SGroup_CreateIfNotFound("car1")
+	car2 = SGroup_CreateIfNotFound("car2")
+	car3 = SGroup_CreateIfNotFound("car3")
+	car4 = SGroup_CreateIfNotFound("car4")
+	sg_AllAxis = SGroup_CreateIfNotFound("sg_AllAxis")
+	sg_AllAlly = SGroup_CreateIfNotFound("sg_AllAlly")	
+	sg_AllAxis2	= SGroup_CreateIfNotFound("sg_AllAxis2")
+	sg_leaving = SGroup_CreateIfNotFound("sg_leaving")
+	sg_Resource13 = SGroup_CreateIfNotFound("sg_Resource13")
+	sg_Resource11 = SGroup_CreateIfNotFound("sg_Resource11")
+	sg_Resource10 = SGroup_CreateIfNotFound("sg_Resource10")
+	sg_Ostwind1 = SGroup_CreateIfNotFound("sg_Ostwind1")
+	sg_Ostwind2 = SGroup_CreateIfNotFound("sg_Ostwind2")
+	sg_TigerTarget1 = SGroup_CreateIfNotFound("sg_TigerTarget1")
+	sg_TigerTarget2 = SGroup_CreateIfNotFound("sg_TigerTarget2")
+	sg_TigerTarget3 = SGroup_CreateIfNotFound("sg_TigerTarget3")
+	sg_temp	= SGroup_CreateIfNotFound("sg_temp")
+	
+	PershingTank = SGroup_CreateIfNotFound("PershingTank")
+	--Cmd_Garrison(garrison, Blg_ArtilleryTower)
+	--Rule_AddInterval(Action_ArtilleryTower, 1)
+
+	print("done")
+	Modify_WeaponRange(TigerAce, "hardpoint_01", 1.2)
+	Modify_WeaponAccuracy(TigerAce, "hardpoint_01", 2)
+	Modify_WeaponDamage(TigerAce, "hardpoint_01", 1.5)
+	Modify_WeaponBurst(TigerAce, "hardpoint_01", 2)
+	Modify_WeaponCooldown(TigerAce, "hardpoint_01", 4)
+	Modify_Vulnerability(TigerAce, 0.5)
+	
+	-- Modify penetration further cause the Tiger Ace ain't badass enough
+--~ 	penetrationMod = Modifier_Create(MAT_Squad, "modifiers\\received_penetration_modifier.lua", MUT_Multiplication, false, 0.8, "")
+--~ 	tigerAcePenetrationID = Modifier_ApplyToSquad(penetrationMod, SGroup_GetSpawnedSquadAt(TigerAce, 1))
+	
+
+	--Modify_ReceivedAccuracy(TigerAce, 1)
+	--Modify_ReceivedDamage(TigerAce, 0.9)
+	
+	--Modify_PlayerResourceRate( player1, RT_Munition, 7)
+	--Modify_PlayerResourceRate( player1, RT_Manpower, 2)
+	--Modify_PlayerResourceRate( player1, RT_Fuel, 4)
+
+		
+	sectorID13 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(Resource13))
+	sectorID12 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(Resource12))
+	sectorID11 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(Resource11))
+	sectorID10 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(Resource10))
+	sectorID7 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(Resource7))
+	sectorID8 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(Resource8))
+	sectorID1 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(Resource1))
+	sectorID2 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(Resource2))
+	sectorID3 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(Resource3))
+	sectorIDAll = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(ResourceAll))
+
+	
+	sg_AllyResource12 = SGroup_CreateIfNotFound("sg_AllyResource12")
+	sg_AxisResource12 = SGroup_CreateIfNotFound("sg_AxisResource12")
+	sg_AllyResource11 = SGroup_CreateIfNotFound("sg_AllyResource11")
+	sg_AxisResource11 = SGroup_CreateIfNotFound("sg_AxisResource11")
+	sg_AllyResource10 = SGroup_CreateIfNotFound("sg_AllyResource10")
+	sg_AxisResource10 = SGroup_CreateIfNotFound("sg_AxisResource10")
+	sg_AllyResource7  = SGroup_CreateIfNotFound("sg_AllyResource7")
+	sg_AxisResource7  = SGroup_CreateIfNotFound("sg_AxisResource7")
+	sg_AllyResource8 = SGroup_CreateIfNotFound("sg_AllyResource8")
+	sg_AxisResource8 = SGroup_CreateIfNotFound("sg_AxisResource8")
+	sg_AllyResource1 = SGroup_CreateIfNotFound("sg_AllyResource1")
+	sg_AxisResource1 = SGroup_CreateIfNotFound("sg_AxisResource1")
+	sg_AllyResource2 = SGroup_CreateIfNotFound("sg_AllyResource2")
+	sg_AxisResource2 = SGroup_CreateIfNotFound("sg_AxisResource2")
+	sg_AllyResource3 = SGroup_CreateIfNotFound("sg_AllyResource3")
+	sg_AxisResource3 = SGroup_CreateIfNotFound("sg_AxisResource3")
+	sg_AllyResourceAll = SGroup_CreateIfNotFound("sg_AllyResourceAll")
+	sg_AxisResourceAll = SGroup_CreateIfNotFound("sg_AxisResourceAll")
+	
+	WehrmachtAlpha1 = SGroup_CreateIfNotFound("WehrmachtAlpha1")
+	WehrmachtAlpha2 = SGroup_CreateIfNotFound("WehrmachtAlpha2")
+	WehrmachtAlpha3 = SGroup_CreateIfNotFound("WehrmachtAlpha3")
+	WehrmachtAlpha4 = SGroup_CreateIfNotFound("WehrmachtAlpha4")
+	WehrmachtAlpha5 = SGroup_CreateIfNotFound("WehrmachtAlpha5")
+	WehrmachtAlpha6 = SGroup_CreateIfNotFound("WehrmachtAlpha6")
+	WehrmachtAlpha7 = SGroup_CreateIfNotFound("WehrmachtAlpha7")
+	
+	table_WehrmachtAlpha = {}
+	table_WehrmachtAlpha[1] = {sgroup = WehrmachtAlpha1, field = Resource97, stronghold = Blg_Stronghold2, spawn = Marker_Blg_Stronghold2, start = Marker_WehrmachtAlpha1, marker1 = Marker_WehrmachtAlpha1, facing = north, unit = SBP.AXIS.GRENADIER, count = 6, timer = 60, timername = "Timer_WehrmachtAlpha1", depart = Marker_Exit4, phase = 1}
+	table_WehrmachtAlpha[2] = {sgroup = WehrmachtAlpha2, field = Resource97, stronghold = Blg_Stronghold2, spawn = Marker_Blg_Stronghold2, start = Marker_WehrmachtAlpha2, marker1 = Marker_WehrmachtAlpha2, facing = north, unit = SBP.AXIS.GRENADIER, count = 6, timer = 60, timername = "Timer_WehrmachtAlpha2", depart = Marker_Exit4, phase = 1}
+	
+	PanzerfaustAlpha1 = SGroup_CreateIfNotFound("PanzerfaustAlpha1")
+	PanzerfaustAlpha2 = SGroup_CreateIfNotFound("PanzerfaustAlpha2")
+	PanzerfaustAlpha3 = SGroup_CreateIfNotFound("PanzerfaustAlpha3")
+	PanzerfaustAlpha4 = SGroup_CreateIfNotFound("PanzerfaustAlpha4")
+	PanzerfaustAlpha5 = SGroup_CreateIfNotFound("PanzerfaustAlpha5")
+	PanzerfaustAlpha6 = SGroup_CreateIfNotFound("PanzerfaustAlpha6")
+	PanzerfaustAlpha7 = SGroup_CreateIfNotFound("PanzerfaustAlpha7")
+
+	table_PanzerfaustAlpha = {}
+	table_PanzerfaustAlpha [1] = {sgroup = PanzerfaustAlpha1, field = Resource89, stronghold =  Blg_Stronghold1, spawn = Marker_Blg_Stronghold1, start = Marker_PanzerfaustAlpha1, marker1 = Marker_PanzerfaustAlpha1, facing = north, 		unit = SBP.AXIS.GRENADIER, count = 3, timer = 120, timername = "Timer_PanzerfaustAlpha1", depart = Marker_Exit1, phase = 0 }
+	table_PanzerfaustAlpha [2] = {sgroup = PanzerfaustAlpha2, field = Resource88, stronghold =  Blg_Stronghold1, spawn = Marker_Blg_Stronghold1, start = Marker_PanzerfaustAlpha2, marker1 = Marker_PanzerfaustAlpha2, facing = west,  		unit = SBP.AXIS.GRENADIER, count = 3, timer = 120, timername = "Timer_PanzerfaustAlpha2", depart = Marker_Exit2, phase = 0 }
+	table_PanzerfaustAlpha [3] = {sgroup = PanzerfaustAlpha3, field = Resource86, stronghold =  Blg_Stronghold2, spawn = Marker_Blg_Stronghold2, start = Marker_PanzerfaustAlpha3, marker1 = Marker_PanzerfaustAlpha3, facing = southwest,  unit = SBP.AXIS.GRENADIER, count = 3, timer = 120, timername = "Timer_PanzerfaustAlpha3", depart = Marker_Exit1, phase = 0 }
+	
+	
+	MGAlpha1 = SGroup_CreateIfNotFound("MGAlpha1")
+	MGAlpha2 = SGroup_CreateIfNotFound("MGAlpha2")
+	MGAlpha3 = SGroup_CreateIfNotFound("MGAlpha3")
+	MGAlpha4 = SGroup_CreateIfNotFound("MGAlpha4")
+	MGAlpha5 = SGroup_CreateIfNotFound("MGAlpha5")
+	MGAlpha6 = SGroup_CreateIfNotFound("MGAlpha6")
+	MGAlpha7 = SGroup_CreateIfNotFound("MGAlpha7")
+	MGAlpha8 = SGroup_CreateIfNotFound("MGAlpha8")
+	MGAlpha9 = SGroup_CreateIfNotFound("MGAlpha9")
+	MGAlpha10 = SGroup_CreateIfNotFound("MGAlpha10")
+	MGAlpha11 = SGroup_CreateIfNotFound("MGAlpha11")
+	MGAlpha12 = SGroup_CreateIfNotFound("MGAlpha12")
+	MGAlpha13 = SGroup_CreateIfNotFound("MGAlpha13")
+	MGAlpha14 = SGroup_CreateIfNotFound("MGAlpha14")
+	MGAlpha15 = SGroup_CreateIfNotFound("MGAlpha15")
+	MGAlpha16 = SGroup_CreateIfNotFound("MGAlpha16")
+	MGAlpha17 = SGroup_CreateIfNotFound("MGAlpha17")
+	
+	table_MGAlpha = {}
+	table_MGAlpha[1] = {sgroup = MGAlpha1, stronghold = Blg_Stronghold1, spawn = Marker_Blg_Stronghold1, start = Marker_Blg_Stronghold1, marker1 = Marker_MGAlpha1, facing = north, unit = SBP.AXIS.HEAVYMG, count = 4, timer = 90, timername = "Timer_MGAlpha1", depart = Marker_Exit4, phase = 1}
+	table_MGAlpha[2] = {sgroup = MGAlpha2, stronghold = Blg_Stronghold2, spawn = Marker_Blg_Stronghold2, start = Marker_Blg_Stronghold2, marker1 = Marker_MGAlpha2, facing = north, unit = SBP.AXIS.HEAVYMG, count = 4, timer = 90, timername = "MGAlpha2", depart = Marker_Exit4, phase = 1 }
+	
+	StormtrooperAlpha1 = SGroup_CreateIfNotFound("StormtrooperAlpha1")
+	StormtrooperAlpha2 = SGroup_CreateIfNotFound("StormtrooperAlpha2")
+	
+	table_StormtrooperAlpha = {}
+	--table_StormtrooperAlpha [1] = {sgroup = StormtrooperAlpha1, stronghold = Blg_Stronghold1, spawn = Marker_Blg_Stronghold1_Vehicle, facing = north, unit = SBP.AXIS.OSTWIND, count = 6, phase = 1, timer = 10, timername = "Timer_StormtrooperAlpha1", depart = Marker_Exit1 }
+	--table_StormtrooperAlpha [2] = {sgroup = StormtrooperAlpha2, stronghold = Blg_Stronghold2, spawn = Marker_Blg_Stronghold2_Vehicle, facing = north, unit = SBP.AXIS.OSTWIND, count = 6, phase = 1, timer = 10, timername = "Timer_StormtrooperAlpha2", depart = Marker_Exit1 }
+	
+	sg_PanzerGamma1 =  SGroup_CreateIfNotFound("sg_PanzerGamma1")
+	sg_PanzerGamma2 =  SGroup_CreateIfNotFound("sg_PanzerGamma2")
+	sg_PanzerGamma3 =  SGroup_CreateIfNotFound("sg_PanzerGamma3")
+	sg_PanzerGamma4 =  SGroup_CreateIfNotFound("sg_PanzerGamma4")
+	sg_PanzerGamma5 =  SGroup_CreateIfNotFound("sg_PanzerGamma5")
+	sg_PanzerGamma6 =  SGroup_CreateIfNotFound("sg_PanzerGamma6")
+	
+	PanzerGamma1 = SGroup_CreateIfNotFound("PanzerGamma1")
+	PanzerGamma2 = SGroup_CreateIfNotFound("PanzerGamma2")
+	PanzerGamma3 = SGroup_CreateIfNotFound("PanzerGamma3")
+	PanzerGamma4 = SGroup_CreateIfNotFound("PanzerGamma4")
+	
+	table_PanzerGamma = {}
+	table_PanzerGamma[1] = {sgroup = PanzerGamma1, attack = StormtrooperAlpha1, sector1 = sectorID1, sector2 = sectorID7, sector3 = sectorID10, field1  = Resource1, field2 = Resource7, field3 = Resource10, spot1 = {Marker_F12B1, Marker_F12B2},  spot2 = {Marker_F10B1, Marker_F10B2 }, spot3 = {Marker_F7B1, Marker_F7B2}, spot4 = {Marker_F1B1, Marker_F1B2}, stronghold = Blg_Stronghold1, spawn = Marker_Blg_Stronghold1_Vehicle, start = Marker_PanzerGamma1, marker1 = Marker_PanzerGamma1, marker2 = Marker_PanzerGamma1, marker3 = Marker_PanzerGamma1, marker4 = Marker_PanzerGamma1, facing = north, unit = SBP.AXIS.PANZER, count = 1, timer = 200, timername = "Timer_PanzerGamma1", depart = Marker_Exit1, trigger1 = Trigger_PanzerGamma1, temp = sg_PanzerGamma1, repair = Marker_Repair1, phase = 1, flag = 0}
+	table_PanzerGamma[2] = {sgroup = PanzerGamma2, attack = StormtrooperAlpha1, sector1 = sectorID1, sector2 = sectorID7, sector3 = sectorID10, field1 = Resource1, field2 = Resource7, field3 = Resource10, spot1 = {Marker_F12B1, Marker_F12B2},  spot2 = {Marker_F10B3, Marker_F10B4}, spot3 = {Marker_F7B3, Marker_F7B4}, spot4 = {Marker_F1B3, Marker_F1B4}, stronghold = Blg_Stronghold1, spawn = Marker_Blg_Stronghold1_Vehicle, start = Marker_PanzerGamma2, marker1 = Marker_PanzerGamma2, marker2 = Marker_PanzerGamma2,  marker3 = Marker_PanzerGamma1, marker4 = Marker_PanzerGamma1, facing = north, unit = SBP.AXIS.PANZER, count = 1, timer = 200, timername = "Timer_PanzerGamma2", depart = Marker_Exit1, trigger1 = Trigger_PanzerGamma2, temp = sg_PanzerGamma2, repair = Marker_Repair1, phase = 1, flag = 0}
+	table_PanzerGamma[3] = {sgroup = PanzerGamma3, attack = StormtrooperAlpha2, sector1 = sectorID2, sector2 = sectorID8, sector3 = sectorID11, field1 = Resource2, field2 = Resource8, field3 = Resource11,  spot1 = {Marker_F12B1, Marker_F12B2},  spot2 = {Marker_F11B1, Marker_F11B2}, spot3 = {Marker_F8B1, Marker_F8B2}, spot4 = {Marker_F2B1, Marker_F2B2}, stronghold = Blg_Stronghold2, spawn = Marker_Blg_Stronghold2_Vehicle, start = Marker_PanzerGamma3, marker1 = Marker_PanzerGamma3, marker2 = Marker_PanzerGamma3, marker3 = Marker_PanzerGamma1, marker4 = Marker_PanzerGamma1, facing = north, unit = SBP.AXIS.PANZER, count = 1, timer = 200, timername = "Timer_PanzerGamma3", depart = Marker_Exit1, trigger1 = Trigger_PanzerGamma3, temp = sg_PanzerGamma3, repair = Marker_Repair2, phase = 1, flag = 0}
+	table_PanzerGamma[4] = {sgroup = PanzerGamma4, attack = StormtrooperAlpha2, sector1 = sectorID2, sector2 = sectorID8, sector3 = sectorID11, field1 = Resource2, field2 = Resource8, field3 = Resource11,  spot1 = {Marker_F12B1, Marker_F12B2},  spot2 = {Marker_F11B3, Marker_F11B4}, spot3 = {Marker_F8B3, Marker_F8B4}, spot4 = {Marker_F2B3, Marker_F2B4}, stronghold = Blg_Stronghold2, spawn = Marker_Blg_Stronghold2_Vehicle, start = Marker_PanzerGamma4, marker1 = Marker_PanzerGamma4, marker2 = Marker_PanzerGamma4, marker3 = Marker_PanzerGamma1, marker4 = Marker_PanzerGamma1, facing = north, unit = SBP.AXIS.PANZER, count = 1, timer = 200, timername = "Timer_PanzerGamma4", depart = Marker_Exit1, trigger1 = Trigger_PanzerGamma4, temp = sg_PanzerGamma4, repair = Marker_Repair2, phase = 1, flag = 0}
+
+	sg_Repair1  = SGroup_CreateIfNotFound("sg_Repair1 ")
+	sg_Repair2  = SGroup_CreateIfNotFound("sg_Repair2 ")
+	
+	PioneerAlpha1 = SGroup_CreateIfNotFound("PioneerAlpha1")
+	PioneerAlpha2 = SGroup_CreateIfNotFound("PioneerAlpha2")
+	
+	table_PioneerAlpha = {}
+	table_PioneerAlpha [1] = {sgroup = PioneerAlpha1, field = Resource11, stronghold =  Blg_Stronghold1, spawn = Marker_Blg_Stronghold1, start = Marker_Blg_Stronghold1, marker1 = Marker_PioneerAlpha1, unit = SBP.AXIS.PIONEER, count = 2, repair = Marker_Repair1, temp = sg_Repair1, timername = "Timer_PioneerAlpha1", timername2 = "Timer2_PioneerAlpha1", timer = 60, phase = 0}
+	table_PioneerAlpha [2] = {sgroup = PioneerAlpha2, field = Resource11, stronghold =  Blg_Stronghold2, spawn = Marker_Blg_Stronghold2, start = Marker_Blg_Stronghold2, marker1 = Marker_PioneerAlpha2, unit = SBP.AXIS.PIONEER, count = 2, repair = Marker_Repair2, temp = sg_Repair2, timername = "Timer_PioneerAlpha2", timername2 = "Timer2_PioneerAlpha2", timer = 60, phase = 0}
+	
+	
+	OstwindAlpha1 = SGroup_CreateIfNotFound("OstwindAlpha1")
+	OstwindAlpha2 = SGroup_CreateIfNotFound("OstwindAlpha2")
+	table_RandomTank = {SBP.AXIS.OSTWIND, SBP.AXIS.PANZER}
+	
+	table_OstwindAlpha = {}
+	table_OstwindAlpha[1] = {sgroup = Ostwind1, stronghold = Blg_Stronghold1, spawn = Marker_Blg_Stronghold1_Vehicle,  marker1 = Marker_OstwindRest1  ,facing = north, unit = Table_GetRandomItem(table_RandomTank), count = 1, timer = 120, timername = "Timer_OstwindAlpha1", depart = Marker_Exit1, trigger1 = Trigger_PanzerGamma1, temp = sg_PanzerGamma1, repair = Marker_Repair1, phase = 2, flag = 0, offset = 2}
+	table_OstwindAlpha[2] = {sgroup = Ostwind2, stronghold = Blg_Stronghold2, spawn = Marker_Blg_Stronghold2_Vehicle, marker1 = Marker_OstwindRest2   ,facing = north, unit = Table_GetRandomItem(table_RandomTank), count = 1, timer = 120, timername = "Timer_OstwindAlpha2", depart = Marker_Exit1, trigger1 = Trigger_PanzerGamma2, temp = sg_PanzerGamma2, repair = Marker_Repair2, phase = 2, flag = 0, offset = 6}
+	
+	
+	table_RandomUnit = { SBP.AXIS.STORMTROOPER, SBP.AXIS.VOLKS_2PANZERF, SBP.AXIS.GRENADIER_MG42_SP}
+	
+--~ 	table_Trucks = {}
+--~ 	table_Trucks[1] = {sgroup = Truck1, range = 15, depart = Marker_Exit1, flag = 0, phase = 0 }
+--~ 	table_Trucks[2] = {sgroup = Truck2, range = 15, depart = Marker_Exit1, flag = 0, phase = 0  }
+--~ 	table_Trucks[3] = {sgroup = Truck3, range = 14, depart = Marker_Exit1, flag = 0, phase = 0  }
+--~ 	table_Trucks[4] = {sgroup = Truck4, range = 30, depart = Marker_Exit1, flag = 0, phase = 0  }
+--~ 	table_Trucks[5] = {sgroup = Truck5, range = 30, depart = Marker_Exit1, flag = 0, phase = 0  }
+--~ 	table_Trucks[6] = {sgroup = Truck6, range = 40, depart = Marker_Exit1, flag = 0, phase = 0  }
+--~ 	table_Trucks[7] = {sgroup = Truck7, range = 40, depart = Marker_Exit1, flag = 0, phase = 0  }
+	
+	table_AxisSGroup = {}
+	
+	sg_field1 = SGroup_CreateIfNotFound("sg_field1")
+	sg_field2 = SGroup_CreateIfNotFound("sg_field2")
+	sg_field3 = SGroup_CreateIfNotFound("sg_field3")
+	sg_field4 = SGroup_CreateIfNotFound("sg_field4")
+	sg_field5 = SGroup_CreateIfNotFound("sg_field5")
+	sg_field6 = SGroup_CreateIfNotFound("sg_field6")
+	sg_field7 = SGroup_CreateIfNotFound("sg_field7")
+	sg_field8 = SGroup_CreateIfNotFound("sg_field8")
+
+	sg_flankunit1 = SGroup_CreateIfNotFound("sg_flankunit1")
+	sg_flankunit2 = SGroup_CreateIfNotFound("sg_flankunit2")
+	sg_flankunit3 = SGroup_CreateIfNotFound("sg_flankunit3")
+	sg_flankunit4 = SGroup_CreateIfNotFound("sg_flankunit4")
+	sg_flankunit5 = SGroup_CreateIfNotFound("sg_flankunit5")
+	sg_flankunit6 = SGroup_CreateIfNotFound("sg_flankunit6")
+	sg_flankunit7 = SGroup_CreateIfNotFound("sg_flankunit7")
+	sg_flankunit8 = SGroup_CreateIfNotFound("sg_flankunit8")
+	
+	sg_frontunit1 = SGroup_CreateIfNotFound("sg_frontunit1")
+	sg_frontunit2 = SGroup_CreateIfNotFound("sg_frontunit2")
+	sg_frontunit3 = SGroup_CreateIfNotFound("sg_frontunit3")	
+	sg_frontunit4 = SGroup_CreateIfNotFound("sg_frontunit4")
+	sg_frontunit5 = SGroup_CreateIfNotFound("sg_frontunit5")
+	sg_frontunit6 = SGroup_CreateIfNotFound("sg_frontunit6")
+	sg_frontunit7 = SGroup_CreateIfNotFound("sg_frontunit7")
+	sg_frontunit8 = SGroup_CreateIfNotFound("sg_frontunit8")
+	
+	sg_checkunit1 = SGroup_CreateIfNotFound("sg_checkunit1")
+	sg_checkunit2 = SGroup_CreateIfNotFound("sg_checkunit2")
+	sg_checkunit3 = SGroup_CreateIfNotFound("sg_checkunit3")
+	sg_checkunit4 = SGroup_CreateIfNotFound("sg_checkunit4")
+	sg_checkunit5 = SGroup_CreateIfNotFound("sg_checkunit5")
+	sg_checkunit6 = SGroup_CreateIfNotFound("sg_checkunit6")
+	sg_checkunit7 = SGroup_CreateIfNotFound("sg_checkunit7")
+	sg_checkunit8 = SGroup_CreateIfNotFound("sg_checkunit8")
+	
+	
+	table_Field = {}
+	table_Field[1] = {marker = Marker_Field1, ostwindtank = Ostwind1, offset = 2,  field = Resource10, sector = sectorID10, adjacent = {}, flank = {2, 3, 4, 5, 6, 7}, front = {8}, phase = 0, sgroup = sg_field1, position = {Marker_F1A1, Marker_F1A2}, active = true, 				flankunit = sg_flankunit1, frontunit = sg_frontunit1, checkunit = sg_checkunit1, tank = TigerAce }
+	table_Field[2] = {marker = Marker_Field2, ostwindtank = Ostwind2, offset = 6,  field = Resource11, sector = sectorID11, adjacent = {}, flank = {1, 3, 4, 5, 6, 7}, front = {8}, phase = 0, sgroup = sg_field2, position = {Marker_F2A1, Marker_F2A2}, active = true, flankunit = sg_flankunit2, frontunit = sg_frontunit2, checkunit = sg_checkunit2, tank = TigerAce }
+	table_Field[3] = {marker = Marker_Field3, ostwindtank = Ostwind1, offset = 2,  field = Resource7,  sector = sectorID7,  adjacent = {}, flank = {4, 5, 6, 7}, front = {1}, phase = 0, sgroup = sg_field3, position = {Marker_F3A1, Marker_F3A2}, active = true, 					flankunit = sg_flankunit3, frontunit = sg_frontunit3, checkunit = sg_checkunit3, tank = TigerAce }
+	table_Field[4] = {marker = Marker_Field4, ostwindtank = Ostwind2, offset = 6,  field = Resource8,  sector = sectorID8,  adjacent = {}, flank = {3, 5, 6, 7}, front = {2}, phase = 0, sgroup = sg_field4, position = {Marker_F4A1, Marker_F4A2}, active = true, 				flankunit = sg_flankunit4, frontunit = sg_frontunit4, checkunit = sg_checkunit4, tank = TigerAce }
+	table_Field[5] = {marker = Marker_Field5, ostwindtank = Ostwind1, offset = 2,  field = Resource1,  sector = sectorID1,  adjacent = {}, flank = {6}, front = {3}, phase = 0, sgroup = sg_field5, position = {Marker_F5A1, Marker_F5A2}, active = true, 					flankunit = sg_flankunit5, frontunit = sg_frontunit5, checkunit = sg_checkunit5, tank = TigerAce }
+	table_Field[6] = {marker = Marker_Field6, ostwindtank = Ostwind2, offset = 6,  field = Resource2,  sector = sectorID2,  adjacent = {}, flank = {5, 7}, front = {4}, phase = 0, sgroup = sg_field6, position = {Marker_F6A1, Marker_F6A2}, active = true, 				flankunit = sg_flankunit6, frontunit = sg_frontunit6, checkunit = sg_checkunit6, tank = TigerAce }
+	table_Field[7] = {marker = Marker_Field7, ostwindtank = Ostwind2, offset = 6,  field = Resource3,  sector = sectorID3,  adjacent = {}, flank = {}, front = {6}, phase = 0, sgroup = sg_field7, position = {Marker_F7A1, Marker_F7A2}, active = true,	 flankunit = sg_flankunit7, frontunit = sg_frontunit7, checkunit = sg_checkunit7, tank = TigerAce }
+	table_Field[8] = {marker = Marker_Field8, ostwindtank = Ostwind1, offset = 2,  field = Resource12, sector = sectorID12, adjacent = {}, flank = {}, front = {}, phase = 0, sgroup = sg_field8, position = {Marker_F8A1}, active = true,	 flankunit = sg_flankunit8, frontunit = sg_frontunit8, checkunit = sg_checkunit8, tank = TigerAce }
+
+	
+	table_WehrmachtEpsilon = {}
+	table_WehrmachtEpsilon[1] = {sgroup = sg_field1, start = Marker_F1A2, unit = SBP.AXIS.GRENADIER, count = 6, phase = 0, active = true}
+	table_WehrmachtEpsilon[2] = {sgroup = sg_field2, start = Marker_F2A2, unit = SBP.AXIS.GRENADIER, count = 6, phase = 0, active = true}
+	table_WehrmachtEpsilon[3] = {sgroup = sg_field3, start = Marker_F3A1, unit = SBP.AXIS.GRENADIER, count = 6, phase = 0, active = true}
+	table_WehrmachtEpsilon[4] = {sgroup = sg_field4, start = Marker_F4A1, unit = SBP.AXIS.GRENADIER, count = 6, phase = 0, active = true}
+	table_WehrmachtEpsilon[5] = {sgroup = sg_field5, start = Marker_F5A1, unit = SBP.AXIS.GRENADIER, count = 6, phase = 0, active = true}
+	table_WehrmachtEpsilon[6] = {sgroup = sg_field6, start = Marker_F6A1, unit = SBP.AXIS.GRENADIER, count = 6, phase = 0, active = true}
+	table_WehrmachtEpsilon[7] = {sgroup = sg_field7, start = Marker_F7A1, unit = SBP.AXIS.GRENADIER, count = 6, phase = 0, active = true}
+	table_WehrmachtEpsilon[8] = {sgroup = sg_field8, start = Marker_F8A1, unit = SBP.AXIS.GRENADIER, count = 6, phase = 0, active = true}
+	
+	
+	WehrmachtGamma1 = SGroup_CreateIfNotFound("WehrmachtGamma1")
+	WehrmachtGamma2 = SGroup_CreateIfNotFound("WehrmachtGamma2")
+	WehrmachtGamma3 = SGroup_CreateIfNotFound("WehrmachtGamma3")
+	WehrmachtGamma4 = SGroup_CreateIfNotFound("WehrmachtGamma4")
+	WehrmachtGamma5 = SGroup_CreateIfNotFound("WehrmachtGamma5")
+	WehrmachtGamma6 = SGroup_CreateIfNotFound("WehrmachtGamma6")
+	WehrmachtGamma7 = SGroup_CreateIfNotFound("WehrmachtGamma7")
+	WehrmachtGamma8 = SGroup_CreateIfNotFound("WehrmachtGamma8")
+	WehrmachtGamma9 = SGroup_CreateIfNotFound("WehrmachtGamma9")
+	WehrmachtGamma10 = SGroup_CreateIfNotFound("WehrmachtGamma10")
+	WehrmachtGamma11 = SGroup_CreateIfNotFound("WehrmachtGamma11")
+	
+	table_WehrmachtGamma = {}
+	table_WehrmachtGamma[1] = {sgroup = WehrmachtGamma1, location0 = RP7, facing0 = north, start = north, prox1 = 25, location1 = RP6, marker1 =north, facing1 = north, prox2 = 35, location2 = RP4, marker2 = north, facing2 = west, prox3 = 25, location3 = RP1, marker3 = north, facing3 = north, depart = Marker_Exit1, unit = SBP.AXIS.GRENADIER, count = 4, phase = 2, flag = 1 }
+	table_WehrmachtGamma[2] = {sgroup = WehrmachtGamma2, location0 = RP6, facing0 = north, start = north, prox1 = 30, location1 = RP4, marker1 =north, facing1 = north, prox2 = 25, location2 = RP1, marker2 = north, facing2 = east, prox3 = 40, location3 = RP8, marker3 = north, facing3 = north, depart = Marker_Exit1, unit = SBP.AXIS.VOLKS_2PANZERF, count = 4, phase = 2, flag = 1  }
+	table_WehrmachtGamma[3] = {sgroup = WehrmachtGamma3, location0 = RP5, facing0 = north, start = north, prox1 = 30, location1 = RP3, marker1 =north, facing1 = north, prox2 = 25, location2 = RP2, marker2 = north, facing2 = east, prox3 = 40, location3 = RP8, marker3 = north, facing3 = north, depart = Marker_Exit1, unit = SBP.AXIS.GRENADIER, count = 4, phase = 2, flag = 1  }
+	table_WehrmachtGamma[4] = {sgroup = WehrmachtGamma4, location0 = RP5, facing0 = north, start = north, prox1 = 30, location1 = RP4, marker1 =north, facing1 = north, prox2 = 25, location2 = RP2, marker2 = north, facing2 = east, prox3 = 40, location3 = RP8,  marker3 = north, facing3 = north, depart = Marker_Exit1, unit = SBP.AXIS.GRENADIER, count = 4, phase = 2, flag = 1  }
+	table_WehrmachtGamma[5] = {sgroup = WehrmachtGamma5, location0 = RP6, facing0 = north, start = north, prox1 = 30, location1 = RP3, marker1 =north, facing1 = north, prox2 = 25, location2 = RP1, marker2 = north, facing2 = east, prox3 = 40, location3 = RP8, marker3 = north, facing3 = north, depart = Marker_Exit2, unit = SBP.AXIS.VOLKS_2PANZERF, count = 4, phase = 2, flag = 1  }
+	table_WehrmachtGamma[6] = {sgroup = WehrmachtGamma6, location0 = RP6, facing0 = north, start = north, prox1 = 30, location1 = RP4, marker1 =north, facing1 = north, prox2 = 25, location2 = RP2, marker2 = north, facing2 = east, prox3 = 40, location3 = RP8, marker3 = north, facing3 = north, depart = Marker_Exit2, unit = SBP.AXIS.VOLKS_2PANZERF, count = 4, phase = 2, flag = 1  }
+	table_WehrmachtGamma[7] = {sgroup = WehrmachtGamma7, location0 = RP3, facing0 = north, start = north, prox1 = 30, location1 = RP1, marker1 =north, facing1 = north, prox2 = 25, location2 = RP8, marker2 = north, facing2 = east, prox3 = 40, location3 = RP8, marker3 = north, facing3 = north, depart = Marker_Exit2, unit = SBP.AXIS.VOLKS_2PANZERF, count = 4, phase = 2, flag = 1  }
+	table_WehrmachtGamma[8] = {sgroup = WehrmachtGamma8, location0 = RP4, facing0 = north, start = north, prox1 = 30, location1 = RP2, marker1 =north, facing1 = north, prox2 = 25, location2 = RP8, marker2 = north, facing2 = east, prox3 = 40, location3 = RP8, marker3 = north, facing3 = north, depart = Marker_Exit2, unit = SBP.AXIS.VOLKS_2PANZERF, count = 4, phase = 2, flag = 1  }
+	table_WehrmachtGamma[9] = {sgroup = WehrmachtGamma9, location0 = RP1, facing0 = north, start = north, prox1 = 30, location1 = RP1, marker1 =north, facing1 = north, prox2 = 25, location2 = RP8, marker2 = north, facing2 = east, prox3 = 40, location3 = RP8, marker3 = north, facing3 = north, depart = Marker_Exit2, unit = SBP.AXIS.VOLKS_2PANZERF, count = 4, phase = 2, flag = 1  }
+	table_WehrmachtGamma[10] = {sgroup = WehrmachtGamma10, location0 = RP2, facing0 = north, start = north, prox1 = 30, location1 = RP2, marker1 =north, facing1 = north, prox2 = 25, location2 = RP8, marker2 = north, facing2 = east, prox3 = 40, location3 = RP8, marker3 = north, facing3 = north, depart = Marker_Exit2, unit = SBP.AXIS.VOLKS_2PANZERF, count = 4, phase = 2, flag = 1  }
+ 
+
+	table_RandomUnitB = {SBP.AXIS.GRENADIER, SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.VOLKS_2PANZERF,  SBP.AXIS.GRENADIER}
+	
+
+	--EGroup_Hide(LAYER_allied_forces, true)
+	EGroup_Hide(LAYER_trees_stuff, true)
+	SGroup_Hide(axis_doods, true)
+	SGroup_Hide(allied_doods, true)
+	
+
+	--Player_StopEarningActionPoints(player1)
+	-- pick an upgrade path for the player
+
+    v_trucks = 0
+	time_wait = 80
+	Player_SetPopCapOverride(player1, 75)
+
+--	Modify_PlayerProductionRate(player1, 3.0)
+    -- play around with the cost/availability of various CC tree upgrades
+	
+    --Player_SetUpgradeAvailability(player1, UPG.COMMANDER_TREE.ALLIES.AIRBORNE_12, ITEM_LOCKED)
+
+	
+	
+	-- use default veteran squads if necessary
+	if not Player_HasPersistentSquadFile(player1) then
+		Player_LoadPersistentSquadsFromFile(player1, "data:scenarios/sp/M15_Cornered_Tiger/default_veteran_squads.lua")
+	end
+
+	sg_allsquads = SGroup_CreateIfNotFound("sg_allsquads")
+	
+	-- set up any difficulty settings
+	M15_Difficulty()
+	
+	--[[ TECH TREE ]]
+	TechTreeSetup()
+	
+	-- initialise the objectives
+	Initialize_OBJECTIVE1()
+	Initialize_MEDALOBJECTIVE()
+
+	Modify_CaptureTime(Resource1, 0.8)
+	Modify_CaptureTime(Resource2, 0.8)
+	Modify_CaptureTime(Resource3, 0.8)
+	Modify_CaptureTime(Resource7, 0.8)
+	Modify_CaptureTime(Resource8, 0.8)
+	Modify_CaptureTime(Resource10, 0.8)
+	Modify_CaptureTime(Resource11, 0.8)
+	
+	Timer_Start("Timer_TigerStart", 60)
+	Rule_Add(Rule_StartMission)
+	Rule_AddInterval(Rule_PutUnitsInGroups, 1)
+	
+	
+	for i = 1, table.getn(table_MGAlpha) do
+		Util_CreateSquadsAndGarrison(player2, table_MGAlpha[i].sgroup, table_MGAlpha[i].unit, table_MGAlpha[i].stronghold, 1)
+	end	
+
+	for i = 1, table.getn(table_WehrmachtEpsilon) do
+		if table_WehrmachtEpsilon[i].active == true then 
+			local value = World_GetRand(1, table.getn(table_RandomUnit))
+			local unittype = table_RandomUnit[value]
+			Util_CreateSquadsAtMarkerFacing(player2, table_WehrmachtEpsilon[i].sgroup, unittype, table_WehrmachtEpsilon[i].start, north, 1, 4) 
+			print("creating Whrmacht Epsilon")
+		end
+	end
+	
+end
+
+Scar_AddInit(OnInit)
+
+
+
+-------------------------------------------------------------------------
+
+-- START THE MISSION
+
+-------------------------------------------------------------------------
+
+function Rule_StartMission()
+		Util_StartNIS(EVENTS.Objective1)
+		Rule_AddInterval(Check_AttackTiger, 1) 
+		Rule_Add(Action_Start) 
+		Rule_AddInterval(Speech_TigerAce, 1)
+		Rule_RemoveMe()
+end
+
+
+
+function M15_Difficulty()
+
+	-- get the difficulty
+	g_dif = Game_GetSPDifficulty()
+
+	-- set health bonus and AI difficulty (if applicable) for player 1
+	Setup_Difficulty(player1, g_dif) -- pass the player and difficulty global variable 
+
+	-- set health handicap and AI difficulty (if applicable) for player 2
+	Setup_Difficulty(player2, g_dif) -- do it for each player that you have defined
+	
+	-- difficulty table
+	difficulty = {}
+	if g_dif == GD_EASY then
+		difficulty.medalop_target = 15
+		difficulty.panzer_skirt_chance = 4
+		difficulty.owstwind_respawn_increment = 30
+		difficulty.owstwind_respawn_cap = 300
+		difficulty.maxhalftracks = 5
+	elseif g_dif == GD_NORMAL then
+		difficulty.medalop_target = 20
+		difficulty.panzer_skirt_chance = 3
+		difficulty.owstwind_respawn_increment = 20
+		difficulty.owstwind_respawn_cap = 250
+		difficulty.maxhalftracks = 5
+	elseif g_dif == GD_HARD then
+		difficulty.medalop_target = 25
+		difficulty.panzer_skirt_chance = 2
+		difficulty.owstwind_respawn_increment = 10
+		difficulty.owstwind_respawn_cap = 200
+		difficulty.maxhalftracks = 5
+	elseif g_dif == GD_EXPERT then
+		difficulty.medalop_target = 30
+		difficulty.panzer_skirt_chance = 1
+		difficulty.owstwind_respawn_increment = 0
+		difficulty.owstwind_respawn_cap = 200
+		difficulty.maxhalftracks = 5
+	end
+
+	-- medalop_target				the number of vehicle kills a player needs to achieve the medal op
+	-- panzer_skirt_chance			the chance that a newly spawned panzer will have an armour skirt ("4" means "1 in 4", so higher = less chance)
+	-- ostwind_respawn_increment	each time a ostwind dies and is respawned, the respawn timer increases by this amount
+	-- ostwind_respawn_cap			the respawn timer never gets above this length (starts at 120 seconds)
+	-- maxhalftracks				the max number of halftracks you can destroy from each spawn point before they don't get generated anymore
+	
+end
+
+function Check_AttackTiger()
+	if Player_OwnsEGroup(player2, Resource1) == false or Player_OwnsEGroup(player2, Resource2) == false or Player_OwnsEGroup(player2, Resource3) == false or Timer_GetRemaining("Timer_TigerStart") == 0 then
+		
+		Rule_RemoveMe()
+		g_TigerAttack  = 1
+		
+	end
+end
+
+function Action_Start() 
+
+	if (Event_IsAnyRunning() == false) then
+--~ 		Player_SetResource(player1, RT_Manpower, 500)
+--~ 		Player_SetResource(player1, RT_Munition, 500)
+--~ 		Player_SetResource(player1, RT_Fuel, 90)
+		Util_SetStartingResources(14)
+		
+		-- start the music
+		--Util_PlayMusic("Sound/Music/sp/M14/m14_Ob1_KillAce", 5, 0)
+		
+		-- randomise the gamma table
+		for i = 1, table.getn(table_WehrmachtGamma) do
+			table_WehrmachtGamma[i].start = Table_GetRandomItem(table_WehrmachtGamma[i].location0)
+			table_WehrmachtGamma[i].phase = 1
+		end
+		
+		Cmd_InstantUpgrade(Blg_Stronghold1, UPG.ALLIES.CONVERT_AMBIENT_BUILDING)
+		Cmd_InstantUpgrade(Blg_Stronghold2, UPG.ALLIES.CONVERT_AMBIENT_BUILDING)
+		
+		--Rule_AddInterval(Action_Trucks, 1)
+		Rule_AddInterval(MedalOp_Start, 2)
+		Rule_AddInterval(Action_AmbientHalftrack, 4)
+--		Objective_AlertSitRep(OBJECTIVE1)
+		SGroup_SetInvulnerable(TigerAce, 0.90)
+		g_TigerThreshold = 0.90
+		tiger_retreat_time = 30
+		Modify_ReceivedDamage(PershingTank, 0.8)
+		Camera_ResetToDefault()
+		Objective_Start(OBJECTIVE1)
+		Rule_AddInterval(Action_WehrmachtGamma, 3)
+		EGroup_Hide(LAYER_trees_stuff, false)
+		SGroup_Hide(axis_doods, false)
+		SGroup_Hide(allied_doods, false)
+		Cmd_Garrison(Sniper2, Blg_Stronghold1)
+		Cmd_Garrison(Sniper3, Blg_Stronghold2)
+		Rule_AddInterval(Action_Tiger, 1)
+		Rule_AddInterval(Action_OstwindAlpha, 1) 
+		Rule_AddInterval(M15_CheckPlayerFail, 5)
+		Rule_AddInterval(Action_Pioneers, 1)
+		
+		Rule_AddInterval(Action_DestroyAll, 3)
+		Rule_AddInterval(Objective1, 1) 
+		
+		Rule_AddInterval(Action_StormtrooperAlpha, 1) 
+		Rule_AddOneShot(Action_StartDelay, 80)
+		Rule_AddInterval(Action_Field, 4) 
+		g_tigerhealth = 100
+		Rule_AddInterval(Action_SetHealth, 1)
+		Rule_AddInterval(Action_ResourcePoint, 1)
+		
+		Rule_RemoveMe()
+		
+		OBJECTIVE1.PingID = Objective_AddUIElements(OBJECTIVE1, TigerAce, false, Loc_FormatText(359100, Loc_ConvertNumber(100)), true, 1)
+		--Player_SetAbilityAvailability(player1, ABILITY.ALLIES.STICKY_BOMB , ITEM_LOCKED) 
+		maxvar = 4
+		HedgerowTimer = 20
+		
+
+	end
+end
+function Action_StartDelay()
+	Rule_AddInterval(Action_TigerAce, 3)
+	Rule_AddInterval(Action_PanzerGamma, 1)
+end
+function AddToTable(group, destination, face)
+	for i = table.getn(table_AxisSGroup), 1, -1 do 
+		if (table_AxisSGroup[i].sgroup == group) then
+			table.remove(table_AxisSGroup, i)	
+		end
+	end
+	table.insert(table_AxisSGroup, {sgroup = group, dest = destination, facing = face})
+end
+
+function Rule_FacingPosition()
+	for i = table.getn(table_AxisSGroup), 1, -1 do		
+		if Prox_AreSquadMembersNearMarker(table_AxisSGroup[i].sgroup, table_AxisSGroup[i].dest, ANY) == true then
+			SGroup_FaceMarker(table_AxisSGroup[i].sgroup, table_AxisSGroup[i].facing)
+			table.remove(table_AxisSGroup, i)			
+		end		
+	end
+end
+
+function Rule_PutUnitsInGroups()
+
+	Player_GetAll(player1)
+	SGroup_Filter(sg_allsquads, {SBP.ALLIES.CROCODILE, SBP.ALLIES.SHERMAN, SBP.ALLIES.PERSHING}, FILTER_KEEP) 
+
+	Player_GetAllSquadsNearMarker(player1, sg_AllyResource12, sectorID12)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisResource12, sectorID12)
+	Player_GetAllSquadsNearMarker(player1, sg_AllyResource11, sectorID11)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisResource11, sectorID11)
+	Player_GetAllSquadsNearMarker(player1, sg_AllyResource10, sectorID10)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisResource10, sectorID10)
+	Player_GetAllSquadsNearMarker(player1, sg_AllyResource7, sectorID7)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisResource7, sectorID7)
+	Player_GetAllSquadsNearMarker(player1, sg_AllyResource8, sectorID8)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisResource8, sectorID8)
+	Player_GetAllSquadsNearMarker(player1, sg_AllyResource3, sectorID3)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisResource3, sectorID3)
+	Player_GetAllSquadsNearMarker(player1, sg_AllyResource2, sectorID2)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisResource2, sectorID2)
+	Player_GetAllSquadsNearMarker(player1, sg_AllyResource1, sectorID1)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisResource1, sectorID1)
+	Player_GetAllSquadsNearMarker(player1, sg_AllyResourceAll, sectorIDAll)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisResourceAll, sectorIDAll)
+
+end
+
+
+
+
+
+
+
+
+
+
+function Action_OstwindAlpha()
+
+	for i = 1, table.getn(table_OstwindAlpha) do 
+		if SGroup_Count(TigerAce) > 0 then 
+			if SGroup_TotalMembersCount(table_OstwindAlpha[i].sgroup) == 0 and table_OstwindAlpha[i].phase ~= 1 then
+				table_OstwindAlpha[i].phase = 0
+			end
+			
+			if table_OstwindAlpha[i].phase == 0  then 
+				table_OstwindAlpha[i].timer = table_OstwindAlpha[i].timer + difficulty.owstwind_respawn_increment
+				if table_OstwindAlpha[i].timer > difficulty.owstwind_respawn_cap then
+					table_OstwindAlpha[i].timer = difficulty.owstwind_respawn_cap
+				end
+				Timer_Start(table_OstwindAlpha[i].timername, table_OstwindAlpha[i].timer)	
+				table_OstwindAlpha[i].phase = 1			
+			end
+			
+			if SGroup_Count(table_OstwindAlpha[i].sgroup) == 0 and Player_OwnsEGroup(player2, table_OstwindAlpha[i].stronghold) == true and  Timer_GetRemaining(table_OstwindAlpha[i].timername) == 0 and table_OstwindAlpha[i].phase == 1 then -- and player is not in the field
+				
+				Util_CreateSquadsAtMarkerFacing(player2, table_OstwindAlpha[i].sgroup, Table_GetRandomItem(table_RandomTank), table_OstwindAlpha[i].spawn, table_OstwindAlpha[i].facing, 1, table_OstwindAlpha[i].count) 						
+				table_OstwindAlpha[i].phase = 2
+				
+				if g_TigerAttack == 1 then 
+					local pos1 = SGroup_GetPosition_EVEN_IF_EMPTY(TigerAce)
+					Cmd_Move(table_OstwindAlpha[i].sgroup, TigerAce, nil, nil, nil, table_OstwindAlpha[i].offset, 15)
+					AddToTable(table_OstwindAlpha[i].sgroup, table_OstwindAlpha[i].marker1,  table_OstwindAlpha[i].facing)
+				end
+				
+			end
+
+			if SGroup_Count(table_OstwindAlpha[i].sgroup) > 0 and table_OstwindAlpha[i].phase == 2 and Prox_SGroupSGroup(TigerAce, table_OstwindAlpha[i].sgroup, PROX_SHORTEST) > 15 then 
+				
+				local pos1 = SGroup_GetPosition_EVEN_IF_EMPTY(TigerAce)
+				Cmd_Move(table_OstwindAlpha[i].sgroup, TigerAce, true, nil, nil, table_OstwindAlpha[i].offset, 15)
+				
+			end
+		end
+		
+	end
+end		
+
+
+
+
+
+
+
+function Action_SetHealth()
+
+	local health = math.floor(SGroup_GetAvgHealth(TigerAce) * 100) -- get the health (and round it down)
+	
+	if health < g_tigerhealth then
+		
+		g_tigerhealth = health
+		
+		Objective_RemoveUIElements(OBJECTIVE1, OBJECTIVE1.PingID)
+		OBJECTIVE1.PingID = Objective_AddUIElements(OBJECTIVE1, TigerAce, false, Loc_FormatText(359100, Loc_ConvertNumber(health)), true, 1)
+		
+	end
+	
+end
+
+
+
+function Action_Pioneers()	
+	for i = 1, table.getn(table_PioneerAlpha) do
+		if SGroup_TotalMembersCount(table_PioneerAlpha[i].sgroup) == 0 and table_PioneerAlpha[i].phase == 0 then 
+			Timer_Start(table_PioneerAlpha[i].timername, table_PioneerAlpha[i].timer)
+			table_PioneerAlpha[i].phase = 1
+		end 
+		if SGroup_TotalMembersCount(table_PioneerAlpha[i].sgroup) == 0 and Timer_GetRemaining(table_PioneerAlpha[i].timername) == 0 and Player_OwnsEGroup(player2, table_PioneerAlpha[i].stronghold) and Player_OwnsEGroup(player2, table_PioneerAlpha[i].field) and table_PioneerAlpha[i].phase == 1 then			
+			Util_CreateSquadsAtMarker(player2, table_PioneerAlpha[i].sgroup, SBP.AXIS.PIONEER, table_PioneerAlpha[i].spawn, 1, table_PioneerAlpha[i].count) 
+			Cmd_Move(table_PioneerAlpha[i].sgroup, table_PioneerAlpha[i].marker1)
+			table_PioneerAlpha[i].phase = 2
+		end 
+		if SGroup_Count(table_PioneerAlpha[i].sgroup) == 0 and table_PioneerAlpha[i].phase ~= 1 then 
+			table_PioneerAlpha[i].phase = 0
+		end
+		if 	table_PioneerAlpha[i].phase == 2  then 
+			Player_GetAllSquadsNearMarker(player2, table_PioneerAlpha[i].temp, table_PioneerAlpha[i].repair)
+			SGroup_Filter(table_PioneerAlpha[i].temp, {SBP.AXIS.TIGER, SBP.AXIS.PANZER}, FILTER_KEEP) 
+			if SGroup_Count(table_PioneerAlpha[i].temp) > 0 and SGroup_GetAvgHealth(table_PioneerAlpha[i].temp) < 1  then 
+				Cmd_Ability(table_PioneerAlpha[i].sgroup, ABILITY.REPAIR, table_PioneerAlpha[i].temp, nil, true)
+				Timer_Start(table_PioneerAlpha[i].timername2, 10)
+				table_PioneerAlpha[i].phase = 3
+			end
+		end
+		if table_PioneerAlpha[i].phase == 3 and Timer_GetRemaining(table_PioneerAlpha[i].timername2) == 0 then 
+			SGroup_SetAvgHealth(table_PioneerAlpha[i].temp, 1) 
+			SGroup_Clear(table_PioneerAlpha[i].temp)			
+			Cmd_Move(table_PioneerAlpha[i].sgroup, table_PioneerAlpha[i].marker1)
+			table_PioneerAlpha[i].phase = 2
+		end 
+	end
+end
+
+
+
+function Action_WehrmachtGamma()
+	
+	for i = table.getn(table_WehrmachtGamma), 1, -1 do
+		
+		if table_WehrmachtGamma[i].phase == 1 then 
+			
+			if Prox_ArePlayersNearMarker(player1, table_WehrmachtGamma[i].start, ANY, 60) then
+				Util_CreateSquadsAtMarkerFacing(player2, table_WehrmachtGamma[i].sgroup, Table_GetRandomItem(table_RandomUnitB), table_WehrmachtGamma[i].start, table_WehrmachtGamma[i].facing1, 1, table_WehrmachtGamma[i].count) 
+				table_WehrmachtGamma[i].phase = 2
+			end
+			
+		elseif table_WehrmachtGamma[i].phase == 2 then 
+			
+			if SGroup_TotalMembersCount(table_WehrmachtGamma[i].sgroup) >= 2 then 
+				if SGroup_Count(sg_allsquads) > 0 then 
+					if Prox_SGroupSGroup(table_WehrmachtGamma[i].sgroup, sg_allsquads, PROX_SHORTEST) < table_WehrmachtGamma[i].prox1 and table_WehrmachtGamma[i].flag == 1 then 
+						
+						local locations1 = table_WehrmachtGamma[i].location1
+						table_WehrmachtGamma[i].marker1 = locations1[World_GetRand(1, table.getn(locations1))]
+						Cmd_Move(table_WehrmachtGamma[i].sgroup, table_WehrmachtGamma[i].marker1) 
+						table_WehrmachtGamma[i].flag = 2
+					end
+					if Prox_SGroupSGroup(table_WehrmachtGamma[i].sgroup, sg_allsquads, PROX_SHORTEST) < table_WehrmachtGamma[i].prox2 and table_WehrmachtGamma[i].flag == 2 then 
+						local locations2 = table_WehrmachtGamma[i].location2
+						table_WehrmachtGamma[i].marker2 = locations2[World_GetRand(1, table.getn(locations2))]
+						Cmd_Move(table_WehrmachtGamma[i].sgroup, table_WehrmachtGamma[i].marker2) 
+						table_WehrmachtGamma[i].flag = 3
+					end
+					if Prox_SGroupSGroup(table_WehrmachtGamma[i].sgroup, sg_allsquads, PROX_SHORTEST) < table_WehrmachtGamma[i].prox3 and table_WehrmachtGamma[i].flag == 3 then 
+						local locations3 = table_WehrmachtGamma[i].location3
+						table_WehrmachtGamma[i].marker3 = locations3[World_GetRand(1, table.getn(locations3))]
+						Cmd_Move(table_WehrmachtGamma[i].sgroup, table_WehrmachtGamma[i].marker3) 
+						table_WehrmachtGamma[i].flag = 4
+					end
+				end
+				
+			end
+			
+			if SGroup_TotalMembersCount(table_WehrmachtGamma[i].sgroup) <= 1  then 
+				Cmd_Move(table_WehrmachtGamma[i].sgroup, table_WehrmachtGamma[i].depart)
+				table.remove(table_WehrmachtGamma, i)
+			end	
+			
+		end
+	end
+	
+end
+function Action_StormtrooperAlpha()
+	for i = 1, table.getn(table_StormtrooperAlpha) do 
+		if SGroup_Count(table_StormtrooperAlpha[i].sgroup) == 0 and Player_OwnsEGroup(player2, table_StormtrooperAlpha[i].stronghold) == true and  Timer_GetRemaining(table_StormtrooperAlpha[i].timername) == 0   and table_StormtrooperAlpha[i].phase == 0 then -- and player is not in the field
+			Util_CreateSquadsAtMarkerFacing(player2, table_StormtrooperAlpha[i].sgroup, table_StormtrooperAlpha[i].unit, table_StormtrooperAlpha[i].spawn, table_StormtrooperAlpha[i].facing, 1, table_StormtrooperAlpha[i].count) 
+			table_StormtrooperAlpha[i].phase = 1 
+		end
+		if SGroup_TotalMembersCount(table_StormtrooperAlpha[i].sgroup) == 0 and table_StormtrooperAlpha[i].phase == 1 then 
+			Timer_Start(table_StormtrooperAlpha[i].timername, table_StormtrooperAlpha[i].timer)
+			table_StormtrooperAlpha[i].phase = 0
+		end
+	 end
+end
+
+	
+
+function Action_Tiger()
+
+	if g_createdTiger1 == false then
+		if SGroup_Count(sg_AllyResource11) > 0 or SGroup_Count(sg_AllyResource12) > 0 then
+			Util_CreateSquadsAtMarker(player2, Tiger1, SBP.AXIS.TIGER, Marker_TruckSpawn2, 1)
+			SGroup_Clear(sg_Tiger1)
+			SGroup_AddGroup(sg_Tiger1, sg_AllyResource11)
+			SGroup_AddGroup(sg_Tiger1, sg_AllyResource12)
+			Cmd_AttackMove(Tiger1, sg_Tiger1)
+			g_createdTiger1 = true
+		end
+	elseif SGroup_Count(Tiger1) > 0 then
+		if SGroup_GetAvgHealth(Tiger1) > 0.4 then 
+			
+			SGroup_Clear(sg_Tiger1)
+			SGroup_AddGroup(sg_Tiger1, sg_AllyResource11)
+			SGroup_AddGroup(sg_Tiger1, sg_AllyResource12)
+			
+			if SGroup_Count(sg_Tiger1) > 0 then 
+				Cmd_AttackMove(Tiger1, sg_Tiger1)
+			elseif Prox_AreSquadMembersNearMarker(Tiger1, Marker_TigerRest1, ANY) == false then 
+				Cmd_Move(Tiger1, Marker_TigerRest1)
+			end 
+			
+		else
+			Cmd_Move(Tiger1, Marker_Repair2)
+		end
+	end
+	
+	if g_createdTiger2 == false then
+		if SGroup_Count(sg_AllyResource10) > 0 or SGroup_Count(sg_AllyResource12) > 0 then
+			Util_CreateSquadsAtMarker(player2, Tiger2, SBP.AXIS.TIGER, Marker_TruckSpawn1, 1)
+			SGroup_Clear(sg_Tiger2)
+			SGroup_AddGroup(sg_Tiger2, sg_AllyResource10)
+			SGroup_AddGroup(sg_Tiger2, sg_AllyResource12)
+			Cmd_AttackMove(Tiger2, sg_Tiger2)
+			g_createdTiger2 = true
+		end
+	elseif SGroup_Count(Tiger2) > 0 then
+		if SGroup_GetAvgHealth(Tiger2) > 0.4 then 
+			
+			SGroup_Clear(sg_Tiger2)
+			SGroup_AddGroup(sg_Tiger2, sg_AllyResource10)
+			SGroup_AddGroup(sg_Tiger2, sg_AllyResource12)
+			
+			if SGroup_Count(sg_Tiger2) > 0 then 
+				Cmd_AttackMove(Tiger2, sg_Tiger2)
+			elseif Prox_AreSquadMembersNearMarker(Tiger2, Marker_TigerRest2, ANY) == false then 
+				Cmd_Move(Tiger2, Marker_TigerRest2)
+			end 
+			
+		else
+			Cmd_Move(Tiger2, Marker_Repair1)
+		end
+	end
+	
+end
+
+
+function Speech_TigerAce()
+	if v_TigerSpeech == nil then
+		if Player_CanSeeSGroup(player1, TigerAce, ANY) and SGroup_IsDoingAttack(TigerAce, ANY, 1) then
+			Util_PlayMusic("SOUND/Music/SP/M14/M14_Ob1_KillAce", 5, 0)
+			Util_StartIntel(EVENTS.TigerAceSpotted)
+			v_TigerSpeech = 1
+			Timer_Start("TigerRetreat", tiger_retreat_time)
+			tiger_retreat_time = tiger_retreat_time + 10
+		end
+	end
+end
+
+
+function Action_TigerAce()
+
+	TigerPos = SGroup_GetPosition_EVEN_IF_EMPTY(TigerAce)
+	
+	if SGroup_GetAvgHealth(TigerAce) > 0.25 then 
+		
+		SGroup_SetMoveType(TigerAce, MOVETYPE.FAST)
+		
+		if SGroup_IsDoingAttack(TigerAce, ANY, 3) and g_TigerAttack == 1 then
+			TigerMod = Modify_WeaponBurst(TigerAce, "hardpoint_01", 5)
+			Timer_Start("TigerAttack", 12)
+			print("timer start!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
+			g_TigerAttack = 2
+			Timer_Start("TigerCue", 12)
+		end
+		
+--~ 		if SGroup_IsAttackMoving(TigerAce, ANY) == false and g_TigerAttack == 2  then 
+--~ 			Timer_Start("TigerAttack", 0)
+--~ 		end
+		
+		if SGroup_IsAttackMoving(TigerAce, ANY, 3) then
+			local pos = SGroup_GetPosition_EVEN_IF_EMPTY(TigerAce)
+			FOW_RevealArea(pos, 50, 5)
+			if Timer_GetRemaining("TigerCue") == 0 then 
+				EventCue_Create(CUE.NORMAL, 42809, 42809, TigerAce)
+				Timer_Start("TigerCue", 25)
+			end
+		end
+		
+		if Timer_GetRemaining("TigerAttack") == 0 and g_TigerAttack == 2 then 
+			
+			Modifier_Remove(TigerMod)
+			
+			-- work out if it's supposed to be retreating or not...
+			local retreat = false
+			if (v_TigerSpeech == 1 and Timer_GetRemaining("TigerRetreat") == 0) or (SGroup_GetAvgHealth(TigerAce) <= (g_TigerThreshold + 0.05)) then
+				retreat = true
+			end
+			
+			if retreat == false then print("Retreat: false") else print("Retreat: true") end
+			
+			if g_TigerThreshold == 0.90 and retreat == true then 
+				
+				if g_Tigerflag == 1 then 
+					print("Retreating as Tiger Ace is near 90% health")
+					Util_PlayMusic("SOUND/Music/genericmissionmusic_Legacy", 5, 0)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_01", false)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_02", false)
+					g_Tigerflag = 0
+					Timer_Start("TigerRetreat0.90", 120)
+				end
+				
+				if Prox_AreSquadMembersNearMarker(TigerAce, mkr_TigerAce2, ANY) == false and Timer_GetRemaining("TigerRetreat0.90") > 0 then 
+					
+					Cmd_Ability(TigerAce, ABILITY.SP.DEFENSIVE_SMOKE, nil, nil, true)
+					Cmd_Move(TigerAce, mkr_TigerAce2)
+					
+				else
+					
+					print("Retreated. Setting level to 80%")
+					
+					g_TigerAttack = 1
+					g_Tigerflag = 1
+					
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_01", true)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_02", true)
+					SGroup_SetInvulnerable(TigerAce, 0.80) -- njr
+					
+					g_TigerThreshold = 0.80
+					v_TigerSpeech = nil
+					
+					SGroup_FaceMarker(TigerAce, mkr_TigerAce1)
+					
+					Timer_Start("TigerAttack2", time_wait)
+					time_wait = time_wait - 10
+					
+				end
+				
+			elseif g_TigerThreshold == 0.80 and retreat == true then 
+				
+				if g_Tigerflag == 1 then 
+					print("Retreating as Tiger Ace is near 80% health")
+					Util_PlayMusic("SOUND/Music/genericmissionmusic_Legacy", 5, 0)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_01", false)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_02", false)
+					g_Tigerflag = 0
+					Timer_Start("TigerRetreat0.80", 110)
+				end
+				
+				if Prox_AreSquadMembersNearMarker(TigerAce, mkr_TigerAce3, ANY) == false and Timer_GetRemaining("TigerRetreat0.80") > 0 then 
+					
+					Cmd_Ability(TigerAce, ABILITY.SP.DEFENSIVE_SMOKE, nil, nil, true)
+					Cmd_Move(TigerAce, mkr_TigerAce3)
+					
+				else
+					
+					print("Retreated. Setting level to 65%")
+					
+					g_TigerAttack = 1
+					g_Tigerflag = 1
+					
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_01", true)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_02", true)
+					SGroup_SetInvulnerable(TigerAce, 0.65) -- njr
+					
+					g_TigerThreshold = 0.65
+					v_TigerSpeech = nil
+					
+					SGroup_FaceMarker(TigerAce, mkr_TigerAce1)
+					
+					Timer_Start("TigerAttack2", time_wait)
+					time_wait = time_wait - 10
+					
+				end
+				
+			elseif g_TigerThreshold == 0.65 and retreat == true then 
+				
+				if g_Tigerflag == 1 then 
+					print("Retreating as Tiger Ace is near 65% health")
+					Util_PlayMusic("SOUND/Music/genericmissionmusic_Legacy", 5, 0)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_01", false)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_02", false)
+					g_Tigerflag = 0
+					Timer_Start("TigerRetreat0.65", 100)
+				end
+				
+				if Prox_AreSquadMembersNearMarker(TigerAce, mkr_TigerAce4, ANY) == false and Timer_GetRemaining("TigerRetreat0.65") > 0 then 
+					
+					
+					Cmd_Ability(TigerAce, ABILITY.SP.DEFENSIVE_SMOKE, nil, nil, true)
+					Cmd_Move(TigerAce, mkr_TigerAce4)
+					
+				else
+					
+					print("Retreated. Setting level to 50%")
+					
+					g_TigerAttack = 1
+					g_Tigerflag = 1
+					
+					Scar_Autosave(359052) -- Tiger Ace at 70%
+					
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_01", true)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_02", true)
+					SGroup_SetInvulnerable(TigerAce, 0.5) -- njr
+					
+					g_TigerThreshold = 0.5
+					v_TigerSpeech = nil
+					
+					SGroup_FaceMarker(TigerAce, mkr_TigerAce1)
+					
+					Timer_Start("TigerAttack2", time_wait)
+					time_wait = time_wait - 10
+					
+				end
+				
+			elseif g_TigerThreshold == 0.5 and retreat == true then
+				
+				if g_Tigerflag == 1 then 
+					print("Retreating as Tiger Ace is near 50% health")
+					Util_PlayMusic("SOUND/Music/genericmissionmusic_Legacy", 5, 0)			
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_01", false)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_02", false)
+					g_Tigerflag = 0
+					Timer_Start("TigerRetreat0.50", 90)
+				end	
+				
+				if Prox_AreSquadMembersNearMarker(TigerAce, mkr_TigerAce5, ANY) == false and Timer_GetRemaining("TigerRetreat0.50") > 0 then 
+					
+					Cmd_Ability(TigerAce, ABILITY.SP.DEFENSIVE_SMOKE, nil, nil, true)
+					Cmd_Move(TigerAce, mkr_TigerAce5)
+					
+				else
+					
+					print("Retreated. Setting level to 35%")
+					
+					g_TigerAttack = 1
+					g_Tigerflag = 1
+					
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_01", true)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_02", true)
+					SGroup_SetInvulnerable(TigerAce, 0.35) -- njr
+					
+					g_TigerThreshold = 0.35 
+					v_TigerSpeech = nil
+					
+					SGroup_FaceMarker(TigerAce, mkr_TigerAce1)
+					
+					Timer_Start("TigerAttack2", time_wait)
+					time_wait = time_wait - 10
+					
+				end
+				
+			elseif g_TigerThreshold == 0.35 and retreat == true then 
+				
+				if g_Tigerflag == 1 then 
+					print("Retreating as Tiger Ace is near 35% health")
+					Util_PlayMusic("SOUND/Music/genericmissionmusic_Legacy", 5, 0)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_01", false)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_02", false)
+					g_Tigerflag = 0
+					Timer_Start("TigerRetreat0.35", 80)
+				end
+				
+				if Prox_AreSquadMembersNearMarker(TigerAce, mkr_TigerAce6, ANY) == false and Timer_GetRemaining("TigerRetreat0.35") > 0 then 
+					
+					Cmd_Ability(TigerAce, ABILITY.SP.DEFENSIVE_SMOKE, nil, nil, true)
+					Cmd_Move(TigerAce, mkr_TigerAce6)
+					
+				else
+					
+					print("Retreated. Setting level to 25%")
+					
+					g_TigerAttack = 1
+					g_Tigerflag = 1
+					
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_01", true)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_02", true)
+					SGroup_SetInvulnerable(TigerAce, 0.25) -- njr
+					g_TigerThreshold = 0.25
+					v_TigerSpeech = nil
+					
+					SGroup_FaceMarker(TigerAce, mkr_TigerAce1)
+					
+					Timer_Start("TigerAttack2", time_wait)
+					time_wait = time_wait - 10
+					
+				end
+				
+			elseif g_TigerThreshold == 0.25 and retreat == true then 
+				
+				if g_Tigerflag == 1 then 
+					print("Retreating as Tiger Ace is near 25% health")
+					Util_PlayMusic("Sound/Music/sp/M14/m14_Ob2_MopUp", 5, 0)	-- switch the music to the "finish him!" score
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_01", false)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_02", false)
+					g_Tigerflag = 0
+					Timer_Start("TigerRetreat0.25", 70)
+				end
+				
+				if Prox_AreSquadMembersNearMarker(TigerAce, mkr_TigerAce7, ANY) == false and Timer_GetRemaining("TigerRetreat0.25") > 0 then 
+					
+					Cmd_Ability(TigerAce, ABILITY.SP.DEFENSIVE_SMOKE, nil, nil, true)
+					Cmd_Move(TigerAce, mkr_TigerAce7)
+					
+				else			
+					
+					print("Retreated. Setting level to 0%")
+					
+					g_TigerAttack = 1
+					g_Tigerflag = 1
+					
+					Scar_Autosave(359053) -- Tiger Ace at 30%
+					
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_01", true)
+					SGroup_SetAutoTargetting(TigerAce, "hardpoint_02", true)
+					SGroup_SetInvulnerable(TigerAce, false) -- njr
+					
+					v_TigerSpeech = nil
+					g_TigerThreshold = 0 
+					
+					SGroup_FaceMarker(TigerAce, mkr_TigerAce1)
+					
+					Timer_Start("TigerAttack2", time_wait)
+					time_wait = time_wait - 10
+					
+				end			
+				
+			end
+		end	
+	elseif SGroup_GetAvgHealth(TigerAce) < 0.26 and SGroup_Count(TigerAce) == 1 then 
+		
+		if g_Tigerflag == 1 then 
+			SGroup_SetAutoTargetting(TigerAce, "hardpoint_01", false)
+			SGroup_SetAutoTargetting(TigerAce, "hardpoint_02", false)
+			g_Tigerflag = 0
+			SGroup_SetInvulnerable(TigerAce, true)
+			Timer_Start("TigerRetreatLast", 90)
+			
+			--SGroup_FaceMarker(TigerAce, mkr_TigerAce1)
+		end
+		
+		if Prox_AreSquadMembersNearMarker(TigerAce, mkr_TigerAce8, ANY) == false and Timer_GetRemaining("TigerRetreatLast") > 0 then 
+			
+			--Cmd_StopStationaryAttack(TigerAce)
+			
+			--Cmd_SquadPath(TigerAce, "TigerPath", true, false, false, 0)
+			g_Tigerphase = 8
+			Cmd_Ability(TigerAce, ABILITY.SP.DEFENSIVE_SMOKE, nil, nil, true)
+			Cmd_Move(TigerAce, mkr_TigerAce8)
+			
+			print("g_Tigerphase 8 top")
+		else
+			g_TigerAttack = 0
+			SGroup_SetAutoTargetting(TigerAce, "hardpoint_01", true)
+			SGroup_SetAutoTargetting(TigerAce, "hardpoint_02", true)
+			SGroup_SetInvulnerable(TigerAce, false)
+			SGroup_FaceMarker(TigerAce, mkr_TigerAce1)
+			--Cmd_StationaryAttack(TigerAce, nil)		
+			print("g_Tigerphase 8 bottom")		
+		end						
+	end
+end
+
+function Action_TigerStop()
+	Cmd_Stop(TigerAce)
+end
+
+
+
+
+function Action_Field()
+--send units to flank the player
+
+	for i = 1, table.getn(table_Field) do 	
+		
+		--if table_Field[i].phase == 0 then 
+		if SGroup_TotalMembersCount(table_Field[i].sgroup) == 2 then 
+			Cmd_Move(table_Field[i].sgroup, Marker_Exit1)
+		end
+		
+		local sectorID = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(table_Field[i].field))		
+		SGroup_Clear(table_Field[i].flankunit)
+		Player_GetAllSquadsNearMarker(player1, table_Field[i].flankunit, sectorID)
+		
+		if SGroup_Count(table_Field[i].flankunit) > 0 then 
+			local flanks = {}
+			for j = table.getn(table_Field[i].flank), 1, -1 do
+				local thisfield = table_Field[i].flank[j]
+				if SGroup_Count(table_Field[thisfield].sgroup) >= 1 then
+					table.insert(flanks, thisfield)
+				end
+			end
+			
+			if table.getn(flanks) > 0  then
+				local flankfield = flanks[World_GetRand(1, table.getn(flanks))]
+				local flankgroup = table_Field[flankfield].sgroup
+				local sectorID = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(table_Field[i].field))
+				
+				table_Field[i].phase = 1
+				if g_TigerAttack == 1 and Timer_GetRemaining("TigerAttack2") == 0 and SGroup_GetAvgHealth(TigerAce) > 0.3 then 
+					
+					print("Flanking field "..i)
+					print("Tank Group: "..SGroup_Count(table_Field[i].tank).."  Targetting: "..SGroup_Count(table_Field[i].flankunit))
+					
+					Cmd_AttackMove(table_Field[i].tank, table_Field[i].flankunit )
+					Cmd_AttackMove(table_Field[i].ostwindtank, table_Field[i].flankunit)
+					if SGroup_TotalMembersCount(flankgroup) > 2 then 
+						Cmd_AttackMove(flankgroup, SGroup_GetPosition_EVEN_IF_EMPTY(table_Field[i].flankunit), nil, nil, 20)
+						print("attacking flank")
+					else
+						Cmd_Move(flankgroup, Marker_Exit1)
+					end
+					
+				end
+				if SGroup_Count(table_Field[i].flankunit) == 0 then 
+					if SGroup_TotalMembersCount(table_Field[i].ostwindtank) > 0 then 
+						Cmd_Move(table_Field[i].ostwindtank, TigerAce, nil, nil, nil, table_Field[i].offset, 6)
+					end
+					Timer_Start("TigerAttack", 0)
+					SGroup_AddGroup(table_Field[i].sgroup, flankgroup)
+					SGroup_Clear(flankgroup)
+					table_Field[i].phase = 1
+				end
+				
+			end
+		end
+		
+		-- get them to go to a marker position because they belong to the field now
+		--if table_Field[i].phase == 1 then 
+		if g_TigerAttack == 1 then 
+			local sectorID = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(table_Field[i].field))
+			SGroup_Clear(table_Field[i].checkunit)
+			Player_GetAllSquadsNearMarker(player1, table_Field[i].checkunit, sectorID)
+			if Player_OwnsEGroup(player2, table_Field[i].field) == false and SGroup_Count(table_Field[i].sgroup) > 0 and SGroup_Count(table_Field[i].checkunit) == 0 then 
+				if SGroup_TotalMembersCount(table_Field[i].sgroup) > 1 and EGroup_CountSpawned(table_Field[i].field) >= 1 then
+					Cmd_AttackMoveThenCapture(table_Field[i].sgroup, table_Field[i].field, true) 
+					print("capture capture")
+				end
+			end
+			if Player_OwnsEGroup(player2, table_Field[i].field) and SGroup_Count(table_Field[i].sgroup) > 0 and SGroup_IsAttackMoving(table_Field[i].sgroup, ANY) == false then
+			
+				local sgroup = table_Field[i].sgroup
+				local positions = table_Field[i].position
+	
+			
+				-- check all of the positions, and see if the squad is near any of them
+	--~ 				local flag = false
+	--~ 				for n = 1,  table.getn(positions) do 
+	--~ 					if Prox_AreSquadsNearMarker(sgroup, positions[n], ANY) == true then 
+	--~ 						flag = true
+	--~ 						break
+	--~ 					end
+	--~ 				end
+			
+			-- if the flag is false (i.e. the squad ISN'T near a marker)
+				--if flag == false then 
+				if Prox_AreSquadMembersNearMarker(sgroup, sectorID, ANY) == false then 
+					local positions = table_Field[i].position
+					local destinationfield = positions[World_GetRand(1, table.getn(positions))]
+					if SGroup_TotalMembersCount(table_Field[i].sgroup) > 2 then
+						Cmd_Move(table_Field[i].sgroup, destinationfield)
+						table_Field[i].phase = 0
+					end
+					--addtotable
+				end
+			end
+		end
+	end	
+	
+-- to fill in the reinforce each hedgerow
+	for i = 1, table.getn(table_Field) do 
+		if Player_OwnsEGroup(player2, table_Field[i].field) == true and SGroup_Count(table_Field[i].sgroup) == 0 then 
+			local sectorID = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(table_Field[i].field))					
+			SGroup_Clear(table_Field[i].frontunit)
+			Player_GetAllSquadsNearMarker(player1, table_Field[i].frontunit, sectorID)
+			
+			if SGroup_Count(table_Field[i].frontunit) == 0 then 
+				local fronts = {}
+				for j = table.getn(table_Field[i].front), 1, -1 do
+					local thisfield = table_Field[i].front[j]
+					if SGroup_Count(table_Field[thisfield].sgroup) >= 1 then
+						table.insert(fronts, thisfield)
+						
+					else 
+						break
+					end
+				end
+			
+				if table.getn(fronts) > 0  then
+					local frontfield = fronts[World_GetRand(1, table.getn(fronts))]
+					local frontgroup = table_Field[frontfield].sgroup
+					local frontpoint = table_Field[frontfield].field
+					local positions = table_Field[i].position
+					local destinationfield = positions[World_GetRand(1, table.getn(positions))]
+					local sectorID = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(table_Field[frontfield].field))
+					--Player_GetAllSquadsNearMarker(player1, table_Field[i].checkunit, sectorID)
+--~ 					Player_GetAllSquadsNearMarker(player1, table_Field[i].checkunit, table_Field[i].marker)
+--~ 					if SGroup_Count(table_Field[i].checkunit) == 0 then 
+				
+					--	if Player_OwnsEGroup(player2, table_Field[i].field) == true then 
+							--Cmd_Move(frontgroup, destinationfield)
+						if SGroup_Count(frontgroup) > 0 then 
+							SGroup_AddGroup(table_Field[i].sgroup, frontgroup)
+							SGroup_Clear(frontgroup)
+							table_Field[i].phase = 1
+						end
+--~ 						elseif 	Player_OwnsEGroup(player2, table_Field[i].field) == false then 
+--~ 							Cmd_AttackMoveThenCapture(frontgroup, frontpoint, true)
+--~ 							SGroup_AddGroup(table_Field[i].sgroup, frontgroup)
+--~ 							SGroup_Clear(frontgroup)
+--~ 							table_Field[i].phase = 1
+						--end	
+					--end					
+				end	
+			end
+		end
+	end
+	-- if player 2 doesnt own the field 
+	for i = 1, table.getn(table_Field) do 
+		if Player_OwnsEGroup(player2, table_Field[i].field) == false then 
+			local fronts = {}
+				for j = table.getn(table_Field[i].front), 1, -1 do
+					local thisfield = table_Field[i].front[j]
+					if SGroup_Count(table_Field[thisfield].sgroup) >= 1 then
+						table.insert(fronts, thisfield)
+					end
+				end
+			
+			--Player_GetAllSquadsNearMarker(player1, table_Field[i].checkunit, table_Field[i].marker)
+			--Player_GetAllSquadsNearMarker(player1, table_Field[i].checkunit, sectorID)
+			if table.getn(fronts) > 0  and table_Field[i].active == true then
+				print("getting check unit")
+				local frontfield = fronts[World_GetRand(1, table.getn(fronts))]
+				local frontgroup = table_Field[frontfield].sgroup
+				local frontpoint = table_Field[frontfield].field
+				local positions = table_Field[i].position
+				local destinationfield = positions[World_GetRand(1, table.getn(positions))]
+				
+				local sectorID = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(table_Field[i].field))
+				SGroup_Clear(table_Field[i].checkunit)
+				Player_GetAllSquadsNearMarker(player1, table_Field[i].checkunit, sectorID)
+				--Player_GetAllSquadsNearMarker(player1, table_Field[i].checkunit, table_Field[i].marker)
+				if SGroup_Count(table_Field[i].checkunit) == 0 and SGroup_Count(table_Field[i].sgroup) == 0 then 
+					print("capturing piont")
+					--Cmd_AttackMoveThenCapture(table_Field[15].sgroup, table_Field[15].field, true)
+					if SGroup_TotalMembersCount(frontgroup) > 2 and EGroup_CountSpawned(table_Field[i].field) >= 1 then 
+						Cmd_AttackMoveThenCapture(frontgroup, table_Field[i].field, true) 
+						SGroup_AddGroup(table_Field[i].sgroup, frontgroup)
+						SGroup_Clear(frontgroup)
+						table_Field[i].phase = 1
+					end
+				end
+			else 
+				break
+			end
+		end
+		if SGroup_Count(sg_field8) == 0  and Timer_GetRemaining("Timer_Hedgerow") == 0 and Player_OwnsEGroup(player2, Blg_Stronghold1) then 
+			local value = World_GetRand(1, table.getn(table_RandomUnit))
+			local unittype = table_RandomUnit[value]
+			Util_CreateSquadsAtMarker(player2, sg_field8, unittype, Marker_Blg_Stronghold1, 1, 4)
+			HedgerowTimer = HedgerowTimer + 5
+			Timer_Start("Timer_Hedgerow", HedgerowTimer)			
+		end
+	end
+
+end	
+
+
+function Action_PanzerGamma()
+
+	for i = 1, table.getn(table_PanzerGamma) do 
+		
+		if SGroup_Count(table_PanzerGamma[i].sgroup) == 0 and Player_OwnsEGroup(player2, table_PanzerGamma[i].stronghold) == true and  Timer_GetRemaining(table_PanzerGamma[i].timername) == 0 and table_PanzerGamma[i].phase == 1 then -- and player is not in the field
+			
+			Util_CreateSquadsAtMarkerFacing(player2, table_PanzerGamma[i].sgroup, table_PanzerGamma[i].unit, table_PanzerGamma[i].spawn, table_PanzerGamma[i].facing, 1, table_PanzerGamma[i].count) 
+			if World_GetRand(1, difficulty.panzer_skirt_chance) == 1 then -- chance of a skirt upgrade dependant on difficulty
+				Cmd_InstantUpgrade(table_PanzerGamma[i].sgroup, UPG.AXIS.PANZER_ARMOR)
+			end
+			
+			table_PanzerGamma[i].flag = 0
+			gammaphase = World_GetRand(2, maxvar)
+			print("getting random: "..gammaphase)
+			table_PanzerGamma[i].phase = gammaphase
+			if gammaphase == 5 and (Player_OwnsEGroup(player2, table_PanzerGamma[i].field1) and Player_OwnsEGroup(player2, table_PanzerGamma[i].field2) and Player_OwnsEGroup(player2, table_PanzerGamma[i].field3) ) then  
+				gammaphase = World_GetRand(2, 4)
+				
+				table_PanzerGamma[i].phase = gammaphase
+				table_PanzerGamma[i].phase= 0 
+			end
+			
+			
+		end
+		if SGroup_TotalMembersCount(table_PanzerGamma[i].sgroup) == 0 and Player_OwnsEGroup(player2, table_PanzerGamma[i].stronghold) == true and table_PanzerGamma[i].phase == 0 then 
+			Timer_Start(table_PanzerGamma[i].timername, table_PanzerGamma[i].timer)			
+			table_PanzerGamma[i].phase = 1
+		end
+		if SGroup_Count(table_PanzerGamma[i].sgroup) == 0 and table_PanzerGamma[i].phase ~= 1 then 
+			table_PanzerGamma[i].phase = 0
+		end
+		
+		
+		if SGroup_Count(table_PanzerGamma[i].sgroup) == 1 and (table_PanzerGamma[i].phase == 2  or table_PanzerGamma[i].phase == 3 or table_PanzerGamma[i].phase == 4 ) then
+			if Player_OwnsEGroup(player2, table_PanzerGamma[i].field3) == true and Player_OwnsEGroup(player2, table_PanzerGamma[i].field2) == true and Player_OwnsEGroup(player2, table_PanzerGamma[i].field1) == true then 		
+				SGroup_Clear(table_PanzerGamma[i].temp)
+				Player_GetAllSquadsNearMarker(player1, table_PanzerGamma[i].temp, table_PanzerGamma[i].sector1)	
+				
+				if SGroup_Count(table_PanzerGamma[i].temp) > 0 and table_PanzerGamma[i].flag == 2 then 
+				
+					Cmd_Attack(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].temp, nil, true)
+					--Cmd_Attack(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].temp, true)
+					table_PanzerGamma[i].flag = 3
+	
+				elseif SGroup_Count(table_PanzerGamma[i].temp) == 0 and table_PanzerGamma[i].flag == 3 then 
+					table_PanzerGamma[i].flag = 0
+				end
+				if table_PanzerGamma[i].flag == 0 then 
+					local positions1 = table_PanzerGamma[i].spot4
+					table_PanzerGamma[i].marker1 = positions1[World_GetRand(1, table.getn(positions1))]
+					table_PanzerGamma[i].flag = 1
+					print("go1")
+				end
+				if table_PanzerGamma[i].flag == 1 then 
+					if Prox_AreSquadMembersNearMarker(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker1, ANY) == false then 
+						Cmd_Move(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker1)
+						AddToTable(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker1,  table_PanzerGamma[i].facing)
+						if Prox_AreSquadMembersNearMarker(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker1, ANY) == true then 
+							table_PanzerGamma[i].flag = 2
+						end
+						print("go2")
+					end
+				end
+			elseif Player_OwnsEGroup(player2, table_PanzerGamma[i].field3) == true and Player_OwnsEGroup(player2, table_PanzerGamma[i].field2) == true and Player_OwnsEGroup(player2, table_PanzerGamma[i].field1) == false then	
+				SGroup_Clear(table_PanzerGamma[i].temp)
+				Player_GetAllSquadsNearMarker(player1, table_PanzerGamma[i].temp, table_PanzerGamma[i].sector2)	
+				if SGroup_Count(table_PanzerGamma[i].temp) > 0 and table_PanzerGamma[i].flag == 2 then 
+					Cmd_Attack(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].temp, true)
+					table_PanzerGamma[i].flag = 3
+				elseif SGroup_Count(table_PanzerGamma[i].temp) == 0 and table_PanzerGamma[i].flag == 3 then 
+					table_PanzerGamma[i].flag = 0
+				end
+				if table_PanzerGamma[i].flag == 0 then 
+					local positions2 = table_PanzerGamma[i].spot3
+					table_PanzerGamma[i].marker2 = positions2[World_GetRand(1, table.getn(positions2))]
+					table_PanzerGamma[i].flag = 1
+				end
+				if table_PanzerGamma[i].flag == 1 then
+					if Prox_AreSquadMembersNearMarker(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker2, ANY) == false then 
+						Cmd_Move(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker2)
+						AddToTable(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker2,  table_PanzerGamma[i].facing)
+						if Prox_AreSquadMembersNearMarker(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker2, ANY) == true then 
+							table_PanzerGamma[i].flag = 2
+						end
+					end
+				end
+			elseif Player_OwnsEGroup(player2, table_PanzerGamma[i].field3) == true and Player_OwnsEGroup(player2, table_PanzerGamma[i].field2) == false and Player_OwnsEGroup(player2, table_PanzerGamma[i].field1) == false then		
+				SGroup_Clear(table_PanzerGamma[i].temp)
+				Player_GetAllSquadsNearMarker(player1, table_PanzerGamma[i].temp, table_PanzerGamma[i].sector3)	
+				if SGroup_Count(table_PanzerGamma[i].temp) > 0 and table_PanzerGamma[i].flag == 2 then 
+					Cmd_Attack(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].temp, true)					
+					table_PanzerGamma[i].flag = 3
+				elseif SGroup_Count(table_PanzerGamma[i].temp) == 0 and table_PanzerGamma[i].flag == 3 then 
+					table_PanzerGamma[i].flag = 0
+				end
+				if table_PanzerGamma[i].flag == 0 then 
+					local positions3 = table_PanzerGamma[i].spot2
+					table_PanzerGamma[i].marker3 = positions3[World_GetRand(1, table.getn(positions3))]
+					table_PanzerGamma[i].flag = 1
+				end
+				if table_PanzerGamma[i].flag == 1 then 
+					if Prox_AreSquadMembersNearMarker(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker3, ANY) == false  then
+						Cmd_Move(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker3)
+						AddToTable(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker3,  table_PanzerGamma[i].facing)
+						if Prox_AreSquadMembersNearMarker(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker3, ANY) == true then 
+							table_PanzerGamma[i].flag = 2
+						end
+					end
+				end	
+			elseif Player_OwnsEGroup(player2, table_PanzerGamma[i].field3) == false and Player_OwnsEGroup(player2, table_PanzerGamma[i].field2) == false and Player_OwnsEGroup(player2, table_PanzerGamma[i].field1) == false then
+				SGroup_Clear(table_PanzerGamma[i].temp)
+				Player_GetAllSquadsNearMarker(player1, table_PanzerGamma[i].temp, table_PanzerGamma[i].sector3)	
+				if SGroup_Count(table_PanzerGamma[i].temp) > 0 and table_PanzerGamma[i].flag == 2 then 
+					Cmd_Attack(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].temp, nil, true)
+					--Cmd_Attack(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].temp, true)
+					table_PanzerGamma[i].flag = 3
+				elseif SGroup_Count(table_PanzerGamma[i].temp) == 0 and table_PanzerGamma[i].flag == 3 then 
+					table_PanzerGamma[i].flag = 0
+				end
+				if table_PanzerGamma[i].flag == 0 then 
+					local positions4 = table_PanzerGamma[i].spot1
+					table_PanzerGamma[i].marker4 = positions4[World_GetRand(1, table.getn(positions4))]
+					table_PanzerGamma[i].flag = 1
+				end
+				if table_PanzerGamma[i].flag == 1 then 
+					if Prox_AreSquadMembersNearMarker(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker4, ANY) == false then
+						Cmd_Move(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker4)
+						AddToTable(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker4,  table_PanzerGamma[i].facing)
+						if Prox_AreSquadMembersNearMarker(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker4, ANY) == true then 
+							table_PanzerGamma[i].flag = 2
+						end
+						--print("hello")
+					end
+					
+				end		
+			end 
+		end
+--~ 		if SGroup_Count(table_PanzerGamma[i].sgroup) == 1 and table_PanzerGamma[i].phase == 3  then
+--~ 			local sectorID1 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(table_PanzerGamma[i].field4))		
+--~ 			Player_GetAllSquadsNearMarker(player1, table_PanzerGamma[i].temp, sectorID1)	
+--~ 			if SGroup_Count(table_PanzerGamma[i].temp) > 0 then 
+--~ 				Cmd_Attack(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].temp, true)
+--~ 			elseif Prox_AreSquadMembersNearMarker(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker1, ANY) == false then 
+--~ 				Cmd_Move(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker1)
+--~ 				AddToTable(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker1,  table_PanzerGamma[i].facing)
+--~ 			end
+--~ 		end
+--~ 		if SGroup_Count(table_PanzerGamma[i].sgroup) == 1 and table_PanzerGamma[i].phase == 4  then
+--~ 			local sectorID1 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(table_PanzerGamma[i].field4))		
+--~ 			Player_GetAllSquadsNearMarker(player1, table_PanzerGamma[i].temp, sectorID1)	
+--~ 			if SGroup_Count(table_PanzerGamma[i].temp) > 0 then 
+--~ 				Cmd_Attack(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].temp, true)
+--~ 			elseif Prox_AreSquadMembersNearMarker(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker1, ANY) == false then 
+--~ 				Cmd_Move(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker1)
+--~ 				AddToTable(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].marker1,  table_PanzerGamma[i].facing)
+--~ 			end
+--~ 		end
+		if SGroup_Count(table_PanzerGamma[i].sgroup) == 1 and table_PanzerGamma[i].phase == 5  then	
+			if SGroup_Count(table_PanzerGamma[i].attack) > 0 then 				
+				if Player_OwnsEGroup(player2, table_PanzerGamma[i].field1) == false then 
+					Cmd_AttackMove(table_PanzerGamma[i].attack, EGroup_GetPosition_EVEN_IF_EMPTY(table_PanzerGamma[i].field1))					
+					Cmd_AttackMove(table_PanzerGamma[i].sgroup, EGroup_GetPosition_EVEN_IF_EMPTY(table_PanzerGamma[i].field1))
+					print("capturing point1")
+					if Player_OwnsEGroup(player2, table_PanzerGamma[i].field1) == true 	then 
+						table_PanzerGamma[i].phase = 0
+					end
+				elseif Player_OwnsEGroup(player2, table_PanzerGamma[i].field2) == false then 
+					Cmd_AttackMove(table_PanzerGamma[i].attack, EGroup_GetPosition_EVEN_IF_EMPTY(table_PanzerGamma[i].field2))	
+					Cmd_AttackMove(table_PanzerGamma[i].sgroup, EGroup_GetPosition_EVEN_IF_EMPTY(table_PanzerGamma[i].field2))
+					if Player_OwnsEGroup(player2, table_PanzerGamma[i].field1) == true then
+						table_PanzerGamma[i].phase = 0
+					end
+				elseif Player_OwnsEGroup(player2, table_PanzerGamma[i].field3) == false then 
+					Cmd_AttackMove(table_PanzerGamma[i].attack, EGroup_GetPosition_EVEN_IF_EMPTY(table_PanzerGamma[i].field3))	
+					Cmd_AttackMove(table_PanzerGamma[i].sgroup, EGroup_GetPosition_EVEN_IF_EMPTY(table_PanzerGamma[i].field3))
+					if Player_OwnsEGroup(player2, table_PanzerGamma[i].field1) == true then
+						table_PanzerGamma[i].phase = 0
+					end
+				else
+					Cmd_AttackMove(table_PanzerGamma[i].attack, EGroup_GetPosition_EVEN_IF_EMPTY(Blg_HQ))
+					if EGroup_Count(Blg_HQ) == 0 then
+						table_PanzerGamma[i].phase = 0
+					end
+					print("attack HQ")
+				end
+			end
+		end
+		if SGroup_Count(table_PanzerGamma[i].sgroup) == 1 and SGroup_GetAvgHealth(table_PanzerGamma[i].sgroup) < 0.50 and table_PanzerGamma[i].phase ~= 0 then
+			Cmd_Move(table_PanzerGamma[i].sgroup, table_PanzerGamma[i].repair)
+			table_PanzerGamma[i].phase = 0
+			table_PanzerGamma[i].flag = 4
+		end
+		if SGroup_Count(table_PanzerGamma[i].sgroup) == 1 and SGroup_GetAvgHealth(table_PanzerGamma[i].sgroup) < 1.00 and table_PanzerGamma[i].phase == 0 then 
+			gammaphase = World_GetRand(2, maxvar)
+			print("getting random2")
+			table_PanzerGamma[i].phase = gammaphase
+			table_PanzerGamma[i].flag = 0
+			
+		end
+		
+	end
+	
+end
+	
+
+	
+	
+	
+
+
+--
+-- Medal Op: Destroy X Axis Vehicles
+--
+function MedalOp_Start()
+
+	local killed = Stats_VehiclesKilled( player1 ) 
+
+	if killed >= 5 and Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		medalop_killed = killed
+		
+		Objective_Start(MEDALOBJECTIVE)
+		Objective_SetCounter(MEDALOBJECTIVE, medalop_killed, difficulty.medalop_target)
+		
+		Rule_AddInterval(MedalOp_Monitor, 2)
+		
+	end
+	
+end
+
+function MedalOp_Monitor()
+
+	local killed = Stats_VehiclesKilled( player1 ) 
+
+	if killed > medalop_killed then
+		
+		medalop_killed = killed
+		
+		-- cap it if needs be
+		if medalop_killed > difficulty.medalop_target then
+			medalop_killed = difficulty.medalop_target
+		end
+		
+		Objective_SetCounter(MEDALOBJECTIVE, medalop_killed, difficulty.medalop_target)
+		
+		if medalop_killed == difficulty.medalop_target then
+			
+			Rule_RemoveMe()
+			Objective_Complete(MEDALOBJECTIVE)
+			
+--			Scar_Autosave(359051) -- Medal Awarded
+			
+		end
+		
+	end
+	
+end
+
+
+
+
+
+-- constantly generate halftracks that drive across the end section (started up by entering the back three regions)
+function Action_AmbientHalftrack()
+
+	if g_createdHalftracks == false then
+		
+		if SGroup_Count(sg_AllyResource10) + SGroup_Count(sg_AllyResource11) + SGroup_Count(sg_AllyResource12) > 0 then
+			g_createdHalftracks = true
+			Timer_Start("car1", 2)
+			Timer_Start("car2", 10)
+		end
+		
+	else
+		
+		if SGroup_Count(car1) == 0 and Timer_GetRemaining("car1") == 0 and g_total_car1 < difficulty.maxhalftracks and Prox_ArePlayersNearMarker(player1, Marker_TruckSpawn1, ANY, 50) == false then 
+			g_total_car1 = g_total_car1 + 1
+			Util_CreateSquadsAtMarkerFacing(player2, car1, SBP.AXIS.HALFTRACK, Marker_TruckSpawn1, Marker_Spawn2, 1) 
+			Cmd_SquadPath(car1, "Path1", true, false, false, 0)
+			Timer_Start("car1", World_GetRand(10, 20))
+		elseif SGroup_Count(car2) == 0 and Timer_GetRemaining("car2") == 0 and g_total_car2 < difficulty.maxhalftracks and Prox_ArePlayersNearMarker(player1, Marker_TruckSpawn2, ANY, 50) == false then 
+			g_total_car2 = g_total_car2 + 1
+			Util_CreateSquadsAtMarkerFacing(player2, car2, SBP.AXIS.HALFTRACK, Marker_TruckSpawn2, Marker_Spawn1, 1) 
+			Cmd_SquadPath(car2, "Path2", true, false, false, 0)
+			Timer_Start("car2", World_GetRand(10, 20))
+		end
+		
+		if g_total_car1 == difficulty.maxhalftracks and g_total_car2 == difficulty.maxhalftracks then
+			Rule_RemoveMe()
+		end
+		
+	end
+	
+end
+
+
+	
+function Action_DestroyAll()
+	Player_GetAllSquadsNearMarker(player2, sg_leaving, Marker_Exit1)
+	
+	if SGroup_ContainsSGroup(sg_leaving, car1, ANY) then
+		g_total_car1 = g_total_car1 - 1
+	end
+	if SGroup_ContainsSGroup(sg_leaving, car2, ANY) then
+		g_total_car2 = g_total_car2 - 1
+	end
+	
+	if SGroup_Count(sg_leaving) > 0 then 
+		SGroup_DestroyAllSquads(sg_leaving)
+	end 
+end
+
+
+
+
+function Action_ResourcePoint()
+	if Player_OwnsEGroup(player1, Resource1) or Player_OwnsEGroup(player1, Resource2) then 
+		maxvar = 5
+		Rule_RemoveMe()
+	end 
+end 
+
+
+function Objective1()
+
+	if SGroup_Count(TigerAce) == 0 then
+		
+		Rule_RemoveMe()
+		Rule_RemoveAll()
+		
+		Objective_Complete(OBJECTIVE1, false)
+		
+		Player_GetAllSquadsNearMarker(player2, sg_AllAxis2, sectorID12)
+ 		Cmd_Move(sg_AllAxis2, Marker_Exit1)
+		
+		Rule_AddOneShot(Objective1_PartB, 4)
+		
+	end
+	
+end
+function Objective1_PartB()
+	Util_StartNIS(EVENTS.Objective1Complete)
+	Rule_Add(Mission_CompleteOver)
+end
+
+
+
+function Mission_CompleteOver()
+
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		Game_EndSP(true, nil, true)
+		
+	end
+
+end
+
+
+
+
+
+
+function SGroup_GetLastAttacker(sgroup1, sgroup2)
+
+	local _CheckSquad = function(gid, idx, sid)
+		Squad_GetLastAttacker(sid, sgroup2)
+	end
+	SGroup_ForEach(sgroup1, _CheckSquad)
+	
+end
+
+
+function ToggleGamePause()
+	gamepause = not gamepause
+end
+
+
+
+
+-- once the NIS is over go here
+
+-- and end the mission
+
+function DoNothing()
+end
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+--Fail conditions
+---------------------
+
+function M15_CheckPlayerFail()
+
+	if Player_HasLost(player1, CRITICAL_BUILDINGS.ALLIES) then
+		Game_EndSP(false, 359934, true)
+	end
+	
+end
+	
+

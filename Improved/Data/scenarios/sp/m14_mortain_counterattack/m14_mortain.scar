@@ -1,0 +1,838 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+--
+-- Script File for Mission 14 Mortain
+--
+-------------------------------------------------------------------------
+------------------------------------------------------------------------
+
+import("ScarUtil.scar")
+import("WinConditions/VPTickerWin-Annihilate.scar")
+g_VPConditionsLoaded = true
+
+-------------------------------------------------------------------------
+-- STARTUP SCRIPTS
+-------------------------------------------------------------------------
+
+-- Called immediately on startup, this just sets out some parameters for the mission
+function OnGameSetup()
+	player1 = Setup_Player(1,349040,TRACE_ALLIES,1)
+	player2 = Setup_Player(2,349041,TRACE_AXIS,2) --Axis AI West
+ 	player3 = Setup_Player(3,349042,TRACE_ALLIES, 1)
+	player4 = Setup_Player(4,349041,TRACE_AXIS,2) --Axis AI East
+--~ 	player4 = Setup_Player(4,"Dog Company", TRACE_ALLIES, 1)
+--~ 	player5 = Setup_Player(5,"101st Airborne Company",TRACE_ALLIES,1)
+--~ 	player6 = Setup_Player(6,"Luftwaffe 6th Parachute Regiment ",TRACE_AXIS, TEAM_NEUTRAL)		-- neutral enemy player, used for special units like the damaged Stug
+end
+function OnGameRestore()
+
+	-- assign player IDs again
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+ 	player3 = World_GetPlayerAt(3)
+	player4 = World_GetPlayerAt(4)
+--~ 	player5 = World_GetPlayerAt(5)
+--~ 	player6 = World_GetPlayerAt(6)
+
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+	
+	-- restore the AI for this mission
+	AI_on()
+end
+
+function Initialize_OBJECTIVE1()
+	OBJECTIVE1 =
+	{
+		SetupUI = function()
+			Objective_AddUIElements( OBJECTIVE1, MRK_ABBEY_VP, true)
+			Objective_AddUIElements( OBJECTIVE1, MRK_S_ROAD_VP, true)
+			Objective_AddUIElements( OBJECTIVE1, MRK_HILL_VP, true)
+			Objective_AddUIElements( OBJECTIVE1, MRK_SE_PASTURE_VP, true)
+		end,
+		
+		OnStart = function()
+			Camera_FollowSGroup(sg_dog1)
+			Util_PlayMusic("SOUND/Music/genericmissionmusic_Legacy", 0, 0)
+			VPTickerData.checkGameEnd = false
+			Rule_AddInterval( obj_complete_check, 1 )
+			Rule_AddInterval( player_loss_base_check, 5 )
+			Rule_AddOneShot( start_medalobj, 25 )
+			
+			-- add the 88 obj check
+			Rule_AddOneShot( delay_obj2, 25 )
+		end,
+		
+		OnComplete = function()
+			Rule_Remove( obj_complete_check ) 
+--			Util_MissionTitle( 349420 )
+			Rule_AddOneShot(game_end_win, 2) 
+		
+			
+			
+		end,
+		
+		IsComplete = function()
+		end,
+		
+		OnFail = function()
+			Rule_AddOneShot(game_end_loss, 8) 
+		end,
+		
+		SitRep =
+			{
+				Movie = "SR_14-01",
+				Force = true,
+				SpeechTiming =
+				{
+					{ 0.5, ACTOR.Conti, 340100 },
+					{ 5.5, ACTOR.Conti, 340110 },
+					{ 11.2, ACTOR.Conti, 340121 },
+				},
+			},
+		
+		Title = 349420,
+		Description = 349430,
+		Type = OT_Primary,
+		Icon= IT_P_Capture,
+		
+	}
+	
+	Objective_Register(OBJECTIVE1)
+	
+end
+function Initialize_OBJECTIVE2() --Secondary Obj 88's 
+
+	OBJECTIVE2 =
+	{
+	
+		SetupUI = function()
+			Objective_AddUIElements( OBJECTIVE2, MRK_88_2, true, false, false ) 
+		end,
+		
+		OnStart = function()
+
+			Rule_AddInterval( Obj2_Complete, 1 )
+--			Rule_AddInterval( Obj2_Fail, 1 )
+			
+		end,
+		
+		OnComplete = function()
+			
+		end,
+		
+		IsComplete = function()
+--			Rule_Remove( Obj2_fail )
+		end,
+		
+		OnFail = function()
+			
+		end,
+		
+		SitRep =
+			{
+				Movie = "SR_14-02",
+				Force = true,
+				SpeechTiming =
+				{
+					{ 0.95, ACTOR.Conti, 340200 },
+					{ 7.25, ACTOR.Conti, 340211 },
+				},
+			},
+		
+		Title = 349425,
+		Description = 349440,
+		Type = OT_Secondary,
+		Icon= IT_P_Attack,
+		
+	}
+	
+	Objective_Register(OBJECTIVE2)
+	
+end
+function Initialize_OBJECTIVE_MEDAL() --Medal Obj
+
+	OBJECTIVE_MEDAL =
+	{
+	
+		SetupUI = function()
+			
+		end,
+		
+		OnStart = function()
+
+			Rule_AddInterval( medal_objective_complete, 1 )
+			
+		end,
+		
+		OnComplete = function()
+			
+		end,
+		
+		IsComplete = function()
+		end,
+		
+		OnFail = function()
+			
+		end,
+		
+		OnSitRep = function()
+		
+		end,
+	
+		
+		Title = 349428,
+		Description = 349441,
+		Type = OT_Medal,
+		Icon= IT_P_Capture,
+		MedalID = MEDALS.SILVER_STAR_M14,
+		
+	}
+	
+	Objective_Register(OBJECTIVE_MEDAL)
+	
+end
+	--debug control for Mission 14 NIS
+	
+function OnInit()
+	g_MissionSpeechPath = "Mission14"
+	Sound_PreCacheSinglePlayerSpeech( g_MissionSpeechPath )	
+	-- mute the sound before the NIS plays
+	Util_MuteAmbientSound(true)
+	
+	SBP_AXIS_88FLAK_SP = BP_GetSquadBlueprint("sbps/races/axis/vehicles/88_flak_squad_sp_m01")
+	
+--	Player_KillEnemyOwnedUnits(player1)
+	
+	Game_FadeToBlack(FADE_OUT, 0)
+	Game_Letterbox(true, 0)
+	
+	FOW_RevealEGroupOnly( EG_88_invis, 1 ) -- this is just so the next line works
+	EGroup_Hide( EG_88_invis, false )
+	EGroup_SetInvulnerable( EG_88_invis, false )
+	
+	Player_SetResource( player2, RT_Munition, 500 )
+	Player_SetResource( player2, RT_Fuel, 150 )
+	Player_SetResource( player2, RT_Manpower, 950 )
+	
+	Player_SetResource( player4, RT_Munition, 500 )
+	Player_SetResource( player4, RT_Fuel, 150 )
+	Player_SetResource( player4, RT_Manpower, 950 )
+	
+	M14_Difficulty()
+	
+	Player_SetPopCapOverride(player1, 75 ) -- player
+	Player_SetPopCapOverride(player2, 75 ) -- Axis West
+	Player_SetPopCapOverride(player3, 75 ) -- not used in this mission but needed 
+	Player_SetPopCapOverride(player4, 75 ) -- Axis East
+	
+	
+	--[[ TECH TREE ]]
+	TechTreeSetup()
+	
+	Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS14_01)')]])")
+
+
+	--load lightingrestarre
+	Game_LoadAtmosphere("data:art/scenarios/presets/atmosphere/m14_lighting.aps", 0)
+	
+	
+	EG_VP_ABBEY		 	= EGroup_CreateIfNotFound("EG_VP_ABBEY")
+	EG_VP_N_FIELD 		= EGroup_CreateIfNotFound("EG_VP_N_FIELD")
+	EG_VP_N_PASS  		= EGroup_CreateIfNotFound("EG_VP_N_PASS ")
+	EG_VP_S_ROAD		= EGroup_CreateIfNotFound("EG_VP_S_ROAD")
+	EG_VP_E_PASS		= EGroup_CreateIfNotFound("EG_VP_E_PASS")
+	EG_VP_HILL			= EGroup_CreateIfNotFound("EG_VP_HILL")
+	EG_VP_SE_PASTURE	= EGroup_CreateIfNotFound("EG_VP_SE_PASTURE")
+	EG_VP_SW_FIELD		= EGroup_CreateIfNotFound("EG_VP_SW_FIELD")
+	EG_VP_MORTAIN		= EGroup_CreateIfNotFound("EG_VP_MORTAIN")
+	EG_SINGLE			= EGroup_CreateIfNotFound("EG_SINGLE")
+	EG_ALL_VP			= EGroup_CreateIfNotFound("EG_ALL_VP")
+	EG_AXIS_AI			= EGroup_CreateIfNotFound("EG_AXIS_AI")
+	EG_AXIS_AI_MINES	= EGroup_CreateIfNotFound("EG_AXIS_AI_MINES")
+	EG_AXIS_AI2			= EGroup_CreateIfNotFound("EG_AXIS_AI2")
+	
+	SG_AXIS_LOCKED		= SGroup_CreateIfNotFound("SG_AXIS_LOCKED")
+	SG_AXIS_LOCKED2		= SGroup_CreateIfNotFound("SG_AXIS_LOCKED2")
+
+	
+	Util_CreateEntities( nil, EG_ALL_VP, EBP.STRAT_POINT.VICTORY, MRK_ABBEY_VP,1)		
+	Util_CreateEntities( nil, EG_ALL_VP, EBP.STRAT_POINT.VICTORY, MRK_S_ROAD_VP,1)		
+	Util_CreateEntities( player1, EG_ALL_VP, EBP.STRAT_POINT.VICTORY, MRK_HILL_VP,1)	
+ 	Util_CreateEntities( nil, EG_ALL_VP, EBP.STRAT_POINT.VICTORY, MRK_SE_PASTURE_VP,1)	
+	
+	EGroup_Hide(LAYER_N13_01,false)
+	
+	
+	Rule_AddOneShot( ai_starting_units, 0.0 )
+	Rule_Add(Start_Mission)
+
+
+--give the AI these buildings
+
+	Rule_AddOneShot(Rule_SpawnAxisBuildings, 2)
+	
+	
+	
+	Util_CreateSquadsAtMarkerFacing( player2, SG_AXIS_LOCKED, SBP.AXIS.PAK_38, MRK_AT_west1, MRK_mine15, 1 ) 	
+	Util_CreateSquadsAtMarkerFacing( player2, SG_AXIS_LOCKED, SBP.AXIS.PAK_38, MRK_AT_west2, MRK_mine10, 1 ) 
+	
+	Util_CreateSquadsAtMarkerFacing( player4, SG_AXIS_LOCKED2, SBP.AXIS.PAK_38, MRK_AT_east1, MRK_mine21, 1 ) 	
+	Util_CreateSquadsAtMarkerFacing( player4, SG_AXIS_LOCKED2, SBP.AXIS.PAK_38, MRK_AT_east2, MRK_mine21, 1 ) 	
+	
+	Cmd_InstantUpgrade( EG_AXIS_BUNKERS, UPG.AXIS.BUNKER_MG42 )
+	
+--autosave
+	Rule_AddInterval ( autosave_300points, 2 )
+--	Rule_AddInterval ( autosave_200points, 2 )
+--	Rule_AddInterval ( autosave_100points, 2 )
+
+	
+	
+	-- use default veteran squads if necessary
+	if not Player_HasPersistentSquadFile(player1) then
+		Player_LoadPersistentSquadsFromFile(player1, "data:scenarios/sp/m14_mortain/default_veteran_squads.lua")
+	end
+	
+	--dog company units that apppear when the mission starts
+	
+	sg_temp 	= 		SGroup_CreateIfNotFound("sg_temp")
+	sg_temp1 	= 		SGroup_CreateIfNotFound("sg_temp1")
+	sg_temp2 	= 		SGroup_CreateIfNotFound("sg_temp2")
+	sg_temp3 	= 		SGroup_CreateIfNotFound("sg_temp3")
+	sg_dog1		=		SGroup_CreateIfNotFound("sg_dog1")
+	sg_dog2		=		SGroup_CreateIfNotFound("sg_dog2")
+	sg_dog3		=		SGroup_CreateIfNotFound("sg_dog3")
+	sg_dog4		=		SGroup_CreateIfNotFound("sg_dog4")
+	SG_AI2		=		SGroup_CreateIfNotFound("SG_AI4")
+	SG_AI4		=		SGroup_CreateIfNotFound("SG_AI4")
+	SG_WARP     = 		SGroup_CreateIfNotFound("SG_WARP")
+	SG_WARP2    = 		SGroup_CreateIfNotFound("SG_WARP2")
+	SG_temp5000	= 		SGroup_CreateIfNotFound("SG_temp5000")
+
+	
+	Util_CreateSquadsAtMarker(player1, sg_dog1, SBP.ALLIES.SHERMAN, MRK_M14_dog3, 1)
+	Rule_AddOneShot(Rule_SpawnCrocodile, 0.5)													-- bugfix: apparently we can't spawn the crocodile right at startup as it messes up after save/load (flamethrower is gone and tank is a normal Sherman)
+	Util_CreateSquadsAtMarker(player1, sg_dog3, SBP.ALLIES.RIFLEMEN, MRK_M14_dog4, 1)
+	Util_CreateSquadsAtMarker(player1, sg_dog4, SBP.ALLIES.M10, MRK_M14_dog1, 1)
+	
+	Camera_MoveToSGroup( sg_dog1 )
+	
+	
+	SG_88 		= 		SGroup_CreateIfNotFound( "SG_88" )
+	SG_881 		= 		SGroup_CreateIfNotFound( "SG_881" )
+	SG_882 		= 		SGroup_CreateIfNotFound( "SG_882" )
+	SG_883		= 		SGroup_CreateIfNotFound( "SG_883" )
+	
+	Util_CreateSquadsAtMarkerFacing( player4, SG_88, SBP_AXIS_88FLAK_SP, MRK_88_5, bombard6, 1 )
+	Util_CreateSquadsAtMarkerFacing( player4, SG_88, SBP_AXIS_88FLAK_SP, MRK_88_6, MRK_S_ROAD_VP, 1 )
+	
+	EG_spawnedHQ			 =	EGroup_CreateIfNotFound( "EG_spawnedHQ" )
+	
+	EG_doomed_buildings 	 =  EGroup_CreateIfNotFound( "EG_doomed_buildings" )
+	
+	Initialize_OBJECTIVE1()
+	Initialize_OBJECTIVE2()
+	Initialize_OBJECTIVE_MEDAL()
+	
+ 	Rule_AddOneShot( HQ_check, 0 )
+	--Rule_AddInterval(medal_objective_start, 30)
+	Rule_AddOneShot(AI_on, 100)
+	
+	
+	Player_GetAllSquadsNearMarker(player2, SG_temp5000, abbey_radius_trigger)
+	SGroup_DestroyAllSquads( SG_temp5000 )
+	
+	Rule_AddInterval(minefield_speech1, 1)
+	Rule_AddInterval(minefield_speech2, 1)
+	Rule_AddInterval(minefield_speech3, 1)
+	
+	Rule_AddInterval(abbey_speech, 1)
+	Rule_AddInterval(hill_speech, 1)
+	Rule_AddInterval(farmhouse_speech, 1)
+	
+	-- set up some data for the AI
+	AI_Setup()
+	
+end
+Scar_AddInit(OnInit)
+
+
+-- bugfix: apparently we can't spawn the crocodile right at startup as it messes up after save/load (flamethrower is gone and tank is a normal Sherman)
+function Rule_SpawnCrocodile()
+	Util_CreateSquadsAtMarker(player1, sg_dog2, SBP.ALLIES.CROCODILE, MRK_M14_dog2, 1)
+end
+
+-- bugfix: can't spawn buildings right at start because FOW is not set correctly after save/load (autosave)
+function Rule_SpawnAxisBuildings()
+	Util_CreateEntities( player2, EG_AXIS_AI, EBP.AXIS.HQ, MRK_HQ1,1)
+	Util_CreateEntities( player2, EG_AXIS_AI, EBP.AXIS.QUARTERS, MRK_Basic1,1)
+	Util_CreateEntities( player2, EG_AXIS_AI, EBP.AXIS.BARRACKS, MRK_Platoon1,1)
+	
+	Util_CreateEntities( player4, EG_AXIS_AI2, EBP.AXIS.HQ, MRK_HQ2, 1)
+	Util_CreateEntities( player4, EG_AXIS_AI2, EBP.AXIS.QUARTERS, MRK_Basic2, 1)
+	Util_CreateEntities( player4, EG_AXIS_AI2, EBP.AXIS.ARMORY, MRK_Company2, 1)
+	
+-- Minefield Setup
+	Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine1, 1 )
+	Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine2, 1 )
+	Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine3, 1 )
+	--Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine4, 1 )
+	Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine5, 1 )
+	Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine6, 1 )
+	Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine7, 1 )
+	Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine8, 1 )
+	Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine9, 1 )
+	Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine10, 1 )
+	Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine11, 1 )
+	Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine12, 1 )
+	Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine13, 1 )
+	Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine14, 1 )
+	Util_CreateEntities( player2, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine15, 1 )
+	
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine16, 1 )
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine17, 1 )
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine18, 1 )
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine19, 1 )
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine20, 1 )
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine21, 1 )
+	
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine22, 1 )
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine23, 1 )
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine24, 1 )
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine25, 1 )
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine26, 1 )
+	
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine27, 1 )
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine28, 1 )
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine29, 1 )
+	
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine30, 1 )
+	Util_CreateEntities( player4, EG_AXIS_AI_MINES, EBP.AXIS.MINES, MRK_mine31, 1 )
+	
+end
+
+----------------------minefield speech-----------------------------------------------
+
+function minefield_speech1()
+	if Player_AreSquadsNearMarker(player1, MRK_minefield_speech1) then
+		Util_StartIntel(EVENTS.MINE_SPEECH1)
+		Rule_RemoveMe()
+	end
+end
+function minefield_speech2()
+	if Player_AreSquadsNearMarker(player1, MRK_minefield_speech2) then
+		Util_StartIntel(EVENTS.MINE_SPEECH2)
+		Rule_RemoveMe()
+	end
+end
+function minefield_speech3()
+	if Player_AreSquadsNearMarker(player1, MRK_minefield_speech3) then
+		Util_StartIntel(EVENTS.MINE_SPEECH3)
+		Rule_RemoveMe()
+	end
+end
+-----------------------------abbey_speech-------------------------------------
+
+function abbey_speech()
+	if Player_AreSquadsNearMarker(player2, MRK_abbey_speech) then
+		Util_StartIntel(EVENTS.ABBEY_SPEECH)
+		Rule_RemoveMe()
+	end
+end
+---------------------------Hill speech-------------------------
+function hill_speech()
+	if Player_AreSquadsNearMarker(player2, Marker_Trench_Nazi_Check) then
+		Util_StartIntel(EVENTS.HILL_SPEECH)
+		Rule_RemoveMe()
+	end
+end
+-------------------------------farmhouse----------------------
+
+function farmhouse_speech()
+	if Player_AreSquadsNearMarker(player2, MRK_farmhouse_speech ) then
+		Util_StartIntel(EVENTS.FARMHOUSE_SPEECH)
+		Rule_RemoveMe()
+	end
+end
+
+
+
+
+
+--------------------------------------
+function HQ_check()
+
+	if EGroup_Count( "EG_playerHQ" ) == 1 then
+		Rule_RemoveMe()
+	elseif EGroup_Count( "EG_playerHQ" ) == 0 then
+		Util_CreateEntities( player1, EG_spawnedHQ, EBP.ALLIES.HQ, MRK_M14HQ, 1 )
+	end
+end
+function M14_Difficulty()
+
+            -- get the difficulty
+            g_dif = Game_GetSPDifficulty()
+
+            -- set health bonus and AI difficulty (if applicable) for player 1
+            Setup_Difficulty(player1, g_dif) -- pass the player and difficulty global variable 
+            Setup_Difficulty(player2, g_dif) -- do it for each player that you have defined
+            Setup_Difficulty(player3, g_dif) 
+			Setup_Difficulty(player4, g_dif)
+end
+
+------------------------------------------------------------------------------------------------------------------------------
+
+function Start_Mission()
+	--Trigger_First_NIS
+	Util_StartNIS(EVENTS.NIS14_01)
+	Rule_AddInterval(NISOver, 1)
+	Rule_RemoveMe()
+	
+end
+
+function ai_starting_units()
+
+	Player_GetAll( player1 )
+	--if the player has tons of units at the beginning of the mission spawn these boners in.
+	if  SGroup_TotalMembersCount ( sg_allsquads )  >=  30 then
+		print "spawning bonus units to help the AI"
+		Util_CreateSquadsAtMarker( player2, SG_AI2, SBP.AXIS.GRENADIER, MRK_HQ1, 2 )
+		Util_CreateSquadsAtMarker( player2, SG_AI2, SBP.AXIS.PAK_38, MRK_HQ1, 1 )
+		Util_CreateSquadsAtMarker( player2, SG_AI2, SBP.AXIS.MOTORCYCLE, MRK_HQ1, 1 )
+		
+		Util_CreateSquadsAtMarker( player4, SG_AI4, SBP.AXIS.GRENADIER, MRK_HQ2, 1 )
+		Util_CreateSquadsAtMarker( player4, SG_AI4, SBP.AXIS.PAK_38, MRK_HQ2, 1 )
+		Util_CreateSquadsAtMarker( player4, SG_AI4, SBP.AXIS.STORMTROOPER, MRK_HQ2, 1 )
+		
+	end
+	
+end
+
+
+function NISOver()
+
+	if (Event_IsAnyRunning() == false) then
+		Util_SetStartingResources(13)
+--		Camera_FollowSGroup(sg_dog2)
+		Objective_Start(OBJECTIVE1)
+		EGroup_Hide( LAYER_N14_01_Hide_TroopCam, false )
+		
+		Cmd_SquadPath(sg_dog1, "PTH_M14_Dog_arrives",true, false, true, 0)
+		Cmd_SquadPath(sg_dog2, "PTH_M14_Dog_arrives",true, false, true, 0)
+		Cmd_SquadPath(sg_dog3, "PTH_M14_Dog_arrives",true, false, true, 0)
+		Cmd_SquadPath(sg_dog4, "PTH_M14_Dog_arrives",true, false, true, 0)
+		
+		EGroup_DestroyAllEntities( EG_NIS_88s )
+		Rule_AddInterval(ai_loss_base_check1, 5.0)
+		Rule_AddInterval(ai_loss_base_check2, 5.0)
+		EGroup_DestroyAllEntities( EG_M14_88_hole )
+		
+		Rule_AddInterval( NISover_shit_talk, 1)
+		
+		Modify_SightRadius( SG_88, 400 )
+		Rule_RemoveMe()
+		
+		EG_doomed_buildings 	 =  EGroup_CreateIfNotFound( "EG_doomed_buildings" )
+		
+		Player_GetAllEntitiesNearMarker( player1, EG_doomed_buildings, MRK_destroy1)
+		EGroup_DestroyAllEntities( EG_doomed_buildings )
+		Player_GetAllEntitiesNearMarker( player1, EG_doomed_buildings, MRK_destroy2) 
+		EGroup_DestroyAllEntities( EG_doomed_buildings )
+		Player_GetAllEntitiesNearMarker( player1, EG_doomed_buildings, MRK_destroy3) 
+		EGroup_DestroyAllEntities( EG_doomed_buildings )
+		Player_GetAllEntitiesNearMarker( player1, EG_doomed_buildings, MRK_destroy4) 
+		EGroup_DestroyAllEntities( EG_doomed_buildings )
+		Player_GetAllEntitiesNearMarker( player1, EG_doomed_buildings, MRK_destroy5) 
+		EGroup_DestroyAllEntities( EG_doomed_buildings )
+		Player_GetAllEntitiesNearMarker( player1, EG_doomed_buildings, MRK_destroy6) 
+		EGroup_DestroyAllEntities( EG_doomed_buildings )
+		
+		Player_GetAllSquadsNearMarker( player1, SG_WARP, MRK_destroy6 )
+		SGroup_WarpToMarker( SG_WARP, S_Inner_Perimeter)
+		Player_GetAllSquadsNearMarker( player1, SG_WARP, MRK_destroy5 )
+		SGroup_WarpToMarker( SG_WARP, S_Inner_Perimeter)
+		Player_GetAllSquadsNearMarker( player1, SG_WARP, MRK_destroy4 )
+		SGroup_WarpToMarker( SG_WARP, S_Inner_Perimeter)
+		Player_GetAllSquadsNearMarker( player1, SG_WARP, MRK_warp1 )
+		SGroup_WarpToMarker( SG_WARP, S_Inner_Perimeter)
+		Player_GetAllSquadsNearMarker( player1, SG_WARP, MRK_warp2 )
+		SGroup_WarpToMarker( SG_WARP, S_Inner_Perimeter)
+		
+		Player_GetAllSquadsNearMarker( player1, SG_WARP2, MRK_destroy3 )
+		SGroup_WarpToMarker( SG_WARP2, N_Inner_Perimeter)
+		Player_GetAllSquadsNearMarker( player1, SG_WARP2, MRK_destroy2 )
+		SGroup_WarpToMarker( SG_WARP2, N_Inner_Perimeter)
+		Player_GetAllSquadsNearMarker( player1, SG_WARP2, MRK_destroy1 )
+		SGroup_WarpToMarker( SG_WARP2, N_Inner_Perimeter)
+		Player_GetAllSquadsNearMarker( player1, SG_WARP2, MRK_warp3 )
+		SGroup_WarpToMarker( SG_WARP2, N_Inner_Perimeter)
+		Player_GetAllSquadsNearMarker( player1, SG_WARP2, MRK_warp4 )
+		SGroup_WarpToMarker( SG_WARP2, N_Inner_Perimeter)
+		Player_GetAllSquadsNearMarker( player1, SG_WARP2, MRK_warp5 )
+		SGroup_WarpToMarker( SG_WARP2, N_Inner_Perimeter)
+		
+		T_SW_88 = {}
+	
+		T_SW_88[1] = {sgroup = SG_881, sw_id = nil, mkr = MRK_88_1}
+		T_SW_88[2] = {sgroup = SG_882, sw_id = nil, mkr = MRK_88_2}
+		T_SW_88[3] = {sgroup = SG_883, sw_id = nil, mkr = MRK_88_3}
+	
+	
+		for i = 1,table.getn (T_SW_88) do 
+			Util_CreateSquadsAtMarkerFacing( player2, T_SW_88[i].sgroup, SBP_AXIS_88FLAK_SP, T_SW_88[i].mkr, Marker_Axis_Main_Attack, 1 )
+			T_SW_88[i].sw_id = SyncWeapon_GetFromSGroup(T_SW_88[i].sgroup)
+		end	
+		
+	
+	end
+	
+end
+function NISover_shit_talk()
+	if (Event_IsAnyRunning() == false) then
+		Game_FadeToBlack(FADE_IN, 2)
+		Util_StartIntel( EVENTS.SHIT_TALK )
+		Rule_RemoveMe()
+	end
+end
+--------------------------------------------------------AI manager--------------------------------------------------------
+
+function AI_Setup()
+
+	Cmd_InstantUpgrade(player2, UPG.AXIS.PHASE2)
+	Cmd_InstantUpgrade(player2, UPG.AXIS.PHASE3)
+	Cmd_InstantUpgrade(player2, UPG.AXIS.PHASE4)
+	
+	Cmd_InstantUpgrade(player4, UPG.AXIS.PHASE2)
+	Cmd_InstantUpgrade(player4, UPG.AXIS.PHASE3)
+	Cmd_InstantUpgrade(player4, UPG.AXIS.PHASE4)
+
+end
+
+function AI_on()
+
+	Util_AI_Setup(player2, {75}, player1, 3, false, 3, 3, 2)
+	AI_Enable(player2, true)
+	AI_UpdateStatics(player2) 
+		
+	AI_LockSGroup(player2, SG_AXIS_LOCKED )
+		
+	--[[ AI BUILD TABLE PLAYER2 ]]
+	t_ai_build_table_player2 = {		
+		{ SBP.AXIS.STUG, 			4, 	4 },
+		{ SBP.AXIS.PUMA, 		4, 	7 },
+		{ SBP.AXIS.PANZER, 			6, 	4 },
+		{ SBP.AXIS.OSTWIND, 	0, 	2 },
+		{ SBP.AXIS.HALFTRACK,		5,  7 },
+		{ SBP.AXIS.MORTAR, 			2, 	3 },
+		{ SBP.AXIS.PIONEER, 		2, 	3 },
+		{ SBP.AXIS.GRENADIER, 		0, 	3 },
+		{ SBP.AXIS.PAK_38, 			6,	5 },
+	}
+	
+	AI_SetBuildTable(player2, t_ai_build_table_player2)
+	AI_DoString(player2, "s_personality.fallback_percentage = 0.2")
+	
+	AI_SetBudgetWeight(player2, "BUDGET_Tech", 150)
+	AI_SetBudgetWeight(player2, "BUDGET_Units", 850)
+	
+	AI_DoString( player2, "s_personality. max_percentage_to_capture = 0.8" )
+	AI_DoString( player2, "s_personality.max_num_capturers = 2" )
+	AI_DoString( player2, "s_personality.defensiveness=0.8" )
+	
+	AI_LockSGroup(player2, SG_88 )
+	AI_LockSGroup(player2, SG_881 )
+	AI_LockSGroup(player2, SG_882 )
+	AI_LockSGroup(player2, SG_883 )
+	AI_SetVictoryPointPercentage( player2, .30	)  
+	
+	Util_AI_Setup(player4, {75}, player1, 3, false, 3, 3, 2)
+	AI_UpdateStatics(player4) 
+	AI_LockSGroup(player4, SG_AXIS_LOCKED2 )
+	
+
+	AI_DoString(player4, "s_personality.fallback_percentage = 0.2")
+	
+	AI_SetBudgetWeight(player4, "BUDGET_Tech", 450)
+	AI_SetBudgetWeight(player4, "BUDGET_Units", 550)
+	
+	AI_DoString( player4, "s_personality. max_percentage_to_capture = 0.8" )
+	AI_DoString( player4, "s_personality.max_num_capturers = 2" )
+	AI_DoString( player4, "s_personality.defensiveness=0.8" )
+
+	--[[ AI BUILD TABLE PLAYER24 ]]	
+	t_ai_build_table_player4 = {		
+		{ SBP.AXIS.STUG, 			4, 	4 },
+		{ SBP.AXIS.PUMA, 		4, 	7 },
+		{ SBP.AXIS.PANZER, 			6, 	4 },
+		{ SBP.AXIS.OSTWIND, 	0, 	2 },
+		{ SBP.AXIS.HALFTRACK,		5,  7 },
+		{ SBP.AXIS.MORTAR, 			2, 	3 },
+		{ SBP.AXIS.PIONEER, 		2, 	2 },
+		{ SBP.AXIS.GRENADIER, 		1, 	3 },
+		{ SBP.AXIS.PAK_38, 			6,	5 },
+	}
+	
+	AI_SetBuildTable(player4, t_ai_build_table_player4)
+
+	AI_LockSGroup(player2, SG_88 )
+	AI_LockSGroup(player2, SG_881 )
+	AI_LockSGroup(player2, SG_882 )
+	AI_LockSGroup(player2, SG_883 )
+	
+	AI_SetVictoryPointPercentage( player2, .33	)  
+	AI_SetVictoryPointPercentage( player4, .33	)  	
+end
+
+
+	
+--------------------------------------------------------- VP check for win condition ------------------------------------------
+
+
+
+function obj_complete_check()
+
+	if VPTicker_GetTeamTickerFromPlayerID( player2 ) <= 0 then
+		print "ticker check"
+		Objective_Complete(OBJECTIVE1)
+		Rule_Remove( obj_complete_check )
+	elseif VPTicker_GetTeamTickerFromPlayerID( player1 ) == 0 then
+		Objective_Fail(OBJECTIVE1)
+		Rule_Remove( obj_complete_check )
+	end
+	
+end
+
+function game_end_loss()
+	Game_EndSP(false, 349550, true)
+end
+
+function game_end_win()
+	
+	Player_GetAll( player2 )
+	Cmd_Retreat( sg_allsquads )
+	Player_GetAll(player4)
+	Cmd_Move( sg_allsquads, Marker_Axis_East  )
+
+	Rule_RemoveMe()
+	Rule_AddOneShot(game_end_win2, 10 )
+	
+end
+
+function game_end_win2()
+	Game_EndSP(true, nil, true)
+end
+--------------------------------------------------------Secondary Win Condition -------------------------------------------
+-- delaying so the 'under attack' check clears
+function delay_obj2()
+	Rule_AddInterval( start_obj2, 1 )
+end
+
+function start_obj2()
+	-- added additional check to trigger the objective
+	if SGroup_IsUnderAttack(SG_88, false, 10) or SGroup_IsDoingAttack(SG_88, ANY, 0.25) or SGroup_GetAvgHealth(SG_881) < 1.0 or SGroup_GetAvgHealth(SG_882) < 1.0 or SGroup_GetAvgHealth(SG_883) < 1.0  then
+		print(SGroup_IsUnderAttack(SG_88, false, 10))
+		print(SGroup_IsDoingAttack(SG_88, ANY, 0.25))
+		Rule_AddOneShot(fire_timer, 10)
+		Rule_RemoveMe()
+	end
+end
+function fire_timer()
+	Objective_Start(OBJECTIVE2)
+end
+
+
+function Obj2_Complete()
+	
+	if SyncWeapon_Exists(T_SW_88[1].sw_id) and SyncWeapon_IsOwnedByPlayer(T_SW_88[1].sw_id, player2) then
+		print("gun 1 owned by player 2")
+		return
+	elseif SyncWeapon_Exists(T_SW_88[2].sw_id) and SyncWeapon_IsOwnedByPlayer(T_SW_88[2].sw_id, player2) then
+		print("gun 2 owned by player 2")
+		return
+	elseif SyncWeapon_Exists(T_SW_88[3].sw_id) and SyncWeapon_IsOwnedByPlayer(T_SW_88[3].sw_id, player2) then
+		print("gun 3 owned by player 2")
+		return
+	else
+		Rule_RemoveMe()
+		Objective_Complete(OBJECTIVE2 )
+	end
+
+end
+
+--~ function Obj2_Fail()
+--~ 	if VPTicker_GetTeamTickerFromPlayerID( player1 ) == 0 or VPTicker_GetTeamTickerFromPlayerID( player2 ) == 0 then
+--~ 		Objective_Fail( OBJECTIVE2 )
+--~ 	end
+--~ end
+
+
+-----------------------------------------------------Medal Opp ---------------------------------------------------------
+
+function start_medalobj()
+	Objective_Start( OBJECTIVE_MEDAL, true )
+end
+
+
+--check if the points are 
+function medal_objective_complete()
+	if VPTicker_GetTeamTickerFromPlayerID( player1 ) <= 249 then
+		Objective_Fail(OBJECTIVE_MEDAL, true)
+		Rule_RemoveMe()
+	elseif VPTicker_GetTeamTickerFromPlayerID( player2 ) <= 0 then
+		Objective_Complete(OBJECTIVE_MEDAL, true)
+		Rule_RemoveMe()
+	end
+	
+end
+----------------------------------------------------------autosave----------------------------------------------------------
+
+function autosave_300points()
+	if VPTicker_GetTeamTickerFromPlayerID( player2 ) <= 300 and Event_IsAnyRunning() == false then
+		Scar_Autosave( 349673 )
+		Rule_RemoveMe()
+	end
+end
+
+function autosave_200points()
+	if VPTicker_GetTeamTickerFromPlayerID( player2 ) <= 200 and Event_IsAnyRunning() == false then
+--		Scar_Autosave( 349674 )
+		Rule_RemoveMe()
+	end
+end
+
+function autosave_100points()
+	if VPTicker_GetTeamTickerFromPlayerID( player2 ) <= 100 and Event_IsAnyRunning() == false then
+--		Scar_Autosave( 349675 )
+		Rule_RemoveMe()
+	end
+end
+
+---------------------------------------------------------Base check for all players------------------------------------------
+
+function player_loss_base_check()
+	if Player_HasLost(player1, CRITICAL_BUILDINGS.ALLIES) then
+		Game_EndSP(false)
+		Rule_RemoveMe()
+	end	
+end
+
+function ai_loss_base_check1()
+	if EGroup_Count(EG_AXIS_AI) == 0 then
+		Util_MissionTitle( 349529 )
+		Scar_Autosave(349671)
+		Rule_RemoveMe()
+	end
+end
+
+function ai_loss_base_check2()
+	if EGroup_Count(EG_AXIS_AI2) == 0 then
+		Util_MissionTitle( 349530 )
+		Scar_Autosave(349672)
+		Rule_RemoveMe()
+	end
+end
+
+
+---------------------------------------------------------- retreat check ----------------------------
+

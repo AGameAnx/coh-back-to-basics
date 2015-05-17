@@ -1,0 +1,1199 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+--
+-- Script File for Mission 16 - Falaise Pocket
+	
+-------------------------------------------------------------------------
+------------------------------------------------------------------------
+
+import("ScarUtil.scar")
+import("FallBack.scar")
+
+function OnGameSetup()
+	-- set up the players
+	player1 = Setup_Player(1, 369040, TRACE_ALLIES,1)
+	player2 = Setup_Player(2, 369041, TRACE_AXIS,2)
+ 	player3 = Setup_Player(3, 369042, TRACE_ALLIES, 1) --AI
+	player4 = Setup_Player(4, 369041, TRACE_AXIS, 2) --AI
+--~ 	player5 = Setup_Player(5, 369040, TRACE_ALLIES,1)
+--~ 	player6 = Setup_Player(6, 369041, TRACE_AXIS, TEAM_NEUTRAL)		-- neutral enemy player, used for special units like the damaged Stug
+end
+
+function OnGameRestore()
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+ 	player3 = World_GetPlayerAt(3)
+	player4 = World_GetPlayerAt(4)
+	
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+	
+	-- restore the AI's default behavior
+	AI_on()
+end
+
+-- Called once things have been initialised proper, and is used to trigger off the game script
+
+function Initialize_OBJ_ConnectTerritory()
+
+   OBJ_ConnectTerritory =
+   {
+		SetupUI = function()
+			--map blip setup
+			--EG_VP_10 = Util_GetPosition( EG_VP_10 )
+			Objective_AddUIElements(OBJ_ConnectTerritory, EG_VP_10, true, 369035)
+		end,
+		
+		OnStart = function()
+			Rule_AddInterval( OBJ_ConnectTerritoryCheck, 2 )
+			Rule_AddInterval( Timer_primarycheck, 1 )
+			Objective_StartTimer( OBJ_ConnectTerritory, COUNT_DOWN, 60*60 ) --CHANGE THIS BACK TO 60*60
+			Rule_AddInterval( player_loss_base_check, 5 )
+		end,
+		
+		OnComplete = function()
+			Rule_AddOneShot( final_attack, 2)
+			Util_StartIntel(EVENTS.LINKED)
+		  
+		end,
+		
+		OnFail = function()
+			Game_EndSP(false)
+		end,
+		
+		SitRep =
+			{
+				Movie = "SR_16-01",
+				Force = true,
+				SpeechTiming =
+				{
+					{ 1, ACTOR.Conti, 360020 },
+					{ 5.95, ACTOR.Conti, 360021 },
+					{ 9.95, ACTOR.Conti, 360030 },
+					{ 16.1, ACTOR.Conti, 360031 },
+					{ 22.7, ACTOR.Conti, 360032 },
+				},
+			},
+		
+		Title = 369020,
+		Description = 369030,
+		Type = OT_Primary,
+   }
+   
+   Objective_Register(OBJ_ConnectTerritory)
+end
+
+function Initialize_OBJ_Keep_Territory_Connected()
+
+   OBJ_Keep_Territory_Connected =
+   {
+		SetupUI = function()
+			--map blip setup
+			Objective_AddUIElements(OBJ_Keep_Territory_Connected, axis_hole_punch1, true, 369021)
+			Objective_AddUIElements(OBJ_Keep_Territory_Connected, axis_hole_punch2, true, 369021)
+			print "ping me baby"
+		end,
+		
+		OnStart = function()
+			Rule_AddInterval( OBJ_Keep_Territory_Connected_Check , 6 )
+			Util_PlayMusic("SOUND/music/SP/M15/M15_Ob2_FinishThem", 5, 0)
+			--Util_MissionTitle( 369022 )  --Keep Allied territory connected and destroy the Axis counterattack.
+			Rule_AddOneShot(autosave5000, 6)
+			--Scar_Autosave(369055)
+		end,
+		
+		OnComplete = function()
+			
+			Rule_AddOneShot( Kill_Obj2, 1 )
+			Rule_AddOneShot (TriggerNIS2, 16)
+			Player_GetAll( player2 )
+			Cmd_Retreat( sg_allsquads )
+			Player_GetAll( player4 )
+			Cmd_Retreat( sg_allsquads )
+			
+		end,
+		
+		OnFail = function()
+		print "----------------failure to keep territory connected--------------------"
+		end,
+		
+		SitRep =
+			{
+				Movie = "SR_16-02",
+				Force = true,
+				SpeechTiming =
+				{
+					{ 1.5, ACTOR.Conti, 360110 },
+					{ 7.4, ACTOR.Conti, 360112 },
+					{ 13.25, ACTOR.Conti, 360113 },
+				},
+			},
+		
+		Title = 369021,
+		Description = 369032,
+		Type = OT_Primary,
+   }
+   
+   Objective_Register(OBJ_Keep_Territory_Connected)
+end
+
+function Initialize_OBJ_SecondObjectiveBridge()
+--thanks Brian...
+   OBJ_SecondObjectiveBridge =
+   {
+		Bridges = {EG_bridge1, EG_bridge2, EG_bridge3, EG_bridge4},
+		
+		SetupUI = function()
+			--map blip setup
+			--EG_VP_10 = Util_GetPosition( EG_bridge1 )
+			OBJ_SecondObjectiveBridge.PingID = {}
+			for i = 1, table.getn(OBJ_SecondObjectiveBridge.Bridges) do
+				OBJ_SecondObjectiveBridge.PingID[i] = Objective_AddUIElements(OBJ_SecondObjectiveBridge, OBJ_SecondObjectiveBridge.Bridges[i], true, 369034, true, 2)
+			end		
+		end,
+		
+		OnStart = function()
+			Rule_AddInterval( OBJ_SecondObjectiveBridgeCheck, 1 )
+			Rule_AddInterval( Rule_CheckBridges, 1 )
+			Rule_AddOneShot( halftrack_convoy_first, 1 )
+			Rule_AddOneShot( conti_warning, 10 )
+		end,
+		
+		OnComplete = function()
+			Util_StartIntel(EVENTS.BRIDGES_SECURED)
+			
+
+		end,
+		
+		OnFail = function()
+			
+		end,
+		
+		Title = 369022,
+		Description = 369033,
+		Type = OT_Secondary,
+   }
+   
+   Objective_Register(OBJ_SecondObjectiveBridge)
+   
+end
+
+function Initialize_OBJ_Medal()--Kill 500 germans
+
+   OBJ_Medal =
+   {
+		SetupUI = function()
+		
+		end,
+		
+		OnStart = function()
+			lastcount = 0
+		--Add axis death counter
+			Rule_AddInterval( death_counter, 1 )
+			
+		end,
+		
+		OnComplete = function()
+
+--          Player_AddUnspentCommandPoints(player1, 1)
+		  
+		end,
+		
+		OnFail = function()
+
+		end,
+		
+		OnSitRep = function()
+		end,
+		
+		Title = 369950,
+		Description = 369950,
+		Type = OT_Medal,
+		MedalID = MEDALS.MEDAL_OF_HONOR,
+   }
+   
+   Objective_Register(OBJ_Medal)
+end
+
+
+	
+function Rule_CheckBridges()
+	if OBJ_SecondObjectiveBridge.PingID ~= nil then
+		for i = 1, table.getn(OBJ_SecondObjectiveBridge.Bridges) do
+			if OBJ_SecondObjectiveBridge.PingID[i] ~= nil and (Player_OwnsEGroup(player1, OBJ_SecondObjectiveBridge.Bridges[i]) or Player_OwnsEGroup(player3, OBJ_SecondObjectiveBridge.Bridges[i]))then
+				Objective_RemoveUIElements(OBJ_SecondObjectiveBridge, OBJ_SecondObjectiveBridge.PingID[i])
+				OBJ_SecondObjectiveBridge.PingID[i] = nil
+				print("check on bridges: " .. i)
+			end
+		end
+	end
+end
+
+function OnInit()
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	g_MissionSpeechPath = "Mission16"
+	Sound_PreCacheSinglePlayerSpeech( g_MissionSpeechPath )	
+	-- mute the sound before the NIS plays
+	Util_MuteAmbientSound(true)
+
+	--set difficulty
+	M16_Difficulty()
+
+	--[[ TECH TREE ]]
+	TechTreeSetup()
+	
+	Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS16_01)')]])")
+	Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS16_02)')]])")
+
+	Game_FadeToBlack(FADE_OUT, 0)
+	Game_Letterbox(true, 0)
+
+	Initialize_OBJ_ConnectTerritory()
+	Initialize_OBJ_Keep_Territory_Connected()
+	Initialize_OBJ_SecondObjectiveBridge()
+	Initialize_OBJ_Medal()
+	
+	--remove the AI's ability to make the tank building
+	--AXIS_BATTALION = World_GetPropertyBagGroupID("ebps/races/axis/buildings/batallion_support_building")
+	--Player_SetEntityProductionAvailability(player2, AXIS_BATTALION, ITEM_REMOVED)
+
+	--Initial game Set up
+	Camera_SetDefault()
+	
+	Player_SetPopCapOverride(player1, 75 ) -- player
+	Player_SetPopCapOverride(player2, 75 ) -- scripted Axis
+	Player_SetPopCapOverride(player3, 75 ) -- Allied AI
+	Player_SetPopCapOverride(player4, 75 ) -- Axis AI
+	
+--~ 	Player_SetResource( player1, RT_Munition, 200 )				-- now set globally with Util_SetStartingResources
+--~ 	Player_SetResource( player1, RT_Fuel, 150 )
+--~ 	Player_SetResource( player1, RT_Manpower, 300 )
+	Rule_AddOneShot( rule_start_mission, 2 )
+	
+	Rule_AddInterval( halftrack_convoy, 2.5*60 ) --spawns convoy @ waypoints are under nazi control
+
+	Rule_AddInterval( convoy_check, 2 ) --checks do display the title card when the player cuts a convoy of
+
+	Rule_AddInterval( nazi_retreat, 5 ) --checks marker to delete retreating nazi's
+	
+	Rule_AddInterval( north_panther_patrol, 3 ) --gets the tanks patrolling
+	Rule_AddInterval( tiger_patrol, 3 ) --gets the tanks patrolling
+	Rule_AddInterval( stug_patrol, 3.5 ) --gets the tanks patrolling
+	Rule_AddInterval( puma_farm_patrol, 3 ) --gets the tanks patrolling
+	Rule_AddInterval( puma_patrol, 2.5 ) --gets the tanks patrolling
+	
+	Rule_AddInterval( bridge_spawn, 1 )
+	Rule_AddInterval( city_encounter, 1 )
+	
+	Rule_AddInterval( west_side_river, 1 )
+	Rule_AddInterval( west_side_river1, 1 )
+	Rule_AddInterval( west_side_river2, 1 )
+	Rule_AddInterval( west_side_river3, 1 )
+	Rule_AddInterval( west_side_river4, 1 )
+	
+	Rule_AddInterval( firestorm, 5 )
+	Rule_AddInterval( firestorm2, 5 )
+	Rule_AddInterval( firestorm3, 5 ) 
+	Rule_AddInterval( firestorm4, 5 )
+	Rule_AddInterval( firestorm5, 5 )
+	Rule_AddInterval( firestorm6, 5 )
+	
+	
+	Rule_AddInterval(medal_obj_start, 1)
+	
+	Rule_AddInterval( autosave_45, 1 )
+	Rule_AddInterval( autosave_30, 1 )
+	Rule_AddInterval( autosave_15, 1 )
+	
+	
+	
+	Rule_Add(TriggerNIS)
+	
+	sg_temp1 = SGroup_CreateIfNotFound("sg_temp1")
+	sg_temp2 = SGroup_CreateIfNotFound("sg_temp2")
+	sg_temp3 = SGroup_CreateIfNotFound("sg_temp3")
+	sg_temp4 = SGroup_CreateIfNotFound("sg_temp4")
+	sg_temp5 = SGroup_CreateIfNotFound("sg_temp5") --hmg's in houses
+	
+	axis_hole_punch1 = SGroup_CreateIfNotFound( "axis_hole_punch1" )
+	axis_hole_punch2 = SGroup_CreateIfNotFound( "axis_hole_punch2" )
+	axis_hole_punch3 = SGroup_CreateIfNotFound( "axis_hole_punch3" )
+	axis_hole_punch4 = SGroup_CreateIfNotFound( "axis_hole_punch4" )
+	axis_hole_punch5 = SGroup_CreateIfNotFound( "axis_hole_punch5" )
+	axis_hole_punch6 = SGroup_CreateIfNotFound( "axis_hole_punch6" )
+	
+	SG_halftrack_convoy1 = SGroup_CreateIfNotFound( "SG_halftrack_convoy1" )
+	SG_halftrack_convoy2 = SGroup_CreateIfNotFound( "SG_halftrack_convoy2" )
+	SG_halftrack_convoy3 = SGroup_CreateIfNotFound( "SG_halftrack_convoy3" )
+	SG_halftrack_convoy4 = SGroup_CreateIfNotFound( "SG_halftrack_convoy4" )
+	
+	halftrack_nazi1 =	SGroup_CreateIfNotFound( "halftrack_nazi1" )
+	
+	SG_panther_patrol_north = SGroup_CreateIfNotFound( "SG_panther_patrol_north" )
+	
+	-- Auto retreat nazi's
+	
+	AutoRetreat_AddSGroup ( SG_retreat_1, MRK_halftrack_convoy_removal1, 0.6 )
+	AutoRetreat_AddSGroup ( SG_retreat_4, MRK_halftrack_convoy_removal2, 0.6 )
+	AutoRetreat_AddSGroup ( SG_retreat_6, MRK_halftrack_convoy_removal3, 0.6 )
+	AutoRetreat_AddSGroup ( SG_retreat_8, MRK_halftrack_convoy_removal1, 0.6 )
+	AutoRetreat_AddSGroup ( SG_retreat_9, MRK_halftrack_convoy_removal3, 0.6 )
+	AutoRetreat_AddSGroup ( SG_retreat_10, MRK_halftrack_convoy_removal3, 0.6 )
+	AutoRetreat_AddSGroup ( SG_retreat_11, MRK_halftrack_convoy_removal4, 0.6 )
+	
+	-- use default veteran squads if necessary
+	if not Player_HasPersistentSquadFile(player1) then
+		Player_LoadPersistentSquadsFromFile(player1, "data:scenarios/sp/M16_Chambois/default_veteran_squads.lua")
+	end
+
+	--Turns on the ai 120 seconds into the mission
+--	Rule_AddOneShot( AI_on, 120 )	
+	Rule_AddOneShot( AI_on, 1 )	
+	
+	
+	
+	table_convoy = {}
+	table_convoy[1] = {creation = halftrack_creategroup1, vp = EG_bridge1}
+	table_convoy[2] = {creation = halftrack_creategroup2, vp = EG_bridge2} 
+	table_convoy[3] = {creation = halftrack_creategroup3, vp = EG_bridge3} 
+	table_convoy[4] = {creation = halftrack_creategroup4, vp = EG_bridge4} 
+	
+	Camera_MoveToPosition( MRK_center )
+	
+	
+	--create some modified Panzers and Pumas for the Enemy AI to use.
+	
+	AI_axis1 = SGroup_CreateIfNotFound( "AI_axis1" )
+	Util_CreateSquadsAtMarker(player2, AI_axis1, SBP.AXIS.PANZER, MRK_axis_spawn2, 1)
+	Cmd_InstantUpgrade( AI_axis1, UPG.AXIS.PANZERSKIRTS)
+	Cmd_InstantUpgrade( AI_axis1, UPG.AXIS.PANZERMG42)
+	
+	Cmd_InstantUpgrade( EG_AXIS_BUNKERS, UPG.AXIS.BUNKER_MG42 )
+	
+	Rule_AddInterval( HMG_farmhouse, 0.90)
+	Rule_AddInterval( HMG_bridge_farmhouse, 0.95)
+	Rule_AddInterval( bunker1, 0.94)
+	Rule_AddInterval( bunker2, 0.93)
+	Rule_AddInterval( bunker3, 0.92)
+	Rule_AddInterval( farmhouse2, 0.91)
+	Rule_AddInterval( field_puma, 0.91)
+	Rule_AddInterval( sniper_AT, 0.91)
+	Rule_AddInterval( field_army, 0.91)
+	Rule_AddInterval( field_mortar, 0.91)
+	Rule_AddInterval( city_encounter2, 0.99)
+	Rule_AddInterval( city_encounter3, 0.99)
+	
+	Rule_AddInterval(bridge_speech, 1 )
+	
+	Rule_AddPlayerEvent(rocket_strike_speech, player1, GE_AbilityExecuted) 
+	
+end
+
+Scar_AddInit(OnInit)
+--------------------------------------------various speech dialouge-------------------------------------------
+
+function autosave5000()
+	Scar_Autosave(369055)
+end
+
+function rocket_strike_speech(player1, abilityID, target)
+	if abilityID == ABILITY.COMMANDER_TREE.ALLIES.STRAFE_ROCKET then
+		Util_StartIntel(EVENTS.ROCKET_RUN)
+	elseif abilityID == ABILITY.COMMANDER_TREE.ALLIES.STRAFE_MG then
+		Util_StartIntel(EVENTS.STRAFE_RUN)
+	end	
+end
+
+function bridge_speech()
+	if Player_AreSquadsNearMarker( player1, MRK_bridge1 ) or Player_AreSquadsNearMarker( player1, MRK_bridge2 ) or Player_AreSquadsNearMarker( player1, MRK_bridge3 ) or Player_AreSquadsNearMarker( player1, MRK_bridge4 ) then
+		local rand = World_GetRand(1,6)
+			if rand == 1 then 
+				Util_StartIntel(EVENTS.ROADS_OPEN1)
+			elseif rand == 2 then
+				Util_StartIntel(EVENTS.ATTACKING_BRIDGES1)
+			elseif rand == 3 then
+				Util_StartIntel(EVENTS.ROADS_OPEN2 )
+			elseif rand == 4 then
+				Util_StartIntel(EVENTS.ATTACKING_BRIDGES2)
+			elseif rand == 5 then
+				Util_StartIntel(EVENTS.ROADS_OPEN3)
+			elseif rand == 6 then
+				Util_StartIntel(EVENTS.ATTACKING_BRIDGES3)
+			end
+		Rule_AddOneShot(bridge_speech2, 320 )
+		Rule_RemoveMe()
+	end
+end
+
+function bridge_speech2()
+	Rule_AddInterval(bridge_speech, 1 )
+	Rule_RemoveMe()
+end
+
+-------------------------------------Spawning Units in-----------------------------------
+function HMG_farmhouse()
+	if Player_AreSquadsNearMarker( player1, MRK_HMG_Farmhouse ) then
+		if EGroup_IsEmpty(EG_HMG_Farmhouse) == false then
+			Util_CreateSquadsAndGarrison( player2, sg_temp5, SBP.AXIS.HEAVYMG, EG_HMG_Farmhouse, 1 )
+			Rule_RemoveMe()
+		else
+			Rule_RemoveMe()
+		end
+	end
+end	
+function HMG_bridge_farmhouse()
+	if Player_AreSquadsNearMarker( player1, MRK_HMG_Bridge_House ) then
+		if EGroup_IsEmpty(EG_HMG_Bridge_House) == false then
+			Util_CreateSquadsAndGarrison( player2, sg_temp5, SBP.AXIS.HEAVYMG, EG_HMG_Bridge_House, 1 )
+			Rule_RemoveMe()
+		else
+			Rule_RemoveMe()
+		end
+	end
+end	
+function bunker1()
+	if Player_AreSquadsNearMarker( player1, MRK_bunker1 ) then
+		if EGroup_IsEmpty(EG_Bunker1) == false then
+			Util_CreateSquadsAndGarrison( player2, sg_temp5, SBP.AXIS.HEAVYMG, EG_Bunker1, 1 )
+			Rule_RemoveMe()
+		else
+			Rule_RemoveMe()
+		end
+	end
+end	
+function bunker2()
+	if Player_AreSquadsNearMarker( player1, MRK_bunker2 ) then
+		if EGroup_IsEmpty(EG_Bunker2) == false then
+			Util_CreateSquads(player2, sg_temp5, SBP.AXIS.GRENADIER, EG_Bunker2, nil, 1 )
+		end
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.HEAVYMG, MRK_city_HMG, MRK_center, 1 )
+		Rule_RemoveMe()
+	end
+end	
+function bunker3()
+	if Player_AreSquadsNearMarker( player1, MRK_bunker3 ) then
+		if EGroup_IsEmpty(EG_Bunker3) == false then
+			Util_CreateSquadsAndGarrison( player2, sg_temp5, SBP.AXIS.GRENADIER, EG_Bunker3, 1 )
+			Rule_RemoveMe()
+		else
+			Rule_RemoveMe()
+		end
+	end
+end	
+function farmhouse2()
+	if Player_AreSquadsNearMarker( player1, MRK_stug_spawn ) then
+		if EGroup_IsEmpty(EG_HMG_Farmhouse2) == false then
+			Util_CreateSquadsAndGarrison( player2, sg_temp5, SBP.AXIS.GRENADIER, EG_HMG_Farmhouse2, 1 )
+			Rule_RemoveMe()
+		else
+			Rule_RemoveMe()
+		end
+	end
+end
+function field_puma()
+	if Player_AreSquadsNearMarker( player1, MRK_field_puma ) then
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.PUMA, MRK_field_puma, MRK_center, 1 )
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.PAK_38, MRK_field_AT , MRK_center, 1 )
+		Rule_RemoveMe()
+	end
+end
+function sniper_AT()
+	if Player_AreSquadsNearMarker( player1, MRK_AT5000 ) then
+		if EGroup_IsEmpty(EG_sniper_house) == false then
+			Util_CreateSquadsAndGarrison( player2, sg_temp5, SBP.AXIS.SNIPER, EG_sniper_house, 1 )
+		end
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.PAK_38, MRK_AT5000 , MRK_center, 1 )
+		Rule_RemoveMe()
+	end
+end
+function field_army()
+	if Player_AreSquadsNearMarker( player1, MRK_field_army ) then
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.GRENADIER, MRK_field_army, MRK_center, 1 )
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.HEAVYMG, MRK_field_army , MRK_center, 1 )
+		Rule_RemoveMe()
+	end
+end
+function field_mortar()
+	if Player_AreSquadsNearMarker( player1, MRK_field_mortar ) then
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.MORTAR, MRK_field_mortar, MRK_center, 1 )
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.HEAVYMG, MRK_field_mortar , MRK_center, 1 )
+		Rule_RemoveMe()
+	end
+end
+function city_encounter2()
+	if Player_AreSquadsNearMarker( player1, MRK_AT_399 ) then
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.PAK_38, MRK_AT_399, MRK_center, 1 )
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.HEAVYMG, MRK_AT_399 , MRK_center, 1 )
+		Rule_RemoveMe()
+	end
+end
+function city_encounter3()
+	if Player_AreSquadsNearMarker( player1, MRK_city_encounter3 ) then
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.SNIPER, MRK_city_encounter3, MRK_center, 1 )
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.MORTAR, MRK_city_mortar , MRK_center, 1 )
+		Rule_RemoveMe()
+	end
+end
+
+-------------------------------------Autosave---------------------------------------------------------
+function autosave_45()
+	if	Objective_IsTimerSet( OBJ_ConnectTerritory ) and Objective_GetTimerSeconds( OBJ_ConnectTerritory ) <= 45*60 then
+		
+		Rule_RemoveMe()
+			
+	end	
+end
+
+function autosave_30()
+	if	Objective_IsTimerSet( OBJ_ConnectTerritory ) and Objective_GetTimerSeconds( OBJ_ConnectTerritory ) <= 30*60 then
+			Scar_Autosave(339053) -- 30 minutes left
+			Rule_AddInterval(conti_warning2, 1 )
+			Rule_RemoveMe()
+	end	
+end
+
+function autosave_15()
+	if	Objective_IsTimerSet( OBJ_ConnectTerritory ) and Objective_GetTimerSeconds( OBJ_ConnectTerritory ) <= 15*60 then
+--			Scar_Autosave(339054) -- 15 minutes left
+			Rule_RemoveMe()
+	end	
+end
+
+--------------------------------------------Conti speech---------------------------------------------
+
+function conti_warning2()
+	if	Objective_IsTimerSet( OBJ_ConnectTerritory ) and Objective_GetTimerSeconds( OBJ_ConnectTerritory ) <= 25*60 then
+		local rand = World_GetRand(1,2)
+			if rand == 1 then 
+				Util_StartIntel(EVENTS.TOO_MANY)
+			elseif rand == 2 then
+				Util_StartIntel(EVENTS.CLOSE_GAP)
+			end
+		Rule_RemoveMe()
+	end	
+end
+------------------------------------------  Dificulty --------------------------------------------------
+
+function M16_Difficulty()
+
+	-- get the difficulty
+	g_dif = Game_GetSPDifficulty()
+
+	-- set health bonus and AI difficulty (if applicable) for player 1
+	Setup_Difficulty(player1, g_dif) -- pass the player and difficulty global variable 
+
+	-- set health handicap and AI difficulty (if applicable) for player 2
+	Setup_Difficulty(player2, g_dif) -- do it for each player that you have defined
+	Setup_Difficulty(player3, 1) -- CHANGED FROM 2. do it for each player that you have defined
+	Setup_Difficulty(player4, g_dif) -- CAHNGED to 1 from g_dif. do it for each player that you have defined\
+	
+	difficulty = {}
+	
+	if g_dif == 0 then --easy
+		difficulty.medaltarget = 300
+	elseif g_dif == 1 then --normal
+		difficulty.medaltarget = 300
+	elseif g_dif == 2 then --hard
+		difficulty.medaltarget = 300
+	else
+		difficulty.medaltarget = 300
+	end
+	
+
+end
+
+	
+function rule_start_mission()
+
+	print ("------------------------------------------------------------------------------------------")
+	print ("------------------------------------- MISSION STARTED ------------------------------------")
+	print ("------------------------------------------------------------------------------------------")
+ 
+ 
+	Cmd_SquadPath( SG_bike1, "path_bike1",true, true, true, 0 )
+	Cmd_SquadPath( SG_bike2, "path_bike2",true, true, true, 0 )
+end
+
+
+
+------------------------------------------------Timer WIN LOSS condition--------------------------------
+
+function Timer_primarycheck()
+	
+	--Timer_DisplayOnScreen(TIMER_PRI)	
+
+	if Objective_IsTimerSet(OBJ_ConnectTerritory) and Objective_GetTimerSeconds(OBJ_ConnectTerritory) == 0 then
+		Objective_Fail(OBJ_ConnectTerritory)
+		Rule_AddOneShot(you_lose, 4)
+		Rule_RemoveMe()
+	elseif g_countdown1 ~= true and Objective_IsTimerSet(OBJ_ConnectTerritory) and Objective_GetTimerSeconds(OBJ_ConnectTerritory) <= 55*60 then
+		Obj_CreatePopup(OBJ_ConnectTerritory.ID, 369126)
+		g_countdown1 = true
+	elseif 	g_countdown2 ~= true and Objective_IsTimerSet(OBJ_ConnectTerritory) and Objective_GetTimerSeconds(OBJ_ConnectTerritory) <= 40*60 then
+		Obj_CreatePopup(OBJ_ConnectTerritory.ID, 369127)
+		g_countdown2 = true
+	elseif 	g_countdown3 ~= true and Objective_IsTimerSet(OBJ_ConnectTerritory) and Objective_GetTimerSeconds(OBJ_ConnectTerritory) <= 30*60 then
+		Obj_CreatePopup(OBJ_ConnectTerritory.ID, 369128)
+		g_countdown3 = true
+	elseif 	g_countdown4 ~= true and Objective_IsTimerSet(OBJ_ConnectTerritory) and Objective_GetTimerSeconds(OBJ_ConnectTerritory) <= 20*60 then
+		Obj_CreatePopup(OBJ_ConnectTerritory.ID, 369129)
+		g_countdown4 = true
+	elseif 	g_countdown5 ~= true and Objective_IsTimerSet(OBJ_ConnectTerritory) and Objective_GetTimerSeconds(OBJ_ConnectTerritory) <= 15*60 then
+		Obj_CreatePopup(OBJ_ConnectTerritory.ID, 369130)
+		g_countdown5 = true
+	elseif 	g_countdown6 ~= true and Objective_IsTimerSet(OBJ_ConnectTerritory) and Objective_GetTimerSeconds(OBJ_ConnectTerritory) <= 10*60 then
+		Obj_CreatePopup(OBJ_ConnectTerritory.ID, 369132)
+		g_countdown6 = true
+	elseif 	g_countdown7 ~= true and Objective_IsTimerSet(OBJ_ConnectTerritory) and Objective_GetTimerSeconds(OBJ_ConnectTerritory) <= 5*60 then
+		Obj_CreatePopup(OBJ_ConnectTerritory.ID, 369133)
+		g_countdown7 = true
+	elseif 	g_countdown8 ~= true and Objective_IsTimerSet(OBJ_ConnectTerritory) and Objective_GetTimerSeconds(OBJ_ConnectTerritory) <= 2*60 then
+		Obj_CreatePopup(OBJ_ConnectTerritory.ID, 369134)
+		g_countdown8 = true
+	end
+end
+
+--display timers tellling the player how much time he has left
+
+function you_lose()
+	World_SetPlayerLose( player1, "")
+	World_SetGameOver()
+end
+
+--------------------------------------------------NIS's-------------------------------------------------------
+--NIS01
+function TriggerNIS()
+		
+		Util_StartNIS(EVENTS.NIS16_01)
+		Rule_Add(TriggerNISOver)
+		Rule_RemoveMe()
+		
+end
+function TriggerNISOver()
+	if (Event_IsAnyRunning() == false) then
+		Util_SetStartingResources(15)
+		Util_PlayMusic("SOUND/Music/SP/M15/m15_ob1_secureroads", 5, 0)
+		Rule_RemoveMe()
+		Camera_MoveToPosition( MRK_center )
+		Objective_Start(OBJ_ConnectTerritory)
+		Rule_AddOneShot( OBJ_secondary, 60 )
+		EGroup_Hide( LAYER_N16_01,false)
+	end
+end
+
+--NIS02
+
+function TriggerNIS2()
+		
+		Util_StartNIS(EVENTS.NIS16_02)
+		Rule_Add(TriggerNISOver2)
+		print "nis working"
+
+end
+function TriggerNISOver2()
+	if (Event_IsAnyRunning() == false) then
+--		World_SetTeamWin( player1, "")
+		Game_EndSP( True,369024 )	
+		Rule_RemoveMe()
+	end
+end
+
+---------------------------------------------------------- 1st bridge spawn---------------------------------------------
+
+function bridge_spawn()
+	if Player_AreSquadsNearMarker( player1, MRK_bridge2 ) or Player_AreSquadsNearMarker( player1, MRK_AT1 ) then
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.PAK_38, MRK_1, MRK_2, 1)
+		Util_CreateSquadsAtMarker( player2, sg_temp5, SBP.AXIS.STORMTROOPER, MRK_2, 1 )
+		Rule_RemoveMe()
+	end
+end
+
+function conti_warning()
+	Util_StartIntel(EVENTS.SECURE_BRIDGES)
+end
+
+
+
+
+----------------------------------------------------------SE city encounter-----------------------------------------
+
+
+function city_encounter()
+	if Player_AreSquadsNearMarker( player1, MRK_4 ) then
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.PANZER, MRK_3, MRK_2, 1)
+		Cmd_InstantUpgrade( sg_temp5, UPG.AXIS.PANZERSKIRTS)
+		Cmd_InstantUpgrade( sg_temp5, UPG.AXIS.PANZERMG42 )
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.PAK_38, MRK_4, MRK_2, 1)
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.KNIGHTSCROSS, MRK_6, MRK_2, 1)
+		Util_CreateSquadsAndGarrison( player2, sg_temp5, SBP.AXIS.SNIPER, EG_house_of_pancakes, 1)
+		Util_CreateSquadsAndGarrison( player2, sg_temp5, SBP.AXIS.HEAVYMG, EG_house_of_pancakes, 1)
+		Rule_RemoveMe()
+	end
+end
+
+---------------------------------------------------------West side river------------------------------------------
+function west_side_river()
+	if Player_AreSquadsNearMarker( player1, MRK_hmg ) then
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.HEAVYMG, MRK_hmg, MRK_firestorm3, 1 )
+		Rule_RemoveMe()
+	end
+end	
+	
+function west_side_river1()
+	if Player_AreSquadsNearMarker( player1, MRK_9 ) then
+		Util_CreateSquadsAndGarrison( player2, sg_temp5, SBP.AXIS.HEAVYMG, EG_pancake, 1)
+		Rule_RemoveMe()
+	end
+end
+
+function west_side_river2()
+	if Player_AreSquadsNearMarker( player1, MRK_7 ) then
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.PAK_38, MRK_7, MRK_center, 1 )
+		Rule_RemoveMe()
+	end
+end	
+function west_side_river3()
+	if Player_AreSquadsNearMarker( player1, MRK_8 ) then
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.PAK_38, MRK_8, MRK_center, 1 )
+		Rule_RemoveMe()
+	end
+end	
+function west_side_river4()
+	if Player_AreSquadsNearMarker( player1, MRK_10 ) then
+		Util_CreateSquadsAtMarkerFacing( player2, sg_temp5, SBP.AXIS.MORTAR, MRK_10, MRK_center, 1 )
+		Rule_RemoveMe()
+	end
+
+end
+-----------------------------------------------------------convoys-------------------------------------------------
+--This is triggered after the second objective is fired off.
+function halftrack_convoy_first()
+
+		SGroup_Clear( sg_temp1 )
+		Util_CreateSquadsAtMarker( player2, sg_temp1, SBP.AXIS.OPELBLITZ, MRK_convoy_1, 1 ) 
+		Modify_UnitSpeed( sg_temp1, 0.4 )
+		SGroup_AddGroup( SG_halftrack_convoy1, sg_temp1 )
+		Util_CreateSquadsAtMarker( player2, SG_halftrack_convoy1, SBP.AXIS.STORMTROOPER, MRK_convoy_1, 1 ) 
+		Cmd_SquadPath( SG_halftrack_convoy1, "convoy1_path", true, false, false, 0 )
+		Rule_AddOneShot( reveal_los2, 3 )
+		UI_CreateEventCue(CUE.ATTACKED.icon, CUE.ATTACKED.sound, 369025, 369025 )
+		
+end
+function reveal_los2()
+	FOW_RevealSGroupOnly( SG_halftrack_convoy1, -1 )
+end
+
+
+function halftrack_convoy()
+	if table.getn(table_convoy) == 0 then
+	Rule_RemoveMe()
+	else
+	local rand = World_GetRand( 1, table.getn(table_convoy))
+	print(rand)
+	table_convoy[rand].creation()
+	end	
+end
+
+function halftrack_creategroup1()
+	if Player_OwnsEGroup( player2, EG_bridge1 ) then
+		SGroup_Clear( sg_temp1 )
+		SGroup_Clear( sg_temp2 )
+		Util_CreateSquadsAtMarker( player2, sg_temp1, SBP.AXIS.HALFTRACK, MRK_con1, 1 )
+		Util_CreateSquadsAndGarrison(player2, halftrack_nazi1, SBP.AXIS.GRENADIER, sg_temp1, 1)
+		Util_CreateSquadsAtMarker( player2, sg_temp1, SBP.AXIS.OPELBLITZ, MRK_con2, 1 )
+		Util_CreateSquadsAtMarker( player2, sg_temp2, SBP.AXIS.HALFTRACK, MRK_con4, 1 )
+		Util_CreateSquadsAndGarrison(player2, halftrack_nazi1, SBP.AXIS.GRENADIER, sg_temp2, 1)
+		Modify_UnitSpeed( sg_temp1, 0.4 )
+		Modify_UnitSpeed( sg_temp2, 0.4 )
+		SGroup_AddGroup( SG_halftrack_convoy1, sg_temp1 )
+		SGroup_AddGroup( SG_halftrack_convoy1, sg_temp2 )
+		Cmd_SquadPath( SG_halftrack_convoy1, "convoy1_path", true, false, false, 0)
+		Rule_AddOneShot( reveal_los3, 3 )
+		UI_CreateEventCue(CUE.ATTACKED.icon, CUE.ATTACKED.sound, 369025, 369025 )
+--		Rule_RemoveMe()
+	end
+end
+function reveal_los3()
+	FOW_RevealSGroupOnly( SG_halftrack_convoy1, -1 )
+end
+
+function halftrack_creategroup2()
+	if Player_OwnsEGroup( player2, EG_bridge2 ) then
+		SGroup_Clear( sg_temp2 )
+		SGroup_Clear( sg_temp3 )
+		Util_CreateSquadsAtMarker( player2, sg_temp2, SBP.AXIS.OPELBLITZ, MRK_con5, 1 ) 
+		Util_CreateSquadsAtMarker( player2, sg_temp3, SBP.AXIS.HALFTRACK, MRK_con6, 1 ) 
+		Util_CreateSquadsAndGarrison(player2, halftrack_nazi1, SBP.AXIS.GRENADIER, sg_temp3, 1)
+		Util_CreateSquadsAtMarker( player2, sg_temp2, SBP.AXIS.OSTWIND, MRK_con7, 1 ) 
+		Modify_UnitSpeed( sg_temp2, 0.4 )
+		Modify_UnitSpeed( sg_temp3, 0.4 )
+		SGroup_AddGroup( SG_halftrack_convoy2, sg_temp2 )
+		SGroup_AddGroup( SG_halftrack_convoy2, sg_temp3 )
+		
+		Cmd_SquadPath( SG_halftrack_convoy2, "convoy2_path", true, false, false, 0)
+		UI_CreateEventCue(CUE.ATTACKED.icon, CUE.ATTACKED.sound, 369025, 369025 )
+		Rule_AddOneShot( reveal_los4, 3 )
+--		Rule_RemoveMe()
+	end
+end	
+function reveal_los4()
+	FOW_RevealSGroupOnly( SG_halftrack_convoy2, -1 )
+end
+
+	
+function halftrack_creategroup3()
+	if Player_OwnsEGroup( player2, EG_bridge3 ) then
+		SGroup_Clear( sg_temp3 )
+		SGroup_Clear( sg_temp1 )
+		
+		--Util_CreateSquadsAtMarker( player2, sg_temp3, SBP.AXIS.PANTHER, MRK_con10, 1 ) 
+		Util_CreateSquadsAtMarker( player2, sg_temp3, SBP.AXIS.PANZER, MRK_con11, 1 )
+		Cmd_InstantUpgrade( sg_temp3, UPG.AXIS.PANZERSKIRTS)
+		Cmd_InstantUpgrade( sg_temp3, UPG.AXIS.PANZERMG42)
+		Util_CreateSquadsAtMarker( player2, sg_temp3, SBP.AXIS.OPELBLITZ, MRK_con12, 1 ) 
+		Util_CreateSquadsAtMarker( player2, sg_temp1, SBP.AXIS.HALFTRACK, MRK_con13, 1 ) 
+		Util_CreateSquadsAndGarrison(player2, halftrack_nazi1, SBP.AXIS.GRENADIER, sg_temp1, 1)
+		Util_CreateSquadsAtMarker( player2, sg_temp3, SBP.AXIS.OPELBLITZ, MRK_con14, 1 ) 
+		SGroup_AddGroup( SG_halftrack_convoy3, sg_temp3 )
+		SGroup_AddGroup( SG_halftrack_convoy3, sg_temp1 )
+		Modify_UnitSpeed( sg_temp3, 0.4 )
+		Modify_UnitSpeed( sg_temp1, 0.4 )
+		Cmd_SquadPath( SG_halftrack_convoy3, "convoy3_path", true, false, false, 0)
+		Rule_AddOneShot( reveal_los5, 3 )
+		UI_CreateEventCue(CUE.ATTACKED.icon, CUE.ATTACKED.sound, 369025, 369025 )
+--		Rule_RemoveMe()
+	end
+end	
+function reveal_los5()
+	FOW_RevealSGroupOnly( SG_halftrack_convoy3, -1 )
+end
+
+
+function halftrack_creategroup4()
+	if Player_OwnsEGroup( player2, EG_bridge4 ) then
+		SGroup_Clear( sg_temp4 )
+		SGroup_Clear( sg_temp2 )
+		Util_CreateSquadsAtMarker( player2, sg_temp2, SBP.AXIS.STUG, MRK_con16, 1 ) 
+		Util_CreateSquadsAtMarker( player2, sg_temp4, SBP.AXIS.HALFTRACK, MRK_con17, 1 ) 
+		Util_CreateSquadsAtMarker( player2, sg_temp4, SBP.AXIS.OPELBLITZ, MRK_con19, 1 ) 
+		Util_CreateSquadsAtMarker( player2, sg_temp4, SBP.AXIS.OPELBLITZ, MRK_con18, 1 )
+		Util_CreateSquadsAtMarker( player2, sg_temp2, SBP.AXIS.PANTHER, MRK_con15, 1 ) 
+		Modify_UnitSpeed( sg_temp4, 0.4)
+		Modify_UnitSpeed( sg_temp2, 0.5)
+		SGroup_AddGroup( SG_halftrack_convoy4, sg_temp4 )
+		SGroup_AddGroup( SG_halftrack_convoy4, sg_temp2 )
+		Cmd_SquadPath( SG_halftrack_convoy4, "convoy4_path", true, false, false, 0)
+		Rule_AddOneShot( reveal_los6, 3 )
+		UI_CreateEventCue(CUE.ATTACKED.icon, CUE.ATTACKED.sound, 369025, 369025 )
+--		Rule_RemoveMe()
+	end
+end
+function reveal_los6()
+	FOW_RevealSGroupOnly( SG_halftrack_convoy4, -1 )
+end
+
+
+
+---------------------------------------------AI manager-----------------------------------------
+
+function AI_on()
+	AI_Enable( player4, true )
+	AI_SetDifficulty(player4, AD_Hard)
+	UI_ForceCommanderTreeChoice(player4, UPG.COMMANDER_TREE.AXIS.BLITZKRIEG)
+
+	--AI_SetClassPreference( player4, "aiclass_light_vehicle", 1 )
+	--AI_SetClassPreference( player4, "aiclass_infantry", 4 )
+	
+	Player_SetPopCapOverride( player3, 35)
+	AI_Enable( player3, true )
+	AI_LockSGroup(player3, SG_AT_teams) 
+	AI_EnableComponent(player3, false, COMPONENT_Attacking)
+	AI_EnableComponent(player3, false, COMPONENT_ForwardDefending)
+	AI_DoString( player3, "s_commandtree_enabled = false" )
+	AI_DoString( player3, "s_playerabilities_enabled = false" )
+	
+	
+	--AI_SetClassPreference( player3, "aiclass_infantry", 4 )
+	
+	
+end
+
+
+
+
+-------------------------------------------- convoy rewards ---------------------------------------
+function convoy_check()
+	for i = table.getn(table_convoy), 1, -1 do
+		if Player_OwnsEGroup( player1, table_convoy[i].vp ) then
+			Util_MissionTitle( 369050 )
+			table.remove(table_convoy, i)
+		end
+	end
+	
+	if table.getn(table_convoy) == 0 then
+		Rule_RemoveMe()
+	end
+end	
+
+------------------------------------------------primary objective check territory---------------------------------------------
+
+function OBJ_ConnectTerritoryCheck()
+	team1 = Player_GetTeam( player1 )
+	
+	if World_TeamTerritoryPointsConnected( team1, Util_GetPosition_EVEN_IF_EMPTY( EG_HQ ), Util_GetPosition_EVEN_IF_EMPTY( EG_VP_10 ) ) == true then 
+		Rule_Remove(Timer_primarycheck)
+		Objective_Complete(OBJ_ConnectTerritory)
+		Rule_RemoveMe()
+	elseif Objective_GetTimerSeconds(OBJ_ConnectTerritory) == 0 then
+		Rule_Remove(Timer_primarycheck)
+		Objective_Fail(OBJ_ConnectTerritory)
+		Rule_RemoveMe()
+	end
+end 
+
+------------------------------------------------ 2nd primary objective axis counterattack-----------------------------------
+function final_attack()
+
+	--spawn tiger panzer and pather spearhead attack to punch hole though player defenses. 
+	Util_CreateSquadsAtMarker (player2, axis_hole_punch1, SBP.AXIS.TIGER, MRK_convoy_3, 1 )
+	Util_CreateSquadsAtMarker (player2, axis_hole_punch1, SBP.AXIS.PANZER, MRK_convoy_3, 1 )	
+	Modify_UnitSpeed( axis_hole_punch1, 0.40 )
+	Cmd_SquadPath( axis_hole_punch1, "path_final_attack1", true, true, true, 0, MRK_halftrack_convoy_removal3 )
+	
+	Util_CreateSquadsAtMarker (player2, axis_hole_punch2, SBP.AXIS.PANTHER, MRK_convoy_4, 1 )
+	Util_CreateSquadsAtMarker (player2, axis_hole_punch2, SBP.AXIS.TIGER, MRK_convoy_4, 1 )
+	Modify_UnitSpeed( axis_hole_punch2, 0.40 )
+	Cmd_SquadPath( axis_hole_punch2, "path_final_attack2", true, true, true, 0, MRK_halftrack_convoy_removal4 )
+	
+	Util_CreateSquadsAtMarker (player2, axis_hole_punch5, SBP.AXIS.TIGER, MRK_convoy_1, 1 )
+	Util_CreateSquadsAtMarker (player2, axis_hole_punch5, SBP.AXIS.PANZER, MRK_convoy_2, 1 )
+	Modify_UnitSpeed( axis_hole_punch5, 0.40 )
+	Cmd_SquadPath( axis_hole_punch5, "path_final_attack2", true, true, true, 0, MRK_halftrack_convoy_removal4 )
+	
+	Util_CreateSquadsAtMarker (player2, axis_hole_punch3, SBP.AXIS.PIONEER, MRK_convoy_3, 1 )
+	Util_CreateSquadsAtMarker (player2, axis_hole_punch3, SBP.AXIS.STORMTROOPER, MRK_convoy_3, 1 )
+	Util_CreateSquadsAtMarker (player2, axis_hole_punch3, SBP.AXIS.VOLKSGRENADIER, MRK_convoy_3, 1 )
+	Cmd_AttackMoveThenCapture( axis_hole_punch3, EG_south_bridge_vp)
+
+	Util_CreateSquadsAtMarker (player2, axis_hole_punch4, SBP.AXIS.PIONEER, MRK_convoy_4, 1 )
+	Util_CreateSquadsAtMarker (player2, axis_hole_punch4, SBP.AXIS.STORMTROOPER, MRK_convoy_4, 1 )
+	Util_CreateSquadsAtMarker (player2, axis_hole_punch4, SBP.AXIS.GRENADIER, MRK_convoy_4, 1 )
+	
+	Cmd_AttackMoveThenCapture( axis_hole_punch4, EG_north_bridge_vp)
+
+	Rule_AddOneShot( start_second_primary_OBJ, 1 )
+	Rule_AddOneShot( counterattack_talk, 8 )
+	Rule_AddOneShot( reveal_los, 3 )
+	--add in patrolling the area after they have captured the point
+end
+
+function counterattack_talk()
+	Util_StartIntel(EVENTS.ROADS_OPEN1)
+end
+function start_second_primary_OBJ()
+	Objective_Start(OBJ_Keep_Territory_Connected)
+end
+
+function reveal_los()
+	FOW_RevealSGroupOnly( axis_hole_punch1, -1 )
+	FOW_RevealSGroupOnly( axis_hole_punch2, -1 )
+end
+
+function OBJ_Keep_Territory_Connected_Check() -- a check to see if the players territory is still connected
+
+	team1 = Player_GetTeam( player1 )
+	--if the players territory is connected and the tanks are destroyed..
+	if World_TeamTerritoryPointsConnected( team1, EGroup_GetPosition_EVEN_IF_EMPTY( EG_HQ ), Util_GetPosition_EVEN_IF_EMPTY( EG_VP_10 )) ==  true and (SGroup_Count(axis_hole_punch1) + SGroup_Count (axis_hole_punch2)) == 0 then
+		Objective_Complete(OBJ_Keep_Territory_Connected)
+	end
+	
+end 
+
+------------------------------------------------Secondary Objective - Convoys------------------------------------------
+
+function OBJ_secondary() --fires 120 into the mission
+
+	Objective_Start( OBJ_SecondObjectiveBridge )
+
+end
+function OBJ_SecondObjectiveBridgeCheck() -- checks every 6 seconds to see if player 1 owns bridges
+
+	if (Player_OwnsEGroup ( player1, EG_bridge1 ) or Player_OwnsEGroup(player3, EG_bridge1)) and 
+		(Player_OwnsEGroup ( player1, EG_bridge2 ) or Player_OwnsEGroup(player3, EG_bridge2)) and 
+		(Player_OwnsEGroup ( player1, EG_bridge3 ) or Player_OwnsEGroup(player3, EG_bridge3)) and 
+		(Player_OwnsEGroup ( player1, EG_bridge4 ) or Player_OwnsEGroup(player3, EG_bridge4)) == true then
+	
+	Objective_Complete( OBJ_SecondObjectiveBridge, 369030 )
+	Rule_RemoveMe()
+		
+		
+	end
+end
+
+
+function Kill_Obj2()
+	if Objective_IsComplete( OBJ_SecondObjectiveBridge ) == false then
+		Objective_Fail( OBJ_SecondObjectiveBridge )
+	end
+	if Objective_IsComplete( OBJ_Medal ) == false then
+		Objective_Fail(OBJ_Medal )
+	end
+end
+
+---------------------------------------------Medal objective----------------------------------------------------------------
+--Medal obj trigger kill five germans
+function medal_obj_start()
+
+	local count = Stats_TeamTally( Player_GetTeam( player1 ), Stats_EntitiesKilled )
+		if count >= 5 then
+			Objective_Start(OBJ_Medal)
+			Rule_RemoveMe()
+		end
+	
+end
+
+--Thanks Neil and Degs!!
+function death_counter()
+	
+	local count = Stats_TeamTally( Player_GetTeam( player1 ), Stats_EntitiesKilled )
+
+	if count >= difficulty.medaltarget then
+		Objective_Complete( OBJ_Medal, true )
+		Rule_RemoveMe()
+	elseif count > lastcount then
+		Objective_SetCounter( OBJ_Medal, count, difficulty.medaltarget )
+		lastcount = count
+	end
+	
+end
+
+
+
+function player_loss_base_check()
+	
+	if Player_HasLost(player1, CRITICAL_BUILDINGS.ALLIES) then
+		Objective_Fail(OBJ_ConnectTerritory)
+		Objective_Fail(OBJ_ConnectTerritory)
+		Objective_Fail(OBJ_ConnectTerritory)
+		Game_EndSP(false)
+	end
+	
+end
+
+-----------------------------------------------auto retreat for a majority SGroups---------------------------------------------
+
+function nazi_retreat()
+	
+	Player_GetAllSquadsNearMarker (player2, sg_temp1, MRK_halftrack_convoy_removal1)
+	
+	SGroup_DestroyAllInMarker(sg_temp1, MRK_halftrack_convoy_removal1)
+	Player_GetAllSquadsNearMarker (player2, sg_temp2, MRK_halftrack_convoy_removal2)
+	
+	SGroup_DestroyAllInMarker(sg_temp2, MRK_halftrack_convoy_removal2)
+	Player_GetAllSquadsNearMarker (player2, sg_temp3, MRK_halftrack_convoy_removal3)
+	
+	SGroup_DestroyAllInMarker(sg_temp3, MRK_halftrack_convoy_removal3)
+	Player_GetAllSquadsNearMarker (player2, sg_temp4, MRK_halftrack_convoy_removal4)
+	
+	SGroup_DestroyAllInMarker(sg_temp4, MRK_halftrack_convoy_removal4)
+
+end
+
+--------------------------------------------------tank patrols---------------------------------------------------------------
+--spawns in various tanks and sends them patrolling the map, triggers when players are near the marker
+
+function north_panther_patrol()
+	if Player_AreSquadsNearMarker (	player1, MRK_panther_spawn_north ) == true then
+		
+		Util_CreateSquadsAtMarker( player2, SG_panther_patrol_north, SBP.AXIS.PANTHER, MRK_panther_spawn_north, 1 ) 
+		Util_CreateSquadsAtMarker( player2, SG_panther_patrol_north, SBP.AXIS.STUG, MRK_panther_spawn_north, 1 ) 
+		Util_CreateSquadsAtMarker( player2, SG_panther_patrol_north, SBP.AXIS.PANZER, MRK_panther_spawn_north, 1 )
+		Cmd_InstantUpgrade( SG_panther_patrol_north, UPG.AXIS.PANZERSKIRTS)
+		Cmd_InstantUpgrade( SG_panther_patrol_north, UPG.AXIS.PANZERMG42)
+		Cmd_SquadPath( SG_panther_patrol_north, "path_panther_patrol_north", true, true, true, 0 )
+		Rule_RemoveMe()
+	end
+end
+	
+function stug_patrol()
+	if Player_AreSquadsNearMarker( player1, MRK_stug_spawn ) == true then
+		SG_stug_patrol = SGroup_CreateIfNotFound( "SG_stug_patrol" )
+		Util_CreateSquadsAtMarker( player2, SG_stug_patrol, SBP.AXIS.STUG, MRK_stug_spawn, 1 ) 
+		Cmd_SquadPath( SG_stug_patrol, "path_stug_patrol", true, true, true, 0 )
+		Rule_RemoveMe()
+	end
+end
+		
+function puma_patrol()
+	if Player_AreSquadsNearMarker( player1, MRK_puma_spawn ) == true then
+		SG_puma_patrol = SGroup_CreateIfNotFound( "SG_puma_patrol" )
+		Util_CreateSquadsAtMarker( player2, SG_puma_patrol, SBP.AXIS.PUMA, MRK_puma_spawn, 1 ) 
+		Cmd_SquadPath( SG_puma_patrol, "path_puma_patrol", true, true, true, 0 )
+		Rule_RemoveMe()
+	end
+end
+
+function tiger_patrol()
+	if Player_AreSquadsNearMarker( player1, MRK_tiger_spawn ) == true then
+		SG_tiger_patrol = SGroup_CreateIfNotFound( "SG_tiger_patrol" )
+		Util_CreateSquadsAtMarker( player2, SG_tiger_patrol, SBP.AXIS.TIGER, MRK_tiger_spawn, 1 )
+		Cmd_SquadPath( SG_tiger_patrol, "path_tiger_patrol", true, true, true, 8 )
+		Rule_RemoveMe()
+	end
+end
+
+function puma_farm_patrol()
+	if Player_AreSquadsNearMarker( player1, MRK_puma_farm_spawn ) == true then
+		SG_puma_farm_patrol = SGroup_CreateIfNotFound( "SG_puma_farm_patrol" )
+		Util_CreateSquadsAtMarker( player2, SG_puma_farm_patrol, SBP.AXIS.PUMA, MRK_puma_farm_spawn, 1 )
+		Cmd_SquadPath( SG_puma_farm_patrol, "path_puma_farm_patrol", true, true, true, 0 )
+		Rule_RemoveMe()
+	end
+end	
+--------------------------------FireStorm--------------------------------------------------------------------------------
+
+
+function firestorm()
+	if Player_AreSquadsNearMarker(player1, MRK_firestorm) then
+		Cmd_Ability(player2, ABILITY.COMMANDER_TREE.AXIS.FIRESTORM, Marker_GetPosition(MRK_firestorm), nil, true)
+		Rule_RemoveMe()
+	end
+end
+
+function firestorm2()
+	if Player_AreSquadsNearMarker(player1, MRK_firestorm2) then
+		Cmd_Ability(player2, ABILITY.COMMANDER_TREE.AXIS.FIRESTORM, Marker_GetPosition(MRK_firestorm2), nil, true)
+		Rule_RemoveMe()
+	end
+end
+
+function firestorm3()
+	if Player_AreSquadsNearMarker(player1, MRK_firestorm3) then
+		Cmd_Ability(player2, ABILITY.COMMANDER_TREE.AXIS.FIRESTORM, Marker_GetPosition(MRK_firestorm3), nil, true)
+		Rule_RemoveMe()
+	end
+end
+function firestorm4()
+	if Player_AreSquadsNearMarker(player1, MRK_firestorm4) then
+		Cmd_Ability(player2, ABILITY.COMMANDER_TREE.AXIS.FIRESTORM, Marker_GetPosition(MRK_firestorm4), nil, true)
+		Rule_RemoveMe()
+	end
+end
+
+function firestorm5()
+	if Player_AreSquadsNearMarker(player1, MRK_firestorm5) then
+		Cmd_Ability(player2, ABILITY.COMMANDER_TREE.AXIS.FIRESTORM, Marker_GetPosition(MRK_firestorm5), nil, true)
+		Rule_RemoveMe()
+	end
+end
+
+function firestorm6()
+	if Player_AreSquadsNearMarker(player1, MRK_firestorm6) then
+		Cmd_Ability(player2, ABILITY.COMMANDER_TREE.AXIS.FIRESTORM, Marker_GetPosition(MRK_firestorm6), nil, true)
+		Rule_RemoveMe()
+	end
+end
+
+	

@@ -1,0 +1,6290 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+-- Hell's Highway Hunt
+
+--~ 	Util_CreateSquads(player, sgroup, sbp, location[, destination, numsquads, loadout, attackmove, facing, upgrades] )
+
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+import("ScarUtil.scar")
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ SETUP ]]
+
+-------------------------------------------------------------------------
+
+function OnGameSetup()
+	-- string numbers should reference dat files
+	-- "allies_commonwealth" "allies" "axis" "axis_panzer_elite"
+	player1 = Setup_Player(1, 1309230, TRACE_AXIS_PANZER_ELITE, 1)
+	player2 = Setup_Player(2, 1309236, TRACE_ALLIES_COMMONWEALTH, 2)
+	
+	-- AI slot (ensure that the AI is on the same team as the other Axis player by setting the second parameter
+--~  	player3 = Setup_Player(3, "$000000", "Axis Infantry Company", 2)
+end
+
+function OnGameRestore()
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+	-- player3 = World_GetPlayerAt(3)
+	
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+end
+
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ ONINIT ]]
+
+-------------------------------------------------------------------------
+
+function OnInit()
+	g_MissionSpeechPath="omg\\sp\\Mission7"
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	-- a constant that stores the mission number for use with
+	-- setting the global speech paths, tech tree setup, and 
+	-- the player's starting resources
+	MISSION_NUMBER 	= 0207
+	print(" ****************** STARTING MISSION: HELL'S HIGHWAY HUNT ************************ ")
+	
+	--[[ PRESET GAME STATE ]]
+	Setup_MissionPreset(MISSION_NUMBER)
+	
+	--[[ PRESET DEBUG CONDITIONS ]]
+	HHHunt_Debug()
+	
+	--[[ SET DIFFICULTY ]]
+	HHHunt_Difficulty()
+	
+	--[[ REGISTER OBJECTIVES ]]
+	HHHunt_ObjectiveRegister()
+	
+	--[[ MOD INITIAL STATS ]]
+	HHHunt_ModifyStats()
+	
+	--[[ SET RESTRICTIONS ]]
+	HHHunt_Restrictions()
+	
+	--[[ SET AI ]]
+	HHHunt_CpuInit()
+	
+	--[[ CLEANUP CODE FOR COUNTERATTACK ]]
+	HHHunt_CleanupCounterAttack()
+	
+	--[[ MISSION PRESETS ]]
+	HHHunt_MissionPreset()
+	
+	--[[ GAME START CHECK ]]
+	Rule_Add(HHHunt_NISStart)
+
+end
+
+Scar_AddInit(OnInit)
+
+function HHHunt_Debug()
+	
+	-- looks for the command line option [-debug]
+	if Misc_IsCommandLineOptionSet("debug") then
+		
+		g_debug = true
+		
+		-- reveal FOW
+		FOW_Enable(false)
+		
+	else	
+		
+		-- set up bindings for NISes
+		Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(NIS_OPENING)')]])")
+		Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS02)')]])")
+		
+	end
+	
+end
+
+function HHHunt_ObjectiveRegister()
+
+	--[[ *** MUST INITIALIZE THE OBJ TABLE BEFORE REGISTERING *** ]]
+	Initialize_OBJ_DestroyHQs()
+--~ 	Initialize_OBJ_EstablishNewBase()
+	Initialize_OBJ_Medal()
+--~ 	Initialize_OBJ_RecoverVehicles()
+	
+	-- [[ Initialize Encounters ]] --
+	Convoy_Init()
+	RepairTeam_Init()
+	SouthFarmyard_Init()
+	Relocation_Init()
+	
+end
+
+function HHHunt_ModifyStats()
+	
+	--[[ saved as example - deg
+	Player_SetDefaultSquadMoodMode(player1, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player2, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player3, MM_ForceTense)
+	
+	-- shorten vision ranges
+	Modify_PlayerSightRadius(player1, 0.75)
+	]]	
+
+	-- mod resource rates
+--~ 	t_player1_res_mods= {}
+--~ 	t_player1_res_mods[1] = Modify_PlayerResourceRate(player1, RT_Manpower, 1.5)
+--~ 	t_player1_res_mods[2] = Modify_PlayerResourceRate(player1, RT_Munition, 2)
+--~ 	t_player1_res_mods[3] = Modify_PlayerResourceRate(player1, RT_Fuel, 1.5)
+	
+end
+
+function HHHunt_Restrictions()
+
+	--[[ UN/RESTRICT UPGRADES 	]]
+	Cmd_InstantUpgrade(player1, UPG.COMMANDER_TREE.ELITE.SCORCHED_EARTH_01)
+	Cmd_InstantUpgrade(player1, UPG.COMMANDER_TREE.ELITE.TANK_DESTROYER_12)
+	Cmd_InstantUpgrade(player1, UPG.SP.JAGDPANTHER)	
+	Player_SetAbilityAvailability(player1, ABILITY.COMMANDER_TREE.ELITE.RECRUIT_HETZER, ITEM_UNLOCKED)
+	Player_SetAbilityAvailability(player1, ABILITY.COMMANDER_TREE.ELITE.RECRUIT_JAGDPANTHER, ITEM_UNLOCKED)
+	Cmd_InstantUpgrade(player2, UPG.COMMANDER_TREE.CW.ENGINEERS_01)
+	Cmd_InstantUpgrade(player2, UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY_01)
+	Modify_VehicleRepairRate(player1, 2.5, SBP.ELITE.PANZERGRENADIER)
+	Player_SetAbilityAvailability(player1, ABILITY.COMMANDER_TREE.ELITE.RECRUIT_JAGDPANTHER, ITEM_REMOVED)
+	
+	--[[ RESOURCES 	]]
+	Player_SetResource(player1, RT_Manpower, 600)
+	Player_SetResource(player1, RT_Munition, 600)
+	Player_SetResource(player1, RT_Fuel, 300)
+	
+	
+	--[[ UN/RESTRICT ABILITIES 
+	Player_SetAbilityAvailability(player1, ABILITY.ALLIES.GRENADE, ITEM_UNLOCKED)
+	Player_SetAbilityAvailability(player1, ABILITY.ALLIES.SATCHEL_CHARGE, ITEM_REMOVED)
+	]]
+--~ 	Player_SetConstructionMenuAvailability(player1, TYPE.CONSTRUCT.AXIS.HQ, ITEM_LOCKED)
+--~ 	Player_SetConstructionMenuAvailability(player1, TYPE.CONSTRUCT.AXIS.PIONEER_ADVANCED, ITEM_LOCKED)
+--~ 	Player_SetConstructionMenuAvailability(player1, TYPE.CONSTRUCT.AXIS.PIONEER_BASIC, ITEM_LOCKED)
+	
+	-- UN/RESTRICT POP CAP
+	Player_SetPopCapOverride(player1, 90)
+
+	--[[ UN/RESTRICT UI 
+	UI_BindingSetEnabled("company_commander", false)
+	UI_BindingSetEnabled("squadcap", false)
+	]]
+	
+	--[[ UN/RESTRICT SBPS ]]
+--~ 	local sbps = {SBP.ALLIES_SHERMAN, SBP.ALLIES_CROCODILE, SBP.ALLIES_GREYHOUN, SBP.ALLIES_PERSHING }
+--~ 	for i = 1, table.getn(sbps) do
+--~ 		Player_SetSquadProductionAvailability(player1, sbps[i], ITEM_LOCKED)
+--~ 	end
+
+end
+
+
+
+function HHHunt_CpuInit()
+
+	--[[ left as an example
+	
+	-- set up Player3 AI  
+	Util_AI_Setup(player3, {Util_DifVar({10, 15, 20, 30}), 5}, player3, Game_GetSPDifficulty(), 7, Util_DifVar({1, 2, 3, 5}), 2, 3)
+	
+	-- Set up AI's resources
+	Player_SetResource(player3, RT_Manpower, 1000)
+	Player_SetResource(player3, RT_Munition, 100)
+	Player_SetResource(player3, RT_Fuel, 100)
+	
+	-- tell AI to go after strongest threat instead of the weakest
+	AI_DoString( player3, "s_personality.attack_prefer_threat = true" )
+	AI_DoString( player3, "s_personality.defend_prefer_threat = true" )
+
+	-- tell AI not to "defend" territories outside of the ring around its base
+	AI_EnableComponent(player3, false, COMPONENT_ForwardDefending)
+	
+	-- disable use of company commander menu and abilities
+	AI_DoString( player3, "s_commandtree_enabled = false" )
+	AI_DoString( player3, "s_playerabilities_enabled = false" )
+	
+	AI_EnableComponent(player3, false, COMPONENT_Attacking)
+	
+	]]
+
+end
+
+
+
+function HHHunt_Difficulty()
+
+	
+	-- get the difficulty
+	g_difficulty = Game_GetSPDifficulty()  -- set a global difficulty variable
+	print("********* DIFFICULTY: "..g_difficulty)
+	
+	-- set health bonus for player 1
+	Setup_Difficulty(player1, g_difficulty) -- pass the player and difficulty global variable into the Set Health function
+	Setup_Difficulty(player1, g_difficulty, TRACE_AXIS) -- do it for each player that you have defined
+	Setup_Difficulty(player2, g_difficulty) -- do it for each player that you have defined
+	Setup_Difficulty(player2, g_difficulty, TRACE_ALLIES) -- do it for each player that you have defined
+	
+
+	t_difficulty = {
+		mainhq_reloc_attempts				= Util_DifVar( {1, 2, 3, 3} ),		-- Max attempts the main HQ will reloc
+		infhq_reloc_attempts				= Util_DifVar( {1, 2, 3, 3} ),		-- Max attempts the inf HQ will reloc
+		armorhq_reloc_attempts				= Util_DifVar( {1, 2, 3, 3} ),		-- Max attempts the armor HQ will reloc
+		mainhq_respawn_timer				= Util_DifVar( {45, 30, 25, 25} ),	-- Respawn timer for the main HQ
+		infhq_respawn_timer					= Util_DifVar( {50, 40, 35, 30} ),	-- Respawn timer for the inf HQ
+		armorhq_respawn_timer				= Util_DifVar( {60, 45, 35, 30} ),	-- Respawn timer for the armor HQ
+		hq_damage_recieved					= Util_DifVar( {0.9, 0.9, 0.85, 0.8} ), -- Recieved damage to the HQs
+	}
+	
+end
+
+
+-------------------------------------------------------------------------
+
+-- MISSION Preset 
+
+-------------------------------------------------------------------------
+
+function HHHunt_MissionPreset()
+	
+	tmkr_hunt_start = Marker_GetTable("mkr_hunt_start%d")
+	tsg_player_start = SGroup_CreateTable("sg_player_start%d", table.getn(tmkr_hunt_start))
+	tmkr_hunt_plyr_tech = Marker_GetTable("mkr_hunt_plyr_tech%d")
+	teg_plyr_tech = EGroup_CreateTable("eg_plyr_tech%d", table.getn(tmkr_hunt_plyr_tech))
+	teg_bridge = EGroup_GetWBTable("eg_bridge%d")
+	sg_jagdpanther = SGroup_CreateIfNotFound("sg_jagdpanther")
+	
+	-- this is a set of threats used by the tank manager to determine which tank to attack first
+	t_elite_threats = {
+		SBP.ELITE.JAGDPANTHER,
+		SBP.ELITE.HETZER,
+		SBP.ELITE.MARDER,
+		SBP.ELITE.HALFTRACK_SNIPER,
+		SBP.ELITE.PANZERGRENADIER,
+	}
+	
+	-- a table of tanks to add threat arrows to
+	t_cw_tank_threats = {
+		SBP.CW.FIREFLY,
+		SBP.CW.CHURCHILL_CROC,
+	}
+	
+	TankCombat_SetThreats(t_elite_threats)
+	
+	tmkr_sp_south_entry = Marker_GetTable("mkr_hunt_convoy_prot2_sp%d")
+	
+	Camera_MoveToPosition(mkr_hunt_start1)
+	
+	sg_temp = SGroup_CreateIfNotFound("sg_temp")
+	eg_temp = EGroup_CreateIfNotFound("eg_temp")
+	
+	eg_starting = EGroup_CreateIfNotFound("eg_starting")
+	
+	Util_CreateEntities(player1, eg_starting, EBP.ELITE.KAMPFGRUPPE, mkr_hunt_plyr_tech2, 1)
+	
+	sg_builder1 = SGroup_CreateIfNotFound("sg_builder1")
+	sg_builder2 = SGroup_CreateIfNotFound("sg_builder2")
+	sg_builder3 = SGroup_CreateIfNotFound("sg_builder3")
+--~ 	sg_builder4 = SGroup_CreateIfNotFound("sg_builder4")
+	
+	Util_CreateSquads(player1, sg_builder1, SBP.ELITE.PANZERGRENADIER, mkr_hunt_builder_spawn)
+	Util_CreateSquads(player1, sg_builder2, SBP.ELITE.PANZERGRENADIER, mkr_hunt_builder_spawn)
+	Util_CreateSquads(player1, sg_builder3, SBP.ELITE.PANZERGRENADIER, mkr_hunt_builder_spawn)
+--~ 	Util_CreateSquads(player1, sg_builder4, SBP.ELITE.PANZERGRENADIER, mkr_hunt_builder_spawn)
+	
+	t_player_buildings = {
+		{ 
+			ebp 		= EBP.ELITE.PANZER_ARTILLERIE,
+			upg			= {},
+		},
+		{ 
+			ebp 		= EBP.ELITE.KAMPFGRUPPE,
+			upg			= {},
+		},
+	}
+	
+	-- setup the bridge manager for the mission
+	-- this may break if one of those bridges has been destroyed during the mission
+	for i=1, table.getn(teg_bridge) do 
+		if EGroup_IsEmpty(teg_bridge[i]) == false then
+			BridgeTerritory_Add(teg_bridge[i], EGroup_FromName("eg_rp_bridge"..i), EGroup_FromName("eg_rp_bridge"..i.."_1"), EGroup_FromName("eg_rp_bridge"..i.."_2"))
+		end
+	end
+	
+	if EGroup_IsEmpty(eg_hunt_town_hq) == false then
+		EGroup_SetInvulnerable(eg_hunt_town_hq, 0.5)
+	end
+	
+	-- Setup the Walking Barrage start
+	v_barrage = 1
+	
+	EGroup_ReSpawn(eg_intro_building)
+	EGroup_Hide(eg_intro_building, true)
+	
+	-- if areas of your script need to be kicked off early
+--~ 	EstablishNewBase_Preset()
+--~ 	WalkingBarrage_EventsInit()
+	Rule_AddOneShot(SouthFarmyard_Preset, 1)
+	Rule_AddOneShot(RecoverVehicles_Init, 0.1)
+	print("HHHunt_MissionPreset Ended")
+	
+end
+
+function HHHunt_CleanupCounterAttack()
+
+	eg_ambush_hq_rp = EGroup_CreateIfNotFound("eg_ambush_hq_rp")
+	teg_rp = EGroup_GetWBTable("eg_rp%d")
+	eg_hunt_entry_point = EGroup_CreateIfNotFound("eg_hunt_entry_point")
+	eg_hunt_start_rp = EGroup_CreateIfNotFound("eg_hunt_start_rp")
+	teg_hunt_player_rp = EGroup_GetWBTable("eg_hunt_player_rp%d")
+	
+	eg_counterattack = EGroup_CreateIfNotFound("eg_counterattack")
+	eg_counterattack_ambient = EGroup_CreateIfNotFound("eg_counterattack_ambient")
+	eg_hunt_base = EGroup_CreateIfNotFound("eg_hunt_base")
+	eg_roadblock = EGroup_CreateIfNotFound("eg_roadblock")
+	eg_hunt_hq_town = EGroup_CreateIfNotFound("eg_hunt_hq_town")
+	eg_ambush_rp_control = EGroup_CreateIfNotFound("eg_ambush_rp_control")
+	
+	eg_emplacements_cleanup = EGroup_CreateIfNotFound("eg_emplacements_cleanup")
+	
+	-- hack to deal with asserts when saving the previous mission
+	if scartype(t_obj_rc) == ST_TABLE then
+		t_obj_rc.timed_events  = {}
+	end
+	
+	-- Remove all emplacements
+	local t_ebps = {
+		EBP.CW.ANTITANK_NEST,
+		EBP.CW.BOFORS_NEST,
+		EBP.CW.MORTAR_NEST,
+		EBP.CW.MG_NEST,
+	}
+	
+	Player_GetAll(player2, eg_emplacements_cleanup)
+	EGroup_Filter(eg_emplacements_cleanup, t_ebps, FILTER_KEEP)
+	EGroup_Kill(eg_emplacements_cleanup)
+	
+	World_GetNeutralEntitiesNearMarker(eg_emplacements_cleanup, mkr_map)
+	EGroup_Filter(eg_emplacements_cleanup, t_ebps, FILTER_KEEP)
+	EGroup_Kill(eg_emplacements_cleanup)
+	
+	-- CLean up Player Squads
+	p1squads = Player_GetSquads(player1)
+	
+	Player_GetAll(player1, sg_temp)
+	if SGroup_IsInHoldEntity(sg_temp, ANY) == true then
+		Cmd_UngarrisonSquad(sg_temp)
+	end
+	
+	Player_GetAll(player2, sg_temp)
+	if SGroup_IsInHoldEntity(sg_temp, ANY) == true then
+		Cmd_UngarrisonSquad(sg_temp)
+	end
+	
+	SGroup_DestroyAllSquads(p1squads)
+	Player_GetAll(player1, sg_temp)
+	SGroup_DestroyAllSquads(sg_temp)
+	Player_GetAll(player2, sg_temp)
+	SGroup_DestroyAllSquads(sg_temp)
+	Player_GetAllEntitiesNearMarker(player1, eg_temp, mkr_ambush_player_start1, 50)
+	EGroup_DestroyAllEntities(eg_temp)
+		
+	local t_ebps = {
+		EBP.ELITE.PANZER_ARTILLERIE,
+		EBP.ELITE.PANZERJAGER,
+		EBP.ELITE.LOGISTIK,
+		EBP.ELITE.KAMPFGRUPPE,
+	}
+	
+	Player_GetAllEntitiesNearMarker(player1, eg_counterattack, mkr_town_church, 60)
+	EGroup_Filter(eg_counterattack, t_ebps, FILTER_KEEP)
+	
+	Player_GetAll(player1, eg_counterattack_ambient)
+	EGroup_InstantRevertOccupiedBuilding(eg_counterattack_ambient)
+	
+	if EGroup_IsEmpty(eg_counterattack) == false then
+		
+		local SetupEntity = function(gid, idx, eid)
+			local loc = Entity_GetPosition(eid)
+			local ebp = Entity_GetBlueprint(eid)
+			
+			Entity_DeSpawn(eid)
+			
+			if EGroup_IsEmpty(eg_hunt_town_hq) == false then
+				Util_CreateEntities(nil, eg_hunt_base, ebp, loc, 1)
+			end
+			
+		end
+		EGroup_ForEach(eg_counterattack, SetupEntity)
+	end
+
+	-- remove the control point from the map, 
+	-- as it is no longer needed as a supply generating territory
+	if EGroup_IsEmpty(eg_ambush_rp_control) == false then
+		EGroup_DestroyAllEntities(eg_ambush_rp_control)
+	end
+	
+	EGroup_SetAvgHealth(eg_hunt_base, 0.5)
+	
+	Player_GetAll(player1, eg_roadblock)
+	EGroup_Filter(eg_roadblock, EBP.ELITE.TANK_TRAP, FILTER_KEEP)
+	EGroup_DeSpawn(eg_roadblock)
+	
+	-- remove all the previous State Machine code that was running
+	-- from the previous mission.
+	StateMachine_RemoveAll()
+	
+	if g_debug ~= true then
+		FOW_Enable(true)
+	end
+	
+	table.insert(teg_rp, eg_ambush_hq_rp)
+	
+	-- set all the starting resources for the map, intially to the enemy player.
+	for i=1, table.getn(teg_rp) do
+		EGroup_RemoveDemolitions(teg_rp[i])
+		EGroup_InstantCaptureStrategicPoint(teg_rp[i], player2)
+	end
+	
+	-- give the player some starting resource points at the beginning of the mission
+	for i=1, table.getn(teg_hunt_player_rp) do
+		EGroup_InstantCaptureStrategicPoint(teg_hunt_player_rp[i], player1)
+	end
+	
+	-- set all the retreat points, and such to control to the enemy player until
+	-- the player establishes a new base in the town
+	EGroup_SetPlayerOwner(eg_town_retreat, player2)
+	EGroup_InstantCaptureStrategicPoint(eg_town_reinforce, player2)
+	EGroup_InstantCaptureStrategicPoint(eg_town_control, player2)
+	
+	Player_SetAbilityAvailability(player1, ABILITY.COMMANDER_TREE.ELITE.HENSCHEL, ITEM_DEFAULT)
+	
+	-- create a new map entry point for the player
+	EGroup_DestroyAllEntities(eg_ambush_entry_point)
+	Util_CreateEntities(player1, eg_hunt_entry_point, EBP.STRAT_POINT.ENTRY, mkr_hunt_map_entry, 1)
+	
+	EGroup_ReSpawn(eg_player_hq)
+	EGroup_SetPlayerOwner(eg_player_hq, player1)
+	
+	-- Set Repair buildings to vulnerable
+	EGroup_SetInvulnerable(eg_hunt_rt_base1, false)
+	EGroup_SetInvulnerable(eg_hunt_rt_base2, false)
+	EGroup_SetInvulnerable(eg_hunt_rt_base3, false)
+	
+	
+	-- repairs any destroyed bridges
+	Bridges_CheckStatus()
+	if bridge1 == false then
+		EGroup_SetAvgHealth(eg_bridge1, 1.0)
+	end
+
+end
+
+
+
+
+-------------------------------------------------------------------------
+
+-- MISSION START 
+
+-------------------------------------------------------------------------
+function HHHunt_NISStart()
+
+
+	Util_StartNIS(NIS_OPENING_BLEND)	
+	
+	Rule_Add(HHHunt_PostNIS)
+	Rule_RemoveMe()
+
+end
+
+function HHHunt_PostNIS()
+
+	if Event_IsAnyRunning() == false then
+		
+		-- delay first objective
+
+		-- add this here because currently the Commonwealth Mobile HQs prevent the counter-attack from being saved.
+		
+
+--~ 		tmr_obj_start = Timer_Start("tmr_obj_start", 3*60)
+--~ 		Rule_AddInterval(Objective_Checker, 1)
+		
+--~ 		Rule_AddOneShot(HHHunt_BaseConstruct, 5)
+		
+--~ 		HHHunt_MoveTank()
+		
+		-- start Encounters
+--~ 		Rule_AddOneShot(HHHunt_Encounter_Init, 7)
+		Rule_AddOneShot(HHHunt_Mission_Kickoff, 3)
+		
+		
+		Rule_RemoveMe()
+		
+	end
+	
+end
+
+function HHHunt_Mission_Kickoff()
+	
+	tmr_obj_start = Timer_Start("tmr_obj_start", 3*60)
+	Rule_AddInterval(Objective_Checker, 1)
+	
+	Rule_AddOneShot(HHHunt_BaseConstruct, 1)
+		
+	HHHunt_MoveTank()
+		
+	Rule_AddOneShot(HHHunt_Encounter_Init, 3)
+	Rule_AddInterval(HHHunt_ChangeOwnership, 2)
+	Rule_AddInterval(HHHunt_CheckPlayerBase, 1.5)
+
+end
+
+function HHHunt_BaseConstruct()
+	
+	DestroyHQs_Preset()
+	
+	mod_log = Modify_EntityBuildTime(player1, EBP.ELITE.LOGISTIK, 0.5)
+	mod_pan = Modify_EntityBuildTime(player1, EBP.ELITE.PANZERJAGER, 0.5)
+	mod_art = Modify_EntityBuildTime(player1, EBP.ELITE.PANZER_ARTILLERIE, 0.5)
+	
+	Cmd_Construct(sg_builder1, EBP.ELITE.LOGISTIK, mkr_hunt_plyr_tech4)
+	Cmd_Construct(sg_builder2, EBP.ELITE.PANZERJAGER, mkr_hunt_plyr_tech3)
+	Cmd_Construct(sg_builder3, EBP.ELITE.PANZER_ARTILLERIE, mkr_hunt_plyr_tech1)
+	
+	SGroup_SuggestPosture(sg_starting, 1, 30)
+
+end
+
+function HHHunt_MoveTank()
+
+	sg_starting = SGroup_CreateIfNotFound("sg_starting")
+	
+	sg_panzer1 = SGroup_CreateIfNotFound("sg_panzer1")
+	sg_panzer2 = SGroup_CreateIfNotFound("sg_panzer2")
+	
+	Util_CreateSquads(player1, sg_starting, SBP.ELITE.PANZERGRENADIER, mkr_starting1, nil, 1, 2)
+	Util_CreateSquads(player1, sg_starting, SBP.ELITE.PANZERGRENADIER, mkr_starting2, nil, 1, 2)
+
+	Misc_SetSquadControlGroup(SGroup_GetSpawnedSquadAt(sg_jagdpanther, 1), 1)
+
+	EGroup_Hide(eg_intro_building, false)
+	
+	EGroup_SetInvulnerable(eg_intro_building, false)
+	
+	SGroup_SetSuppression(sg_starting, 9)
+	
+	World_GetSquadsNearMarker(player1, sg_panzer1, mkr_hunt_start2, 1)
+	World_GetSquadsNearMarker(player1, sg_panzer2, mkr_hunt_start3, 1)
+
+	Cmd_Move(sg_jagdpanther, mkr_hunt_jagd, false, false, mkr_hunt_jagd)
+	Cmd_Move(sg_panzer1, mkr_hunt_panz1, false, false, mkr_hunt_panz1)
+	Cmd_Move(sg_panzer2, mkr_hunt_panz2, false, false, mkr_hunt_panz2)
+	
+
+end
+
+
+
+function HHHunt_DelayMedal()
+
+	Objective_Start(OBJ_Medal)
+
+end
+
+
+-------------------------------------------------------------------------
+-- Destroy HQs 
+-------------------------------------------------------------------------
+-- The player is purposed with the task of seeking out a number of 
+-- of Commonwealth HQs and destroying them to complete the mission.
+-------------------------------------------------------------------------
+function Initialize_OBJ_DestroyHQs()
+
+	OBJ_DestroyHQs = {
+		
+		SetupUI = function() 
+			-- mark a point or position
+		end,
+		
+		OnStart = function()
+			
+			-- win/lose check
+			Rule_AddInterval(DestroyHQs_WinCheck, 5)
+			
+			-- Start Medal Op Delay
+			Rule_AddInterval(Medal_DelayStart, 1)
+			
+			Rule_AddInterval(WreckClear, 1)
+			
+			-- start related action
+			DestroyHQs_Kickoff()
+			Convoy_Kickoff()
+			
+			
+			
+		end,
+		
+		OnComplete = function()
+			
+			-- tell the player they did good
+			Player_GetAll(player2, sg_p2_all)
+			
+			if SGroup_IsInHoldEntity(sg_p2_all, ANY) == true then
+				local pos = SGroup_GetPosition(sg_p2_all)
+				Cmd_UngarrisonSquad(sg_p2_all)
+			end
+			
+			Cmd_Retreat(sg_p2_all, mkr_sp_convoy, mkr_sp_convoy)
+			
+			if SGroup_IsRetreating(sg_p2_all, ANY) == false then
+				Cmd_Retreat(sg_p2_all, mkr_sp_convoy)
+				Cmd_Move(sg_p2_all, mkr_sp_convoy)
+			end
+			
+			t_nis_end = {
+				{camPos = false, waitType = NISLET_VO, waitValue = {ACTOR.CXP2.Wolfgang, 1470525}},
+				{camPos = false, waitType = NISLET_VO, waitValue = {ACTOR.CXP2.Voss, 1470531}},
+				{camPos = false, waitType = NISLET_VO, waitValue = {ACTOR.CXP2.Voss, 1470532}},
+				{camPos = false, waitType = NISLET_VO, waitValue = {ACTOR.CXP2.Voss, 1472033}},
+				{camPos = false, waitType = NISLET_TIME, waitValue = 1},
+			}
+			
+			Util_AutoNISlet(NISLET_GAME2GAME, t_nis_end, false)
+			Rule_AddInterval(HHHunt_MissionComplete, 1)
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			
+		end,
+		
+		Title = 1479100,
+		Description = 1479101,
+		Type = OT_Primary,
+		
+		SitRep = {
+			Movie = "CXP2_SR_07-01",
+			Force = true,
+			SpeechTiming =
+			{
+				{ 1,	ACTOR.CXP2.Voss, 1471300 }, -- Oberleutnant Deinhard...
+				{ 10,	ACTOR.CXP2.Voss, 1471310 }, -- I'm relying on you...
+				{ 14.8,	ACTOR.CXP2.Voss, 1471320 }, -- Expect the 30th Corps...
+				{ 22,	ACTOR.CXP2.Voss, 1471330 }, -- English officers are...
+				{ 30,	ACTOR.CXP2.Voss, 1471340 }, -- I've provided...
+				{ 35.7,	ACTOR.CXP2.Voss, 1471350 }, -- The Jagdpanther can...
+				{ 40.4,	ACTOR.CXP2.Voss, 1471362 }, -- Your brother, Aldrich...
+				{ 46,	ACTOR.CXP2.Voss, 1471364 }, -- I'm relying on you, Wolfgang...
+				{ 52.5,	ACTOR.CXP2.Voss, 1471360 }, -- Good hunting...
+			},
+		},
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_DestroyHQs)
+	Objective_SetCounter(OBJ_DestroyHQs, 0, 3)
+	-- Initialize Data
+	DestroyHQs_Init()
+	
+end
+
+-------------------------------------------------------------------------
+-- Destroy HQs - Functions 
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Obj data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function DestroyHQs_Init()
+
+	-- define sgroups, egroups, etc associated with this obj
+	tmkr_hunt_hq = Marker_GetTable("mkr_hunt_hq%d")
+	tmkr_dhq_relocate = Marker_GetTable("mkr_dhq_relocate%d")	
+	tsg_dhq_hq = SGroup_CreateTable("sg_dhq_hq%d", table.getn(tmkr_hunt_hq))
+	teg_dhq_relocate_rp = EGroup_GetWBTable("eg_dhq_relocate_rp%d")
+	teg_dhq_relocate_spawn = EGroup_GetWBTable("eg_dhq_relocate%d_spawn")
+	
+    t_dhq = {}
+	DestroyHQs_EventsInit()
+	
+	-- table that holds each of the types of 
+	t_dhq_hq = {
+		{ 
+			sbp 		= SBP.CW.INFANTRY_HQ,
+			events 		= t_dhq.events.hq_inf,
+		},
+		{ 
+			sbp 		= SBP.CW.ARMOUR_HQ,
+			events 		= t_dhq.events.hq_armor,
+		},
+		{ 
+			sbp 		= SBP.CW.HQ,
+			events 		= t_dhq.events.hq_main,
+		},
+	}
+	
+	for k, this in pairs(t_dhq_hq) do 
+		this.sgroup 	= tsg_dhq_hq[k]
+		this.spawn 		= tmkr_hunt_hq[k]
+		this.map_id 	= false
+	end
+	
+	t_dhq.inf_sbps = {
+		SBP.CW.LIEUTENANT,
+		SBP.CW.TOMMIES,
+		SBP.CW.SAPPER,
+		SBP.CW.VICKERS_MG_SP,
+		SBP.CW.CAPTAIN,
+		SBP.CW.COMMANDOS,
+		SBP.CW.COMMANDOS_MORTAR,
+		SBP.CW.COMMANDOS_MG,
+	}
+	
+	-- this table manages the list of various positions on the map that the HQs can retreat/move to and defend
+	t_dhq.t_relocate = {}
+	for i=1, table.getn(tmkr_dhq_relocate) do
+		t_dhq.t_relocate[i] = {}
+		local this = t_dhq.t_relocate[i]
+		
+		this.mkr 				= tmkr_dhq_relocate[i] 			-- the location that the HQ will move to 
+		this.fg_occupied 		= false							-- a flag to indicate whether or not this location is occupied by another HQ.
+		this.eg_rp 				= teg_dhq_relocate_rp[i]		-- the resource point that controls the territory of this location
+		this.eg_spawn 			= teg_dhq_relocate_spawn[i]		-- the building(s) from which units will spawn at this location
+		this.t_def_locations 	= {}							-- the "defense spots" at which units will build defenses to protect the location
+		this.tmkr_tank			= Marker_GetTable("mkr_dhq_relocate"..i.."_tank%d") -- the "tank" locations to which the tanks should move to defend the location
+		
+		-- these sub tables manage the "defense" locations at each of the relocation positions.
+		-- the HQs will respond to the various defense locations in different ways.
+		local tmkr = Marker_GetTable("mkr_dhq_relocate"..i.."_def%d")
+		local teg = EGroup_CreateTable("eg_dhq_relocate"..i.."_def%d", table.getn(tmkr))
+		for j=1, table.getn(tmkr) do 
+			this.t_def_locations[j] = {
+				mkr 		= tmkr[j],
+				fg_built 	= false,
+				attempts	= 0,
+				egroup		= teg[j],
+			}
+		end
+		
+	end
+	
+	sg_p2_all = SGroup_CreateIfNotFound("sg_p2_all")
+	
+	DHQ_InfInit()
+	DHQ_MainInit()
+	DHQ_ArmorInit()
+
+end
+
+function DestroyHQs_EventsInit()
+
+	-- set up intel event tables
+	t_dhq.events = {
+		
+		obj_start = {
+			{ACTOR.CXP2.Voss, 1470500}, 
+			{ACTOR.CXP2.Voss, 1470510},
+			{ACTOR.CXP2.Voss, 1470515},
+			{ACTOR.CXP2.Voss, 1470520},
+		},
+		
+		obj_end = {
+			{ACTOR.CXP2.Wolfgang, 1470525}, 
+			{ACTOR.CXP2.Voss, 1470531},
+			{ACTOR.CXP2.Voss, 1470532},
+			{ACTOR.CXP2.Voss, 1472033},
+		},
+		
+		hq_inf = {
+			-- played the first time the player spots the HQ
+			fg_spotted = false,
+			spotted = {
+				{ACTOR.CXP2.Wolfgang, 1471500},
+				{ACTOR.CXP2.Wolfgang, 1471510},
+			},
+			
+			-- one is randomly chosen when the HQ is on the move
+			relocate = {
+				{ACTOR.CXP2.Wolfgang, 1471580},
+				{ACTOR.CXP2.Wolfgang, 1471590},
+				{ACTOR.CXP2.Wolfgang, 1471600},
+				{ACTOR.CXP2.Wolfgang, 1471610},
+				{ACTOR.CXP2.Wolfgang, 1471620},
+				{ACTOR.CXP2.Wolfgang, 1471630},
+			},
+			
+			-- one is randomly chosen when the player comes in contact with the forces
+			-- of the HQ.
+			tactics = {
+				{ACTOR.CXP2.Wolfgang, 1471550},
+				{ACTOR.CXP2.Wolfgang, 1471560},
+				{ACTOR.CXP2.Wolfgang, 1471570},
+			},
+			
+			-- when the player has destroyed the HQ
+			destroyed = {
+				{ACTOR.CXP2.Voss, 1471520},
+				{ACTOR.CXP2.Voss, 1471530},
+			},
+		},
+		
+		hq_armor = {
+			-- played the first time the player spots the HQ
+			fg_spotted = false,
+			spotted = {
+				{ACTOR.CXP2.Wolfgang, 1471100},
+				{ACTOR.CXP2.Wolfgang, 1471110},
+			},
+			
+			-- one is randomly chosen when the HQ is on the move
+			relocate = {
+				{ACTOR.CXP2.Wolfgang, 1471170},
+				{ACTOR.CXP2.Wolfgang, 1471180},
+				{ACTOR.CXP2.Wolfgang, 1471190},
+				{ACTOR.CXP2.Wolfgang, 1471200},
+				{ACTOR.CXP2.Wolfgang, 1471210},
+				{ACTOR.CXP2.Wolfgang, 1471220},
+			},
+			
+			-- one is randomly chosen when the player comes in contact with the forces
+			-- of the HQ.
+			tactics = {
+				{ACTOR.CXP2.Wolfgang, 1471140},
+				{ACTOR.CXP2.Wolfgang, 1471150},
+				{ACTOR.CXP2.Wolfgang, 1471160},
+			},
+			
+			-- when the player has destroyed the HQ
+			destroyed = {
+				{ACTOR.CXP2.Voss, 1471120},
+				{ACTOR.CXP2.Voss, 1471130},
+			},
+		},
+		
+		hq_main = {
+			-- played the first time the player spots the HQ
+			fg_spotted = false,
+			spotted = {
+				{ACTOR.CXP2.Wolfgang, 1472000},
+				{ACTOR.CXP2.Wolfgang, 1472010},
+			},
+			
+			-- one is randomly chosen when the HQ is on the move
+			relocate = {
+				{ACTOR.CXP2.Wolfgang, 1472080},
+				{ACTOR.CXP2.Wolfgang, 1472090},
+				{ACTOR.CXP2.Wolfgang, 1472092},
+				{ACTOR.CXP2.Wolfgang, 1472094},
+				{ACTOR.CXP2.Wolfgang, 1472096},
+				{ACTOR.CXP2.Wolfgang, 1472098},
+			},
+			
+			-- one is randomly chosen when the player comes in contact with the forces
+			-- of the HQ.
+			tactics = {
+				{ACTOR.CXP2.Wolfgang, 1472050},
+				{ACTOR.CXP2.Wolfgang, 1472060},
+				{ACTOR.CXP2.Wolfgang, 1472070},
+			},
+			
+			-- when the player has destroyed the HQ
+			destroyed = {
+				{ACTOR.CXP2.Voss, 1472020},
+				{ACTOR.CXP2.Voss, 1472030},
+			},
+		},
+		
+	}
+	
+
+end
+
+-- preset any units or events needed before the kickoff, but you do not
+-- want them to occur at the outset of the map.
+-- Example: Often units are needed to exist before the objective start (because they start the objective)
+-- then spawn those units here when they need to be spawned
+function DestroyHQs_Preset()
+
+	-- spawn squads
+	for k, this in pairs(t_dhq_hq) do
+		
+		EGroup_Clear(eg_temp)
+		Player_GetAllEntitiesNearMarker(player1, eg_temp, this.spawn, 10)
+		EGroup_RemoveGroup(eg_temp, eg_hunt_town_hq)
+		if not EGroup_IsEmpty(eg_temp) then
+			EGroup_DestroyAllEntities(eg_temp)
+		end
+		
+		Util_CreateSquads(player2, this.sgroup, this.sbp, this.spawn)
+		Util_SetCommonwealthHQMobility(this.sgroup, false, true)
+		Modify_UnitSpeed(this.sgroup, 1.5)
+		Modify_Vulnerability(this.sgroup, t_difficulty.hq_damage_recieved)
+	end
+	
+	DHQ_InfSpawn()
+	DHQ_ArmorSpawn()
+	DHQ_MainSpawn()
+	
+	-- start enemy behavior
+	
+	-- do other cool things
+
+end
+
+
+-- example of how to finish an Obj
+function DestroyHQs_WinCheck()
+	
+	DestroyHQs_UpdatePings()
+	
+	local num = 0
+	local all_dead = true
+	for k, this in pairs(t_dhq_hq) do 
+		
+		if SGroup_IsEmpty(this.sgroup) == false then
+			all_dead = false
+		else
+			
+			if this.events.fg_destroyed ~= true then
+				Util_AutoIntel(this.events.destroyed)
+				this.events.fg_destroyed = true
+			end
+			num = num + 1
+		end
+		
+	end
+	
+	Objective_SetCounter(OBJ_DestroyHQs, num, 3)
+	t_dhq.fg_ax_all_dead = all_dead
+	
+	-- one of them must be set to true before the player can win or lose the objective
+	if t_dhq.fg_ax_all_dead then
+		
+		-- the player has just won
+		Objective_Complete(OBJ_DestroyHQs)
+		g_hhhunt_win = true
+--~ 		Rule_Add(HHHunt_EndNIS)
+		
+		Rule_RemoveMe()
+		
+	end
+	
+end
+
+function HHHunt_MissionComplete()
+
+	if Event_IsAnyRunning() == false then
+		
+		-- delay first objective
+		Game_EndSP(true, nil, true)
+		
+		Rule_RemoveMe()
+	end
+
+end
+
+function DestroyHQs_UpdatePings()
+
+	if Objective_IsComplete(OBJ_DestroyHQs) then
+		return
+	end
+
+	for k, this in pairs(t_dhq_hq) do 
+		
+		if SGroup_IsEmpty(this.sgroup) == false
+		and this.map_id == false then
+			
+			if Player_CanSeeSGroup(player1, this.sgroup, ANY) then
+				this.map_id = Objective_AddUIElements(OBJ_DestroyHQs, this.sgroup, true, 1479102, true)
+				Util_AutoIntel(this.events.spotted)
+			end
+			
+		end
+		
+	end
+	
+end
+
+
+-- start the related action
+function DestroyHQs_Kickoff()
+
+	-- action that starts with the Obj being granted
+	DHQ_InfKickoff()
+	DHQ_ArmorKickoff()
+	DHQ_MainKickoff()
+	Relocation_Kickoff()
+	
+	Rule_AddInterval(DHQ_ManageArtillery, 5)
+	
+end
+
+-- checks if the town has been vacated of all 3 HQs
+--~ function DHQ_IsTownVacated()
+
+--~ 	if t_dhq_inf.relocate == false then
+--~ 		return false
+--~ 	end
+
+--~ 	if t_dhq_armor.relocate == false then
+--~ 		return false
+--~ 	end
+
+--~ 	if t_dhq_main.relocate == false then
+--~ 		return false
+--~ 	end
+--~ 	
+--~ 	return true
+--~ 	
+--~ end
+
+function DHQ_GetRelocationPoint()
+
+	local location = t_dhq.t_relocate[1]
+	
+	-- first check if there is only one HQ left.  Then that HQ needs
+	-- to move to the "final" location.
+	if Objective_GetCounter(OBJ_DestroyHQs) == 2 then
+		location = t_dhq.t_relocate[1]
+	else
+		for i=1, 10 do 
+			local rand = World_GetRand(2, table.getn(t_dhq.t_relocate))
+			location = t_dhq.t_relocate[rand]
+			
+			if location.fg_occupied == false then
+				break
+			end
+		
+		end
+	end
+
+	return location
+
+end
+
+function DHQ_RepairCheck(t_hq)
+
+	-- if we are already in the repair state, then make sure the health of the HQ
+	-- gets fixed back up to 100% health (0.999, because sometimes you just can't make it to 1)
+	if t_hq.fg_repair == true
+	and SGroup_GetAvgHealth(t_hq.sg_hq) <= 0.99	then
+		return true
+	end
+
+	-- check to make sure that the health of the HQ is below a certain percentage, otherwise
+	-- every other hit will spawn the engineers to come out and repair the HQ.
+	if SGroup_GetAvgHealth(t_hq.sg_hq) <= 0.75
+	and t_hq.relocate ~= false then
+		return true
+	end
+	
+	return false
+
+
+end
+
+function DHQ_AddHQToRepair(sgroup, location)
+
+	if t_dhq.t_repair == nil then
+		t_dhq.t_repair = {}
+	end
+	
+	local repair = {
+		sgroup = SGroup_CreateIfNotFound("sg_dhq_repair"),
+		sg_to_repair = sgroup,
+		eg_spawn = location.eg_spawn,
+		location = location.mkr
+	}
+
+	table.insert(t_dhq.t_repair, repair)
+
+	if Rule_Exists(DHQ_RepairHQ) == false then
+		Rule_AddInterval(DHQ_RepairHQ, 2.5)
+	end
+
+end
+
+-- this function manages the squads that will repair nearby HQs near relocate
+function DHQ_RepairHQ()
+
+	for k, this in pairs(t_dhq.t_repair) do 
+		
+		-- if the HQ is destroyed or fully repaired,
+		-- get rid of the repair team
+		if SGroup_IsEmpty(this.sg_to_repair) or SGroup_GetAvgHealth(this.sg_to_repair) >= 0.99 then
+			
+			-- checks to see if the repair sgroup is in a building
+			-- then commands them to garrison or be destroyed.
+			-- note they SHOULD not fight.
+			if SGroup_IsInHoldEntity(this.sgroup, ANY) then
+				SGroup_DestroyAllSquads(this.sgroup)
+			elseif SGroup_IsMoving(this.sgroup, ANY) == false
+			and EGroup_IsEmpty(this.eg_spawn) == false then
+				Cmd_Garrison(this.sgroup, this.eg_spawn, true)
+			end
+			
+			-- if the sgroup is empty AND the HQ repaired, then
+			-- there's no need to continue managing the repair process
+			if SGroup_IsEmpty(this.sgroup) then
+				table.remove(t_dhq.t_repair, k)
+				break
+			end
+		else
+			
+			-- *** TODO: Add a timer to keep the squads from continually spawning
+			if SGroup_IsEmpty(this.sgroup) then
+				if EGroup_IsEmpty(this.eg_spawn) == false
+				and Player_OwnsEGroup(player1, this.eg_spawn) == false then 
+					
+					Util_CreateSquads(player2, this.sgroup, SBP.CW.SAPPER, this.eg_spawn, Util_GetPosition(this.eg_spawn))
+					if EGroup_HasUpgrade(this.eg_spawn, UPG.ALLIES.CONVERT_AMBIENT_BUILDING, ANY) == false then
+						Cmd_InstantUpgrade(this.eg_spawn, UPG.ALLIES.CONVERT_AMBIENT_BUILDING)
+					end
+				end
+				
+			elseif SGroup_IsInHoldEntity(this.sgroup, ANY) then
+			
+				Cmd_UngarrisonSquad(this.sgroup, this.location)
+			
+			elseif SGroup_IsUnderAttack(this.sgroup, ANY, 10) == false
+			and SGroup_IsMoving(this.sgroup, ANY) == false
+			and SGroup_IsUsingAbility(this.sgroup, ANY) == false then
+				Cmd_Ability(this.sgroup, ABILITY.REPAIR, this.sg_to_repair, nil, true)
+			end
+			
+		end
+		
+	end
+	
+	if table.getn(t_dhq.t_repair) == 0 then
+		Rule_RemoveMe()
+	end
+
+end
+
+-- this function forces all the HQs into a Relocation
+-- behavior
+function DHQ_ForceRelocation(t_hq)
+	
+	if t_hq.relocate == false
+	and t_hq.fg_relocating == false
+	and not SGroup_IsEmpty(t_hq.sg_hq) then
+		t_hq.fg_relocating = true
+		t_hq.relocate = DHQ_GetRelocationPoint()
+		DHQ_RelocateHQ(t_hq)
+	end
+
+end
+
+-- checks whether or not an HQ should relocate
+function DHQ_CheckRelocate(t_hq)
+
+	if SGroup_IsEmpty(t_hq.sg_hq) then
+		return false
+	end
+		
+	-- *** TODO: need to add a timer to keep the HQ from continually moving when
+	-- it is damaged and still under attack
+	
+	-- if they are at the final encounter location, don't try to relocate
+	if Objective_GetCounter(OBJ_DestroyHQs) == 2 
+	and t_hq.relocate == t_dhq.t_relocate[1] then
+		if Prox_AreSquadsNearMarker(t_hq.sg_hq, t_hq.relocate.mkr, ANY, 10) == false then
+			return true
+		else
+			return false
+		end
+	end
+	
+	if t_hq.relocate ~= false
+	and Prox_AreSquadsNearMarker(t_hq.sg_hq, t_hq.relocate.mkr, ANY, 10) == false then
+		return true
+	end
+	
+	-- search through the list of possible locations and find 
+	-- a new location to move to.
+	if t_hq.fg_relocating == false then
+	
+--~ 		local v_hqhealth = SGroup_GetAvgHealth(t_hq.sg_hq)
+		if t_hq.reloc_attempts == t_hq.reloc_attempts_max then
+			
+			print(t_hq.reloc_attempts)
+			return false
+		
+--~ 		elseif SGroup_GetAvgHealth(t_hq.sg_hq) <= 0.5 
+		elseif SGroup_IsUnderAttack(t_hq.sg_hq, ANY, 10)
+		or (Objective_GetCounter(OBJ_DestroyHQs) == 2 and t_hq.relocate ~= t_dhq.t_relocate[1]) then
+			
+			local old_location = t_hq.relocate
+			
+			t_hq.relocate = DHQ_GetRelocationPoint()
+			t_hq.fg_relocating = true
+			t_hq.relocate.fg_occupied = true
+			
+			if old_location ~= false then
+				old_location.fg_occupied = false
+				
+				-- check to see if the static defenses that were built 
+				-- around these areas are still intact, otherwise mark
+				-- them as not built.
+				for k, this in pairs(old_location.t_def_locations) do 
+									
+					-- check if the building is dead or
+					-- if the player no longer owns the building
+					-- *** TODO what to do with half completed buildings?
+					if EGroup_IsEmpty(this.egroup)
+					or Player_OwnsEGroup(player2, this.egroup) == false then
+						this.fg_built = false
+					end
+					
+					this.attempts = 0
+					
+				end
+			end
+			
+			return true
+		end
+		
+	end
+	
+	return false
+
+end
+
+function DHQ_RelocateExit(t_hq)
+
+	t_hq.fg_relocating = false
+	if not SGroup_IsEmpty(t_hq.sg_hq) then
+		Util_SetCommonwealthHQMobility(t_hq.sg_hq, false, false)
+--~ 		t_hq.reloc_attempts = t_hq.reloc_attempts + 1
+		print(t_hq.reloc_attempts)
+	end
+
+end
+
+function DHQ_RelocateEnter(t_hq)
+
+	t_hq.fg_relocating = true
+	local last_state = StateMachine_GetLastState(t_hq.state_machine_id)
+	
+	-- checks if the HQ was relocating or respawning and if NOT, then
+	-- it plays the appropriate intel event.
+	if last_state ~= "respawn" 
+	and last_state ~= "relocate" then
+		local rand = World_GetRand(1, table.getn(t_hq.events.relocate))
+		Util_AutoIntel({t_hq.events.relocate[rand]})
+		t_hq.reloc_attempts = t_hq.reloc_attempts + 1
+	end
+	
+	-- checks for the various static emplacements that were built at the relocation point
+	-- and removes them from the HQ to be defended.
+	if t_hq.t_static_def ~= nil 
+	and table.getn(t_hq.t_static_def) > 0 then
+		for k, this in pairs(t_hq.relocate.t_def_locations) do
+			if k <= table.getn(t_dhq_main.t_static_def) then
+				EGroup_Clear(eg_temp)
+				Player_GetAllEntitiesNearMarker(player2, eg_temp, this.mkr, 15)
+				EGroup_Filter(eg_temp, t_hq.t_static_def[k].ebp, FILTER_KEEP)
+				
+				if not EGroup_IsEmpty(eg_temp) then
+					local eg_def = t_dhq_main.t_static_def[k].egroup
+					EGroup_Clear(eg_def)
+					EGroup_AddEGroup(eg_def, eg_temp)
+				end
+			end
+		end
+	end
+	
+	-- Start the reloc Timer 
+	Timer_Start(t_hq.reloc_timer, t_hq.reloc_timer_length)
+
+end
+
+function DHQ_DefendIntel(t_hq)
+	
+	if table.getn(t_hq.events.tactics) > 0 then
+		local rand = World_GetRand(1, table.getn(t_hq.events.tactics))
+		Util_AutoIntel({t_hq.events.tactics[rand]})
+		table.remove(t_hq.events.tactics, rand)
+	end
+
+end
+
+
+function DHQ_RelocateHQ(t_hq)
+
+	-- Check timer and if timer is >0 then return
+	if Timer_Exists(t_hq.reloc_timer) and Timer_GetRemaining(t_hq.reloc_timer) > 0 then
+		return
+	end
+	
+
+	if SGroup_IsEmpty(t_hq.sg_hq) == false then
+		
+		Util_SetCommonwealthHQMobility(t_hq.sg_hq, true, false)
+		
+		if Prox_AreSquadMembersNearMarker(t_hq.sg_hq, t_hq.relocate.mkr, ANY, 30) == false then
+			if SGroup_IsMoving(t_hq.sg_hq, ANY) == false then
+--~ 				Cmd_Ability(t_hq.sg_hq, ABILITY.CW.HQ_SETUP, Marker_GetPosition(t_hq.relocate.mkr))
+				Cmd_Move(t_hq.sg_hq, Marker_GetPosition(t_hq.relocate.mkr))
+				SGroup_GetLastAttacker(t_hq.sg_hq, sg_dhq_inf_reloc_attacker)
+				
+--~ 				SGroup_ContainsBlueprints(t_hq.sg_reloc_attackers, t_sbp_attackers.t_
+--~ 				if t_hq.sg_reloc_attacker 
+			end			
+		end
+	end
+
+end
+
+
+function DHQ_DefaultCheck(t_hq) 
+	
+	return true
+
+end
+
+function DHQ_BuildEmplacements(t_hq)
+	
+	-- Heavy Armour: AT guns
+	-- Heavy Inf: MG nests
+	-- Artillery: Howitzers
+	-- Combined: MG nest/AT gun/Mortar
+	
+	
+	
+	local all_built = true
+	local sgroup = t_hq.sg_build
+	
+	for k, this in pairs(t_hq.relocate.t_def_locations) do 
+		
+		
+		if this.fg_built == false then
+		
+			all_built = false
+			local pos = this.mkr
+			-- if we have attempted to build the building x number
+			-- of times, just "stop" and move on assuming that 
+			-- the building cannot be built
+			if this.attempts >= t_hq.max_build_attempts then
+				this.fg_built = true
+			elseif this.attempts > 1 then
+				pos = Util_GetRandomPosition(this.mkr, 20)				
+			end
+			
+			-- spawn a the builders if they are dead
+			-- probably need to add a timer to prevent the soldiers
+			-- from continually respawning.
+			if SGroup_IsEmpty(sgroup) then
+				Util_CreateSquads(player2, sgroup, SBP.CW.SAPPER, t_hq.relocate.eg_spawn)
+			end
+			
+			-- first check if the player owns the territory...
+			if Player_OwnsEGroup(player2, t_hq.relocate.eg_rp) == false then
+				
+				if SGroup_IsInHoldEntity(sgroup, ANY) then
+					Cmd_UngarrisonSquad(sgroup)
+				elseif SGroup_IsMoving(sgroup, ANY) == false
+				and SGroup_IsUnderAttack(sgroup, ANY, 7) == false
+				and SGroup_IsCapturing(sgroup, ANY) == false then
+					Cmd_AttackMoveThenCapture(sgroup, t_hq.relocate.eg_rp)
+					-- break the loop because the soldiers are busy
+					break
+				end
+				
+			else
+				
+				if t_hq.ebp_build ~= nil then
+				-- check if the building has been built 
+				-- at the desired position.
+					if EGroup_IsEmpty(this.egroup) then
+						EGroup_Clear(eg_temp)
+						Player_GetAllEntitiesNearMarker(player2, eg_temp, this.mkr, 20)
+						
+						-- filter out for the appropriate building being constructed
+						EGroup_Filter(eg_temp, t_hq.ebp_build, FILTER_KEEP)
+						EGroup_Clear(this.egroup)
+						EGroup_AddEGroup(this.egroup, eg_temp)
+						EGroup_AddEGroup(t_hq.t_static_def[k].egroup, eg_temp)
+						
+					end
+					
+					if EGroup_IsEmpty(this.egroup) == false then
+					
+						-- check if the EBP is under construction
+						EGroup_Clear(eg_temp)
+						EGroup_AddEGroup(eg_temp, this.egroup)
+						EGroup_FilterUnderConstruction(eg_temp, FILTER_REMOVE)
+						
+						if EGroup_IsEmpty(eg_temp) == false then
+							this.fg_built = true
+						end
+						
+					end				
+					
+					-- is the building built yet?
+					if this.fg_built == false then
+					
+						-- the squads are in a building still
+						if SGroup_IsInHoldEntity(sgroup, ANY) then
+							Cmd_UngarrisonSquad(sgroup)
+						-- are the squads building or moving to a location?
+						elseif SGroup_IsConstructingBuilding(sgroup, ANY) == false
+						and SGroup_IsMoving(sgroup, ANY) == false then
+	--~ 						local rand = World_GetRand(1, table.getn(t_hq_ebp_build))
+	--~ 						local build = t_hq.ebp_build[rand]
+							if t_hq.ebp_build ~= nil then
+								if EGroup_IsEmpty(this.egroup) == false then
+									Cmd_Construct(sgroup, t_hq.ebp_build, this.egroup)
+								else
+									Cmd_Construct(sgroup, t_hq.ebp_build, pos, Util_GetPosition(tmkr_hunt_start[1]))
+								end
+								this.attempts = this.attempts + 1
+							end
+							-- break the loop because the soldiers are busy
+							break
+						end
+					end
+				end
+				
+			end				
+		end
+	end
+	
+	if all_built == true then
+		
+		if SGroup_IsEmpty(sgroup) then
+			Rule_RemoveMe()
+		end
+		
+		if SGroup_IsInHoldEntity(sgroup, ANY)
+		or Player_CanSeeSGroup(player1, sgroup, ANY) == false then
+			SGroup_DestroyAllSquads(sgroup)
+		elseif SGroup_IsMoving(sgroup, ANY) == false then
+			Cmd_Garrison(sgroup, t_hq.relocate.eg_spawn, true)
+		end
+	
+	end
+
+end
+
+
+
+
+-- manages the artillery that is built around the HQ
+function DHQ_ManageArtillery()
+
+	if DHQ_InfDefend_Check() then
+		DHQ_ArtilleryShoot(t_dhq_inf.sg_attacker)
+	end
+	
+	if DHQ_ArmorDefend_Check() then
+		DHQ_ArtilleryShoot(t_dhq_armor.sg_attacker)
+	end
+	
+	if DHQ_MainDefend_Check() then
+		DHQ_ArtilleryShoot(t_dhq_main.sg_attacker)
+	end
+	
+	DHQ_ArtilleryManageThreatArrows()
+
+end
+
+function DHQ_ArtilleryShoot(sg_attacker)
+
+	sg_friendlyfire = SGroup_CreateIfNotFound("sg_friendlyfire")
+	SGroup_Clear(sg_friendlyfire)
+	
+	eg_friendlyfire = EGroup_CreateIfNotFound("eg_friendlyfire")
+	EGroup_Clear(eg_friendlyfire)
+	v_sg_ff_go = true
+	for k, this in pairs(t_dhq_main.t_static_def) do
+		if SGroup_IsEmpty(sg_attacker) == false 
+		and Player_OwnsEGroup(player2, this.egroup) then
+			
+			if EGroup_IsUsingAbility(this.egroup, ANY) == false 
+			and Prox_EGroupSGroup(this.egroup, sg_attacker, PROX_CENTER) > t_dhq_main.arty_range_min
+			and Prox_EGroupSGroup(this.egroup, sg_attacker, PROX_CENTER) < t_dhq_main.arty_range_max then
+				
+				pos = Util_GetRandomPosition(Util_GetPosition(sg_attacker), 15)
+				
+				Player_GetAllSquadsNearMarker(player2, sg_friendlyfire, pos, 20)
+				
+				if SGroup_TotalMembersCount(sg_friendlyfire) <= 3 then
+					if SGroup_ContainsBlueprints(sg_friendlyfire, SBP.CW.HQ, ANY) == false
+					  and SGroup_ContainsBlueprints(sg_friendlyfire, SBP.CW.ARMOUR_HQ, ANY) == false
+					  and SGroup_ContainsBlueprints(sg_friendlyfire, SBP.CW.INFANTRY_HQ, ANY) == false then
+						v_sg_ff_go = true
+						print("ACCEPTABLE CASUALTIES")
+					else
+						v_sg_ff_go = false
+					end
+				else
+					v_sg_ff_go = false
+				end
+					
+				if v_sg_ff_go == true then
+					if Rule_Exists(DHQ_ArtilleryFireOne) == false then
+						Rule_AddOneShot(DHQ_ArtilleryFireOne, 5)
+					end
+					
+					if Rule_Exists(DHQ_ArtilleryFireTwo) == false then
+						Rule_AddOneShot(DHQ_ArtilleryFireTwo, 15)
+					end
+					
+					if Rule_Exists(DHQ_ArtilleryFireThree) == false then
+						Rule_AddOneShot(DHQ_ArtilleryFireThree, 20)
+					end
+					
+					print("FIRE MISSION COMMENCING")
+				
+				else
+					print("NO FIRE TARGET")
+				
+				end
+					
+				
+			end
+			
+		end
+	end
+
+end
+
+function DHQ_ArtilleryFireOne()
+
+	if EGroup_CountSpawned(teg_dhq_main_arty[1]) > 0 
+	and Player_OwnsEGroup(player2, teg_dhq_main_arty[1], ALL) then
+		Cmd_Ability(teg_dhq_main_arty[1], ABILITY.CW.PDR_25_BARRAGE, pos, nil, true)
+	end
+
+end
+
+function DHQ_ArtilleryFireTwo()
+
+	if EGroup_CountSpawned(teg_dhq_main_arty[2]) > 0 
+	and Player_OwnsEGroup(player2, teg_dhq_main_arty[2], ALL) then
+		Cmd_Ability(teg_dhq_main_arty[2], ABILITY.CW.PDR_25_BARRAGE, pos, nil, true)
+	end
+
+end
+
+function DHQ_ArtilleryFireThree()
+
+	if EGroup_CountSpawned(teg_dhq_main_arty[3]) > 0
+	and Player_OwnsEGroup(player2, teg_dhq_main_arty[3], ALL) then
+		Cmd_Ability(teg_dhq_main_arty[3], ABILITY.CW.PDR_25_BARRAGE, pos, nil, true)
+	end
+
+end
+
+
+function DHQ_ArtilleryManageThreatArrows()
+
+	for k, this in pairs(t_dhq_main.t_static_def) do
+					
+		if this.threat_id ~= false
+		and EGroup_IsUsingAbility(this.egroup, ANY) == false then
+			
+			ThreatArrow_DestroyGroup(this.threat_id)
+			this.threat_id = false
+			
+		elseif this.threat_id == false
+		and Player_OwnsEGroup(player2, this.egroup)
+		and EGroup_IsUsingAbility(this.egroup, ANY) then
+			
+			SGroup_Clear(sg_temp)
+			EGroup_GetSquadsHeld(this.egroup, sg_temp)
+			if SGroup_IsEmpty(sg_temp) == false then
+				this.threat_id = ThreatArrow_CreateGroup(sg_temp)
+			end
+			
+		end
+		
+	end
+
+end
+
+-- checks whether or not an HQ should relocate
+function DHQ_CheckRespawn( t_hq )
+	
+	if SGroup_IsEmpty(t_hq.sg_hq) then
+		return false
+	end
+	
+	if Timer_Exists(t_hq.timer_respawn)
+	and Timer_GetRemaining(t_hq.timer_respawn) > 0 then
+		return false
+	end
+	
+	-- since the infantry hq spawns squads from the relocation buildings, 
+	-- we need to ensure that a relocation building is available
+	if t_hq == t_dhq_inf then
+		if t_hq.relocate == false or EGroup_IsEmpty(t_dhq_inf.relocate.eg_spawn) then
+			return false
+		end
+	end
+	
+	for k, this in pairs( t_hq.t_mobile_def ) do 
+		
+		if SGroup_IsEmpty(this.sgroup) then
+			Timer_Start(t_hq.timer_respawn, t_hq.timer_respawn_amt)
+			return true
+		end
+		
+	end
+	
+	if t_hq.t_tanks ~= nil then
+		for k, this in pairs( t_hq.t_tanks ) do 
+			
+			if SGroup_IsEmpty(this.sgroup) then
+				Timer_Start(t_hq.timer_respawn, t_hq.timer_respawn_amt)
+				return true
+			end
+			
+		end
+	end
+
+	return false
+end
+
+
+
+
+-- makes the squads retreat to a location on the map, to get rid of them.
+function DHQ_Retreat( t_squads )
+
+	for k, this in pairs(t_squads) do
+		
+		if not SGroup_IsEmpty(this.sgroup) then
+			
+			if not SGroup_IsMoving(this.sgroup, ANY) then
+				
+				if this.hull_down == true then
+					Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+					this.hull_down = false
+				end
+				
+				if SGroup_IsInHoldEntity(this.sgroup, ANY) then
+					Cmd_UngarrisonSquad(this.sgroup)
+				elseif DHQ_IsInfantry(this.sbp) then
+					Cmd_Retreat(this.sgroup, this.mkr_retreat, this.mkr_retreat)
+				else
+					-- vehicles cannot retreat so order the vehicle to move to the retreat position
+					Cmd_Move(this.sgroup, this.mkr_retreat, nil, this.mkr_retreat)
+				end
+				
+			end
+			
+		end
+		
+	end
+
+end
+
+function DHQ_MovementTanks(t_hq, t_tanks)
+
+	-- nothing to defend if they don't have an egroup to defend
+	if SGroup_IsEmpty(t_hq.sg_hq) then
+		return
+	end
+	
+	if t_hq.tc_id ~= false
+	or TankCombat_GroupExists(t_hq.tc_id) then
+		TankCombat_RemoveGroup(t_hq.tc_id)
+		t_hq.tc_id = false
+	end
+	
+	for k, this in pairs(t_tanks) do
+		
+		
+		local facing = mkr_player_hq
+		if t_hq.relocate ~= false then
+--~ 			local move_pos = Util_GetPosition(t_hq.relocate.tmkr_tank[k])
+--~ 			move_pos = Marker_GetPosition(t_hq.relocate.tmkr_tank[k])
+			
+			-- the number of tanks should never be more than the number of markers (3)
+			local mkr = t_hq.relocate.tmkr_tank[k]
+			
+			-- get the direction of the marker to determine facing
+			local vector = Marker_GetDirection(mkr)
+			local facing = Marker_GetPosition(mkr)
+			
+			facing.x = facing.x + (10*vector.x)
+			facing.y = facing.y + (10*vector.y)
+			facing.z = facing.z + (10*vector.z)
+		end
+		
+		
+		
+		if not SGroup_IsEmpty(this.sgroup) then
+			if not SGroup_IsMoving(this.sgroup, ANY) then
+				if t_hq.reloc_attempts == 0 then
+					local move_pos = Marker_GetPosition(this.spawn)
+					if Prox_AreSquadsNearMarker(this.sgroup, this.initial, ANY, 40) == false then
+						-- a special check to make sure that the squad is actually trying to move
+						-- get the last known position of the sgroup first
+						if this.last_pos == false 
+						or this.last_pos == nil then
+							this.last_pos = SGroup_GetPosition(this.sgroup)
+						-- if the squad has not moved from its spot the last check
+						-- then assume that the squad is still hull down and get it moving
+						elseif SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) then
+							Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+	--~ 					elseif Prox_AreSquadsNearMarker(this.sgroup, this.last_pos, ANY, 2) then
+	--~ 						this.hull_down = false
+						else
+							this.last_pos = false
+						end
+						
+						-- stop the tank from being in hull down mode
+						if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) then
+							Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+	--~ 						this.hull_down = false
+						end
+						
+						if t_hq.fg_relocating == true then
+							if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) then
+								Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+							else
+								Cmd_Move(this.sgroup, t_hq.relocate.tmkr_tank[k], false, nil, t_hq.relocate.tmkr_tank[k])
+							end
+						end
+						
+						-- if the HQ has relocated, move the tanks into a defensive position around the HQ.
+						if t_hq.relocate ~= false and t_hq.relocating == false then
+							Cmd_Move(this.sgroup, move_pos)
+						else
+	--~ 						Cmd_Move(this.sgroup, move_pos)
+	--~ 						Cmd_Move(this.sgroup, t_hq.sg_hq, nil, nil, nil, this.hq_offset, this.offset_dist)
+						end
+						
+						
+					else
+						if t_hq.fg_relocating == false then
+							if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) == false then
+								Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+							end
+						else
+							if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) then
+								Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+							else
+								Cmd_Move(this.sgroup, t_hq.relocate.tmkr_tank[k], false, nil, t_hq.relocate.tmkr_tank[k])
+							end
+						end
+					end
+				elseif t_hq.reloc_attempts >= 1 then
+					local move_pos = Marker_GetPosition(t_hq.relocate.tmkr_tank[k])
+					if Prox_AreSquadsNearMarker(this.sgroup, move_pos, ANY, 40) == false then
+						-- a special check to make sure that the squad is actually trying to move
+						-- get the last known position of the sgroup first
+						if this.last_pos == false 
+						or this.last_pos == nil then
+							this.last_pos = SGroup_GetPosition(this.sgroup)
+						-- if the squad has not moved from its spot the last check
+						-- then assume that the squad is still hull down and get it moving
+						elseif SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) then
+							Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+	--~ 					elseif Prox_AreSquadsNearMarker(this.sgroup, this.last_pos, ANY, 2) then
+	--~ 						this.hull_down = false
+						else
+							this.last_pos = false
+						end
+						
+						-- stop the tank from being in hull down mode
+						if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) then
+							Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+	--~ 						this.hull_down = false
+						end
+						
+						-- if the HQ has relocated, move the tanks into a defensive position around the HQ.
+						if t_hq.relocate ~= false then
+							Cmd_Move(this.sgroup, t_hq.relocate.tmkr_tank[k], false, nil, t_hq.relocate.tmkr_tank[k])
+						else
+	--~ 						Cmd_Move(this.sgroup, move_pos)
+	--~ 						Cmd_Move(this.sgroup, t_hq.sg_hq, nil, nil, nil, this.hq_offset, this.offset_dist)
+						end
+						
+					else
+						if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) == false then
+							Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+						end
+					end
+				end
+			end
+		end
+		
+	end
+	
+	
+end
+
+function DHQ_MovementArmorTanks(t_hq, t_mobile_def)
+
+	if SGroup_IsEmpty(t_hq.sg_hq) then
+		return
+	end
+	
+	if t_hq.tc_id ~= false
+	or TankCombat_GroupExists(t_hq.tc_id) then
+		TankCombat_RemoveGroup(t_hq.tc_id)
+		t_hq.tc_id = false
+	end
+	
+	for k, this in pairs(t_mobile_def) do
+		
+		
+		local facing = mkr_player_hq
+		if t_hq.relocate ~= false then
+--~ 			local move_pos = Util_GetPosition(t_hq.relocate.tmkr_tank[k])
+--~ 			move_pos = Marker_GetPosition(t_hq.relocate.tmkr_tank[k])
+			
+			-- the number of tanks should never be more than the number of markers (3)
+			local mkr = t_hq.relocate.tmkr_tank[k]
+			
+			-- get the direction of the marker to determine facing
+			local vector = Marker_GetDirection(mkr)
+			local facing = Marker_GetPosition(mkr)
+			
+			facing.x = facing.x + (10*vector.x)
+			facing.y = facing.y + (10*vector.y)
+			facing.z = facing.z + (10*vector.z)
+		end
+		
+		
+		
+		if not SGroup_IsEmpty(this.sgroup) then
+			if not SGroup_IsMoving(this.sgroup, ANY) then
+				if t_hq.reloc_attempts == 0 then
+					local move_pos = Marker_GetPosition(this.spawn)
+					if Prox_AreSquadsNearMarker(this.sgroup, this.spawn, ANY, 40) == false then
+						-- a special check to make sure that the squad is actually trying to move
+						-- get the last known position of the sgroup first
+						if this.last_pos == false 
+						or this.last_pos == nil then
+							this.last_pos = SGroup_GetPosition(this.sgroup)
+						-- if the squad has not moved from its spot the last check
+						-- then assume that the squad is still hull down and get it moving
+						elseif SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) then
+							Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+	--~ 					elseif Prox_AreSquadsNearMarker(this.sgroup, this.last_pos, ANY, 2) then
+	--~ 						this.hull_down = false
+						else
+							this.last_pos = false
+						end
+						
+						-- stop the tank from being in hull down mode
+						if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) then
+							Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+	--~ 						this.hull_down = false
+						end
+						
+						if t_hq.fg_relocating == true then
+							if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) then
+								Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+							else
+								Cmd_Move(this.sgroup, t_hq.relocate.tmkr_tank[k], false, nil, t_hq.relocate.tmkr_tank[k])
+							end
+						end
+						
+						-- if the HQ has relocated, move the tanks into a defensive position around the HQ.
+						if t_hq.relocate ~= false and t_hq.relocating == false then
+							Cmd_Move(this.sgroup, move_pos)
+						else
+	--~ 						Cmd_Move(this.sgroup, move_pos)
+	--~ 						Cmd_Move(this.sgroup, t_hq.sg_hq, nil, nil, nil, this.hq_offset, this.offset_dist)
+						end
+						
+						
+					else
+						if t_hq.fg_relocating == false then
+							if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) == false then
+								Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+							end
+						else
+							if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) then
+								Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+							else
+								Cmd_Move(this.sgroup, t_hq.relocate.tmkr_tank[k], false, nil, t_hq.relocate.tmkr_tank[k])
+							end
+						end
+					end
+				elseif t_hq.reloc_attempts >= 1 then
+					local move_pos = Marker_GetPosition(t_hq.relocate.tmkr_tank[k])
+					if Prox_AreSquadsNearMarker(this.sgroup, move_pos, ANY, 40) == false then
+						-- a special check to make sure that the squad is actually trying to move
+						-- get the last known position of the sgroup first
+						if this.last_pos == false 
+						or this.last_pos == nil then
+							this.last_pos = SGroup_GetPosition(this.sgroup)
+						-- if the squad has not moved from its spot the last check
+						-- then assume that the squad is still hull down and get it moving
+						elseif SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) then
+							Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+	--~ 					elseif Prox_AreSquadsNearMarker(this.sgroup, this.last_pos, ANY, 2) then
+	--~ 						this.hull_down = false
+						else
+							this.last_pos = false
+						end
+						
+						-- stop the tank from being in hull down mode
+						if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) then
+							Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+	--~ 						this.hull_down = false
+						end
+						
+						-- if the HQ has relocated, move the tanks into a defensive position around the HQ.
+						if t_hq.relocate ~= false then
+							Cmd_Move(this.sgroup, t_hq.relocate.tmkr_tank[k], false, nil, t_hq.relocate.tmkr_tank[k])
+						else
+	--~ 						Cmd_Move(this.sgroup, move_pos)
+	--~ 						Cmd_Move(this.sgroup, t_hq.sg_hq, nil, nil, nil, this.hq_offset, this.offset_dist)
+						end
+						
+					else
+						if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) == false then
+							Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+						end
+					end
+				end
+			end
+		end
+		
+	end
+	
+	
+end
+
+function DHQ_CheckRetreat( t_hq )
+
+	if not SGroup_IsEmpty( t_hq.sg_hq ) then
+		return false
+	end
+	
+	if t_hq.t_mobile_def ~= nil then
+		for k, this in pairs(t_hq.t_mobile_def) do
+			if not SGroup_IsEmpty(this.sgroup) then
+				return true
+			end
+		end
+	end
+	
+	if t_hq.t_tanks ~= nil then
+		for k, this in pairs(t_hq.t_tanks) do
+			if not SGroup_IsEmpty(this.sgroup) then
+				return true
+			end
+		end
+	end
+	
+	-- remove this group from management by the state machine.
+	StateMachine_RemoveTable(t_hq.state_machine_id)
+	return false
+
+end
+
+function DHQ_IsInfantry(sbp)
+
+	for i=1, table.getn(t_dhq.inf_sbps) do
+		if sbp == t_dhq.inf_sbps[i] then
+			return true
+		end
+	end
+	
+	return false
+
+end
+
+-------------------------------------------------------------------------
+-- ******************************************************************* --
+-- DESTROY HQs (INFANTRY, ARMOR, MAIN)
+-- These particular set of functions outline the specific behaviors
+-- of each of the particular HQs that the player will need to battle.
+-- Each HQ has been broken into a separate encounter, because the may
+-- or may not be performing similar activies.  The goal will be to abstract
+-- the similar activities and isolate the unique behaviors for each HQ.
+-- ******************************************************************* --
+-------------------------------------------------------------------------
+
+
+-------------------------------------------------------------------------
+-- ******************************************************************* --
+-- INFANTRY HQ ENCOUNTER
+-- ******************************************************************* --
+-------------------------------------------------------------------------
+
+function DHQ_InfInit()
+	
+	-- roles
+	
+	-- mobile defense -- these are squads that stay with the HQ to guard it.
+	-- first responders -- these are the squads that attack targets that are attacking it
+	
+	-- static defense -- ebps that are built near the HQ to guard it.
+	-- repair team -- a squad of soldiers that ensure that the HQ isn't TOO easy to kill.
+	-- movement paths -- where does the hq go to hide?
+		-- when does it move
+		-- where does it move
+	
+	-- modifications to the HQ (to make sure that it's not too easy to kill)
+	
+	sg_dhq_inf_attacker = SGroup_CreateIfNotFound("sg_dhq_inf_attacker")
+	sg_dhq_inf_reloc_attacker = SGroup_CreateIfNotFound("sg_dhq_inf_reloc_attacker")
+	tmkr_dhq_inf_at = Marker_GetTable("mkr_dhq_inf_at%d")
+	teg_dhq_inf_at = EGroup_CreateTable("eg_dhq_inf_at%d", table.getn(tmkr_dhq_inf_at))
+	tsg_dhq_inf_at = SGroup_CreateTable("sg_dhq_inf_at%d", table.getn(tmkr_dhq_inf_at))
+	sg_dhq_inf_build = SGroup_CreateIfNotFound("sg_dhq_inf_build")
+	
+
+	t_dhq_inf = {
+		sg_hq						= tsg_dhq_hq[1],
+		sg_attacker					= sg_dhq_inf_attacker,
+		sg_reloc_attacker			= sg_dhq_inf_reloc_attacker,
+		t_mobile_def				= {},
+		t_static_def				= {},
+		fg_relocating				= false,
+		relocate 					= false,
+		build_attempts				= 1,
+		max_build_attempts			= 10,
+		sg_build					= sg_dhq_inf_build,
+		ebp_build					= EBP.CW.ANTITANK_NEST,
+		timer_respawn				= "DHQ INF RESPAWN TIMER",
+		timer_respawn_amt			= t_difficulty.infhq_respawn_timer,
+		events						= t_dhq.events.hq_inf,
+		reloc_attempts				= 0,							-- Number of times this HQ has relocated
+		reloc_attempts_max			= t_difficulty.infhq_reloc_attempts,		-- Max number of times this HQ can relocate
+		reloc_timer					= "DHQ INF RELOC TIMER",
+		reloc_timer_length			= 10,
+	}
+	
+	
+	-- the first hq is defended primarily by infantry
+	t_dhq_inf.t_mobile_def = {
+		{ 
+			sbp 		= SBP.CW.BREN_CARRIER,
+			upg			= {},
+			hq_offset	= OFFSET_FRONT,
+		},
+		{ 
+			sbp 		= SBP.CW.BREN_CARRIER,
+			upg			= {},
+			hq_offset	= OFFSET_BACK,
+		},
+		{ 
+			sbp 		= SBP.CW.TOMMIES,
+			upg			= {UPG.CW.RIFLE_GRENADE},
+			hq_offset	= OFFSET_FRONT,
+		},
+		{ 
+			sbp 		= SBP.CW.SAPPER,
+			upg			= {UPG.CW.PIAT},
+			hq_offset	= OFFSET_BACK,
+		},
+		{ 
+			sbp 		= SBP.CW.LIEUTENANT,
+			upg			= {},
+			hq_offset	= OFFSET_LEFT,
+		},
+		{ 
+			sbp 		= SBP.CW.SAPPER,
+			upg			= {UPG.CW.PIAT},
+			hq_offset	= OFFSET_BACK_LEFT,
+			garrison	= true,
+		},
+	}
+	
+	tsg_dhq_inf_mob_def = SGroup_CreateTable("sg_dhq_inf_mob_def%d", table.getn(t_dhq_inf.t_mobile_def))
+	tsg_dhq_inf_mob_ride = SGroup_CreateTable("sg_dhq_inf_mob_rides%d", table.getn(t_dhq_inf.t_mobile_def))
+	
+	-- this the group of mobile defenders that 
+	-- move around with the HQ trying to defend it
+	for k, this in pairs(t_dhq_inf.t_mobile_def) do 
+		this.sgroup 		= tsg_dhq_inf_mob_def[k]
+		this.offset_dist 	= 15
+		this.spawn 			= Util_GetOffsetPosition(mkr_hunt_hq1, this.hq_offset, this.offset_dist)
+		this.sg_ride		= tsg_dhq_inf_mob_ride[k]
+		this.mkr_retreat 	= mkr_sp_convoy
+	end
+	
+	-- specify which sgroups, use other sgroups and "rides"
+	t_dhq_inf.t_mobile_def[3].sg_ride = t_dhq_inf.t_mobile_def[1].sgroup
+	t_dhq_inf.t_mobile_def[4].sg_ride = t_dhq_inf.t_mobile_def[2].sgroup
+	t_dhq_inf.t_mobile_def[5].sg_ride = t_dhq_inf.t_mobile_def[2].sgroup
+	
+	-- the starting AT guns
+	for i=1, table.getn(teg_dhq_inf_at) do 
+		t_dhq_inf.t_static_def[i] = {}
+		local this = t_dhq_inf.t_static_def[i]
+		this.egroup 	= teg_dhq_inf_at[i]
+		this.spawn 		= tmkr_dhq_inf_at[i]
+		this.ebp 		= EBP.SYNC_WEAPON.AT_57MM
+		this.sgroup 	= tsg_dhq_inf_at[i]
+		this.sync_id 	= false
+		this.sbp 		= SBP.CW.TOMMIES
+		this.eg_spawn 	= eg_hunt_rt_base3
+	end
+	
+	t_dhq_inf.states = {
+		{	-- PURPOSE: the default behavior for the HQ, which is to sit idle and not do much-- but still needed
+			state		= "default",										-- the name of the state
+			ExecState 	= function() DHQ_InfDefault_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_InfDefault_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_InfDefault_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_InfDefault_Exit() end,			-- this function transitions out of this state
+			priority 	= 1													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: retreats the units off the map after the HQ has been destroyed
+			state		= "retreat",									-- the name of the state
+			ExecState 	= function() DHQ_InfRetreat_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_InfRetreat_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_InfRetreat_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_InfRetreat_Exit() end,			-- this function transitions out of this state
+			priority 	= 10													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: Respawns the units that might have died
+			state		= "respawn",									-- the name of the state
+			ExecState 	= function() DHQ_InfRespawn_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_InfRespawn_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_InfRespawn_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_InfRespawn_Exit() end,			-- this function transitions out of this state
+			priority 	= 6													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: 
+			state		= "relocate",										-- the name of the state
+			ExecState 	= function() DHQ_InfRelocate_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_InfRelocate_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_InfRelocate_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_InfRelocate_Exit() end,			-- this function transitions out of this state
+			priority 	= 8													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: 
+			state		= "defend",										-- the name of the state
+			ExecState 	= function() DHQ_InfDefend_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_InfDefend_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_InfDefend_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_InfDefend_Exit() end,			-- this function transitions out of this state
+			priority 	= 4													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+--~ 		{	-- PURPOSE: 
+--~ 			state		= "repair",										-- the name of the state
+--~ 			ExecState 	= function() DHQ_InfRepair_Execute() end,		-- the function to execute the state
+--~ 			CheckState 	= function() return DHQ_InfRepair_Check() end,	-- the function that checks if the current state is valid
+--~ 			EnterState	= function() DHQ_InfRepair_Enter() end,			-- this function transitions into this state
+--~ 			ExitState	= function() DHQ_InfRepair_Exit() end,			-- this function transitions out of this state
+--~ 			priority 	= 3													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+--~ 		},
+		{	-- PURPOSE: 
+			state		= "build",										-- the name of the state
+			ExecState 	= function() DHQ_InfBuild_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_InfBuild_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_InfBuild_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_InfBuild_Exit() end,			-- this function transitions out of this state
+			priority 	= 2													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: 
+			state		= "setup",										-- the name of the state
+			ExecState 	= function() DHQ_InfSetup_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_InfSetup_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_InfSetup_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_InfSetup_Exit() end,			-- this function transitions out of this state
+			priority 	= 7												-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+	}
+
+end
+
+function DHQ_InfKickoff()
+
+	t_dhq_inf.state_machine_id = StateMachine_AddTable(t_dhq_inf.states)
+	Rule_AddInterval(DHQ_InfOccupyATGuns, 3)
+
+end
+
+function DHQ_InfSpawn()
+
+	for k, this in pairs(t_dhq_inf.t_mobile_def) do 
+		
+		local spawn = this.spawn
+		-- special situation for the riders 
+		if k ==3 or k == 4 or k == 5 then
+			spawn = this.sg_ride
+		end
+		
+		Util_CreateSquads(player2, this.sgroup, this.sbp, spawn, nil, nil, nil, nil, nil, this.upg)
+		
+		if this.garrison == true then
+			Util_GarrisonNearbyBuilding(this.sgroup, this.spawn, 10)
+		end
+		
+	end
+	
+	for k, this in pairs(t_dhq_inf.t_static_def) do 
+		
+		EGroup_Clear(eg_temp)
+		Player_GetAllEntitiesNearMarker(player1, eg_temp, this.spawn, 10)
+		EGroup_RemoveGroup(eg_temp, eg_hunt_town_hq)
+		if not EGroup_IsEmpty(eg_temp) then
+			EGroup_DestroyAllEntities(eg_temp)
+		end
+		
+		Util_CreateEntities(nil, this.egroup, this.ebp, this.spawn, 1)
+		this.sync_id = SyncWeapon_GetFromEGroup(this.egroup)		
+	end
+	
+end 
+
+function DHQ_InfOccupyATGuns()
+
+	local all = true
+	for k, this in pairs(t_dhq_inf.t_static_def) do 
+		
+		if EGroup_IsEmpty(this.eg_spawn) == false then
+			if SyncWeapon_IsOwnedByPlayer(this.sync_id, player2) == false then
+				
+				all = false
+				SGroup_Clear(sg_temp)
+				EGroup_GetSquadsHeld(this.eg_spawn, sg_temp)
+				
+				if SGroup_IsEmpty(this.sgroup) then
+					
+					if SGroup_Count(sg_temp) < 2
+					and this.spawned ~= true then
+						Util_CreateSquads(player2, this.sgroup, this.sbp, this.eg_spawn, SyncWeapon_GetPosition(this.sync_id), nil, 3)
+						this.spawned = true
+					end
+					
+				elseif SGroup_IsInHoldEntity(this.sgroup, ANY) then
+					Cmd_UngarrisonSquad(this.sgroup)
+				elseif SGroup_IsMoving(this.sgroup, ANY) == false then
+					Cmd_CaptureTeamWeapon(this.sgroup, this.egroup)
+				end
+			elseif SGroup_IsEmpty(this.sgroup) then
+				all = false
+				Player_GetAllSquadsNearMarker(player2, this.sgroup, this.spawn, 5)
+				if SGroup_CountSpawned(this.sgroup) > 0 then
+					ATGun_AddGroup(this.sgroup, player2)
+				end
+			end
+		end
+		
+	end	
+	
+	if all then
+		Rule_RemoveMe()
+	end
+	
+end
+
+function DHQ_Inf_Defend()
+	
+	for k, this in pairs(t_dhq_inf.t_mobile_def) do 
+	
+		if SGroup_IsEmpty(this.sgroup) == false then
+		
+			if SGroup_IsEmpty(this.sg_ride)
+			and SGroup_IsDoingAttack(this.sgroup, ANY, 7) == false
+			and SGroup_IsInHoldEntity(this.sgroup, ANY) == false
+			and SGroup_IsMoving(this.sgroup, ANY) == false then
+				
+				if SGroup_IsEmpty(t_dhq_inf.sg_attacker) == false then
+					Cmd_AttackMove(this.sgroup, t_dhq_inf.sg_attacker)
+				elseif SGroup_IsEmpty(t_dhq_inf.sg_hq) == false 
+				and (this.sg_ride == false or SGroup_IsEmpty(this.sg_ride)) then
+					Cmd_Move(this.sgroup, t_dhq_inf.sg_hq, nil, nil, nil, this.hq_offset, this.offset_dist)
+				end
+			end	
+		end
+	end
+
+end
+
+function DHQ_InfMove()
+
+	for k, this in pairs(t_dhq_inf.t_mobile_def) do
+		if SGroup_IsEmpty(this.sgroup) == false then
+			
+			if SGroup_IsInHoldEntity(this.sgroup, ANY) then
+				Cmd_UngarrisonSquad(this.sgroup)
+			elseif (this.sbp == SBP.CW.TOMMIES or this.sbp == SBP.CW.LIEUTENANT or this.sbp == SBP.CW.SAPPER)
+			and SGroup_IsEmpty(this.sg_ride) == false then
+				Cmd_Garrison(this.sgroup, this.sg_ride)			
+			elseif SGroup_IsEmpty(t_dhq_inf.sg_hq) == false
+			and Prox_AreSquadsNearMarker(this.sgroup, Util_GetPosition(t_dhq_inf.sg_hq), ANY, 30) == false then
+				Cmd_Move(this.sgroup, t_dhq_inf.sg_hq, nil, nil, nil, this.hq_offset, this.offset_dist)
+			end
+			
+		end
+	end
+	
+
+end
+
+
+-------------------------------------------------------------------------
+-- INFANTRY HQ STATES
+-------------------------------------------------------------------------
+
+function DHQ_InfDefault_Execute()
+
+	if DHQ_InfDefend_Check() then
+		DHQ_Inf_Defend()
+	else
+		DHQ_InfMove()
+	end
+
+end
+
+function DHQ_InfDefault_Enter()
+
+	
+	
+end
+
+function DHQ_InfDefault_Exit()
+
+	
+
+end
+
+function DHQ_InfDefault_Check()
+
+	return DHQ_DefaultCheck(t_dhq_inf)
+
+end
+
+-----------------------------------------
+-- **** INFANTRY HQ DEFEND STATE **** ---
+-----------------------------------------
+
+function DHQ_InfDefend_Execute()
+
+	-- the hq will do nothing
+	DHQ_Inf_Defend()
+
+end
+
+function DHQ_InfDefend_Enter()
+
+	-- no code to enter this state
+
+end
+
+function DHQ_InfDefend_Exit()
+	
+	t_dhq_inf.tc_id = false
+
+end
+
+function DHQ_InfDefend_Check()
+
+	-- check to see if someone is attacking the HQ
+	if SGroup_IsEmpty(t_dhq_inf.sg_hq) then
+		return false
+	end
+	
+	-- check to see if anyone from the group is under attack
+	for k, this in pairs(t_dhq_inf.t_mobile_def) do 
+		if SGroup_IsEmpty(this.sgroup) == false
+		and SGroup_IsUnderAttack(this.sgroup, ANY, 15) then
+			
+			if SGroup_IsEmpty(t_dhq_inf.sg_attacker) then
+				-- set the last attacker
+				SGroup_GetLastAttacker(this.sgroup, t_dhq_inf.sg_attacker)
+			end
+			
+			return true
+			
+		end
+	end
+	
+	for k, this in pairs(t_dhq_inf.t_static_def) do 
+		
+		if SGroup_IsEmpty(this.sgroup) == false
+		and SGroup_IsUnderAttack(this.sgroup, ANY, 7) then
+			
+			if SGroup_IsEmpty(t_dhq_inf.sg_attacker) then
+				SGroup_GetLastAttacker(this.sgroup, t_dhq_inf.sg_attacker)
+			end
+			return true
+			
+		end
+		
+	end
+	
+	if SGroup_IsUnderAttack(t_dhq_inf.sg_hq, true, 10) then
+		
+		if SGroup_IsEmpty(t_dhq_inf.sg_attacker) then
+			SGroup_GetLastAttacker( t_dhq_inf.sg_hq, t_dhq_inf.sg_attacker )
+		end
+		return true
+		
+	end
+	
+	return false
+	
+
+end
+
+-----------------------------------------
+-- **** INFANTRY HQ RELOCATE STATE *** --
+-----------------------------------------
+function DHQ_InfRelocate_Execute()
+
+	DHQ_RelocateHQ(t_dhq_inf)
+	if DHQ_InfDefend_Check() then
+		DHQ_Inf_Defend()
+	else
+		DHQ_InfMove()
+	end
+
+end
+
+function DHQ_InfRelocate_Enter()
+
+	DHQ_RelocateEnter(t_dhq_inf)
+
+end
+
+function DHQ_InfRelocate_Exit()
+
+	t_dhq_inf.fg_relocating = false
+	if not SGroup_IsEmpty(t_dhq_inf.sg_hq) then
+		if SGroup_IsMoving(t_dhq_inf.sg_hq, ALL) == false then
+			Util_SetCommonwealthHQMobility(t_dhq_inf.sg_hq, false, false)
+			t_dhq_inf.reloc_attempts = t_dhq_inf.reloc_attempts + 1
+--~ 			Util_CreateSquads(player2, sg_inf_cap_squad, SBP.CW.TOMMIES, t_dhq_inf.sg_hq)
+--~ 			Modify_CaptureTime(t_dhq_inf.relocate.eg_rp, 0.3)
+--~ 			Cmd_MoveToThenCapture(sg_inf_cap_squad, t_dhq_inf.relocate.eg_rp)
+		end
+	end
+
+end
+
+function DHQ_InfRelocate_Check()
+
+	return DHQ_CheckRelocate(t_dhq_inf)
+
+end
+
+
+-----------------------------------------
+-- **** INFANTRY HQ REPAIR STATE **** ---
+-----------------------------------------
+function DHQ_InfRepair_Execute()
+	
+	if DHQ_InfDefend_Check() then
+		DHQ_Inf_Defend()
+	else
+		DHQ_InfMove()
+	end
+
+end
+
+function DHQ_InfRepair_Enter()
+
+	t_dhq_inf.fg_repair = true
+	
+	-- add them to the repair state, only when they are being repaired
+	DHQ_AddHQToRepair(t_dhq_inf.sg_hq, t_dhq_inf.relocate)
+
+end
+
+function DHQ_InfRepair_Exit()
+	
+	t_dhq_inf.fg_repair = false
+
+end
+
+function DHQ_InfRepair_Check()
+
+	return DHQ_RepairCheck(t_dhq_inf)
+	
+end
+
+----------------------------------------
+-- **** INFANTRY HQ BUILD STATE **** ---
+----------------------------------------
+function DHQ_InfBuild_Execute()
+	
+	DHQ_BuildEmplacements(t_dhq_inf)
+	if DHQ_InfDefend_Check() then
+		DHQ_Inf_Defend()
+	else
+		DHQ_InfMove()
+	end
+
+end
+
+function DHQ_InfBuild_Enter()
+
+	t_dhq_inf.fg_build = true
+	
+end
+
+function DHQ_InfBuild_Exit()
+
+	t_dhq_inf.fg_build = false
+	
+	-- loops through the various nearby defense locations and
+	-- assigns them to the static defense elements to the table
+	-- for additional management
+	EGroup_Clear(eg_temp)
+	Player_GetAllEntitiesNearMarker(player2, eg_temp, t_dhq_inf.relocate.mkr, 40)
+	EGroup_Filter(eg_temp, t_dhq_inf.ebp_build, FILTER_KEEP)
+	
+	if EGroup_IsEmpty(eg_temp) == false then
+	
+		for i=1, EGroup_CountSpawned(eg_temp) do
+			
+			if i <= table.getn(t_dhq_inf.t_static_def) then
+				local this = t_dhq_inf.t_static_def[i]
+				EGroup_Clear(this.egroup)
+				EGroup_Add(this.egroup, EGroup_GetSpawnedEntityAt(eg_temp, i))
+			end
+			
+		end
+	
+	end
+
+end
+
+function DHQ_InfBuild_Check()
+
+	local all_built = true
+	local sgroup = t_dhq_inf.sg_build
+	if t_dhq_inf.relocate == false then
+		return false
+	end
+	
+	if EGroup_IsEmpty(t_dhq_inf.relocate.eg_spawn) then
+		return false
+	end
+	
+	for k, this in pairs(t_dhq_inf.relocate.t_def_locations) do 
+		
+		if this.fg_built == false then
+			return true
+		end
+		
+	end
+	
+	if all_built == true
+	and SGroup_IsEmpty(sgroup) == false then
+		return true
+	end
+	
+	return false
+
+end
+
+-----------------------------------------
+-- **** INFANTRY HQ RESPAWN STATE **** --
+-----------------------------------------
+function DHQ_InfRespawn_Execute()
+
+	if SGroup_IsEmpty(t_dhq_inf.sg_hq) then
+		return
+	end
+	
+	
+
+	for k, this in pairs(t_dhq_inf.t_mobile_def) do 
+		
+		if SGroup_IsEmpty(this.sgroup) then
+			local spawn = Util_GetPosition(t_dhq_inf.sg_hq)
+			local dest
+			
+			if Timer_Exists("tmr_infhq_inf_respawn") == false then
+				Timer_Start("tmr_infhq_inf_respawn", t_dhq_inf.timer_respawn_amt)
+			end
+			
+			local v_respawn_inf_timer = Timer_GetRemaining("tmr_infhq_inf_respawn")
+			-- special situation for the riders 
+			if (this.sbp == SBP.CW.TOMMIES or this.sbp == SBP.CW.LIEUTENANT or this.sbp == SBP.CW.SAPPER) then
+				spawn = t_dhq_inf.relocate.eg_spawn
+				if SGroup_IsEmpty(this.sg_ride) == false then
+					dest = this.sg_ride
+				end
+			end
+			
+			if scartype(spawn) ~= ST_EGROUP
+			or not EGroup_IsEmpty(spawn) then
+				if v_respawn_inf_timer == 0 then
+					Util_CreateSquads(player2, this.sgroup, this.sbp, spawn, dest, nil, nil, nil, nil, this.upg)
+					Timer_End("tmr_infhq_inf_respawn")
+				end
+			end
+			
+			
+			return
+			
+		end
+		
+	end
+
+end
+
+function DHQ_InfRespawn_Enter()
+
+--~ 	t_dhq_inf.fg_respawn = true
+
+end
+
+function DHQ_InfRespawn_Exit()
+	
+--~ 	t_dhq_inf.fg_respawn = false
+
+end
+
+function DHQ_InfRespawn_Check()
+
+	return DHQ_CheckRespawn(t_dhq_inf)
+	
+end
+
+
+
+
+
+-----------------------------------------
+-- **** INFANTRY HQ RETREAT STATE **** --
+-----------------------------------------
+function DHQ_InfRetreat_Execute()
+
+	DHQ_Retreat(t_dhq_inf.t_mobile_def)
+
+end
+
+function DHQ_InfRetreat_Enter()
+
+	
+	
+end
+
+function DHQ_InfRetreat_Exit()
+
+	
+
+end
+
+function DHQ_InfRetreat_Check()
+
+	return DHQ_CheckRetreat(t_dhq_inf)
+
+end
+-----------------------------------------
+-- **** INFANTRY HQ SETUP STATE **** --
+-----------------------------------------
+function DHQ_InfSetup_Execute()
+
+--~ 	Util_SetCommonwealthHQMobility(t_dhq_inf.sg_hq, false, false)
+	Cmd_Ability(t_dhq_inf.sg_hq, ABILITY.CW.HQ_SETUP)
+
+end
+
+function DHQ_InfSetup_Enter()
+
+	
+	
+end
+
+function DHQ_InfSetup_Exit()
+
+	
+
+end
+
+function DHQ_InfSetup_Check()
+
+	local mobile = Util_GetCommonwealthHQMobility(t_dhq_inf.sg_hq)
+	
+	if mobile == true then
+		
+		return true
+		
+	end
+	
+	
+
+end
+
+-------------------------------------------------------------------------
+-- ******************************************************************* --
+-- ARMOUR HQ ENCOUNTER
+-- ******************************************************************* --
+-------------------------------------------------------------------------
+
+function DHQ_ArmorInit()
+
+	-- mobile defense -- these are squads that stay with the HQ to guard it.
+	-- first responders -- these are the squads that attack targets that are attacking it
+	
+	-- static defense -- ebps that are built near the HQ to guard it.
+	-- repair team -- a squad of soldiers that ensure that the HQ isn't TOO easy to kill.
+	-- movement paths -- where does the hq go to hide?
+		-- when does it move
+		-- where does it move
+	
+	-- modifications to the HQ (to make sure that it's not too easy to kill)
+	
+	sg_dhq_armor_attacker = SGroup_CreateIfNotFound("sg_dhq_armor_attacker")
+	sg_dhq_armor_reloc_attacker = SGroup_CreateIfNotFound("sg_dhq_armor_reloc_attacker")
+	sg_dhq_armor_build = SGroup_CreateIfNotFound("sg_dhq_armor_build")
+
+	
+	t_dhq_armor = {
+		sg_hq						= tsg_dhq_hq[2],
+		sg_attacker					= sg_dhq_armor_attacker,
+		sg_reloc_attacker			= sg_dhq_armor_reloc_attacker,
+		t_mobile_def				= {},
+		t_static_def				= {},
+		fg_relocating				= false,
+		relocate 					= false,
+		offset_dist					= 30,
+		max_build_attempts			= 10,
+		tc_id						= false,
+		sg_build					= sg_dhq_armor_build,
+		ebp_build					= nil,
+		timer_respawn				= "DHQ ARMOR RESPAWN TIMER",
+		timer_respawn_amt			= t_difficulty.armorhq_respawn_timer,
+		events						= t_dhq.events.hq_armor,
+		reloc_attempts				= 0,							-- Number of times this HQ has relocated
+		reloc_attempts_max			= t_difficulty.armorhq_reloc_attempts,							-- Max number of times this HQ can relocate
+		reloc_timer					= "DHQ ARMOR RELOC TIMER",
+		reloc_timer_length			= 10,
+	}
+		
+	-- the first hq is defended primarily by infantry
+	t_dhq_armor.t_mobile_def = {
+		{ 
+			sbp 		= SBP.CW.CHURCHILL_CROC,
+			upg			= {},
+			hq_offset	= OFFSET_BACK,
+			spawn		= mkr_hunt_hq2_tank1,
+			offset_dist	= 5,
+			facing		= mkr_kr_sp3_6,
+		},
+		{ 
+			sbp 		= SBP.CW.CROMWELL,
+			upg			= {},
+			hq_offset	= OFFSET_LEFT,
+			spawn		= mkr_hunt_hq2_tank2,
+			offset_dist	= 15,
+			facing		= mkr_ambush_eb1,
+		},
+		{ 
+			sbp 		= SBP.CW.CROMWELL,
+			upg			= {},
+			hq_offset	= OFFSET_FRONT,
+			spawn		= mkr_hunt_hq2_tank3,
+			offset_dist	= 15,
+			facing		= mkr_dhq_relocate2_def1,
+		}, 
+	}
+	
+	-- for the TankCombat code, set up the tanks into two groups that will be used to attack the player	
+	tsg_dhq_armor_mob_def = SGroup_CreateTable("sg_dhq_armor_mob_def%d", table.getn(t_dhq_armor.t_mobile_def))
+	
+	for k, this in pairs(t_dhq_armor.t_mobile_def) do 
+		this.sgroup 		= tsg_dhq_armor_mob_def[k]
+--~ 		this.spawn 			= Util_GetOffsetPosition(mkr_hunt_hq2, this.hq_offset, 15)
+--~ 		this.offset_dist 	= this.dist
+		this.hull_down 		= true
+		this.mkr_retreat	= mkr_convoy_end
+	end
+	
+	t_dhq_armor.states = {
+		{	-- PURPOSE: the default behavior for the HQ, which is to sit idle and not do much-- but still needed
+			state		= "default",										-- the name of the state
+			ExecState 	= function() DHQ_ArmorDefault_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_ArmorDefault_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_ArmorDefault_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_ArmorDefault_Exit() end,			-- this function transitions out of this state
+			priority 	= 1													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: forces the squads that are left over to retreat from battle
+			state		= "retreat",									-- the name of the state
+			ExecState 	= function() DHQ_ArmorRetreat_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_ArmorRetreat_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_ArmorRetreat_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_ArmorRetreat_Exit() end,			-- this function transitions out of this state
+			priority 	= 10													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: 
+			state		= "respawn",									-- the name of the state
+			ExecState 	= function() DHQ_ArmorRespawn_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_ArmorRespawn_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_ArmorRespawn_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_ArmorRespawn_Exit() end,			-- this function transitions out of this state
+			priority 	= 7													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+--~ 		{	-- PURPOSE: the relocation state orders the HQ to move to a location if it comes under attack and takes too much damage
+--~ 			state		= "relocate",										-- the name of the state
+--~ 			ExecState 	= function() DHQ_ArmorRelocate_Execute() end,			-- the function to execute the state
+--~ 			CheckState 	= function() return DHQ_ArmorRelocate_Check() end,	-- the function that checks if the current state is valid
+--~ 			EnterState	= function() DHQ_ArmorRelocate_Enter() end,			-- this function transitions into this state
+--~ 			ExitState	= function() DHQ_ArmorRelocate_Exit() end,			-- this function transitions out of this state
+--~ 			priority 	= 9													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+--~ 		},
+		{	-- PURPOSE: the defend behavior of the HQ which is pretty much the same as sit by idle
+			state		= "defend",											-- the name of the state
+			ExecState 	= function() DHQ_ArmorDefend_Execute() end,			-- the function to execute the state
+			CheckState 	= function() return DHQ_ArmorDefend_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_ArmorDefend_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_ArmorDefend_Exit() end,			-- this function transitions out of this state
+			priority 	= 5													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: repair ensures that the HQ gets repaired at its new location and if it is not under attack
+			state		= "repair",											-- the name of the state
+			ExecState 	= function() DHQ_ArmorRepair_Execute() end,			-- the function to execute the state
+			CheckState 	= function() return DHQ_ArmorRepair_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_ArmorRepair_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_ArmorRepair_Exit() end,			-- this function transitions out of this state
+			priority 	= 2													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: 
+			state		= "setup",										-- the name of the state
+			ExecState 	= function() DHQ_ArmorSetup_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_ArmorSetup_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_ArmorSetup_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_ArmorSetup_Exit() end,			-- this function transitions out of this state
+			priority 	= 8													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: 
+			state		= "build",										-- the name of the state
+			ExecState 	= function() DHQ_ArmorBuild_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_ArmorBuild_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_ArmorBuild_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_ArmorBuild_Exit() end,			-- this function transitions out of this state
+			priority 	= 3													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+	}
+
+end
+
+function DHQ_ArmorSpawn()
+
+	-- spawn some preset stuff for this encounter
+
+end
+
+function DHQ_ArmorMobileDefense_Default()
+	
+	-- nothing to defend if they don't have an egroup to defend
+	if SGroup_IsEmpty(t_dhq_armor.sg_hq) then
+		return
+	end
+	
+	DHQ_MovementTanks(t_dhq_armor, t_dhq_armor.t_mobile_def)
+
+end
+
+function DHQ_ArmorMobileDefense_Defend()
+
+	-- if the tanks are hull down, then let them move.
+	for k, this in pairs(t_dhq_armor.t_mobile_def) do
+		if this.hull_down == false then
+			Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+			this.hull_down = true
+		end
+	end
+	
+	if TankCombat_GroupExists(t_dhq_armor.tc_id) == false then
+		t_dhq_armor.tc_id = false
+	end
+	
+	-- check if there is an attacker that the tanks can focus on 
+	if SGroup_IsEmpty(t_dhq_armor.sg_attacker) == false 
+	and t_dhq_armor.tc_id == false then
+		t_dhq_armor.tc_id = TankCombat_AddGroup(tsg_dhq_armor_mob_def, Util_GetPosition(t_dhq_armor.sg_attacker), Util_GetPosition(t_dhq_armor.sg_hq))
+		TankCombat_EnableFormUp(t_dhq_armor.tc_id, false)
+		TankCombat_EnableRetreat(t_dhq_armor.tc_id, false)
+		TankCombat_AddThreatArrows(t_dhq_armor.tc_id, t_cw_tank_threats)
+	end
+
+end
+
+function DHQ_ArmorKickoff()
+
+	-- spawn the defense of the squads near the HQ
+	for k, this in pairs(t_dhq_armor.t_mobile_def) do 
+		
+--~ 		local pos = Util_GetOffsetPosition(t_dhq_armor.sg_hq, this.hq_offset, t_dhq_armor.offset_dist)
+		Util_CreateSquads(player2, this.sgroup, this.sbp, this.spawn)
+		
+	end
+	
+	t_dhq_armor.state_machine_id = StateMachine_AddTable(t_dhq_armor.states)
+
+end
+
+function DHQ_ArmorMove()
+
+--~ 	for k, this in pairs(t_dhq_armor.t_mobile_def) do
+--~ 		if SGroup_IsEmpty(this.sgroup) == false then
+--~ 			
+--~ 			if SGroup_IsInHoldEntity(this.sgroup, ANY) then
+--~ 				Cmd_UngarrisonSquad(this.sgroup)
+--~ 			elseif (this.sbp == SBP.CW.TOMMIES or this.sbp == SBP.CW.LIEUTENANT or this.sbp == SBP.CW.SAPPER)
+--~ 			and SGroup_IsEmpty(this.sg_ride) == false then
+--~ 				Cmd_Garrison(this.sgroup, this.sg_ride)			
+--~ 			elseif SGroup_IsEmpty(t_dhq_armor.sg_hq) == false
+--~ 			and Prox_AreSquadsNearMarker(this.sgroup, Util_GetPosition(t_dhq_armor.sg_hq), ANY, 30) == false then
+--~ 				Cmd_Move(this.sgroup, t_dhq_armor.sg_hq, nil, nil, nil, this.hq_offset, this.offset_dist)
+--~ 				return
+--~ 			end
+--~ 			
+--~ 		end
+--~ 	end
+	return
+	
+
+end
+
+function DHQ_ArmorTank_Movement()
+
+	if SGroup_IsEmpty(t_dhq_armor.sg_hq) then
+		return
+	end
+	
+	-- piggy backing the tank movement with the 
+	-- mobile defense movement
+--~ 	DHQ_MainMobileDefMovement()
+	
+	if TankCombat_GroupExists(t_dhq_armor.tc_id) == false then
+		t_dhq_armor.tc_id = false
+	end
+	
+	-- remove the hull down on the tanks if any of the squads are being attacked
+	-- and check if there is an attacker that the tanks can focus on 
+	if not SGroup_IsEmpty(t_dhq_armor.sg_attacker) then
+		-- if the tanks are hull down, then let them move.
+		for k, this in pairs(t_dhq_armor.t_mobile_def) do
+			if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) == true then
+			
+		--~ 			if this.hull_down == false then
+				Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+--~ 				this.hull_down = true
+			end
+		end
+		
+		if t_dhq_armor.tc_id == false then
+					
+			t_dhq_armor.tank_pos = Util_GetPosition(t_dhq_armor.sg_attacker)
+			t_dhq_armor.tc_id = TankCombat_AddGroup(tsg_dhq_armor_mob_def, t_dhq_armor.tank_pos)
+			TankCombat_EnableFormUp(t_dhq_armor.tc_id, false)
+			TankCombat_EnableRetreat(t_dhq_armor.tc_id, false)
+			TankCombat_AddThreatArrows(t_dhq_armor.tc_id, t_cw_tank_threats)
+		end
+		
+	elseif SGroup_IsEmpty(t_dhq_armor.sg_attacker) then
+		if t_dhq_armor.tc_id ~= false then
+			TankCombat_RemoveGroup(t_dhq_armor.tc_id)
+			t_dhq_armor.tc_id = false
+		end
+	end
+	
+	if t_dhq_armor.tc_id == false then
+		DHQ_MovementArmorTanks(t_dhq_armor, t_dhq_armor.t_mobile_def)
+	end
+
+end
+
+
+
+-- *********************************** --
+-- **** ARMOR DEFAULT STATE *** --
+-- *********************************** --
+function DHQ_ArmorDefault_Execute()
+
+	-- the HQ does nothing
+	
+--~ 	DHQ_ArmorMobileDefense_Default()
+	
+--~ 	for k, this in pairs(t_dhq_armor.t_mobile_def) do
+--~ 		if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) == false then
+		
+	--~ 			if this.hull_down == false then
+--~ 			Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+--~ 				this.hull_down = true
+--~ 		end
+--~ 	end
+	DHQ_ArmorTank_Movement()
+
+end
+
+function DHQ_ArmorDefault_Enter()
+
+	-- spawn reinforcements
+
+end
+
+function DHQ_ArmorDefault_Exit()
+
+end
+
+function DHQ_ArmorDefault_Check()
+
+	return DHQ_DefaultCheck(t_dhq_armor)
+
+end
+
+-- *********************************** --
+-- **** ARMOR DEFEND STATE **** --
+-- *********************************** --
+
+function DHQ_ArmorDefend_Execute()
+
+	-- the hq will do nothing
+--~ 	DHQ_ArmorMobileDefense_Defend()
+	DHQ_ArmorTank_Movement()
+
+end
+
+function DHQ_ArmorDefend_Enter()
+
+	-- no code to enter this state
+
+end
+
+function DHQ_ArmorDefend_Exit()
+	
+	if TankCombat_GroupExists(t_dhq_armor.tc_id) then
+		TankCombat_RemoveGroup(t_dhq_armor.tc_id)
+	end
+	
+	t_dhq_armor.tc_id = false
+
+end
+
+function DHQ_ArmorDefend_Check()
+
+	-- check to see if someone is attacking the HQ
+	if SGroup_IsEmpty(t_dhq_armor.sg_hq) then
+		return false
+	end
+	
+	-- check to see if anyone from the group is under attack
+	for k, this in pairs(t_dhq_armor.t_mobile_def) do 
+		if SGroup_IsEmpty(this.sgroup) == false
+		and SGroup_IsUnderAttack(this.sgroup, ANY, 15) then
+			
+			-- set the last attacker
+			SGroup_Clear(t_dhq_armor.sg_attacker)
+			SGroup_GetLastAttacker(this.sgroup, t_dhq_armor.sg_attacker)
+			-- ** TODO - Need to get the Last Attacker for an EGroup for the HQ
+			
+			return true
+			
+		end
+	end
+	
+	if SGroup_IsUnderAttack(t_dhq_armor.sg_hq, true, 10) then
+		SGroup_Clear(t_dhq_armor.sg_attacker)
+		SGroup_GetLastAttacker( t_dhq_armor.sg_hq, t_dhq_armor.sg_attacker )
+		return true
+	end
+	
+	SGroup_Clear(t_dhq_armor.sg_attacker)
+	return false
+	
+
+end
+
+-----------------------------------------
+-- **** ARMOR RELOCATE STATE **** --
+-----------------------------------------
+function DHQ_ArmorRelocate_Execute()
+
+	DHQ_RelocateHQ(t_dhq_armor)
+	
+--~ 	if DHQ_ArmorDefend_Check() then
+--~ 		DHQ_ArmorMobileDefense_Defend()
+--~ 	else
+--~ 		DHQ_ArmorMobileDefense_Default()
+--~ 	end
+	DHQ_ArmorTank_Movement()
+		
+
+end
+
+function DHQ_ArmorRelocate_Enter()
+
+	DHQ_RelocateEnter(t_dhq_armor)
+
+end
+
+function DHQ_ArmorRelocate_Exit()
+
+	t_dhq_armor.fg_relocating = false
+	if not SGroup_IsEmpty(t_dhq_armor.sg_hq) then
+		Util_SetCommonwealthHQMobility(t_dhq_armor.sg_hq, false, false)
+		t_dhq_armor.reloc_attempts = t_dhq_armor.reloc_attempts + 1
+	end
+
+end
+
+function DHQ_ArmorRelocate_Check()
+	
+	return DHQ_CheckRelocate(t_dhq_armor)
+
+end
+
+
+----------------------------------------
+-- **** ARMOR HQ BUILD STATE **** ---
+----------------------------------------
+function DHQ_ArmorBuild_Execute()
+	
+	DHQ_BuildEmplacements(t_dhq_armor)
+--~ 	if DHQ_ArmorDefend_Check() then
+--~ 		DHQ_Armor_Defend()
+--~ 	else
+--~ 		DHQ_ArmorMove()
+--~ 	end
+	DHQ_ArmorTank_Movement()
+
+end
+
+function DHQ_ArmorBuild_Enter()
+
+	t_dhq_armor.fg_build = true
+	
+end
+
+function DHQ_ArmorBuild_Exit()
+
+--~ 	t_dhq_armor.fg_build = false
+	return
+	
+	-- loops through the various nearby defense locations and
+	-- assigns them to the static defense elements to the table
+	-- for additional management
+--~ 	EGroup_Clear(eg_temp)
+--~ 	Player_GetAllEntitiesNearMarker(player2, eg_temp, t_dhq_armor.relocate.mkr, 40)
+--~ 	EGroup_Filter(eg_temp, t_dhq_armor.ebp_build, FILTER_KEEP)
+--~ 	
+--~ 	if EGroup_IsEmpty(eg_temp) == false then
+--~ 	
+--~ 		for i=1, EGroup_CountSpawned(eg_temp) do
+--~ 			
+--~ 			if i <= table.getn(t_dhq_armor.t_static_def) then
+--~ 				local this = t_dhq_armor.t_static_def[i]
+--~ 				EGroup_Clear(this.egroup)
+--~ 				EGroup_Add(this.egroup, EGroup_GetSpawnedEntityAt(eg_temp, i))
+--~ 			end
+--~ 			
+--~ 		end
+--~ 	
+--~ 	end
+
+end
+
+function DHQ_ArmorBuild_Check()
+
+	local all_built = true
+	local sgroup = t_dhq_armor.sg_build
+	if t_dhq_armor.relocate == false then
+		return false
+	end
+	
+	if EGroup_IsEmpty(t_dhq_armor.relocate.eg_spawn) then
+		return false
+	end
+	
+	for k, this in pairs(t_dhq_armor.relocate.t_def_locations) do 
+		
+		if this.fg_built == false then
+			return true
+		end
+		
+	end
+	
+	if all_built == true
+	and SGroup_IsEmpty(sgroup) == false then
+		return true
+	end
+	
+	return false
+
+end
+
+-----------------------------------------
+-- **** ARMOR REPAIR STATE **** --
+-----------------------------------------
+function DHQ_ArmorRepair_Execute()
+
+--~ 	if DHQ_ArmorDefend_Check() then
+--~ 		DHQ_ArmorMobileDefense_Defend()
+--~ 	else
+--~ 		DHQ_ArmorMobileDefense_Default()
+--~ 	end
+	DHQ_ArmorTank_Movement()
+
+end
+
+function DHQ_ArmorRepair_Enter()
+
+	t_dhq_armor.fg_repair = true
+	
+	-- add them to the repair state, only when they are being repaired
+	DHQ_AddHQToRepair(t_dhq_armor.sg_hq, t_dhq_armor.relocate)
+
+end
+
+function DHQ_ArmorRepair_Exit()
+	
+	t_dhq_armor.fg_repair = false
+
+end
+
+function DHQ_ArmorRepair_Check()
+
+	return DHQ_RepairCheck(t_dhq_armor)
+	
+
+end
+-----------------------------------------
+-- **** ARMOR HQ RESPAWN STATE **** --
+-----------------------------------------
+function DHQ_ArmorRespawn_Execute()
+
+	for k, this in pairs(t_dhq_armor.t_mobile_def) do 
+		
+		if SGroup_IsEmpty(this.sgroup) then
+			if Timer_Exists("tmr_armorhq_respawn") == false then
+				Timer_Start("tmr_armorhq_respawn", t_dhq_armor.timer_respawn_amt)
+			end
+			
+			local v_respawn_timer = Timer_GetRemaining("tmr_armorhq_respawn")
+			local spawn = Util_GetPosition(t_dhq_armor.sg_hq)
+			local dest = Util_GetOffsetPosition(t_dhq_armor.sg_hq, this.hq_offset, this.offset_dist)
+			
+			if v_respawn_timer == 0 then
+				Util_CreateSquads(player2, this.sgroup, this.sbp, spawn, this.spawn, nil, nil, nil, nil, this.upg)
+				Timer_End("tmr_armorhq_respawn")
+			end
+			
+			return
+			
+		end
+		
+	end
+	
+	
+
+end
+
+function DHQ_ArmorRespawn_Enter()
+
+
+
+end
+
+function DHQ_ArmorRespawn_Exit()
+	
+
+
+end
+
+function DHQ_ArmorRespawn_Check()
+
+	return DHQ_CheckRespawn(t_dhq_armor)
+	
+end
+
+
+-----------------------------------------
+-- **** ARMOR HQ RETREAT STATE **** --
+-----------------------------------------
+function DHQ_ArmorRetreat_Execute()
+
+	if t_dhq_armor.tc_id ~= false then
+		TankCombat_RemoveGroup(t_dhq_armor.tc_id)
+		t_dhq_armor.tc_id = false
+	end
+	DHQ_Retreat(t_dhq_armor.t_mobile_def)
+
+end
+
+function DHQ_ArmorRetreat_Enter()
+
+	
+	
+end
+
+function DHQ_ArmorRetreat_Exit()
+
+	
+
+end
+
+function DHQ_ArmorRetreat_Check()
+
+	return DHQ_CheckRetreat(t_dhq_armor)
+
+end
+
+-----------------------------------------
+-- **** ARMOR HQ SETUP STATE **** --
+-----------------------------------------
+function DHQ_ArmorSetup_Execute()
+
+	Cmd_Ability(t_dhq_armor.sg_hq, ABILITY.CW.HQ_SETUP)
+
+end
+
+function DHQ_ArmorSetup_Enter()
+
+	
+	
+end
+
+function DHQ_ArmorSetup_Exit()
+
+	
+
+end
+
+function DHQ_ArmorSetup_Check()
+
+	local mobile = Util_GetCommonwealthHQMobility(t_dhq_armor.sg_hq)
+	
+	if mobile == true then
+		
+		return true
+		
+	end
+	
+	
+
+end
+
+-------------------------------------------------------------------------
+-- ******************************************************************* --
+-- MAIN HQ ENCOUNTER
+-- ******************************************************************* --
+-------------------------------------------------------------------------
+
+function DHQ_MainInit()
+
+	-- roles
+	
+	-- mobile defense -- these are squads that stay with the HQ to guard it.
+	-- first responders -- these are the squads that attack targets that are attacking it
+	
+	-- static defense -- ebps that are built near the HQ to guard it.
+	-- repair team -- a squad of soldiers that ensure that the HQ isn't TOO easy to kill.
+	-- movement paths -- where does the hq go to hide?
+		-- when does it move
+		-- where does it move
+	
+	-- modifications to the HQ (to make sure that it's not too easy to kill)
+	
+	sg_dhq_main_attacker = SGroup_CreateIfNotFound("sg_dhq_main_attacker")
+	sg_dhq_main_reloc_attacker = SGroup_CreateIfNotFound("sg_dhq_main_reloc_attacker")
+	tmkr_dhq_main_arty = Marker_GetTable("mkr_dhq_main_arty%d")
+	tmkr_dhq_main_tank_sp = Marker_GetTable("mkr_dhq_main_tank_sp%d")
+	teg_dhq_main_arty = EGroup_CreateTable("eg_dhq_main_arty%d", table.getn(tmkr_dhq_main_arty))
+	tsg_dhq_main_arty = SGroup_CreateTable("sg_dhq_main_arty%d", table.getn(tmkr_dhq_main_arty))
+	sg_dhq_main_build = SGroup_CreateIfNotFound("sg_dhq_main_build")
+	eg_dhq_main_arty_threat = EGroup_CreateIfNotFound("eg_dhq_main_arty_threat")
+	
+	t_dhq_main = {
+		sg_hq						= tsg_dhq_hq[3],				-- the hq that this encounter revolves around
+		sg_attacker					= sg_dhq_main_attacker,			-- the attacking squad that encounter will use as the primary attack target
+		sg_reloc_attacker			= sg_dhq_main_reloc_attacker,	-- SGroup used to determine defenses to setup
+		t_mobile_def				= {},							-- table to manage the mobile defenses for the HQ
+		t_static_def				= {},							-- table to hold the static (emplacements) for the HQ
+		fg_relocating				= false,						-- flag to detect whether or not this HQ is relocating
+		relocate 					= false,						-- a table that references a relocation
+		max_build_attempts			= 10,							-- maximum number of attempts the AI can make to build a howitzer
+		arty_range_max				= 150,							-- the range at which artillery batteries can shoot.  (shortened to account for random variation)
+		arty_range_min				= 30,							-- the minimum range at which the artillery battieries will fire
+		tank_pos					= false,						-- the position to which the mobile tank defense is moving to.
+		sg_build					= sg_dhq_main_build,			-- the squad used to build all the nearby emplacements for the HQ.
+		timer_tank_move				= "DHQ TANK MAIN MOVE",			-- tank movement timer to keep the tanks from continually jumping around
+		ebp_build					= EBP.CW.ANTITANK_NEST,			-- the ebp of the types of buildings that the AI will build around the HQ at the defensive locations
+		timer_respawn				= "DHQ MAIN RESPAWN TIMER",		-- timer to respawn...?
+		timer_respawn_amt			= t_difficulty.mainhq_respawn_timer,
+		events						= t_dhq.events.hq_main,
+		reloc_attempts				= 0,							-- Number of times this HQ has relocated
+		reloc_attempts_max			= t_difficulty.mainhq_reloc_attempts,			-- Max number of times this HQ can relocate
+		reloc_timer					= "DHQ MAIN RELOC TIMER",
+		reloc_timer_length			= 10,		
+	}
+	
+	
+	
+	-- the first hq is defended primarily by mainantry
+	-- *** TODO implement the priest
+	t_dhq_main.t_mobile_def = {
+		{ 
+			sbp 		= SBP.CW.SAPPER,
+			upg			= {UPG.CW.PIAT},
+			hq_offset	= OFFSET_BACK,
+		},
+		{ 
+			sbp 		= SBP.CW.TOMMIES,
+			upg			= {UPG.CW.RIFLE_GRENADE},
+			hq_offset	= OFFSET_FRONT,
+		},
+		{ 
+			sbp 		= SBP.CW.CAPTAIN,
+			upg			= {},
+			hq_offset	= OFFSET_LEFT,
+		},
+	}
+	
+	tsg_dhq_main_mob_def = SGroup_CreateTable("sg_dhq_main_mob_def%d", table.getn(t_dhq_main.t_mobile_def))
+
+	-- this the group of mobile defenders that 
+	-- move around with the HQ trying to defend it
+	for k, this in pairs(t_dhq_main.t_mobile_def) do 
+		this.sgroup 		= tsg_dhq_main_mob_def[k]
+		this.spawn 			= Util_GetOffsetPosition(mkr_hunt_hq3, this.hq_offset, 15)
+		this.offset_dist 	= 20
+		this.mkr_retreat 	= mkr_sp_convoy
+	end
+	
+	t_dhq_main.t_tanks = {
+		{ 
+			sbp 		= SBP.CW.COMMAND_CROMWELL,
+			upg			= {},
+--~ 			hq_offset	= OFFSET_BACK_RIGHT,
+			spawn		= mkr_hunt_convoy_prot1_sp1,
+			initial		= mkr_hunt_hq3_tank1,
+			respawn		= mkr_hunt_hq3_tank1,
+			facing		= Marker_GetPosition(mkr_dhq_relocate2_tank1)
+		},
+		{ 
+			sbp 		= SBP.CW.FIREFLY,
+			upg			= {},
+--~ 			hq_offset	= OFFSET_LEFT,
+			spawn		= mkr_hunt_convoy_prot1_sp2,
+			initial		= mkr_hunt_hq3_tank2,
+			respawn		= mkr_hunt_hq3_tank2,
+			facing		= Marker_GetPosition(mkr_dhq_relocate2_tank1)
+		},
+		{ 
+			sbp 		= SBP.CW.CHURCHILL,
+			upg			= {},
+--~ 			hq_offset	= OFFSET_FRONT_RIGHT,
+			spawn		= mkr_hunt_convoy_prot1_sp3,
+			initial		= mkr_hunt_hq3_tank3,
+			respawn		= mkr_hunt_hq3_tank3,
+			facing		= Marker_GetPosition(mkr_kr_sp2_2)
+		},
+	}
+	
+	tsg_dhq_main_tanks = SGroup_CreateTable("sg_dhq_main_tanks%d", table.getn(t_dhq_main.t_tanks))
+	
+		-- this the group of mobile defenders that 
+	-- move around with the HQ trying to defend it
+	for k, this in pairs(t_dhq_main.t_tanks) do 
+		this.sgroup 		= tsg_dhq_main_tanks[k]
+--~ 		this.spawn 			= Util_GetOffsetPosition(mkr_hunt_hq3, this.hq_offset, 15)
+--~ 		this.spawn 			= tmkr_dhq_main_tank_sp[k]
+--~ 		this.offset_dist 	= 20
+		this.hull_down		= true
+		this.mkr_retreat 	= mkr_sp_convoy
+	end
+	
+	-- the starting artillery guns
+	for i=1, table.getn(teg_dhq_main_arty) do 
+		t_dhq_main.t_static_def[i] = {}
+		local this 			= t_dhq_main.t_static_def[i]
+		this.egroup		 	= teg_dhq_main_arty[i]
+		this.spawn		 	= tmkr_dhq_main_arty[i]
+		this.sgroup			= tsg_dhq_main_arty[i]
+		this.ebp 			= EBP.CW.HOWITZER_NEST
+		this.eg_threat 		= eg_dhq_main_arty_threat
+		this.threat_id 		= false
+	end
+	
+	t_dhq_main.states = {
+		{	-- PURPOSE: the default behavior for the HQ, which is to sit idle and not do much-- but still needed
+			state		= "default",										-- the name of the state
+			ExecState 	= function() DHQ_MainDefault_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_MainDefault_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_MainDefault_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_MainDefault_Exit() end,			-- this function transitions out of this state
+			priority 	= 1													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: forces the squads that are left over to retreat from battle
+			state		= "retreat",									-- the name of the state
+			ExecState 	= function() DHQ_MainRetreat_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_MainRetreat_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_MainRetreat_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_MainRetreat_Exit() end,			-- this function transitions out of this state
+			priority 	= 10													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: the respawn behavior ensures that the HQ still has protection after the player takes it out.
+			state		= "respawn",									-- the name of the state
+			ExecState 	= function() DHQ_MainRespawn_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_MainRespawn_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_MainRespawn_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_MainRespawn_Exit() end,			-- this function transitions out of this state
+			priority 	= 7													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: the default behavior for the HQ, which is to sit idle and not do much-- but still needed
+			state		= "relocate",										-- the name of the state
+			ExecState 	= function() DHQ_MainRelocate_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_MainRelocate_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_MainRelocate_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_MainRelocate_Exit() end,			-- this function transitions out of this state
+			priority 	= 9													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: the default behavior for the HQ, which is to sit idle and not do much-- but still needed
+			state		= "defend",										-- the name of the state
+			ExecState 	= function() DHQ_MainDefend_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_MainDefend_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_MainDefend_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_MainDefend_Exit() end,			-- this function transitions out of this state
+			priority 	= 5													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+--~ 		{	-- PURPOSE: the default behavior for the HQ, which is to sit idle and not do much-- but still needed
+--~ 			state		= "repair",										-- the name of the state
+--~ 			ExecState 	= function() DHQ_MainRepair_Execute() end,		-- the function to execute the state
+--~ 			CheckState 	= function() return DHQ_MainRepair_Check() end,	-- the function that checks if the current state is valid
+--~ 			EnterState	= function() DHQ_MainRepair_Enter() end,			-- this function transitions into this state
+--~ 			ExitState	= function() DHQ_MainRepair_Exit() end,			-- this function transitions out of this state
+--~ 			priority 	= 3													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+--~ 		},
+		{	-- PURPOSE: the default behavior for the HQ, which is to sit idle and not do much-- but still needed
+			state		= "build",										-- the name of the state
+			ExecState 	= function() DHQ_MainBuild_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_MainBuild_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_MainBuild_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_MainBuild_Exit() end,			-- this function transitions out of this state
+			priority 	= 2													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: 
+			state		= "setup",										-- the name of the state
+			ExecState 	= function() DHQ_MainSetup_Execute() end,		-- the function to execute the state
+			CheckState 	= function() return DHQ_MainSetup_Check() end,	-- the function that checks if the current state is valid
+			EnterState	= function() DHQ_MainSetup_Enter() end,			-- this function transitions into this state
+			ExitState	= function() DHQ_MainSetup_Exit() end,			-- this function transitions out of this state
+			priority 	= 8													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+	}
+
+end
+
+function DHQ_MainKickoff()
+
+	t_dhq_main.state_machine_id = StateMachine_AddTable(t_dhq_main.states)
+
+end
+
+function DHQ_MainSpawn()
+	
+	for k, this in pairs(t_dhq_main.t_static_def) do
+	
+		EGroup_Clear(eg_temp)
+		Player_GetAllEntitiesNearMarker(player1, eg_temp, this.spawn, 10)
+		if not EGroup_IsEmpty(eg_temp) then
+			EGroup_DestroyAllEntities(eg_temp)
+		end
+	
+		Util_CreateEntities(player2, this.egroup, this.ebp, this.spawn, 1)
+		EGroup_AddEGroup(this.eg_threat, this.egroup)
+		EGroup_GetSquadsHeld(this.egroup, this.sgroup)
+	end
+	
+	for k, this in pairs(t_dhq_main.t_tanks) do
+		Util_CreateSquads(player2, this.sgroup, this.sbp, this.respawn, this.initial)
+	end
+	
+end
+
+function DHQ_MainTank_Movement()
+
+	if SGroup_IsEmpty(t_dhq_main.sg_hq) then
+		return
+	end
+	
+	-- piggy backing the tank movement with the 
+	-- mobile defense movement
+	DHQ_MainMobileDefMovement()
+	
+	if TankCombat_GroupExists(t_dhq_main.tc_id) == false then
+		t_dhq_main.tc_id = false
+	end
+	
+	-- remove the hull down on the tanks if any of the squads are being attacked
+	-- and check if there is an attacker that the tanks can focus on 
+	if not SGroup_IsEmpty(t_dhq_main.sg_attacker) then
+		-- if the tanks are hull down, then let them move.
+		for k, this in pairs(t_dhq_main.t_tanks) do
+			if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) == true then
+			
+		--~ 			if this.hull_down == false then
+				Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+--~ 				this.hull_down = true
+			end
+		end
+		
+		if t_dhq_main.tc_id == false then
+					
+			t_dhq_main.tank_pos = Util_GetPosition(t_dhq_main.sg_attacker)
+			t_dhq_main.tc_id = TankCombat_AddGroup(tsg_dhq_main_tanks, t_dhq_main.tank_pos)
+			TankCombat_EnableFormUp(t_dhq_main.tc_id, false)
+			TankCombat_EnableRetreat(t_dhq_main.tc_id, false)
+			TankCombat_AddThreatArrows(t_dhq_main.tc_id, t_cw_tank_threats)
+		end
+		
+	elseif SGroup_IsEmpty(t_dhq_main.sg_attacker) then
+		if t_dhq_main.tc_id ~= false then
+			TankCombat_RemoveGroup(t_dhq_main.tc_id)
+			t_dhq_main.tc_id = false
+		end
+	end
+	
+	if t_dhq_main.tc_id == false then
+		DHQ_MovementTanks(t_dhq_main, t_dhq_main.t_tanks)
+	end
+	
+end
+
+function DHQ_MainMobileDefMovement()
+
+	for k, this in pairs(t_dhq_main.t_mobile_def) do
+		if SGroup_IsEmpty(this.sgroup) == false then
+			
+			-- do something special if the HQ is relocating, but that may be a different function...
+			if SGroup_IsEmpty(t_dhq_main.sg_hq) == false
+			and Prox_AreSquadsNearMarker(this.sgroup, Util_GetPosition(t_dhq_main.sg_hq), ANY, 30) == false
+			and t_dhq_main.fg_relocating == true then
+				if not SGroup_IsInHoldEntity(this.sgroup, ANY)
+				and not SGroup_IsMoving(this.sgroup, ANY) then
+--~ 					Cmd_Move(this.sgroup, t_dhq_main.relocate.tmkr_tank, nil, nil, nil, this.hq_offset, this.offset_dist)
+					Cmd_Move(this.sgroup, t_dhq_main.sg_hq, nil, nil, nil, this.hq_offset, this.offset_dist)
+				else
+					Cmd_UngarrisonSquad(this.sgroup)
+				end
+				
+			elseif SGroup_IsInHoldEntity(this.sgroup, ANY) then
+				EGroup_Clear(eg_temp)
+				SGroup_GetHoldEGroup(this.sgroup, eg_temp)
+			
+				-- compare the build that the squads are occupying to the one from which they spawn
+				-- and if they are in the spawn building, we need to clear them out.
+				if t_dhq_main.relocate ~= false then
+					EGroup_RemoveGroup(eg_temp, t_dhq_main.relocate.eg_spawn)
+				end
+				
+				if EGroup_IsEmpty(eg_temp) then
+					Cmd_UngarrisonSquad(this.sgroup)
+				end				
+				
+			elseif SGroup_IsInHoldEntity(this.sgroup, ANY) == false then
+				local ignore = {eg_hunt_town_hq, eg_hunt_town_tech}
+				if t_dhq_main.relocate ~= false then
+					table.insert(ignore, t_dhq_main.relocate.eg_spawn)
+				end
+				Util_GarrisonNearbyBuilding(this.sgroup, SGroup_GetPosition(t_dhq_main.sg_hq), 60, false, ignore)
+			end
+			
+		end
+	end
+
+end
+
+
+----------------------------------------
+-- **** MAIN DEFAULT STATE 
+----------------------------------------
+function DHQ_MainDefault_Execute()
+
+	DHQ_MainTank_Movement()
+--~ 		for k, this in pairs(t_dhq_main.t_tanks) do
+--~ 			if SGroup_IsDoingAbility(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, ANY) == false then
+			
+		--~ 			if this.hull_down == false then
+--~ 				Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN)
+--~ 				this.hull_down = true
+--~ 			end
+--~ 		end
+
+end
+
+function DHQ_MainDefault_Enter()
+
+	
+	
+end
+
+function DHQ_MainDefault_Exit()
+
+	
+
+end
+
+function DHQ_MainDefault_Check()
+
+	return DHQ_DefaultCheck(t_dhq_main)
+
+end
+
+----------------------------------------
+-- **** MAIN DEFEND STATE 
+----------------------------------------
+function DHQ_MainDefend_Execute()
+
+	DHQ_MainTank_Movement()
+
+end
+
+function DHQ_MainDefend_Enter()
+
+end
+
+function DHQ_MainDefend_Exit()
+
+end
+
+function DHQ_MainDefend_Check()
+
+	-- check to see if someone is attacking the HQ
+	if SGroup_IsEmpty(t_dhq_main.sg_hq) then
+		return false
+	end
+	
+	-- check to see if anyone from the group is under attack
+	for k, this in pairs(t_dhq_main.t_tanks) do 
+		if SGroup_IsEmpty(this.sgroup) == false
+		and SGroup_IsUnderAttack(this.sgroup, ANY, 15) then
+			
+			if  SGroup_IsEmpty(t_dhq_main.sg_attacker) then
+				-- set the last attacker
+				SGroup_GetLastAttacker(this.sgroup, t_dhq_main.sg_attacker)
+				SGroup_FilterPlayer(t_dhq_main.sg_attacker, player2)
+			end
+			return true
+			
+		end
+	end
+	
+	for k, this in pairs(t_dhq_main.t_static_def) do 
+		
+		if EGroup_IsEmpty(this.egroup) == false
+		and EGroup_IsUnderAttack(this.egroup, ANY, 10)
+		and Player_OwnsEGroup(player2, this.egroup) then
+			
+			if SGroup_IsEmpty(t_dhq_main.sg_attacker) then
+				EGroup_GetLastAttacker(this.egroup, t_dhq_main.sg_attacker)
+				SGroup_FilterPlayer(t_dhq_main.sg_attacker, player2)				
+			end
+			return true
+		end
+	end
+	
+	-- check if the HQ is under attack
+	if SGroup_IsUnderAttack(t_dhq_main.sg_hq, true, 10) then
+		
+		if SGroup_IsEmpty(t_dhq_main.sg_attacker) then
+			SGroup_GetLastAttacker(t_dhq_main.sg_hq, t_dhq_main.sg_attacker)
+			SGroup_GetLastAttacker(t_dhq_main.sg_hq, t_dhq_main.sg_reloc_attacker)
+			SGroup_FilterPlayer(t_dhq_main.sg_attacker, player2)
+		end
+		return true
+		
+	end
+	
+	SGroup_Clear(t_dhq_main.sg_attacker)	
+	return false
+	
+end
+
+function SGroup_FilterPlayer(sgroup, player)
+
+	local CheckSquad = function(gid, idx, sid)
+		
+		if Player_OwnsSquad(player, sid) then
+			SGroup_Remove(gid, sid)
+		end
+		
+	end
+	
+	SGroup_ForEach(sgroup, CheckSquad)
+
+end
+
+----------------------------------------
+-- **** MAIN RELOCATE STATE 
+----------------------------------------
+function DHQ_MainRelocate_Execute()
+
+	DHQ_MainTank_Movement()
+	DHQ_RelocateHQ(t_dhq_main)
+	
+	-- *** TODO add movement plans for the mobile defense
+
+end
+
+function DHQ_MainRelocate_Enter()
+
+	DHQ_RelocateEnter(t_dhq_main)
+	
+end
+
+function DHQ_MainRelocate_Exit()
+
+	DHQ_RelocateExit(t_dhq_main)
+--~ 	t_dhq_main.fg_relocating = false
+--~ 	if not SGroup_IsEmpty(t_dhq_main.sg_hq) then
+--~ 		Util_SetCommonwealthHQMobility(t_dhq_main.sg_hq, false, false)
+--~ 		t_dhq_main.reloc_attempts = t_dhq_main.reloc_attempts + 1
+--~ 	end
+
+end
+
+function DHQ_MainRelocate_Check()
+
+	return DHQ_CheckRelocate(t_dhq_main)
+
+end
+
+
+
+
+
+----------------------------------------
+-- **** MAIN REPAIR STATE 
+----------------------------------------
+function DHQ_MainRepair_Execute()
+
+	DHQ_MainTank_Movement()
+
+end
+
+function DHQ_MainRepair_Enter()
+
+	t_dhq_main.fg_repair = true
+	
+	-- add them to the repair state, only when they are being repaired
+	DHQ_AddHQToRepair(t_dhq_main.sg_hq, t_dhq_main.relocate)
+	
+end
+
+function DHQ_MainRepair_Exit()
+
+	t_dhq_main.fg_repair = true
+
+end
+
+function DHQ_MainRepair_Check()
+
+	return DHQ_RepairCheck(t_dhq_main)
+
+end
+
+
+----------------------------------------
+-- **** MAIN BUILD STATE 
+----------------------------------------
+function DHQ_MainBuild_Execute()
+
+	DHQ_MainTank_Movement()
+	DHQ_BuildEmplacements(t_dhq_main)
+	
+end
+
+function DHQ_MainBuild_Enter()
+
+	t_dhq_main.fg_build = true
+	
+end
+
+function DHQ_MainBuild_Exit()
+
+	t_dhq_main.fg_build = false
+	
+	for k, this in pairs(t_dhq_main.relocate.t_def_locations) do
+		
+		EGroup_Clear(eg_temp)
+		Player_GetAllEntitiesNearMarker(player2, eg_temp, this.mkr, 5)
+		EGroup_Filter(eg_temp, EBP.CW.HOWITZER_NEST, FILTER_KEEP)
+		
+		if not EGroup_IsEmpty(eg_temp) 
+		and k <= table.getn(t_dhq_main.t_static_def) then
+			local eg_arty = t_dhq_main.t_static_def[k].egroup
+			EGroup_Clear(eg_arty)
+			EGroup_AddEGroup(eg_arty, eg_temp)
+		end
+		
+	end
+
+end
+
+function DHQ_MainBuild_Check()
+
+	local all_built = true
+	local sgroup = sg_dhq_main_build
+	if t_dhq_main.relocate == false then
+		return false
+	end
+	
+	if EGroup_IsEmpty(t_dhq_main.relocate.eg_spawn) then
+		return false
+	end
+	
+	for k, this in pairs(t_dhq_main.relocate.t_def_locations) do 
+		
+		if this.fg_built == false then
+			return true
+		end
+		
+	end
+	
+	if all_built == true
+	and SGroup_IsEmpty(sgroup) == false then
+		return true
+	end
+	
+	return false
+
+end
+
+----------------------------------------
+-- **** MAIN HQ RESPAWN STATE **** -----
+----------------------------------------
+
+function DHQ_MainRespawn_Execute()
+
+	for k, this in pairs(t_dhq_main.t_mobile_def) do 
+		
+		if SGroup_IsEmpty(this.sgroup) then
+			local spawn = Util_GetPosition(t_dhq_main.sg_hq)
+			local dest = Util_GetOffsetPosition( t_dhq_main.sg_hq, this.hq_offset, this.offset_dist)
+			local v_respawn_inf_timer = Timer_GetRemaining("tmr_mainhq_inf_respawn")
+			
+			if Timer_Exists("tmr_mainhq_inf_respawn") == false then
+				Timer_Start("tmr_mainhq_inf_respawn", t_dhq_main.timer_respawn_amt)
+			end
+			
+			if v_respawn_inf_timer == 0 then
+				Util_CreateSquads(player2, this.sgroup, this.sbp, spawn, dest, nil, nil, nil, nil, this.upg)
+				Timer_End("tmr_mainhq_inf_respawn")
+			end
+			return
+			
+		end
+		
+	end
+	
+	-- slightly different than the mobile squads, but spawn all the tanks at once, from their specified spawn
+	-- location (as if the HQ is being reinforced from the North.
+	for k, this in pairs(t_dhq_main.t_tanks) do 
+		
+		if SGroup_IsEmpty(this.sgroup) then	
+			local v_respawn_armor_timer = Timer_GetRemaining("tmr_mainhq_tank_respawn")
+			
+			if Timer_Exists("tmr_mainhq_tank_respawn") == false then
+				Timer_Start("tmr_mainhq_tank_respawn", t_dhq_main.timer_respawn_amt)
+			end
+			
+			if v_respawn_armor_timer == 0 then
+				if t_dhq_main.reloc_attempts == 0 then
+					Util_CreateSquads(player2, this.sgroup, this.sbp, this.spawn, this.initial)
+--~ 					DHQ_MainTank_Movement()
+				elseif t_dhq_main.reloc_attempts >= 1 then
+					Util_CreateSquads(player2, this.sgroup, this.sbp, this.spawn)
+--~ 					DHQ_MainTank_Movement()
+				end
+					
+				Timer_End("tmr_mainhq_tank_respawn")
+			end
+		end
+		
+	end
+
+end
+
+function DHQ_MainRespawn_Enter()
+
+	-- do nothing
+
+end
+
+function DHQ_MainRespawn_Exit()
+	
+	-- do nothing
+	
+end
+
+function DHQ_MainRespawn_Check()
+
+	return DHQ_CheckRespawn(t_dhq_main)
+	
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-----------------------------------------
+-- **** MAIN HQ RETREAT STATE **** --
+-----------------------------------------
+function DHQ_MainRetreat_Execute()
+
+	if t_dhq_main.tc_id ~= false then
+		TankCombat_RemoveGroup(t_dhq_main.tc_id)
+		t_dhq_main.tc_id = false
+	end
+	DHQ_Retreat(t_dhq_main.t_mobile_def)
+	DHQ_Retreat(t_dhq_main.t_tanks)
+
+end
+
+function DHQ_MainRetreat_Enter()
+
+end
+
+function DHQ_MainRetreat_Exit()
+
+end
+
+function DHQ_MainRetreat_Check()
+
+	return DHQ_CheckRetreat(t_dhq_main)
+
+end
+
+-----------------------------------------
+-- **** MAIN HQ SETUP STATE **** --
+-----------------------------------------
+function DHQ_MainSetup_Execute()
+
+	Cmd_Ability(t_dhq_main.sg_hq, ABILITY.CW.HQ_SETUP)
+
+end
+
+function DHQ_MainSetup_Enter()
+
+	
+	
+end
+
+function DHQ_MainSetup_Exit()
+
+	
+
+end
+
+function DHQ_MainSetup_Check()
+
+	local mobile = Util_GetCommonwealthHQMobility(t_dhq_main.sg_hq)
+	
+	if mobile == true then
+		
+		return true
+		
+	end
+	
+	
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+
+-- CONVOY ENCOUNTER
+
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Encounter data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function Convoy_Init()
+
+	-- define sgroups, egroups, etc associated with this Encounter
+	t_convoy = {
+		vehicle_idx 						= 1,
+		vehicle_timer						= "CONVOY VEHICLE TIMER",
+		vehicle_timer_min 					= 30,
+		vehicle_timer_max					= 40,
+		sg_attacker							= SGroup_CreateIfNotFound("sg_convoy_attacker"),
+		fg_protection						= false,
+		timer_sp_prot						= "CONVOY ARMOR SPAWN",
+		timer_sp_prot_amt					= 3*60,
+	}
+	
+	t_convoy.sbps = {
+		{
+			sbp = SBP.ALLIES.TRUCK,
+			upg = {},
+		},
+		{
+			sbp = SBP.ALLIES.HALFTRACK,
+			upg = {},
+		},
+		{
+			sbp = SBP.CW.STUART,
+			upg = {},
+		},
+		{
+			sbp = SBP.ALLIES.TRUCK,
+			upg = {},
+		},
+		{
+			sbp = SBP.ALLIES.HALFTRACK,
+			upg = {UPG.ALLIES.HALFTRACK_QUAD},
+		},
+		{
+			sbp = SBP.ALLIES.TRUCK,
+			upg = {},
+		},
+		{
+			sbp = SBP.ALLIES.JEEP,
+			upg = {},
+		},
+		{
+			sbp = SBP.ALLIES.SHERMAN,
+			upg = {},
+		},	
+	}
+	
+	tsg_convoy_trucks = SGroup_CreateTable("sg_convoy_truck%d", 7)
+	t_convoy.t_vehicles = {}
+	
+	for i=1, table.getn(tsg_convoy_trucks) do 
+		t_convoy.t_vehicles[i] = {
+			sgroup = tsg_convoy_trucks[i],
+			spawn = mkr_sp_convoy,
+			truck = false,
+		}
+	end
+	
+	-- squads to provide protection for the convoy trucks
+	t_convoy.t_protection = {}	
+	t_convoy.t_protection[1] = {
+		
+		squads = {	
+			{
+				sbp = SBP.CW.FIREFLY,
+				upg = {},
+			},
+			{
+				sbp = SBP.CW.CROMWELL,
+				upg = {},
+			},
+			{
+				sbp = SBP.ALLIES.SHERMAN,
+				upg = {},
+			},
+		},
+		eg_territory_sp		= eg_rp24, -- a point that needs to be captured to determine if the tanks respawn or not
+	}
+	
+	t_convoy.t_protection[2] = {
+		
+		squads = {
+			{
+				sbp = SBP.CW.FIREFLY,
+				upg = {},
+			},
+			{
+				sbp = SBP.CW.CHURCHILL,
+				upg = {},
+			},
+			{
+				sbp = SBP.CW.CHURCHILL_CROC,
+				upg = {},
+			},
+		},
+		eg_territory_sp		= eg_rp3,	-- a point that needs to be captured to determine if the tanks respawn or not
+	}
+	
+	for k, this in pairs(t_convoy.t_protection) do
+		
+		this.tsgroup 		= SGroup_CreateTable("tsg_convoy_prot"..k.."_%d", table.getn(this.squads))
+		this.tmkr			= Marker_GetTable("mkr_hunt_convoy_prot"..k.."_sp%d")
+		this.tc_id 			= false
+		this.pos_idle		= Util_GetPosition(this.tmkr[1])
+		
+		for j, v in pairs(this.squads) do
+			v.sgroup = this.tsgroup[j]
+			v.spawn = this.tmkr[j]
+		end
+		
+	end
+	
+	if EGroup_IsEmpty(eg_hunt_rt_base1) == false then
+		t_convoy.t_protection[1].pos_retreat = EGroup_GetPosition(eg_hunt_rt_base1)
+	else
+		t_convoy.t_protection[1].pos_retreat = nil
+	end
+	
+	if EGroup_IsEmpty(eg_hunt_rt_base2) == false then
+		t_convoy.t_protection[2].pos_retreat = EGroup_GetPosition(eg_hunt_rt_base2)
+	else
+		t_convoy.t_protection[2].pos_retreat = nil
+	end
+	
+	
+	-- setup some variables for the medal op
+	v_spawnedtruck = 0
+	v_destroyedtruck = 0
+
+end
+
+-- preset any units or events needed before the kickoff
+function Convoy_Preset()
+
+	-- spawn squads
+	
+	-- start enemy behavior
+	
+	-- do other cool things
+
+end
+
+-- start the related action
+function Convoy_Kickoff()
+
+	-- action that starts when this encounter is triggered
+	Rule_AddInterval(Convoy_Manager, 10)
+	
+end
+
+
+function Convoy_Manager()
+
+	Convoy_SpawnVehicles()
+	Convoy_Protection()
+	Convoy_Despawn()
+
+end
+
+function Convoy_Despawn()
+
+	for k, this in pairs(t_convoy.t_vehicles) do 
+		if SGroup_IsEmpty(this.sgroup) == false then
+			if Prox_AreSquadsNearMarker(this.sgroup, mkr_convoy_end, ANY, 15) then
+				if SGroup_ContainsBlueprints(this.sgroup, SBP.ALLIES.TRUCK, ANY) == true then
+					if Rule_Exists(Convoy_On_Death) == true then
+						Rule_RemoveSGroupEvent(Convoy_On_Death, this.sgroup)
+					end
+				end
+				SGroup_DestroyAllSquads(this.sgroup)
+				SGroup_Clear(this.sgroup)
+			end
+		end
+	end
+
+end
+
+-- this determine when to spawn the next set of vehicles that travel
+-- along the road in the convoy
+function Convoy_SpawnVehicles()
+	
+	-- ** TODO add code to deal with the player camping the spawn point
+	-- of the vehicles.
+
+	local rand = World_GetRand(1, table.getn(t_convoy.sbps))
+	local sbp = t_convoy.sbps[rand].sbp
+	local upg = t_convoy.sbps[rand].upg
+	this = t_convoy.t_vehicles[t_convoy.vehicle_idx]
+	
+	-- checks to see if the current vehicle.
+	if SGroup_IsEmpty(this.sgroup) == false then
+		
+		if t_convoy.vehicle_idx < table.getn(t_convoy.t_vehicles) then
+			t_convoy.vehicle_idx = t_convoy.vehicle_idx + 1
+		elseif t_convoy.vehicle_idx == table.getn(t_convoy.t_vehicles) then
+			t_convoy.vehicle_idx = 1
+		end
+	
+	elseif Timer_Exists(t_convoy.vehicle_timer) == false or Timer_GetRemaining(t_convoy.vehicle_timer) == 0 then
+		
+		--spawn the next set of vehicles
+		
+		Util_CreateSquads(player2, this.sgroup, sbp, this.spawn, nil, nil, nil, nil, nil, upg)
+		if Objective_IsStarted(OBJ_Medal) == true then
+			if sbp == SBP.ALLIES.TRUCK then
+				Rule_AddSGroupEvent(Convoy_On_Death, this.sgroup, GE_SquadKilled)
+				this.truck = true
+			end
+		elseif Objective_IsStarted(OBJ_Medal) == false then
+			if sbp == SBP.ALLIES.TRUCK then
+				this.truck = true
+				print("TRUCK SPAWNED")
+			end
+		end
+		
+		if sbp == SBP.ALLIES.TRUCK then
+			this.mod_speed_id = Modify_UnitSpeed(this.sgroup, 0.5)
+		elseif sbp == SBP.ALLIES.HALFTRACK then
+			this.mod_speed_id = Modify_UnitSpeed(this.sgroup, 0.64)
+		elseif sbp == SBP.CW.STUART then
+			this.mod_speed_id = Modify_UnitSpeed(this.sgroup, 0.69)
+		elseif sbp == SBP.ALLIES.JEEP then
+			this.mod_speed_id = Modify_UnitSpeed(this.sgroup, 0.8)
+		elseif sbp == SBP.ALLIES.SHERMAN then
+			this.mod_speed_id = Modify_UnitSpeed(this.sgroup, 0.86)
+		end
+
+		if sbp == SBP.ALLIES.TRUCK or sbp == SBP.ALLIES.HALFTRACK or sbp == SBP.ALLIES.JEEP then
+			Cmd_SquadPath(this.sgroup, "path_hunt_convoy", true, LOOP_NONE, false, 0)
+		elseif sbp == SBP.ALLIES.SHERMAN or sbp == SBP.CW.STUART then
+			Cmd_SquadPath(this.sgroup, "path_hunt_convoy", true, LOOP_NONE, true, 0)
+		end
+		
+		amount = World_GetRand(t_convoy.vehicle_timer_min, t_convoy.vehicle_timer_max)
+		Timer_Start(t_convoy.vehicle_timer, amount)
+		
+		if t_convoy.vehicle_idx < table.getn(t_convoy.t_vehicles) then
+			t_convoy.vehicle_idx = t_convoy.vehicle_idx + 1
+		end
+		
+	end
+
+end
+
+function Convoy_Protection()
+	
+	Convoy_ProtectionRespawn()
+
+	if Convoy_IsUnderAttack() then
+		
+		for k, this in pairs(t_convoy.t_protection) do 
+			if this.tc_id == false 
+			or TankCombat_GroupExists(this.tc_id) == false 
+			or this.fg_idle == true then
+				-- to prevent the crash from getting the position of an empty group
+				local type = scartype(t_convoy.sg_attacker)
+				if type == ST_SGROUP and SGroup_CountSpawned(t_convoy.sg_attacker) >= 1 then
+					TankCombat_RemoveGroup(this.tc_id)
+					this.tc_id = TankCombat_AddGroup(this.tsgroup, Util_GetPosition(t_convoy.sg_attacker), this.pos_retreat)
+					TankCombat_EnableFormUp(this.tc_id, false)
+					TankCombat_AddThreatArrows(this.tc_id, t_cw_tank_threats)
+					this.fg_idle = false
+				end
+			end
+		end
+		
+	else
+		for k, this in pairs(t_convoy.t_protection) do 
+		
+			if this.tc_id == false 
+			or TankCombat_GroupExists(this.tc_id) == false then
+				this.tc_id = TankCombat_AddGroup(this.tsgroup, this.pos_idle, this.pos_retreat)
+				TankCombat_AddThreatArrows(this.tc_id, t_cw_tank_threats)
+				TankCombat_EnableFormUp(this.tc_id, false)
+				this.fg_idle = true
+			end
+		end
+	end
+
+end
+
+
+function Convoy_ProtectionRespawn()
+
+	if Timer_Exists(t_convoy.timer_sp_prot) 
+	and Timer_GetRemaining(t_convoy.timer_sp_prot) > 0 then
+		return
+	end
+	
+	for i=1, table.getn(t_convoy.t_protection) do 
+		
+		-- check whether or not the player owns the territory, so that we don't bother spawning
+		-- if they control the road sections
+		if Player_OwnsEGroup(player1, t_convoy.t_protection[i].eg_territory_sp, ANY) == false then
+			
+			for k, this in pairs(t_convoy.t_protection[i].squads) do 
+				if SGroup_IsEmpty(this.sgroup) then
+					
+					-- check if any of the player's squads are nearby before spawning squads
+					SGroup_Clear(sg_temp)
+					Player_GetAllSquadsNearMarker(player1, sg_temp, this.spawn, 30)
+					
+					if SGroup_IsEmpty(sg_temp) then
+						Util_CreateSquads(player2, this.sgroup, this.sbp, this.spawn)
+						Timer_Start(t_convoy.timer_sp_prot, t_convoy.timer_sp_prot_amt)
+					end
+				end
+			end
+		end
+	end
+
+end
+
+function Convoy_IsUnderAttack()
+	
+	for k, this in pairs(t_convoy.t_vehicles) do 
+		if SGroup_IsEmpty(this.sgroup) == false then
+			if SGroup_IsUnderAttack(this.sgroup, ANY, 10) then
+				
+				SGroup_GetLastAttacker(this.sgroup, t_convoy.sg_attacker)
+				return true
+				
+			end
+		end
+	end
+	
+	return false
+
+end
+
+
+function Convoy_On_Death()
+	
+	v_destroyedtruck = v_destroyedtruck + 1
+	if Objective_IsStarted(OBJ_Medal) == true then
+		Objective_SetCounter(OBJ_Medal, v_destroyedtruck, 10)
+	end
+	
+	if v_destroyedtruck == 1 then
+		Util_AutoIntel(t_medal_op.first)
+	end
+
+end
+
+function Convoy_LastRush()
+
+	local attack = Player_GetSquadConcentration(player1)
+	
+	for i=1, table.getn(t_convoy.t_protection) do 
+		for k, this in pairs(t_convoy.t_protection[i].squads) do 
+			if SGroup_IsEmpty(this.sgroup) == false then
+				Cmd_AttackMove(this.sgroup, attack)
+			end
+		end
+	end
+
+end
+
+
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+-- OPENING ENCOUNTER
+-- to make the player feel empowered and to give him some basic units to fight at the
+-- beginning of the map
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+
+function SouthFarmyard_Init()
+
+	teg_hunt_sf = EGroup_GetWBTable("eg_hunt_sf%d")
+	sg_hunt_sf_all = SGroup_CreateIfNotFound("sg_hunt_sf_all")
+	tmkr_hunt_sf = Marker_GetTable("mkr_hunt_sf%d")
+
+	tmkr_sf1_tankspawn = Marker_GetTable("mkr_hunt_sf1_tankspawn%d")
+	
+	t_enc_sf = {
+		fg_retreat 					= false,
+		sg_leader					= false,
+		tc_id						= false,
+		timer_tank_sp				= "SF TANK SPAWN",
+		timer_tank_sp_amt			= 3*60,
+		fg_remove_tanks				= true,
+	}
+	
+	-- note that if the retreat position is nil 
+	-- for the tank manager, then the tanks just don't retreat.
+	if EGroup_IsEmpty(eg_hunt_rt_base3) == false then
+		t_enc_sf.pos_tc_retreat = EGroup_GetPosition(eg_hunt_rt_base3)
+	end
+	
+	t_enc_sf.tank_squads = {
+		{
+			sbp = SBP.CW.STUART,
+			upg = {},
+			patrol = true,
+		},
+		{
+			sbp = SBP.CW.STUART,
+			upg = {},
+			patrol = true,
+		},
+		{
+			sbp = SBP.CW.BREN_CARRIER,
+			upg = {},
+			patrol = true,
+		},		
+	}
+	
+	tsg_hunt_sf_tanks = SGroup_CreateTable("sg_hunt_sf_tanks%d", table.getn(t_enc_sf.tank_squads))
+	
+	for k, this in pairs(t_enc_sf.tank_squads) do 
+		this.sgroup = tsg_hunt_sf_tanks[k]
+		this.spawn = tmkr_sf1_tankspawn[k]
+	end
+	
+	t_enc_sf.squads = {
+		{
+			sbp = SBP.CW.BREN_CARRIER,
+			upg = {},
+			spawn = mkr_hunt_sf_sp1,
+			alt = nil,
+		},
+		{
+			sbp = SBP.CW.LIEUTENANT,
+			upg = {},
+			spawn = teg_hunt_sf[1],
+			alt = mkr_hunt_sf1a_alt,
+		},
+		{
+			sbp = SBP.CW.SAPPER,
+			upg = {UPG.CW.PIAT},
+			spawn = teg_hunt_sf[2],
+			alt = mkr_hunt_sf2_alt,
+		},
+		{
+			sbp = SBP.CW.SAPPER,
+			upg = {UPG.CW.PIAT},
+			spawn = teg_hunt_sf[1],
+			alt = mkr_hunt_sf1b_alt,
+		},
+		{
+			sbp = SBP.CW.TOMMIES,
+			upg = {UPG.CW.RECON_TEAM},
+			spawn = teg_hunt_sf[3],
+			alt = mkr_hunt_sf3_alt,
+		},
+		{
+			sbp = SBP.CW.VICKERS_MG_SP,
+			upg = {},
+			spawn = mkr_hunt_sf_sp2,
+			alt = nil,
+		},
+		{
+			sbp = SBP.CW.TOMMIES,
+			upg = {UPG.CW.RIFLE_GRENADE},
+			spawn = tsg_hunt_sf_tanks[3],
+			alt = nil,
+		},
+		{
+			sbp = SBP.CW.VICKERS_MG_SP,
+			upg = {},
+			spawn = eg_intro_building,
+			critical = true,
+		},
+	}
+	
+	tsg_hunt_sf = SGroup_CreateTable("sg_hunt_sf%d", table.getn(t_enc_sf.squads))
+
+	for k, this in pairs(t_enc_sf.squads) do 
+		this.sgroup = tsg_hunt_sf[k]
+		if this.sbp == SBP.CW.BREN_CARRIER then
+			this.sg_ride = false
+		else
+			this.sg_ride = tsg_hunt_sf[1]
+		end
+	end
+	
+	-- tanks
+	t_enc_sf.sg_leader = tsg_hunt_sf[2]
+
+end
+
+function SouthFarmyard_Preset()
+
+	for k, this in pairs(t_enc_sf.tank_squads) do
+		if SGroup_IsEmpty(this.sgroup)
+		and (scartype(this.spawn) ~= ST_EGROUP or EGroup_IsEmpty(this.spawn) == false) then
+			Util_CreateSquads(player2, this.sgroup, this.sbp, this.spawn, nil, nil, nil, nil, nil, this.upg)
+			Timer_Start(t_enc_sf.timer_tank_sp, t_enc_sf.timer_tank_sp_amt)
+		end
+	end
+
+	for k, this in pairs(t_enc_sf.squads) do 
+		
+		local num = 1
+		if this.sbp == SBP.CW.BREN_CARRIER then
+			num = 2
+		end 
+		
+		if SGroup_IsEmpty(this.sgroup)
+		and (scartype(this.spawn) ~= ST_EGROUP or EGroup_IsEmpty(this.spawn) == false) then
+			
+			if (scartype(this.spawn) == ST_EGROUP
+			  and EGroup_IsEmpty(this.spawn) == false)
+			  or scartype(this.spawn) == ST_MARKER
+			  or scartype(this.spawn) == ST_SGROUP then
+				Util_CreateSquads(player2, this.sgroup, this.sbp, this.spawn, nil, num, nil, nil, nil, this.upg)
+			elseif scartype(this.spawn) == ST_EGROUP
+			  and EGroup_IsEmpty(this.spawn) == true then
+				if this.alt ~= nil then
+					Util_CreateSquads(player2, this.sgroup, this.sbp, this.alt, nil, num, nil, nil, nil, this.upg)
+				end
+			end
+			
+			if this.sbp ~= SBP.CW.BREN_CARRIER then
+				SGroup_AddGroup(sg_hunt_sf_all, this.sgroup)
+			end
+			
+			if this.sbp == SBP.CW.VICKERS_MG_SP then
+				Cmd_InstantSetupTeamWeapon(this.sgroup)
+			end
+		end
+		
+	end	
+
+	SouthFarmyard_Kickoff()
+
+end
+
+function SouthFarmyard_Kickoff()
+
+	Rule_AddInterval(SouthFarmyard_CheckStatus, 3)
+	Rule_AddInterval(SouthFarmyard_Mobilize, 5)
+
+end
+
+function SouthFarmyard_CheckStatus()
+
+	local members_left = SGroup_TotalMembersCount( sg_hunt_sf_all )	
+	local pos = Util_GetPosition(mkr_hunt_hq1)
+	
+	if not SGroup_IsEmpty(t_dhq_inf.sg_hq) then
+		pos = Util_GetPosition(t_dhq_inf.sg_hq)
+	end
+	
+	if members_left <= 10 
+	or SGroup_IsEmpty(t_enc_sf.sg_leader) then
+		t_enc_sf.fg_retreat = true
+	end
+	
+	local all_dead = true
+
+	for k, this in pairs(t_enc_sf.squads) do 
+		
+		if SGroup_IsEmpty(this.sgroup) == false then
+			
+			all_dead = false
+			
+			if t_enc_sf.fg_retreat == true
+			or (this.sbp ~= SBP.CW.LIEUTENANT and SGroup_TotalMembersCount(this.sgroup) == 1) then
+			
+				-- if any of the squads are near the point to be removed
+				if Prox_AreSquadsNearMarker(this.sgroup, pos, ANY, 10) 
+				and SGroup_IsUnderAttack(this.sgroup, ANY, 10) == false
+				and SGroup_IsOnScreen(player1, this.sgroup, ANY, 0.8) == false then
+					SGroup_DestroyAllSquads(this.sgroup)
+				end
+				
+				if this.sbp == SBP.CW.BREN_CARRIER then
+					
+					SGroup_Clear(sg_temp)
+					SGroup_GetSquadsHeld(this.sgroup, sg_temp)
+					
+					if SGroup_TotalMembersCount(sg_temp) >= (members_left - 4)
+					or SGroup_CountSpawned(sg_temp) >= 4
+					or SGroup_TotalMembersCount(sg_temp) >= 8 then
+						
+						Cmd_Move(this.sgroup, pos, false, pos)
+						t_enc_sf.fg_bren_full = true
+					end
+					
+				else
+					
+					if SGroup_IsMoving(this.sgroup, ANY) == false then
+						if SGroup_IsInHoldEntity(this.sgroup, ANY) then
+							Cmd_UngarrisonSquad(this.sgroup)
+						elseif SGroup_IsEmpty(this.sg_ride) == false 
+						and t_enc_sf.fg_bren_full ~= true then
+							Cmd_Garrison(this.sgroup, this.sg_ride)
+							Objective_Start(OBJ_DestroyHQs)
+						else
+							Cmd_Retreat(this.sgroup, pos, pos)
+						end
+					end
+				end
+			end
+			
+		end
+		
+	end
+		
+	
+	if all_dead then
+		Rule_RemoveMe()
+		t_enc_sf.fg_remove_tanks = true
+	end
+
+end
+
+function SouthFarmyard_Mobilize()
+
+	SouthFarmyard_Respawn()
+	
+	local dead_count = table.getn(t_enc_sf.tank_squads)
+	for k, this in pairs(t_enc_sf.tank_squads) do
+		if SGroup_IsEmpty(this.sgroup) then
+			dead_count = dead_count - 1
+		end
+	end
+	
+	-- if there is one tank or less, don't bother 
+	-- trying to send them to attack.
+	if dead_count == 0
+	and t_enc_sf.fg_remove_tanks == true then
+		Rule_RemoveMe()
+	elseif dead_count <= 1 then
+		return
+	end
+	
+	local rand = World_GetRand(1, table.getn(tmkr_hunt_sf))
+	local pos = Util_GetPosition(tmkr_hunt_sf[rand])
+--~ 	local pos = "pth_hunt_sf"
+	
+	for k, this in pairs(t_enc_sf.squads) do 
+			
+		if SGroup_IsEmpty(this.sgroup) == false
+		and SGroup_IsUnderAttack(this.sgroup, ANY, 10) then
+			SGroup_Clear(sg_temp)
+			SGroup_GetLastAttacker(this.sgroup, sg_temp)
+			
+			if SGroup_IsEmpty(sg_temp) == false then
+				pos = Util_GetPosition(sg_temp)
+				break
+			end
+		end
+	end
+	
+--~ 	for k, this in pairs(t_enc_sf.tank_squads) do
+--~ 		if this.patrol == true then
+--~ 			Cmd_SquadPath(this.sgroup, "pth_hunt_sf", true, true, true, nil)
+--~ 		end	
+--~ 	end
+
+	if t_enc_sf.tc_id == false
+	or TankCombat_GroupExists( t_enc_sf.tc_id  ) == false then
+		t_enc_sf.tc_id = TankCombat_AddGroup(tsg_hunt_sf_tanks, pos, t_enc_sf.pos_tc_retreat)
+		TankCombat_AddThreatArrows(t_enc_sf.tc_id, t_cw_tank_threats)
+		TankCombat_EnableFormUp(t_enc_sf.tc_id, false)
+	end
+	
+end
+
+function SouthFarmyard_Respawn()
+	
+	-- stop spawning the tanks!  Encounter is finished
+	if t_enc_sf.fg_remove_tanks == true then
+		return
+	end
+
+	if Timer_Exists(t_enc_sf.timer_tank_sp) 
+	and Timer_GetRemaining(t_enc_sf.timer_tank_sp) > 0 then
+		return
+	end
+
+	for k, this in pairs(t_enc_sf.tank_squads) do
+		if SGroup_IsEmpty(this.sgroup) then
+			Util_CreateSquads(player2, this.sgroup, this.sbp, this.spawn, nil, nil, nil, nil, nil, this.upg)
+			Timer_Start(t_enc_sf.timer_tank_sp, t_enc_sf.timer_tank_sp_amt)
+		end
+	end
+	
+
+end
+
+function Objective_Checker()
+
+	v_tmr_obj_left = Timer_GetRemaining("tmr_obj_start")
+
+	for k, this in pairs(t_enc_sf.squads) do
+		if this.critical ~= nil then
+			if SGroup_IsEmpty(this.sgroup) == true 
+			  or v_tmr_obj_left <= 0 
+			  or Prox_ArePlayersNearMarker(player1, mkr_hunt_plyr_tech4, ALL, 100) == false then
+				Objective_Start(OBJ_DestroyHQs)
+				Rule_RemoveMe()
+			end
+		end
+	end
+
+end
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+-- REPAIR TEAM (RT)
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+function RepairTeam_Init()
+
+	teg_hunt_rt_base = EGroup_GetWBTable("eg_hunt_rt_base%d")
+	tsg_base_inf = SGroup_CreateTable("sg_base_inf%d", table.getn(teg_hunt_rt_base))
+	sg_vehicles_to_repair = SGroup_CreateIfNotFound("sg_vehicles_to_repair")
+	tsg_repair_team = SGroup_CreateTable("sg_repair_team%d", table.getn(teg_hunt_rt_base))
+	
+	-- put squads into ambient buildings and upgrade the buildings, these are the repair, fallback stations
+	for i=table.getn(teg_hunt_rt_base), 1, -1 do 
+		
+		if EGroup_IsEmpty(teg_hunt_rt_base[i]) == false then
+			Util_CreateSquads(player2, tsg_base_inf[i], SBP.ALLIES.HEAVYMG, teg_hunt_rt_base[i], nil, nil, nil, nil, nil, UPG.CW.PIAT)
+			if Player_OwnsEGroup(player2, teg_hunt_rt_base[i]) then
+				Cmd_InstantUpgrade(teg_hunt_rt_base[i], UPG.ALLIES.CONVERT_AMBIENT_BUILDING)
+			end
+		else
+			table.remove(teg_hunt_rt_base, i)
+			table.remove(tsg_repair_team, i)
+			table.remove(tsg_base_inf, i)
+		end
+	end
+
+	-- order of the vehicles in this table determines the order
+	-- that the infantry will repair the vehicles
+	t_rt_vehicle_sbps = {		
+		SBP.ALLIES.M10,
+		SBP.ALLIES.SHERMAN,
+		SBP.ALLIES.PERSHING,
+		SBP.ALLIES.CROCODILE,
+		SBP.ALLIES.HALFTRACK,
+		SBP.CW.STUART,
+		SBP.CW.CROMWELL,
+		SBP.CW.FIREFLY,
+		SBP.CW.COMMAND_CROMWELL,
+		SBP.CW.CHURCHILL,
+		SBP.CW.CHURCHILL_AVRE,
+		SBP.CW.CHURCHILL_CROC,
+		SBP.CW.BREN_CARRIER,
+	}
+	
+	t_rt = {
+		repair_percent 			= 0.999,
+		repair_rate				= Modify_VehicleRepairRate(player2, 2, SBP.CW.SAPPER)
+	}
+	
+	t_repair_team = {}
+	for i=1, table.getn(tsg_repair_team) do 
+		t_repair_team[i] = {
+			sgroup				= tsg_repair_team[i],
+			eg_repair 			= teg_hunt_rt_base[i],
+			sg_target			= false,
+			fg_active			= false,
+			sbp 				= SBP.CW.SAPPER,
+			timer_sp			= "REPAIR TEAM RESPAWN"..i,
+		}
+	end
+	
+	Rule_AddInterval(RT_DetermineRepair, 4.5)
+	
+
+end
+
+
+-- this function determines if there are any vehicles near the bases to repair
+function RT_DetermineRepair()
+
+	for i=1, table.getn(teg_hunt_rt_base) do 
+		-- determine if there are any vehicles nearby that need repair
+		if RT_IsBaseValid(teg_hunt_rt_base[i]) then
+			
+			Player_GetAllSquadsNearMarker(player2, sg_vehicles_to_repair, EGroup_GetPosition(teg_hunt_rt_base[i]), 80)
+			SGroup_Filter(sg_vehicles_to_repair, t_rt_vehicle_sbps, FILTER_KEEP)
+			if SGroup_IsEmpty(sg_vehicles_to_repair) == false then
+			
+				-- this checks a squad to see if it falls below the threshold, and if so removes them
+				-- from the sgroup of vehicles to repair
+				local _FilterHealth = function(gid, idx, sid)
+					local currentHealth = 0
+					local maxHealth = 0
+					
+					currentHealth = Squad_GetHealth(sid)
+					maxHealth = Squad_GetHealthMax(sid)
+					if maxHealth > 0 and currentHealth/maxHealth > t_rt.repair_percent then
+						SGroup_Remove(gid, sid)
+					end
+					
+				end
+				
+				-- loop through the various available vehicles and determine which ones
+				-- fall under the threshold
+				SGroup_ForEach(sg_vehicles_to_repair, _FilterHealth)
+				
+				if SGroup_IsEmpty(sg_vehicles_to_repair) == false then
+					
+					t_repair_team[i].eg_repair = teg_hunt_rt_base[i]
+					RT_RepairTeamActive()
+					return
+				end
+			end
+		end
+		
+	end
+	
+	-- if the code makes it through without finding any vehicles to repair, then
+	-- make sure all the repair engineers are gone.
+	RT_RepairTeamInactive()
+	
+end
+
+-- this function spawns pioneers that are near the bases to move and repair nearby tanks
+function RT_RepairTeamActive()
+	
+	-- spawns, or orders the various 
+	local _RepairVehicles = function(gid, idx, sid)
+	
+		-- if there aren't any team members available for repair,
+		-- then don't process the rest of the squads
+		if t_repair_team[idx] == nil then
+			return
+		end
+		
+		local sgroup = t_repair_team[idx].sgroup
+		SGroup_Clear(sg_temp)
+		
+		if RT_IsBaseValid(t_repair_team[idx].eg_repair) == false then
+			
+			-- if the repair team is dead, spawn them.
+			if SGroup_IsEmpty(sgroup) then
+				if Timer_Exists(t_repair_team[idx].timer_sp) == false or Timer_GetRemaining(t_repair_team[idx].timer_sp) == 0 then
+				
+					if Player_OwnsEGroup(player2, t_repair_team[idx].eg_repair) == true then
+						Util_CreateSquads(player2, sgroup, t_repair_team[idx].sbp, t_repair_team[idx].eg_repair, EGroup_GetPosition(t_repair_team[idx].eg_repair), nil, 2)
+					end
+					
+					Timer_Start(t_repair_team[idx].timer_sp, 60)
+				end
+			elseif SGroup_IsInHoldEntity(sgroup, ANY) then
+				Cmd_UngarrisonSquad(sgroup, EGroup_GetPosition(t_repair_team[idx].eg_repair))
+			elseif SGroup_IsDoingAbility(sgroup, ABILITY.REPAIR, ANY) == false then
+				Cmd_Ability(sgroup, ABILITY.REPAIR, gid)		
+			end
+		end
+	
+	end
+	
+	SGroup_ForEach(sg_vehicles_to_repair, _RepairVehicles)
+
+end
+
+-- loops through the various team members and orders them
+-- back into a building to despawn
+function RT_RepairTeamInactive()
+
+	for i=1, table.getn(t_repair_team) do 
+		local sgroup = t_repair_team[i].sgroup
+	
+		if SGroup_IsEmpty(sgroup) == false then		
+			if SGroup_IsInHoldEntity(sgroup, ALL) then
+				SGroup_DestroyAllSquads(sgroup)
+			elseif RT_IsBaseValid(t_repair_team[i].eg_repair) == false then
+				-- make the location that they despawn at, better at choosing that location
+				Cmd_Garrison(sgroup, t_repair_team[i].eg_repair)
+			end
+		
+		end
+	end
+
+end
+
+function RT_IsBaseValid(eg_base)
+
+	if EGroup_IsEmpty(eg_base) then
+		return false
+	end
+
+	if Player_OwnsEGroup(player2, eg_base) == false then
+		return false
+	end
+
+	return true
+
+end
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- ******************************************************************* --
+-- Relocation Encounters
+-- ******************************************************************* --
+-------------------------------------------------------------------------
+-- these are specific sets of encounters that are customized for each location,
+-- and will provide the player with some extra interest/challenge depending on 
+-- which location the HQ ends up at.  These encounters work in conjuction with
+-- the HQ moving to them.
+
+function Relocation_Init()
+
+	t_dhq.t_relocate[1].RelocExec = function() Reloc_BridgeNorth() end
+
+end
+
+function Relocation_Kickoff()
+
+	Rule_AddInterval(Relocation_Check, 2)
+
+end
+
+function Relocation_Check()
+
+	for k, this in pairs(t_dhq.t_relocate) do
+		if this.fg_occupied == true
+		and this.RelocExec ~= nil then
+			this.RelocExec()
+		end
+	end
+
+end
+
+-- associated with the Northern Bridge
+function Reloc_BridgeNorth()
+	print("Reloc_BridgeNorth")
+	
+	EGroup_SetDemolitions(player2, eg_hunt_bridge_north)
+	
+	-- check if the bridge has already been destroyed.
+	if EGroup_IsEmpty(eg_hunt_bridge_north) then
+		return
+		Rule_RemoveMe()
+	end
+	
+	Player_GetAllSquadsNearMarker(player1, sg_temp, mkr_dhq_island_bridge, 9)
+	if SGroup_IsEmpty(sg_temp) == false then
+		
+		Rule_AddOneShot(Reloc_BridgeNorthDestroy, 2)
+		Rule_RemoveMe()
+	end
+
+end
+
+function Reloc_BridgeNorthDestroy()
+
+	local intel = {
+		{ACTOR.CXP2.Voss, 1472105},
+		{ACTOR.CXP2.Voss, 1472110},
+		{ACTOR.CXP2.Voss, 1472120},
+	}
+	
+	Cmd_DetonateDemolitions(player2, eg_hunt_bridge_north)
+	Util_AutoIntel(intel)
+
+end
+
+
+-------------------------------------------------------------------------
+-- Medal 
+-------------------------------------------------------------------------
+-- This objective checks if the player has established a new base or not.
+-- if he has NOT established a new base, then complete this objective.
+-------------------------------------------------------------------------
+function Initialize_OBJ_Medal()
+
+	OBJ_Medal = {
+		
+		SetupUI = function() 
+			OBJ_Medal.counter = Objective_SetCounter(OBJ_Medal, 0, 10)
+			-- mark a point or position
+			-- OBJ_Medal.mapElementID = Objective_AddUIElements(OBJ_Medal, mkr_marker, true, 000000, true)
+		end,
+		
+		OnStart = function()
+			
+			Util_AutoIntel(t_medal_op.start)
+			-- start related action
+			Medal_Kickoff()
+			
+		end,
+		
+		OnComplete = function()
+			
+			-- tell the player they did good
+			Util_AutoIntel(t_medal_op.complete)
+			
+			if Rule_Exists(Convoy_Manager) then
+				Rule_Remove(Convoy_Manager)
+			end
+			
+			if Rule_Exists(Convoy_ProtectionRespawn) then
+				Rule_Remove(Convoy_ProtectionRespawn)
+			end
+			
+			Convoy_LastRush()
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			
+		end,
+		
+		Title = 1479300,
+		Description = 1479301,
+		Type = OT_Medal,
+		MedalID = MEDALS.CXP2.HELLS_HIGHWAY_HUNT,
+		
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_Medal)
+	-- Initialize Data
+	Medal_Init()
+	
+end
+
+-------------------------------------------------------------------------
+-- Medal - Functions 
+-------------------------------------------------------------------------
+function Medal_Init()
+
+	t_medal_op = {
+		-- player is told of the convoy
+		start = {
+			{ACTOR.CXP2.Voss, 1473000},
+			{ACTOR.CXP2.Voss, 1473010},
+		},
+		
+		-- played when the first truck is destroyed
+		first = {
+			{ACTOR.CXP2.GenericPanzerElite, 1473020},
+		},
+		
+		complete = {
+			{ACTOR.CXP2.Voss, 1473030},
+		},
+	}
+
+end
+
+function Medal_Preset()
+
+	-- do nothiing
+
+end
+
+
+function Medal_DelayStart()
+
+	for k, this in pairs(t_convoy.t_vehicles) do
+		if Player_CanSeeSGroup(player1, this.sgroup, ANY) == true then
+--~ 			print("Convoy SPotted")
+			if this.truck == true then
+--~ 				print("Truck Spotted")
+				Objective_Start(OBJ_Medal)
+				Rule_RemoveMe()
+			end
+		end
+	end
+
+end
+
+-- example of how to finish an Obj
+function Medal_WinCheck()
+
+	if v_destroyedtruck == 10 then
+		Objective_Complete(OBJ_Medal)
+	end
+	
+end
+
+-- start the related action
+function Medal_Kickoff()
+
+	Rule_AddInterval(Medal_WinCheck, 2)
+	
+
+	for k, that in pairs(t_convoy.t_vehicles) do
+		if this.truck == true then
+			Rule_AddSGroupEvent(Convoy_On_Death, that.sgroup, GE_SquadKilled)
+		end
+	end
+
+end
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- Recover Vehicles - Functions 
+-------------------------------------------------------------------------
+function RecoverVehicles_Init()
+	
+	return -- disabled because bergetiger is not available in the mod
+	
+	-- define sgroups, egroups, etc associated with this obj
+	--[[tmkr_rv_wreck = Marker_GetTable("mkr_hunt_wreck%d")
+	teg_rv_wreck = EGroup_CreateTable("teg_rv_wreck%d", table.getn(tmkr_rv_wreck))
+	tsg_rv_wreck = SGroup_CreateTable("tsg_rv_wreck%d", table.getn(tmkr_rv_wreck))
+	
+	EGroup_CreateIfNotFound("eg_ambush_wrecks")
+	
+	t_wrecks = {
+		EBP.WRECKS.ARMOURCAR_221,
+		EBP.WRECKS.ARMOURCAR_222,
+		EBP.WRECKS.ARMOURCAR_223,
+		EBP.WRECKS.HALFTRACK_250,
+		EBP.WRECKS.HALFTRACK_251,
+		EBP.WRECKS.HALFTRACK_MORTAR,
+		EBP.WRECKS.HALFTRACK_SNIPER,
+		EBP.WRECKS.HALFTRACK_VAMPIRE,
+		EBP.WRECKS.HETZER,
+		EBP.WRECKS.HUMMEL,
+		EBP.WRECKS.JAGDPANTHER,
+		EBP.WRECKS.MARDER,
+		EBP.WRECKS.PANTHER,
+		EBP.WRECKS.PANZER,
+		EBP.WRECKS.TIGER,
+	}
+	
+	t_hunt_wrecks = { }
+	
+    t_rv = {
+		
+	}
+	
+	t_rv.wrecks = {
+		{
+			sbp			= SBP.AXIS.PANTHER,
+			ebp			= EBP.WRECKS.PANTHER,
+		},
+		{
+			sbp			= SBP.AXIS.PANZER,
+			ebp			= EBP.WRECKS.PANZER,
+		},
+		{
+			sbp 		= SBP.AXIS.TIGER,
+			ebp			= EBP.WRECKS.TIGER,
+		},
+	}
+	
+	for k, this in pairs(t_rv.wrecks) do
+		this.egroup 		= teg_rv_wreck[k]
+		this.sgroup 		= tsg_rv_wreck[k]
+		this.spawn 			= tmkr_rv_wreck[k]
+		this.map_id			= false
+	end
+	
+	for k, this in pairs(t_rv.wrecks) do
+		Util_CreateSquads(player1, this.sgroup, this.sbp, this.spawn)
+		SGroup_Kill(this.sgroup)
+	end
+	
+	eg_temp_wrecks = EGroup_CreateIfNotFound("eg_temp_wrecks")
+	
+	v_curr_spawn = 1
+	
+	Rule_AddOneShot(RecoverVehicles_Preset, 2)]]
+	
+end
+
+
+--[[function RecoverVehicles_Preset()
+
+	-- spawns the vehicles, then destroys them to create a wreck and assigns it to the appropriate
+	-- egroup for tracking.
+	World_GetNeutralEntitiesNearMarker(eg_temp_wrecks, mkr_map)
+	EGroup_Filter(eg_temp_wrecks, t_wrecks, FILTER_KEEP)
+	
+	
+	v_wreck_num = 0
+	
+	local Wreck_Marker = function(gid, idx, eid)
+		
+		v_wreck_num = v_wreck_num + 1
+		
+		egroup = EGroup_CreateIfNotFound("eg_wreck"..v_wreck_num)
+		
+		EGroup_Add(egroup, eid)
+		
+		local ebp = Entity_GetBlueprint(eid)
+		
+		if ebp == EBP.WRECKS.MARDER then
+			text = Loc_FormatText(1479405, 1479421)
+		elseif ebp == EBP.WRECKS.ARMOURCAR_221 then
+			text = Loc_FormatText(1479405, 1479410)
+		elseif ebp == EBP.WRECKS.ARMOURCAR_222 then
+			text = Loc_FormatText(1479405, 1479411)
+		elseif ebp == EBP.WRECKS.ARMOURCAR_223 then
+			text = Loc_FormatText(1479405, 1479412)
+		elseif ebp == EBP.WRECKS.HALFTRACK_250 then
+			text = Loc_FormatText(1479405, 1479415)
+		elseif ebp == EBP.WRECKS.HALFTRACK_251 then
+			text = Loc_FormatText(1479405, 1479417)
+		elseif ebp == EBP.WRECKS.HALFTRACK_MORTAR then
+			text = Loc_FormatText(1479405, 1479414)
+		elseif ebp == EBP.WRECKS.HALFTRACK_VAMPIRE then
+			text = Loc_FormatText(1479405, 1479416)
+		elseif ebp == EBP.WRECKS.HALFTRACK_SNIPER then
+			text = Loc_FormatText(1479405, 1479427)
+		elseif ebp == EBP.WRECKS.PANTHER then
+			text = Loc_FormatText(1479405, 1479426)
+		elseif ebp == EBP.WRECKS.PANZER then
+			text = Loc_FormatText(1479405, 1479424)
+		elseif ebp == EBP.WRECKS.TIGER then
+			text = Loc_FormatText(1479405, 1479425)
+		else
+			text = 14794031
+		end
+		
+		local pos = Util_GetPosition(egroup)
+		pos.y = pos.y + 2.5
+		HintMouseover_Add(text, pos, 10, false)
+		
+		
+	end
+	
+	
+	EGroup_ForEach(eg_temp_wrecks, Wreck_Marker)
+	
+
+end]]
+
+
+
+-------------------------------------------------------------------------
+-- **********************
+-- ** ENCOUNTER SPAWNS **
+-- **********************
+-------------------------------------------------------------------------
+
+function HHHunt_Encounter_Init()
+
+	t_encounters = { }
+	
+	t_encounters.northwindmill = {
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_enc_nwindmill_mg01"),
+			sbp = SBP.CW.VICKERS_MG_SP,
+			pos = eg_hunt_enc_01,
+			secpos = mkr_hunt_enc_01,
+			tank = false,
+			difficulty = 0,
+			alt = mkr_hunt_enc_01,
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_enc_nwindmill_tank01"),
+			sbp = SBP.CW.CROMWELL,
+			pos = mkr_hunt_enc_nwindmill1,
+			tank = true,
+			difficulty = 0,
+			alt = nil,
+		},
+		
+		{	-- AT gun
+			egroup = EGroup_CreateIfNotFound("eg_enc_leftisland_at1"),
+			ebp = EBP.CW.ANTITANK_NEST,
+			pos = mkr_hunt_enc_nwindmill_at1,
+			tank = false,
+			emplacement = true,
+			difficulty = 1,
+			alt = nil,
+		},
+		
+	}
+	
+	t_encounters.southfieldmortar = {
+		
+--~ 		sg_enc_sfieldmortar_command = SGroup_CreateIfNotFound("sg_enc_sfieldmortar_command"),
+		
+		{	-- Mortar Emplacement
+			egroup = EGroup_CreateIfNotFound("eg_enc_sfieldmortar_mortar"),
+			ebp = EBP.CW.MORTAR_NEST,
+			pos = mkr_hunt_enc_southfieldmortar_mortar,
+			tank = false,
+			emplacement = true,
+			difficulty = 0,
+		},
+		
+		{	-- Trench 1
+			egroup = EGroup_CreateIfNotFound("eg_enc_sfieldmortarl_trench1"),
+			ebp = EBP.CW.SLITTRENCH_NEST,
+			pos = mkr_hunt_enc_southfieldmortar_trench01,
+			tank = false,
+			emplacement = true,
+			difficulty = 0,
+		},
+		
+		{	-- Trench 2
+			egroup = EGroup_CreateIfNotFound("eg_enc_sfieldmortarl_trench2"),
+			ebp = EBP.CW.SLITTRENCH_NEST,
+			pos = mkr_hunt_enc_southfieldmortar_trench02,
+			tank = false,
+			emplacement = true,
+			difficulty = 0,
+		},
+		
+		{	
+			sgroup = SGroup_CreateIfNotFound("sg_enc_sfieldmortarl_tommies01"),
+			sbp = SBP.CW.TOMMIES,
+			pos = mkr_hunt_enc_southfieldmortar_trench01,
+			tank = false,
+			garrison = true,
+			command = SGroup_CreateIfNotFound("sg_enc_sfieldmortar1_command"),
+			difficulty = 0,
+		},
+		
+		{	
+			sgroup = SGroup_CreateIfNotFound("sg_enc_sfieldmortarl_tommies02"),
+			sbp = SBP.CW.TOMMIES,
+			pos = mkr_hunt_enc_southfieldmortar_trench02,
+			tank = false,
+			garrison = true,
+			command = SGroup_CreateIfNotFound(" sg_enc_sfieldmortar1_command"),
+			difficulty = 0,
+		},
+		
+		{	
+			sgroup = SGroup_CreateIfNotFound("sg_enc_sfieldmortarl_lt01"),
+			sbp = SBP.CW.LIEUTENANT,
+			pos = mkr_hunt_enc_southfieldmortar_trench02,
+			tank = false,
+			garrison = true,
+			command = SGroup_CreateIfNotFound("sg_enc_sfieldmortar1_command"),
+			difficulty = 0,
+		},
+		
+		{	-- AT gun
+			egroup = EGroup_CreateIfNotFound("eg_enc_sfieldmortarl_at"),
+			ebp = EBP.CW.ANTITANK_NEST,
+			pos = mkr_hunt_enc_southfieldmortar_at,
+			tank = false,
+			emplacement = true,
+			difficulty = 1,
+		},
+		
+	}
+	
+	t_encounters.leftisland = {
+		
+--~ 		sg_enc_sfieldmortar_command = SGroup_CreateIfNotFound("sg_enc_sfieldmortar_command"),
+		
+		
+		{	-- Trench 1
+			egroup = EGroup_CreateIfNotFound("eg_enc_leftisland_trench1"),
+			ebp = EBP.CW.SLITTRENCH_NEST,
+			pos = mkr_hunt_enc_leftisland_trench1,
+			tank = false,
+			emplacement = true,
+		},
+		
+		{	-- Trench 2
+			egroup = EGroup_CreateIfNotFound("eg_enc_leftisland_trench2"),
+			ebp = EBP.CW.SLITTRENCH_NEST,
+			pos = mkr_hunt_enc_leftisland_trench2,
+			tank = false,
+			emplacement = true,
+		},
+		
+		{	-- MG Nest
+			egroup = EGroup_CreateIfNotFound("eg_enc_leftisland_mg1"),
+			ebp = EBP.CW.MG_NEST,
+			pos = mkr_hunt_enc_leftisland_mg1,
+			tank = false,
+			emplacement = true,
+		},
+		
+		{	
+			sgroup = SGroup_CreateIfNotFound("sg_enc_leftisland_tommies01"),
+			sbp = SBP.CW.TOMMIES,
+			pos = mkr_hunt_enc_leftisland_trench1,
+			tank = false,
+			garrison = true,
+			command = SGroup_CreateIfNotFound("sg_enc_leftisland_command"),
+		},
+		
+		{	
+			sgroup = SGroup_CreateIfNotFound("sg_enc_leftisland_tommies02"),
+			sbp = SBP.CW.TOMMIES,
+			pos = mkr_hunt_enc_leftisland_trench2,
+			tank = false,
+			garrison = true,
+			command = SGroup_CreateIfNotFound("sg_enc_leftisland_command"),
+		},
+		
+		{	
+			sgroup = SGroup_CreateIfNotFound("sg_enc_leftisland_tank1"),
+			sbp = SBP.CW.CROMWELL,
+			pos = mkr_hunt_enc_leftisland_tank1,
+			tank = true,
+			command = SGroup_CreateIfNotFound("sg_enc_leftisland_command"),
+		},
+		
+		{	
+			sgroup = SGroup_CreateIfNotFound("sg_enc_leftisland_tank2"),
+			sbp = SBP.CW.CHURCHILL,
+			pos = mkr_hunt_enc_leftisland_tank2,
+			tank = true,
+			command = SGroup_CreateIfNotFound("sg_enc_leftisland_command"),
+		},
+		
+	}
+	
+	
+	t_encounters.reloc5 = {
+		
+--~ 		sg_enc_nwindmill_command = SGroup_CreateIfNotFound("sg_enc_nwindmill_command"),
+		
+		{
+			egroup = EGroup_CreateIfNotFound("eg_enc_reloc5_trench2"),
+			ebp = EBP.CW.SLITTRENCH_NEST,
+			pos = mkr_hunt_enc_reloc5_trench2,
+			tank = false,
+			emplacement = true,
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_enc_reloc5_tommies2"),
+			sbp = SBP.CW.TOMMIES,
+			pos = mkr_hunt_enc_reloc5_trench2,
+			tank = true,
+			garrison = true,
+		},
+		
+		{
+			egroup = EGroup_CreateIfNotFound("eg_enc_reloc5_trench3"),
+			ebp = EBP.CW.SLITTRENCH_NEST,
+			pos = mkr_hunt_enc_reloc5_trench3,
+			tank = false,
+			emplacement = true,
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_enc_reloc5_tommies3"),
+			sbp = SBP.CW.TOMMIES,
+			pos = mkr_hunt_enc_reloc5_trench3,
+			tank = true,
+			garrison = true,
+		},
+		
+	}
+	
+	t_encounters.northdef = {
+		
+--~ 		sg_enc_nwindmill_command = SGroup_CreateIfNotFound("sg_enc_nwindmill_command"),
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_enc_northdef_tank1"),
+			sbp = SBP.CW.CHURCHILL,
+			pos = mkr_hunt_enc_northdef_tank1,
+			tank = true,
+			difficulty = 0,
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_enc_northdef_tank2"),
+			sbp = SBP.CW.CHURCHILL,
+			pos = mkr_hunt_enc_northdef_tank2,
+			tank = true,
+			difficulty = 0,
+		},
+		
+		{
+			egroup = EGroup_CreateIfNotFound("eg_enc_northdef_mg1"),
+			ebp = EBP.CW.MG_NEST,
+			pos = mkr_hunt_enc_northdef_mg1,
+			tank = false,
+			emplacement = true,
+			difficulty = 0,
+		},
+		
+		{
+			egroup = EGroup_CreateIfNotFound("eg_enc_northdef_mg2"),
+			ebp = EBP.CW.MG_NEST,
+			pos = mkr_hunt_enc_northdef_mg2,
+			tank = false,
+			emplacement = true,
+			difficulty = 0,
+		},
+		
+	}
+	
+	t_encounters.southdef = {
+		
+--~ 		sg_enc_nwindmill_command = SGroup_CreateIfNotFound("sg_enc_nwindmill_command"),
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_enc_southdef_tank1"),
+			sbp = SBP.CW.CHURCHILL,
+			pos = mkr_hunt_enc_southdef_tank1,
+			tank = true,
+			difficulty = 0,
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_enc_southdef_tank2"),
+			sbp = SBP.CW.CHURCHILL,
+			pos = mkr_hunt_enc_southdef_tank2,
+			tank = true,
+			difficulty = 0,
+		},
+		
+	}
+	
+	t_encounters.arty1 = {		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_enc_arty1_tank1"),
+			sbp = SBP.CW.CROMWELL,
+			pos = mkr_hunt_arty1_tank1,
+			tank = true,
+			difficulty = 0,
+		},	
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_enc_arty1_tank3"),
+			sbp = SBP.CW.CROMWELL,
+			pos = mkr_hunt_arty1_tank2,
+			tank = true,
+			difficulty = 0,
+		},	
+	}
+	
+	
+	t_encounters.arty2 = {
+		{
+			egroup = EGroup_CreateIfNotFound("eg_enc_arty2_trench"),
+			ebp = EBP.CW.SLITTRENCH_NEST,
+			pos = mkr_hunt_arty2_trench,
+			emplacement = true,
+			difficulty = 0,
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_enc_arty2_tommy1"),
+			sbp = SBP.CW.TOMMIES,
+			pos = mkr_hunt_arty2_trench,
+			garrison = true,
+			loadout = 3,
+			difficulty = 0,
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_enc_arty2_tank"),
+			sbp = SBP.CW.CROMWELL,
+			pos = mkr_hunt_arty2_tank,
+			tank = true,
+			difficulty = 2,
+		},	
+	}
+	
+	t_encounters.arty3 = {
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_enc_arty4_tommy1"),
+			sbp = SBP.CW.TOMMIES,
+			pos = eg_hunt_arty3_building,
+			alt = mkr_hunt_arty3_building,
+			loadout = 3,
+			difficulty = 0,
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_enc_arty4_tommy2"),
+			sbp = SBP.CW.TOMMIES,
+			pos = eg_hunt_arty3_building,
+			alt = mkr_hunt_arty3_buildingalt,
+			loadout = 4,
+			difficulty = 0,
+			upg = UPG.CW.PIAT,
+		},	
+	}
+	
+	
+	sfm_isspawned = false
+	nwm_isspawned = false
+	ndf_isspawned = false
+	sdf_isspawned = false
+	art1_isspawned = false
+	art2_isspawned = false
+	art3_isspawned = false
+	
+	v_sfm_initial = 0
+	v_nwm_initial = 0
+	v_ndf_initial = 0
+	v_sdf_initial = 0
+	v_art1_initial = 0
+	v_art2_initial = 0
+	v_art3_initial = 0
+	
+	Rule_AddInterval(HHHunt_Encounter_Spawner, 1)
+	
+end
+----------------
+function HHHunt_Encounter_Spawner()
+
+	HHHunt_Encounter_SouthFieldMortar()
+	HHHunt_Encounter_NorthWindmill()
+	HHHunt_Encounter_NorthDefense()
+	HHHunt_Encounter_SouthDefense()
+	HHHunt_Encounter_Arty1Defense()
+	HHHunt_Encounter_Arty2Defense()
+	HHHunt_Encounter_Arty3Defense()
+	
+
+end
+----------------
+function HHHunt_Encounter_SouthFieldMortar()
+
+	if sfm_isspawned == true then
+		return
+	elseif sfm_isspawned == false then
+		if Prox_ArePlayersNearMarker(player1, mkr_hunt_enc_southfieldmortar_check, ANY) then
+		
+			sfm_isspawned = true
+			
+			for k, this in pairs(t_encounters.southfieldmortar) do
+				if this.difficulty <= g_difficulty then
+					if this.emplacement == true then
+						Util_ClearWrecksFromMarker(this.pos, 10)
+						Util_CreateEntities(player2, this.egroup, this.ebp, this.pos, 1)
+					else
+						if scartype(this.pos) == ST_EGROUP then
+							if EGroup_IsEmpty(this.pos) == true then
+								Util_CreateSquads(player2, this.sgroup, this.sbp, this.secpos, nil, nil, this.loadout)
+							else
+								Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, nil, this.loadout)
+							end
+						else
+							Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, nil, this.loadout)
+						end
+					end
+					
+					if this.upg ~= nil then
+						Cmd_InstantUpgrade(this.sgroup, this.upg)
+					end
+					
+					if this.tank == true then
+						Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, nil, nil, true)
+					end
+					
+					if this.at == true then
+						ATGun_AddGroup(this.sgroup, player2)
+					end
+					
+					if this.garrison == true and SGroup_IsInHoldEntity(this.sgroup, ANY) == false then
+						Util_GarrisonNearbyBuilding(this.sgroup, this.pos, 5)
+					end
+				end
+				if this.command ~= nil then
+					v_sfm_initial = SGroup_TotalMembersCount(this.command)
+				end
+			end
+			
+			
+			
+		end
+	end
+
+end
+
+function HHHunt_Encounter_NorthWindmill()
+
+	if nwm_isspawned == true then
+		return
+	elseif nwm_isspawned == false then
+		if Prox_ArePlayersNearMarker(player1, mkr_hunt_enc_nwindmill_check, ANY) then
+		
+			nwm_isspawned = true
+			
+			for k, this in pairs(t_encounters.northwindmill) do
+				if this.difficulty <= g_difficulty then
+					if this.emplacement == true then
+						Util_ClearWrecksFromMarker(this.pos, 10)
+						Util_CreateEntities(player2, this.egroup, this.ebp, this.pos, 1)
+					else
+						if (scartype(this.pos) == ST_EGROUP
+						  and EGroup_IsEmpty(this.pos) == false)
+						  or scartype(this.pos) == ST_MARKER then
+							Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, nil, this.loadout)
+						elseif scartype(this.pos) == ST_EGROUP
+						  and EGroup_IsEmpty(this.pos) == true then
+							if this.alt ~= nil then
+								Util_CreateSquads(player2, this.sgroup, this.sbp, this.alt, nil, nil, this.loadout)
+							end
+						end
+						
+					end
+					
+					if this.upg ~= nil then
+						Cmd_InstantUpgrade(this.sgroup, this.upg)
+					end
+					
+					if this.tank == true then
+						Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, nil, nil, true)
+					end
+					
+					if this.at == true then
+						ATGun_AddGroup(this.sgroup, player2)
+					end
+					
+					if this.garrison == true and SGroup_IsInHoldEntity(this.sgroup, ANY) == false then
+						Util_GarrisonNearbyBuilding(this.sgroup, this.pos, 5)
+					end
+				end
+				if this.command ~= nil then
+					v_nwm_initial = SGroup_TotalMembersCount(this.command)
+				end
+			end
+			
+			
+			
+		end
+	end
+
+end
+
+function HHHunt_Encounter_NorthDefense()
+
+	if ndf_isspawned == true then
+		return
+	elseif ndf_isspawned == false then
+		if Prox_ArePlayersNearMarker(player1, mkr_hunt_enc_northdef_check, ANY) then
+		
+			ndf_isspawned = true
+			
+			for k, this in pairs(t_encounters.northdef) do
+				if this.difficulty <= g_difficulty then
+					if this.emplacement == true then
+						Util_ClearWrecksFromMarker(this.pos, 10)
+						Util_CreateEntities(player2, this.egroup, this.ebp, this.pos, 1)
+					else
+						Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, nil, this.loadout)
+					end
+					
+					if this.upg ~= nil then
+						Cmd_InstantUpgrade(this.sgroup, this.upg)
+					end
+					
+					if this.tank == true then
+						Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, nil, nil, true)
+					end
+					
+					if this.at == true then
+						ATGun_AddGroup(this.sgroup, player2)
+					end
+					
+					if this.garrison == true and SGroup_IsInHoldEntity(this.sgroup, ANY) == false then
+						Util_GarrisonNearbyBuilding(this.sgroup, this.pos, 5)
+					end
+				end
+				if this.command ~= nil then
+					v_ndf_initial = SGroup_TotalMembersCount(this.command)
+				end
+			end
+			
+			
+			
+		end
+	end
+
+end
+
+function HHHunt_Encounter_SouthDefense()
+
+	if sdf_isspawned == true then
+		return
+	elseif sdf_isspawned == false then
+		if Prox_ArePlayersNearMarker(player1, mkr_hunt_enc_southdef_check, ANY) then
+		
+			sdf_isspawned = true
+			
+			for k, this in pairs(t_encounters.southdef) do
+				if this.difficulty <= g_difficulty then
+					if this.emplacement == true then
+						Util_ClearWrecksFromMarker(this.pos, 10)
+						Util_CreateEntities(player2, this.egroup, this.ebp, this.pos, 1)
+					else
+						Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, nil, this.loadout)
+					end
+					
+					if this.upg ~= nil then
+						Cmd_InstantUpgrade(this.sgroup, this.upg)
+					end
+					
+					if this.tank == true then
+						Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, nil, nil, true)
+					end
+					
+					if this.at == true then
+						ATGun_AddGroup(this.sgroup, player2)
+					end
+					
+					if this.garrison == true and SGroup_IsInHoldEntity(this.sgroup, ANY) == false then
+						Util_GarrisonNearbyBuilding(this.sgroup, this.pos, 5)
+					end
+				end
+				if this.command ~= nil then
+					v_sdf_initial = SGroup_TotalMembersCount(this.command)
+				end
+			end
+			
+			
+			
+		end
+	end
+
+end
+
+function HHHunt_Encounter_Arty1Defense()
+
+	if art1_isspawned == true then
+		return
+	elseif art1_isspawned == false then
+		if Prox_ArePlayersNearMarker(player1, mkr_hunt_enc_arty1_check, ANY) then
+		
+			art1_isspawned = true
+			
+			for k, this in pairs(t_encounters.arty1) do
+				if this.difficulty <= g_difficulty then
+					if this.emplacement == true then
+						Util_ClearWrecksFromMarker(this.pos, 10)
+						Util_CreateEntities(player2, this.egroup, this.ebp, this.pos, 1)
+					else
+						Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, nil, this.loadout)
+					end
+					
+					if this.upg ~= nil then
+						Cmd_InstantUpgrade(this.sgroup, this.upg)
+					end
+					
+					if this.tank == true then
+						Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, nil, nil, true)
+					end
+					
+					if this.at == true then
+						ATGun_AddGroup(this.sgroup, player2)
+					end
+					
+					if this.garrison == true and SGroup_IsInHoldEntity(this.sgroup, ANY) == false then
+						Util_GarrisonNearbyBuilding(this.sgroup, this.pos, 5)
+					end
+				end
+				if this.command ~= nil then
+					v_art1_initial = SGroup_TotalMembersCount(this.command)
+				end
+			end
+			
+			
+			
+		end
+	end
+
+end
+
+function HHHunt_Encounter_Arty2Defense()
+
+	if art2_isspawned == true then
+		return
+	elseif art2_isspawned == false then
+		if Prox_ArePlayersNearMarker(player1, mkr_hunt_enc_arty2_check, ANY) then
+		
+			art2_isspawned = true
+			
+			for k, this in pairs(t_encounters.arty2) do
+				if this.difficulty <= g_difficulty then
+					if this.emplacement == true then
+						Util_ClearWrecksFromMarker(this.pos, 10)
+						Util_CreateEntities(player2, this.egroup, this.ebp, this.pos, 1)
+					else
+						Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, nil, this.loadout)
+					end
+					
+					if this.upg ~= nil then
+						Cmd_InstantUpgrade(this.sgroup, this.upg)
+					end
+					
+					if this.tank == true then
+						Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, nil, nil, true)
+					end
+					
+					if this.at == true then
+						ATGun_AddGroup(this.sgroup, player2)
+					end
+					
+					if this.garrison == true and SGroup_IsInHoldEntity(this.sgroup, ANY) == false then
+						Util_GarrisonNearbyBuilding(this.sgroup, this.pos, 5)
+					end
+				end
+				if this.command ~= nil then
+					v_art2_initial = SGroup_TotalMembersCount(this.command)
+				end
+			end
+			
+			
+			
+		end
+	end
+
+end
+
+function HHHunt_Encounter_Arty3Defense()
+
+	if art3_isspawned == true then
+		return
+	elseif art3_isspawned == false then
+		if Prox_ArePlayersNearMarker(player1, mkr_hunt_enc_arty3_check, ANY) then
+		
+			art3_isspawned = true
+			
+			for k, this in pairs(t_encounters.arty3) do
+				if this.difficulty <= g_difficulty then
+					if this.emplacement == true then
+						Util_ClearWrecksFromMarker(this.pos, 10)
+						Util_CreateEntities(player2, this.egroup, this.ebp, this.pos, 1)
+					else
+						if (scartype(this.pos) == ST_EGROUP
+						  and EGroup_IsEmpty(this.pos) == false)
+						  or scartype(this.pos) == ST_MARKER then
+							Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, nil, this.loadout)
+						elseif scartype(this.pos) == ST_EGROUP
+						  and EGroup_IsEmpty(this.pos) == true then
+							if this.alt ~= nil then
+								Util_CreateSquads(player2, this.sgroup, this.sbp, this.alt, nil, nil, this.loadout)
+							end
+						end
+					end
+					
+					if this.upg ~= nil then
+						Cmd_InstantUpgrade(this.sgroup, this.upg)
+					end
+					
+					if this.tank == true then
+						Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, nil, nil, true)
+					end
+					
+					if this.at == true then
+						ATGun_AddGroup(this.sgroup, player2)
+					end
+					
+					if this.garrison == true and SGroup_IsInHoldEntity(this.sgroup, ANY) == false then
+						Util_GarrisonNearbyBuilding(this.sgroup, this.pos, 5)
+					end
+				end
+				if this.command ~= nil then
+					v_art3_initial = SGroup_TotalMembersCount(this.command)
+				end
+			end
+			
+			
+			
+		end
+	end
+
+end
+
+
+----------------
+function HHHunt_Encounter_Garrison()
+
+	for k, this in pairs(t_encounters) do
+		for m, this in pairs(t_encounters[k]) do
+			local this = t_encounters[k][m]
+			
+			if this.garrison == true and SGroup_IsInHoldEntity(this.sgroup, ANY) == false then
+				Util_GarrisonNearbyBuilding(this.sgroup, this.pos, 5)
+			end
+			
+			if this.tank == true then
+				Cmd_Ability(this.sgroup, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, nil, nil, true)
+			end
+			
+			if this.at == true then
+				ATGun_AddGroup(this.sgroup, player2)
+			end
+			
+		end
+	end
+
+end
+
+
+function HHHunt_Encounter_Manager()
+
+	for k, this in pairs(t_encounters) do
+		for m, this in pairs(t_encounters[k]) do
+			local this = t_encounters[k][m]
+			
+			if this.command ~= nil then
+				if SGroup_TotalMembersCount(this.command) <= 4 then
+					if SGroup_IsInHoldEntity(this.command, ANY) == true then
+						Cmd_UngarrisonSquad(this.command, this.pos)
+						
+						Cmd_Retreat(this.command, mkr_sp_convoy, mkr_sp_convoy, true)
+					elseif this.at == true then
+						Cmd_AbandonTeamWeapon(this.command, true)
+						
+						Cmd_Retreat(this.command, mkr_sp_convoy, mkr_sp_convoy, true)
+					else
+						Cmd_Retreat(this.command, mkr_sp_convoy, mkr_sp_convoy, true)
+					end
+				end
+			end
+		end
+	end
+
+end
+
+function HHHunt_Encounter_Patrols()
+
+	sg_patrol1 = SGroup_CreateIfNotFound("sg_patrol1")
+	sg_patrol2 = SGroup_CreateIfNotFound("sg_patrol2")
+	sg_patrol3 = SGroup_CreateIfNotFound("sg_patrol3")
+
+	Util_CreateSquads(player2, sg_patrol1, SBP.CW.STUART, mkr_enc_hunt_pat1)
+	Cmd_SquadPath(sg_patrol1, "pth_hunt_pat1", true, LOOP_NORMAL, true, 3)
+	
+	Util_CreateSquads(player2, sg_patrol2, SBP.CW.CROMWELL, mkr_enc_hunt_pat2)
+	Cmd_SquadPath(sg_patrol2, "pth_hunt_pat2", true, LOOP_NORMAL, true, 3)
+	
+	Util_CreateSquads(player2, sg_patrol3, SBP.CW.CROMWELL, mkr_enc_hunt_pat3)
+	Cmd_SquadPath(sg_patrol3, "pth_hunt_pat3", true, LOOP_NORMAL, true, 3)
+
+
+end
+
+
+
+
+
+function HHHunt_CheckPlayerBase()
+
+	if Player_HasLost(player1, CRITICAL_BUILDINGS.ELITE) then
+		
+		if Rule_Exists(HHHunt_EndMission) == false then
+			g_hhhunt_win = false
+			Rule_Add(HHHunt_EndMission)
+		end
+		
+		Rule_RemoveMe()
+	end
+
+end
+
+-------------------------------------------------------------------------
+-- ******************************************************************* --
+-- MISCELLANEOUS
+-- ******************************************************************* --
+-------------------------------------------------------------------------
+
+function HHHunt_ChangeOwnership()
+
+	if EGroup_IsEmpty(eg_hunt_town_hq) then
+		Rule_RemoveMe()
+		return
+	end
+
+	if Player_OwnsEGroup(player1, eg_hunt_town_hq)
+	and EGroup_HasUpgrade(eg_hunt_town_hq, UPG.SP.HELLS_AMBIENT_BUILDING, ANY) then
+		
+		EGroup_InstantCaptureStrategicPoint(eg_town_reinforce, player1)
+		EGroup_InstantCaptureStrategicPoint(eg_town_control, player1)
+		EGroup_SetPlayerOwner(eg_hunt_base, player1)
+		Rule_RemoveMe()
+		
+	end
+
+end
+
+function HHHunt_EndMission()
+
+	if Event_IsAnyRunning() == false then
+		Game_EndSP(g_hhhunt_win)
+	end
+
+end
+
+
+function Test()
+	
+	
+end
+
+
+
+
+-- this function updates the variables that indicate if the bridges are intact (and puts bridges back into groups)
+function Bridges_CheckStatus()
+
+	-- Bridge 1
+	if EGroup_Count(eg_bridge1) == 0 then
+		World_GetNeutralEntitiesNearMarker(eg_bridge1, mkr_bridge1_check)
+		EGroup_Filter(eg_bridge1, {EBP.BRIDGE_25.NORMAL}, FILTER_KEEP)
+	end
+	
+
+	if EGroup_ContainsBlueprints(eg_bridge1, {EBP.BRIDGE_25.NORMAL}, ANY) then
+		bridge1 = true
+	else
+		bridge1 = false
+	end
+	
+	
+end    
+
+
+function WreckClear()
+
+	tmk_wreckclear = Marker_GetTable("mkr_hunt_wreckclear%d")
+	
+	Util_ClearWrecksFromMarker(mkr_hunt_wreckclear1)
+	Util_ClearWrecksFromMarker(mkr_hunt_wreckclear2)
+
+end
+
+

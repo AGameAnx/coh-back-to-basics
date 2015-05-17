@@ -1,0 +1,19 @@
+HeaderInfo =  
+{
+	scenarioname = "TestMap",
+	scenariodescription = "",
+	maxplayers = 2,
+	date = "5/14/2015 19:22",
+	scenarioabbrname = "",
+	savedname = "",
+	version = 2004,
+	mapsize =  
+	{
+		256,
+		256,
+	},
+	music = "",
+	scenariotype = 2,
+	modname = "Improved",
+}
+

@@ -1,0 +1,3824 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+-- Operation Goodwood
+
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+import("ScarUtil.scar")
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ SETUP ]]
+
+-------------------------------------------------------------------------
+
+function OnGameSetup()
+	-- string numbers should reference dat files
+	-- "allies_commonwealth" "allies" "axis" "axis_panzer_elite"
+	player1 = Setup_Player(1, 1309110, TRACE_ALLIES_COMMONWEALTH, 1)
+	player2 = Setup_Player(2, 1309111, TRACE_AXIS, 2)
+	player3 = Setup_Player(3, 1309112, TRACE_ALLIES_COMMONWEALTH, 1) -- player's CPU controlled ally
+	player4 = Setup_Player(4, 1309112, TRACE_ALLIES_COMMONWEALTH, 1) -- player's uncontrolled ally
+end
+
+function OnGameRestore()
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+	player3 = World_GetPlayerAt(3)
+	player4 = World_GetPlayerAt(4)
+	
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+end
+
+
+-------------------------------------------------------------------------
+
+-- [[ ONINIT ]]
+
+-------------------------------------------------------------------------
+
+function OnInit()
+	g_MissionSpeechPath="Caen\\sp2\\Mission9"
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	-- a constant that stores the mission number for use with
+	-- setting the global speech paths, tech tree setup, and 
+	-- the player's starting resources
+	MISSION_NUMBER = 0109
+	
+	--[[ PRESET GAME STATE ]]
+	Setup_MissionPreset(MISSION_NUMBER)
+	
+	--[[ PRESET GAME STATE ]]
+	--AutoCinematic(true, 0)
+	
+	--[[ PRESET DEBUG CONDITIONS ]]
+	Goodwood_Debug()
+	
+	--[[ REGISTER OBJECTIVES ]]
+	Goodwood_ObjectiveRegister()
+	
+	--[[ MOD INITIAL STATS ]]
+	Goodwood_ModifyStats()
+	
+	--[[ SET RESTRICTIONS ]]
+	Goodwood_Restrictions()
+	
+	--[[ SET AI ]]
+	Goodwood_CpuInit()
+	
+	--[[ SET DIFFICULTY ]]
+ 	Goodwood_Difficulty()
+	
+	--[[ MISSION PRESETS ]]
+	Goodwood_MissionPreset()
+	
+	--[[ GAME START CHECK ]]
+	Rule_Add(Goodwood_MissionStart)
+end
+
+Scar_AddInit(OnInit)
+
+function Goodwood_Debug()
+	
+	-- looks for the command line option [-debug]
+	if Misc_IsCommandLineOptionSet("debug") then
+		
+		g_debug = true
+		
+		FOW_RevealAll()
+		-- reveal FOW
+		
+		Scar_DebugConsoleExecute("bind([[ALT+3]], [[Scar_DoString('Rule_AddOneShot(PanzerDivision_DelayStart, 1)')]])")
+	end
+	
+	-- set up bindings for NISes
+	Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS01)')]])")
+	Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS02)')]])")
+	
+	if Misc_IsCommandLineOptionSet("nis") then
+--~ 		Scar_DebugConsoleExecute("bind([[ALT+3]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS03)')]])")
+	end
+end
+
+function Goodwood_ObjectiveRegister()
+
+	-- data that must be initialized before the OBJECTIVES are initialized
+	t_cw_tank_threats = {
+		SBP.CW.FIREFLY,
+		SBP.CW.PRIEST,
+		SBP.CW.CHURCHILL, 
+		SBP.CW.CHURCHILL_AVRE,
+		SBP.CW.CHURCHILL_CROC,
+		SBP.CW.CROMWELL, 
+		SBP.CW.COMMAND_CROMWELL,
+		SBP.CW.STUART,
+		SBP.ALLIES.SHERMAN,
+		SBP.ALLIES.CROCODILE,
+		SBP.ALLIES.M10,
+	}
+
+	--[[ *** MUST INITIALIZE THE OBJ TABLE BEFORE REGISTERING *** ]]
+	Initialize_OBJ_CaptureTowns()
+	Initialize_OBJ_Kill88s()
+	Initialize_OBJ_ClearBourg()
+	Initialize_OBJ_PanzerDivision()
+	Initialize_OBJ_TankDeaths()
+	
+	FOWReveal_Init()
+end
+
+function Goodwood_ModifyStats()
+	
+	--[[ saved as example - deg
+	Player_SetDefaultSquadMoodMode(player1, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player2, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player3, MM_ForceTense)
+	
+	-- shorten vision ranges
+	Modify_PlayerSightRadius(player1, 0.75)
+
+	-- mod resource rates
+	t_player1_res_mods= {}
+	t_player1_res_mods[1] = Modify_PlayerResourceRate(player1, RT_Manpower, 2)
+	t_player1_res_mods[2] = Modify_PlayerResourceRate(player1, RT_Munition, 2)
+	t_player1_res_mods[3] = Modify_PlayerResourceRate(player1, RT_Fuel, 1)
+	]]
+end
+
+function Goodwood_Restrictions()
+	--[[ UN/RESTRICT UPGRADES ]]
+	
+	--[[ RESOURCES ]]
+	Player_SetResource(player1, RT_Manpower, 2000)
+	Player_SetResource(player1, RT_Munition, 600)
+	Player_SetResource(player1, RT_Fuel, 200)
+	
+	--[[ UN/RESTRICT ABILITIES ]]
+	-- grant the player Cromwells
+	Cmd_InstantUpgrade(player1, UPG.COMMANDER_TREE.CW.ENGINEERS_10)
+	
+	--[[ but hold off on these, make the player invest in the tech tree
+	Cmd_InstantUpgrade(player1, UPG.COMMANDER_TREE.CW.ENGINEERS_11)
+	Cmd_InstantUpgrade(player1, UPG.COMMANDER_TREE.CW.ENGINEERS_12)
+	]]
+	
+	-- UN/RESTRICT POP CAP
+	Player_SetPopCapOverride(player1, 95)
+	
+	--[[ UN/RESTRICT UI 
+	UI_BindingSetEnabled("company_commander", false)
+	UI_BindingSetEnabled("squadcap", false)
+	]]
+	
+	--[[ UN/RESTRICT SBPS 
+	local sbps = {SBP.ALLIES_SHERMAN, SBP.ALLIES_CROCODILE, SBP.ALLIES_GREYHOUN, SBP.ALLIES_PERSHING }
+	for i = 1, table.getn(sbps) do
+		Player_SetSquadProductionAvailability(player1, sbps[i], ITEM_LOCKED)
+	end
+	]]
+end
+
+
+function Goodwood_CpuInit()
+	-- left as an example
+	AI_Enable(player3, true)
+	
+	-- set up Player3 AI  
+--~ 	Util_AI_Setup(player3, {Util_DifVar({10, 15, 20, 30}), 5}, player3, Game_GetSPDifficulty(), 7, Util_DifVar({1, 2, 3, 5}), 2, 3)
+	
+	-- Set up AI's resources
+	Player_SetResource(player3, RT_Manpower, 1000)
+	Player_SetResource(player3, RT_Munition, 100)
+	Player_SetResource(player3, RT_Fuel, 100)
+	
+	-- tell AI to go after strongest threat instead of the weakest
+--~ 	AI_DoString( player3, "s_personality.attack_prefer_threat = true" )
+--~ 	AI_DoString( player3, "s_personality.defend_prefer_threat = true" )
+	
+	-- tell AI not to "defend" territories outside of the ring around its base
+--~ 	AI_EnableComponent(player3, false, COMPONENT_ForwardDefending)
+	
+	-- disable use of company commander menu and abilities
+	AI_DoString( player3, "s_commandtree_enabled = false" )
+	AI_DoString( player3, "s_playerabilities_enabled = false" )
+	
+--~ 	AI_EnableComponent(player3, false, COMPONENT_Attacking)
+	
+	Ally_Init()
+end
+
+
+
+function Goodwood_Difficulty()
+	-- get the difficulty
+	g_difficulty = Game_GetSPDifficulty()  -- set a global difficulty variable
+	print("********* DIFFICULTY: "..g_difficulty)
+	-- because its the last mission 'No Easy'
+	if g_difficulty == 0 then g_difficulty = g_difficulty+1 end
+	
+	Setup_Difficulty(player1, g_difficulty) -- pass the player and difficulty global variable into the Set Health function
+	Setup_Difficulty(player2, g_difficulty) -- do it for each player that you have defined
+	Setup_Difficulty(player3, g_difficulty) -- do it for each player that you have defined
+	Setup_Difficulty(player4, g_difficulty) -- do it for each player that you have defined
+	
+	-- difficulty variables
+	t_dif = {
+		sol_AT_vul 			= Util_DifVar( {2, 1.5, 1} ), -- vulnerability modifier for the Soliers AT guns
+		medal_Goal 			= Util_DifVar( {10*1, 10*1, 10*1.5, 10*2} ), -- inverse difficulty, fewer to loose to compensate for easier difficulty
+		pazner_Goal 		= Util_DifVar( {20+10, 20+10, 20+6, 20+4} ),			-- vulnerability modifier for the Soliers AT guns
+	}
+end
+-------------------------------------------------------------------------
+
+-- MISSION Preset 
+
+-------------------------------------------------------------------------
+
+function Goodwood_MissionPreset()
+
+	-- if areas of your script need to be kicked off early
+	CaptureTowns_Preset()
+	Kill88s_Preset()
+	
+	-- global variable to track whether or not the player has won/lost the mission
+	g_win = false
+	
+	tmkr_player_start = Marker_GetTable("mkr_player_start%d")
+	tsg_player_start = SGroup_CreateTable("sg_player_start%d", table.getn(tmkr_player_start))
+	-- the hqs
+	sg_p1_hq = SGroup_CreateTable("sg_p1_hq%d", 3)
+	
+	sg_temp = SGroup_CreateIfNotFound("sg_temp")
+	eg_temp = EGroup_CreateIfNotFound("eg_temp")
+	
+	-- this table is used to generate the data that will appear when used for the reinforcements button
+	-- that the player uses to call in extra squads using this function: Goodwood_TankReinforcements
+	t_gw = {
+		p1ResourcemodID = false, -- to be used to flux the player's resource rate
+		resourceMod = {
+			{popLimit = 80, scale = 1, thisTier = false},
+			{popLimit = 60, scale = 2, thisTier = false},
+			{popLimit = 40, scale = 3, thisTier = false},
+			{popLimit = 20, scale = 4, thisTier = false},
+		},
+		victory_points = {
+			{vp = eg_bourg_vp, territory = eg_bourg_territory},
+			{vp = eg_k88_strat_point, territory = eg_k88_territory},
+		},
+		p1StartHQs = {
+			{sgroup = sg_p1_hq[1], sbp = SBP.CW.INFANTRY_HQ, spawn = mkr_p1_HQspawn1, goto = mkr_p1_HQgoto1},
+			{sgroup = sg_p1_hq[2], sbp = SBP.CW.HQ, spawn = mkr_p1_HQspawn2, goto = mkr_p1_HQgoto2},
+			{sgroup = sg_p1_hq[3], sbp = SBP.CW.ARMOUR_HQ, spawn = mkr_p1_HQspawn3, goto = mkr_p1_HQgoto3},
+		},
+		
+		tank_reinforcements = {
+			{ 
+				sbp 		= SBP.CW.CHURCHILL,
+				upg			= {},
+				offset		= false,
+			},
+			
+			{ 
+				sbp 		= SBP.CW.CROMWELL,
+				upg			= {},
+				offset		= OFFSET_LEFT,
+			},
+			
+			{ 
+				sbp 		= SBP.CW.FIREFLY,
+				upg			= {},
+				offset		= OFFSET_RIGHT,
+			},
+			
+			{ 
+				sbp 		= SBP.CW.LIEUTENANT,
+				upg			= {},
+				offset		= OFFSET_RIGHT,
+			},
+		},
+		
+		-- player's starting units
+		-- ment to emmulate the starting units from the NIS
+		p1StartSquads = {
+			{ 
+				sbp 		= SBP.CW.CROMWELL,
+			},
+			{ 
+				sbp 		= SBP.CW.CROMWELL,
+			},
+			{ 
+				sbp 		= SBP.CW.LIEUTENANT,
+			},
+			{ 
+				sbp 		= SBP.CW.SAPPER,
+			},
+			{ 
+				sbp 		= SBP.CW.TOMMIES,
+				spawn		= eg_player_base,
+			},
+			{ 
+				sbp 		= SBP.CW.CROMWELL,
+			},
+		},
+	}
+	
+	for k, this in pairs(t_gw.tank_reinforcements) do 
+		this.sgroup = SGroup_CreateIfNotFound("sg_tank_reinforcement"..k)
+	end
+
+	local pos_start = Util_GetPosition(eg_entry_point)
+
+	Goodwood_GlobalFunctions()
+	-- initialize the Allied player
+	Ally_Preset()
+end
+
+
+function Goodwood_GlobalFunctions()
+
+	-- start resource tracker
+	t_gw.p1ResourcemodID = Modify_PlayerResourceRate(player1, RT_Manpower, 1)
+	-- Rule_AddInterval(Goodwood_ModPlayerResourceRate, 1)
+	
+	-- start the VP trackers
+	Rule_AddInterval(Goodwood_TerritoryWatcher, 1)
+	-- used as the generic lose
+	Rule_AddInterval(Goodwood_Fail_Check, 5)
+
+end
+
+-- the idea is to track the resources to make sure the player always has enough to keep making progress
+function Goodwood_ModPlayerResourceRate()
+	
+	local pop = Player_GetCurrentPopulation(player1, CT_Personnel)
+	local rate = Player_GetResourceRate(player1, RT_Manpower) 
+	if rate >= 600 then
+		Modifier_Remove(t_gw.p1ResourcemodID)
+	else
+		for k,v in pairs(t_gw.resourceMod) do 
+			if pop > v.popLimit then
+				if v.thisTier ~= true and rate*v.scale < 600 then
+					Modifier_Remove(t_gw.p1ResourcemodID)
+					print("scale factor is now "..v.scale)
+					t_gw.p1ResourcemodID = Modify_PlayerResourceRate(player1, RT_Manpower, v.scale)
+					v.thisTier = true
+				end
+				break
+			else
+				v.thisTier = false
+			end
+		end
+	end
+	
+end
+
+	
+function Goodwood_TerritoryWatcher()
+	
+	for k,v in pairs(t_gw.victory_points) do 
+		local player = Util_GetPlayerOwner(v.vp)
+		if player ~= Util_GetPlayerOwner(v.territory) then
+			if World_OwnsEGroup(v.vp, ANY) then
+				Entity_SetStrategicPointNeutral(EGroup_GetSpawnedEntityAt(v.territory, 1))
+			else
+				EGroup_InstantCaptureStrategicPoint(v.territory, player)
+			end
+		end
+	end	
+
+end
+---------------------------
+
+function Goodwood_Fail_Check()
+
+	Player_GetAll(player1)	
+	
+	if SGroup_IsEmpty(sg_allsquads) == true then
+		Game_EndSP(false, nil, false)
+	end
+
+end
+
+-------------------------------------------------------------------------
+
+-- MISSION START 
+
+-------------------------------------------------------------------------
+
+function Goodwood_MissionStart()
+	
+	-- opening NIS 
+	Util_StartNIS(NIS_OPENING_BLACK)
+	
+	Rule_Add(Goodwood_OpeningNISEnd)
+	
+	Rule_RemoveMe()
+end
+	
+function Goodwood_OpeningNISEnd()
+
+	if Event_IsAnyRunning() == false then
+		-- debug - unit create - deg
+		for k, this in pairs(t_gw.p1StartSquads) do
+			if this.spawn == nil then
+				this.spawn = tmkr_player_start[k]
+			end
+			this.sgroup = tsg_player_start[k]
+			Util_CreateSquads(player1, this.sgroup, this.sbp, this.spawn)
+		end
+		-- debug - HQ create - deg
+		for k, hq in pairs(t_gw.p1StartHQs) do
+			Util_CreateSquads(player1, hq.sgroup, hq.sbp, hq.spawn)
+			SGroup_AddGroup(sg_player_hq, hq.sgroup)
+			Cmd_InstantUpgrade(hq.sgroup, UPG.CW.ENABLE_MOBILE_HQ)
+			-- move the HQ, 
+			Cmd_Move(hq.sgroup, hq.goto)
+		end
+		SGroup_Hide(tsg_soliers_mg[3], false)
+		
+		-- debug - reset camera - deg
+		Camera_FocusOnPosition(Marker_GetPosition(mkr_camera_start), false)
+		Camera_ResetToDefault()
+		
+		-- delay first objective
+		Rule_AddOneShot(Goodwood_DelayCaptureTowns, 0)
+		Rule_AddInterval(Kill88s_DelayStart, 5)
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+function Goodwood_DelayCaptureTowns()
+	
+	Objective_Start(OBJ_CaptureTowns)
+	Ally_Kickoff()
+	
+end
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- Capture Towns
+-------------------------------------------------------------------------
+-- The player, accompanied by his Ally will focus on attacking 
+-- and capturing the small towns of Soliers and Fours, which 
+-- are guarded by a contingent of static infantry and AT guns
+-------------------------------------------------------------------------
+function Initialize_OBJ_CaptureTowns()
+
+	OBJ_CaptureTowns = {
+		
+		SetupUI = function() 
+			-- mark a point or position
+			OBJ_CaptureTowns.mapElementID = {}
+			OBJ_CaptureTowns.mapElementID[1] = Objective_AddUIElements(OBJ_CaptureTowns, eg_town1, true, 1400203, true)
+			-- disabling for Josh, only Soliers matters
+			-- OBJ_CaptureTowns.mapElementID[2] = Objective_AddUIElements(OBJ_CaptureTowns, eg_town2, true, 1400203, true)
+			
+		end,
+		
+		OnStart = function()
+			Sound_PlayMusic("Music/genericmissionmusic_CXP.bsc",2,0)
+			Sound_PlayStreamed("Ambiences/Ambiences_Streamed/CXP2/SP/plane_raid_distant")
+			-- flash the granted ability
+			UI_FlashAbilityButton(ABILITY.COMMANDER_TREE.CW.RECRUIT_CHURCHILL, true, BT_UI_Strong_AbilityBtn)
+			
+			-- start related action
+			CaptureTowns_Kickoff()
+			-- intel rule 
+			Rule_AddInterval(CaptureTowns_OpeningIntel, 1)
+			
+		end,
+		
+		OnComplete = function()
+			
+			-- tell the player they did good
+			t_k88s.fg_start = true
+			
+			-- add pop
+			Player_SetPopCapOverride(player1, 90)
+			
+			-- unlock Hull Down
+			Cmd_InstantUpgrade(player1, UPG.COMMANDER_TREE.CW.ENGINEERS_01)
+			UI_FlashAbilityButton(ABILITY.COMMANDER_TREE.CW.HULL_DOWN, true, BT_UI_Strong_AbilityBtn)
+			-- unlock long range
+			Cmd_InstantUpgrade(player1, UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY_10)
+			UI_FlashAbilityButton(ABILITY.COMMANDER_TREE.CW.PDR_25_SUPERCHARGE, true, BT_UI_Strong_AbilityBtn)
+			
+			-- remove the object that tells the AI to attack the area around the left-town (Fours)
+			EGroup_DeSpawn(eg_ai_fours_attack)
+			
+			-- Disable the AI to allow scripted base defenses on Player 3
+			AI_Enable(player3, false)
+			
+			-- create the HQ for the Ally and start moving it
+			Ally_CreateAndMoveHQ()
+			
+			-- intel rule 
+			Rule_AddInterval(CaptureTowns_ClosingIntel, 1)
+			
+		end,
+		IsComplete = function()
+		
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			
+		end,
+		
+		Title = 1400200,
+		Description = 1400201,
+		TitleEnd = 1400202,
+		Type = OT_Primary,
+		
+ 		-- SitRep = {},
+		SitRep = {
+ 			Movie = "CXP1_SR_09-01",
+ 			Force = true,
+ 			SpeechTiming =
+ 			{
+ 				{ 1, ACTOR.CXP1.Cutting, 1390530 }, -- Sir, forward security...
+ 				{ 5, ACTOR.CXP1.Cutting, 1390540 }, -- They've set up a hasty...
+ 				{ 9.3, ACTOR.CXP1.Cutting, 1390550 }, -- There are two small...
+ 				{ 14.7, ACTOR.CXP1.Cutting, 1390560 }, -- We can expect...
+ 				{ 17.9, ACTOR.CXP1.Blackmore, 1390570 }, -- We need to establish...
+ 				{ 21.9, ACTOR.CXP1.Blackmore, 1390580 }, --  From there, we can...
+ 			--	{ 32, ACTOR.CXP1.Blackmore, 1390590 }, -- No longer used, July 17, 2007, -cmartin
+ 				{ 28.1, ACTOR.CXP1.Blackmore, 1390600 }, --The loss of Caen...
+ 				{ 31.2, ACTOR.CXP1.Blackmore, 1390610 }, -- The 1st SS will...
+ 				{ 34, ACTOR.CXP1.Blackmore, 1390620 }, -- All this open...
+ 				{ 38, ACTOR.CXP1.Blackmore, 1390630 }, -- Make sure our tanks...
+ 				{ 40, ACTOR.CXP1.Blackmore, 1390640 }, -- If there are any 88's...
+ 				{ 45.5, ACTOR.CXP1.Blackmore, 1390650 }, -- Once the Panzers have...
+ 				{ 50, ACTOR.CXP1.Blackmore, 1390660 }, -- It has all come down...
+ 			},
+ 		},
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_CaptureTowns)
+	-- Initialize Data
+	CaptureTowns_Init()
+	
+end
+
+-- announce the initial goal
+function CaptureTowns_OpeningIntel()
+	if Event_IsAnyRunning() == false then
+		Util_StartIntel(EVENTS.Opening)
+		Rule_RemoveMe()
+	end
+end
+
+-- announce the completion
+function CaptureTowns_ClosingIntel()
+	if Event_IsAnyRunning() == false then
+		Util_StartIntel(EVENTS.TownsClear)
+		Rule_RemoveMe()
+	end
+end
+
+-------------------------------------------------------------------------
+-- Capture Towns - Functions 
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Obj data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function CaptureTowns_Init()
+
+	tmkr_sol_at	= Marker_GetTable("mkr_sp_sol_at%d")
+	tmkr_fours_at	= Marker_GetTable("mkr_sp_fours_at%d")
+	teg_sol_mgs = EGroup_GetWBTable("eg_sol_mg%d")
+	teg_fours_mgs = EGroup_GetWBTable("eg_fours_mg%d")
+	
+	
+	tsg_soliers_mg = SGroup_CreateTable("sg_soliers_mg%d", table.getn(teg_sol_mgs))
+	tsg_soliers_at = SGroup_CreateTable("sg_soliers_at%d", table.getn(tmkr_sol_at))
+	sg_soliers_atAll = SGroup_CreateIfNotFound("sg_soliers_atAll")
+	-- new groups added for colour
+	sg_soliers_at4retreat = SGroup_CreateIfNotFound("sg_soliers_at4retreat")
+	sg_sol_at3_reman = SGroup_CreateIfNotFound("sg_sol_at3_reman")
+	eg_sol_at3_reman = EGroup_CreateIfNotFound("eg_sol_at3_reman")
+
+	tsg_fours_mg = SGroup_CreateTable("sg_fours_mg%d", table.getn(teg_fours_mgs))
+	tsg_fours_at = SGroup_CreateTable("sg_fours_at%d", table.getn(tmkr_fours_at))
+
+	-- define sgroups, egroups, etc associated with this obj
+	
+	-- *** TODO to incorporate some mobile units into the first encounter.
+	local mobile_sbps = {
+		{
+			sbp 					= SBP.AXIS.VOLKSGRENADIER,
+			upg						= {},
+			spawn					= eg_town1,
+		},
+	}
+	
+	-- ** TODO **
+	-- add a panzerschreck squad to attack the stuart
+	-- so that the stuart can be used for recon, but it doesn't 
+	-- set off the trap.
+	
+	-- 
+    t_capture_towns = {
+		timerID = 187634826,
+		fg_soliers_clear 			= false,			-- flag to indicate that the town of soliers has been captured
+		fg_fours_clear 			= false,			-- flag to indicate that the town of fours has been captured.
+		tsg_sol_mg					= tsg_soliers_mg,	-- table of all the sgroups for the machine guns in soliers
+		tsg_sol_at					= tsg_soliers_at,	-- table of all the sgroups for all the AT guns in soliers
+		t_threats					= t_cw_tank_threats,-- a table of threats that will set off the trap in the first town
+	}
+	
+	t_sol_atguns = {}
+	for i=1, table.getn(tmkr_sol_at) do 
+		t_sol_atguns[i] = {
+			sgroup					= tsg_soliers_at[i],
+			mkr_sp					= tmkr_sol_at[i],
+			timer					= "AT GUN SOLIERS TIMER"..i,					-- a timer that must count down before the at gun will try to find a new target
+			timer_amt				= 10,											-- timer amount of time,
+			swid					= SyncWeapon_GetFromSGroup(tsg_soliers_at[i]),
+			threat_id				= ThreatArrow_CreateGroup(),
+			action					= false,										-- used to determined whether or not a at gun should perform a specific action during an ambush
+		}
+	end
+	
+	-- specific actions defined for the AT GUN for when the player enters the town of soliers
+	t_sol_atguns[1].action = "advance"
+	t_sol_atguns[3].action = "advance"
+	t_sol_atguns[5].action = "advance"
+	
+	-- see t_sol_atguns for more information about the following data.
+	t_fours_atguns = {}
+	for i=1, table.getn(tmkr_fours_at) do 
+		t_fours_atguns[i] = {
+			sgroup					= tsg_fours_at[i],
+			mkr_sp					= tmkr_fours_at[i],
+			timer					= "AT GUN FOURS TIMER"..i,
+			timer_amt				= 10,
+			swid					= SyncWeapon_GetFromSGroup(tsg_fours_at[i]),
+			threat_id				= ThreatArrow_CreateGroup(),
+			action					= false,
+		}
+	
+	end
+	
+	-- set up intel event tables
+	t_capture_towns.event_start = {
+		{ACTOR.GenericAlly, 000000}, 
+		{ACTOR.GenericAlly, 000000},
+	}
+	
+	t_capture_towns.event_end = {
+		{ACTOR.GenericAlly, 000000}, 
+		{ACTOR.GenericAlly, 000000},
+	}	
+
+end
+
+-- preset any units or events needed before the kickoff, but you do not
+-- want them to occur at the outset of the map.
+-- Example: Often units are needed to exist before the objective start (because they start the objective)
+-- then spawn those units here when they need to be spawned
+function CaptureTowns_Preset()
+	
+	-- SOLIERS
+	
+	-- spawn squads
+	for i=1, table.getn(tsg_soliers_mg) do 
+		-- hack to alter sbp types without messing too much with the script - deg
+		local sbp1 = SBP.AXIS.HEAVYMG
+		-- customize
+		if i == 1 then sbp1 = SBP.AXIS.SNIPER 
+		elseif i == 3 then sbp1 = SBP.AXIS.VOLKSGRENADIER
+		elseif i == 4 then sbp1 = SBP.ELITE.PANZERGRENADIER end
+		-- same create function
+		Util_CreateSquads(player2, tsg_soliers_mg[i], sbp1, teg_sol_mgs[i])
+	end
+	-- make the sniper suck!
+	Modify_WeaponAccuracy(tsg_soliers_mg[1], "hardpoint_01", .01)
+	SGroup_Hide(tsg_soliers_mg[3], true)
+	
+	-- conver the Soliers HQ
+	Cmd_InstantUpgrade(eg_town1, UPG.AXIS.CONVERT_AMBIENT_BUILDING)
+	
+	-- created, hide and disable the AT guns in Soliers until the player arrives.
+	for k, this in pairs(t_sol_atguns) do 
+		Util_CreateSquads(player2, this.sgroup, SBP.AXIS.PAK_38, this.mkr_sp)
+		SGroup_SetAutoTargetting(this.sgroup, "hardpoint_01", false)
+		SGroup_AddGroup(sg_soliers_atAll, this.sgroup)
+		Cmd_Ability(this.sgroup, ABILITY.AXIS.CAMOUFLAGE_AT)
+		-- DIFFICULTY
+		Modify_Vulnerability(this.sgroup, t_dif.sol_AT_vul)
+	end
+
+	-- FOURS
+	
+	for i=1, table.getn(tsg_fours_mg) do 
+		Util_CreateSquads(player2, tsg_fours_mg[i], SBP.AXIS.HEAVYMG, teg_fours_mgs[i])
+	end
+	
+	-- convert the Fours HQ
+	Cmd_InstantUpgrade(eg_town2, UPG.AXIS.CONVERT_AMBIENT_BUILDING)
+	
+	for k, this in pairs(t_fours_atguns) do 
+		Util_CreateSquads(player2, this.sgroup, SBP.AXIS.PAK_38, this.mkr_sp)
+	end
+	
+end
+
+-- if the player has "captured" the Axis ambient buildings, 
+-- then he has completed the objective
+function CaptureTowns_WinCheck()
+	
+	-- disabling for Josh, only Soliers matters
+	-- if t_capture_towns.fg_fours_clear and t_capture_towns.fg_soliers_clear then
+	if t_capture_towns.fg_soliers_clear then
+		Objective_Complete(OBJ_CaptureTowns)
+		
+		-- *** TODO *** despawn the point that the Ally (player3) uses to attack the location of the town.
+		Rule_RemoveMe()
+		return
+	end
+	
+end
+
+function CaptureTowns_SoliersClear()
+	local clear = false
+	-- if EGroup_IsEmpty(eg_town1) then
+	if SGroup_IsEmpty(sg_soliers_atAll) then
+		clear = true
+	elseif Player_OwnsEGroup(player1, eg_town1) or EGroup_IsCapturedByPlayer(eg_sol_point, player1, false) then
+		Cmd_Move(sg_soliers_atAll, mkr_sp_tank_respawn1, false, mkr_sp_tank_respawn1)
+		clear = true
+	end
+	
+	if clear == true then
+		Objective_RemoveUIElements(OBJ_CaptureTowns, OBJ_CaptureTowns.mapElementID[1])
+		t_capture_towns.fg_soliers_clear = true
+		Rule_RemoveMe()
+	end
+end
+
+function CaptureTowns_FoursClear()
+	local clear = false
+	if EGroup_IsEmpty(eg_town2) or Player_OwnsEGroup(player2, eg_town2) == false then
+		clear = true
+	end
+	
+	if clear == true then
+		-- disabling for Josh, only ping Soliers
+		-- Objective_RemoveUIElements(OBJ_CaptureTowns, OBJ_CaptureTowns.mapElementID[2])
+		t_capture_towns.fg_fours_clear = true
+		Rule_RemoveMe()
+	end
+end
+
+
+-- start the related action
+function CaptureTowns_Kickoff()
+
+	-- action that starts with the Obj being granted
+	Rule_AddInterval(CT_ATUnderAttack, 3)
+	
+	-- win/lose check
+	Rule_AddInterval(CaptureTowns_WinCheck, 1)
+	Rule_AddInterval(CaptureTowns_SoliersClear, 3)
+	Rule_AddInterval(CaptureTowns_FoursClear, 3)
+	
+	-- additional behaviors
+	Rule_AddInterval(CT_VolksRetreat, 8)
+	Rule_AddInterval(CT_HQRetreat, 1)
+	Rule_AddInterval(CT_AT4_Retreat, 8)
+	Rule_AddInterval(CT_AT3_Unman, 1)
+	
+	-- the Soliers AT ambush
+	Rule_AddInterval(CT_StartSoliersAmbush, 1)
+	
+	-- ambient intels
+	Timer_Start(t_capture_towns.timerID, 12)
+	Rule_AddInterval(CT_AmbientIntel, 1)
+	
+end
+
+
+	
+function CT_AmbientIntel()
+	local count = table.getn(EVENTS.AmbientSolier)
+	if count == 0 or Objective_IsComplete(OBJ_CaptureTowns) then
+		Rule_RemoveMe()
+	else
+		if Event_IsAnyRunning() then
+			if Timer_GetRemaining(t_capture_towns.timerID) < 20 then
+				Timer_Add(t_capture_towns.timerID, World_GetRand(30, 60))
+			end
+		elseif Timer_GetRemaining(t_capture_towns.timerID) == 0 then
+			Player_GetAll(player1)
+			if SGroup_IsUnderAttack(sg_allsquads, false, 5) then
+				local rand = World_GetRand(1, count)
+				Util_StartAmbient(EVENTS.AmbientSolier[rand])
+				table.remove(EVENTS.AmbientSolier, rand)
+			end
+		end
+	end
+end
+
+-------------------------------------------------------------------------
+-- Additional Unit Behaviors
+
+-- Volks retreat
+function CT_VolksRetreat()
+	-- the first squad the player should encounter
+	local sgroup = tsg_soliers_mg[3]
+	if SGroup_IsEmpty(sgroup) then
+		Rule_RemoveMe()
+	elseif SGroup_IsUnderAttack(sgroup, false, 10) then
+		-- if the squad is not dead the building should still be standing
+		Cmd_Ungarrison(eg_sol_mg3)
+		-- run away once out
+		Rule_AddOneShot(CT_VolksFallback, 5)
+		
+		Rule_RemoveMe()
+	end
+end
+-- Run
+function CT_VolksFallback()
+	Cmd_Move(tsg_soliers_mg[3], mkr_sol_ambush, NO_QUEUE, NIL_DELETE, NIL_FACE, NIL_OFFSET, NIL_DIST, 10)
+end
+
+-- HQ squad retreat
+function CT_HQRetreat()
+	-- the HQ squad for Soliers
+	local sgroup = tsg_soliers_mg[4]
+	if SGroup_IsEmpty(sgroup) then
+		-- bring the house down
+		Rule_AddOneShot(CT_HQCollapse, 1)
+		Rule_RemoveMe()
+	elseif SGroup_TotalMembersCount(sgroup) < 2 then
+		-- if the squad is not dead the building should still be standing
+		Cmd_Ungarrison(eg_sol_mg4)
+		Cmd_Retreat(sgroup, Marker_GetPosition(mkr_sol_retreat), mkr_sol_retreat, true)
+		-- bring the house down
+		Rule_AddOneShot(CT_HQCollapse, 1)
+		
+		Rule_RemoveMe()
+	end
+end
+-- Destroy the HQ
+function CT_HQCollapse()
+	EGroup_Kill(eg_sol_mg4)
+end
+
+-- AT #4 retreat
+function CT_AT4_Retreat()
+	-- the left side AT gun
+	local atRetreat = {tsg_soliers_at[4], tsg_soliers_at[2]}
+	local done = true
+	for i = 1, 2 do 
+		if SGroup_IsEmpty(atRetreat[i]) then
+			-- do nothing
+		elseif SGroup_TotalMembersCount(atRetreat[i]) < 4 then
+			-- transfer the group over
+			SGroup_AddGroup(sg_soliers_at4retreat, atRetreat[i])
+			SGroup_Clear(atRetreat[i])
+			Cmd_Move(sg_soliers_at4retreat, mkr_sp_tank_respawn3, NO_QUEUE, mkr_sp_tank_respawn3)
+		else	
+			done = false
+		end
+	end
+	if done == true then Rule_RemoveMe() end
+end
+
+-- AT #3 unman
+function CT_AT3_Unman()
+	-- the AT gun straight up the road
+	local sgroup = tsg_soliers_at[3]
+	if SGroup_IsEmpty(sgroup) then
+		Rule_RemoveMe()
+	else 
+		-- get the sync ID
+		sync_AT3_unmanned = SyncWeapon_GetFromSGroup(sgroup)
+		-- remove the crew
+		Cmd_AbandonTeamWeapon(sgroup)
+		-- next 
+		Rule_AddOneShot(CT_AT3_Unman_KillLeftOver, 3)
+		Rule_AddInterval(CT_AT3_Reman, 1)
+		
+		Rule_RemoveMe()
+	end
+
+end
+
+function CT_AT3_Unman_KillLeftOver()
+	-- the AT gun straight up the road
+	local sgroup = tsg_soliers_at[3]
+	if SGroup_IsEmpty(sgroup) == false then
+		SGroup_Kill(sgroup)
+	end
+end
+
+-- AT #3 reman
+function CT_AT3_Reman()
+	-- the trigger squad for remanning the AT gun
+	local sgroup = tsg_soliers_mg[5]
+	if SGroup_IsEmpty(sgroup) or SGroup_IsUnderAttack(sgroup, false, 10) then
+		if SyncWeapon_Exists(sync_AT3_unmanned) and SyncWeapon_IsOwnedByPlayer(sync_AT3_unmanned, player1) == false then
+			-- get the egroup of the sync weapon
+			EGroup_Add(eg_sol_at3_reman, SyncWeapon_GetEntity(sync_AT3_unmanned))
+			Util_CreateSquads(player2, sg_sol_at3_reman, SBP.ELITE.FALLSCHIRMJAGER, mkr_sol_at3_reman, mkr_sp_sol_at3, 1, 3)
+			Cmd_CaptureTeamWeapon(sg_sol_at3_reman, eg_sol_at3_reman, true)
+			-- check the capture
+			Rule_AddInterval(CT_AT3_RemanCheck, 1)
+		end
+		Rule_RemoveMe()
+	end
+
+end
+
+function CT_AT3_RemanCheck()
+	if SyncWeapon_Exists(sync_AT3_unmanned) == false or SyncWeapon_IsOwnedByPlayer(sync_AT3_unmanned, player1) then
+		Rule_RemoveMe()
+	elseif SyncWeapon_IsOwnedByPlayer(sync_AT3_unmanned, player2) then
+		SGroup_AddGroup(tsg_soliers_mg[5], sg_sol_at3_reman)
+		SGroup_AddGroup(sg_soliers_atAll, sg_sol_at3_reman)
+		Rule_RemoveMe()
+	end
+end
+
+
+
+
+-------------------------------------------------------------------------
+-- Soliers AT Ambush
+
+function CT_IsPlayerInSoliers()
+	local filter = {
+		SBP.CW.CHURCHILL,
+		SBP.CW.CROMWELL,
+		SBP.CW.FIREFLY,
+		SBP.CW.COMMAND_CROMWELL,
+		SBP.CW.CHURCHILL_AVRE,
+		SBP.CW.CHURCHILL_CROC,
+	}
+
+	Player_GetAllSquadsNearMarker(player1, sg_temp, mkr_sol_ambush)
+	SGroup_Filter(sg_temp, filter, FILTER_KEEP)
+	if SGroup_IsEmpty(sg_temp) == false then
+		return true
+	end
+	
+	for k, sgroup in pairs (tsg_soliers_at) do 
+	
+		if SGroup_IsEmpty(sgroup) or SGroup_IsUnderAttack(sgroup, ANY, 5) then
+			return true
+		end
+	end
+	return false
+	
+end
+
+function CT_StartSoliersAmbush()
+
+	if CT_IsPlayerInSoliers() == false then
+		return
+	end
+
+	for k, this in pairs(t_sol_atguns) do
+		if SGroup_IsEmpty(this.sgroup) == false then
+			Cmd_Ability(this.sgroup, ABILITY.AXIS.CAMOUFLAGE_AT)
+			SGroup_SetAutoTargetting(this.sgroup, "hardpoint_01", true)
+			
+			if this.action == "advance" then
+				Cmd_Move(this.sgroup, this.sgroup, nil, nil, nil, OFFSET_FRONT, 20)
+			end
+		end
+	end
+	
+	Rule_RemoveMe()
+
+end
+
+-- checks to see whether or not any of the AT Guns
+-- are under attack in the town and orders them to face the
+-- appropriate direction if they fell threatened.
+function CT_ATUnderAttack()
+
+	if Objective_IsComplete(OBJ_CaptureTowns) then
+		Rule_RemoveMe()
+		return
+	end
+	
+	TeamWeapon_AttackResponse(t_sol_atguns)
+	TeamWeapon_AttackResponse(t_fours_atguns)
+
+end
+
+-- loops through the various table of at guns and 
+-- enacts an appropriate response to the player's movements:
+-- if the gun is not shooting at something, then attack that target.
+-- it determines its target by this table of SBPS: t_cw_tank_threats
+function TeamWeapon_AttackResponse(t_atguns)
+
+	for i, this in pairs (t_atguns) do 
+		
+		if SGroup_IsEmpty(this.sgroup) == false then
+			
+			SGroup_Clear(sg_temp)
+			Squad_GetAttackTargets(SGroup_GetSpawnedSquadAt(this.sgroup, 1), sg_temp)
+			
+			-- add/remove threat arrow if the sgroup is attacking the player
+			if SGroup_IsDoingAttack(this.sgroup, ANY, 10) 
+			and Player_OwnsSGroup(player1, sg_temp) then
+				ThreatArrow_Add(this.threat_id, this.sgroup)
+				FOW_RevealSGroupOnly(this.sgroup, 10)
+			else
+				ThreatArrow_Remove(this.threat_id, this.sgroup)
+			end
+			
+			-- move the at gun appropriately, if they are under attack and not attacking themselves
+			if SGroup_IsUnderAttack(this.sgroup, ANY, 5) then		
+				
+				-- only move if the actual AT Guns is NOT attacking and the timer has expired (which prevents the guns from moving too much)
+				if SyncWeapon_IsAttacking(this.swid, 10) == false 
+				and SGroup_IsMoving(this.sgroup, ANY) == false 
+				and (Timer_Exists(this.timer) == false or Timer_GetRemaining(this.timer) == 0) then
+					
+					SGroup_GetLastAttacker(this.sgroup, sg_temp)
+					SGroup_FilterThreat(sg_temp, t_capture_towns.t_threats)
+					
+					-- find a threat and move the gun to point at that threat (specifically tanks)
+					if SGroup_IsEmpty(sg_temp) == false then
+						Cmd_Move(this.sgroup, Util_GetPosition(this.sgroup), false, nil, Util_GetPosition(sg_temp))
+						Timer_Start(this.timer, this.timer_amt)
+					end
+					
+				end
+					
+			end
+			
+		else
+			ThreatArrow_DestroyGroup(this.threat_id)
+		end
+		
+	end
+
+end
+
+
+
+
+--
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- OBJECTIVE DESTROY 88s
+-------------------------------------------------------------------------
+-- The player must figure out a way to move up the hill on the right side
+-- of the map and attack and destroy all the 88s on the Ridge
+-- ** TODO ** this should be a timed objective to put some pressure on the player
+-- to finish the objective before the additional panzer division shows up
+-- the left side of the map is guarded by a contingent of tanks that 
+-- will attack and harass the player is he moves too far upw the left-hand 
+-- side of the map.
+-------------------------------------------------------------------------
+function Initialize_OBJ_Kill88s()
+
+	OBJ_Kill88s = {
+		
+		SetupUI = function() 
+			-- mark a point or position
+			OBJ_Kill88s.mapElementID = Objective_AddUIElements(OBJ_Kill88s, eg_k88_strat_point, true, false)
+			
+		end,
+		
+		OnStart = function()
+			
+			-- random recon planes
+			Timer_Start(t_fow.timerID, 20*60)
+			Rule_AddDelayedInterval(FOWReveal_RandomReconPlane, 60, 20)
+			
+			-- win/lose check
+			Rule_AddInterval(Kill88s_WinCheck, 5)
+			
+			-- start related action
+			Kill88s_Kickoff()
+			
+			-- intel rule
+			Rule_AddInterval(Kill88s_OpeningIntel, 1)
+			
+		end,
+		
+		OnComplete = function()
+			
+			-- tell the player they did good
+			Rule_AddOneShot(ClearBourg_DelayStart, 3)
+			Rule_AddInterval(K88_RetreatPanzers, 5)
+			
+			-- add pop
+			Player_SetPopCapOverride(player1, 100)
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			
+		end,
+		
+		Title = 1400220,
+		Description = 1400221,
+		TitleEnd = 1400223,
+		Type = OT_Primary,
+		
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_Kill88s)
+	-- Initialize Data
+	Kill88s_Init()
+	
+end
+
+-- tell the player to kill the 88s
+function Kill88s_OpeningIntel()
+	if Event_IsAnyRunning() == false then
+		Util_StartIntel(EVENTS.Clear88s1)
+		Rule_AddInterval(Kill88s_AmbientIntel, 1)
+		Rule_RemoveMe()
+	end
+end
+-- follow with Ambient
+function Kill88s_AmbientIntel()
+	if Event_IsAnyRunning() == false then
+		Util_StartAmbient(EVENTS.AmbientClear88s1)
+		Rule_RemoveMe()
+	end
+end
+
+-------------------------------------------------------------------------
+-- Kill 88s - Functions 
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Obj data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function Kill88s_Init()
+
+	-- define sgroups, egroups, etc associated with this obj
+	tmkr_sp_tank = Marker_GetTable("mkr_sp_tank%d")
+	tmkr_sp_88 = Marker_GetTable("mkr_sp_88%d")
+	tsg_88s = SGroup_CreateTable("sg_88%d", table.getn(tmkr_sp_88))
+	teg_88s = EGroup_GetWBTable("eg_88%d")
+	sg_k88s_start = SGroup_CreateIfNotFound("sg_k88s_start")
+	sg_k88s_playerNear = SGroup_CreateIfNotFound("sg_k88s_playerNear")
+	tmkr_sp_k88_recce = Marker_GetTable("mkr_sp_k88_recce%d")
+	tsg_k88_recce = SGroup_CreateTable("sg_k88_recce%d", table.getn(tmkr_sp_k88_recce))
+	tmkr_sp_k88_sniper = Marker_GetTable("mkr_sp_k88_sniper%d")
+	tsg_k88_sniper = SGroup_CreateTable("sg_k88_sniper%d", table.getn(tmkr_sp_k88_sniper))
+	
+	-- need to initialize the repair team because it is referenced in this objective	
+	RepairTeamInit()
+	
+	-- a table that will manage all the overall variables for the objective
+    t_k88s = {
+		sg_panzer_target 				= SGroup_CreateIfNotFound("sg_panzer_target"),	-- current sgroup that holds the target that the tanks will primarily attack
+		pos_panzer_idle					= Util_GetPosition(mkr_k88_pzr_attack1),		-- current position where the tanks will waiting to attack something
+		tsg_panzer_lead					= false,										-- holds a table of sgroups that will be identified as the leading group
+		snipers							= {},											-- a table that will populated with snipers to provide line of sight for 88s.
+		fg_start						= false,										-- flag to indicate whether or not the objective should be started
+	}
+	
+	-- a table that manages all the 88s that the player will encounter in the ambush
+	t_flak88s = {}
+	for i=1, table.getn(tmkr_sp_88) do
+		t_flak88s[i] = {
+			spawn 			= tmkr_sp_88[i],	-- the spawn point
+			sgroup 			= tsg_88s[i],		-- the sgroup associated with the flak 88
+			egroup 			= teg_88s[i],		-- if the weapon is not part of an sgroup, its egroup equivalent
+			eg_spawn 		= eg_ax_base,		-- the base from which the defenders will move to occupy the 88 (*** TODO ***)
+			sbp 			= SBP.AXIS.FLAK_88,
+		}
+		
+		if teg_88s[i] ~= nil then
+			t_flak88s[i].swid = SyncWeapon_GetFromEGroup(teg_88s[i])
+		else
+			t_flak88s[i].swid = false
+			t_flak88s[i].egroup = false
+		end
+	end
+	
+	-- this is a table to manage a group of vehicles that will act as spotters for the 88s
+	t_k88s_recce = {}
+	for i=1, table.getn(tmkr_sp_k88_recce) do 
+		t_k88s_recce[i] = {
+			sgroup 			= tsg_k88_recce[i],
+			spawn			= tmkr_sp_k88_recce[i],
+			sbp 			= SBP.AXIS.PUMA,
+			path			= "path_k88_recce"..i,
+			retreat_offset 	= OFFSET_FRONT,				-- retreats to an offset of a nearby 88 gun
+			offset_dist		= 35,						-- distance from the 88 gun
+		}
+	end
+	
+	-- indicates what flak gun they will try to retreat near for protection against
+	-- player attacks
+	t_k88s_recce[1].sg_retreat = t_flak88s[6].sgroup
+	t_k88s_recce[2].sg_retreat = t_flak88s[1].sgroup
+	t_k88s_recce[3].sg_retreat = t_flak88s[8].sgroup
+	
+	-- the blueprints that determine the core of the tanks
+	-- that are used to defend the left-hand side of the map
+	local t_group = {
+		{ --[[ 1 ]]
+			{sbp = SBP.AXIS.PANZER, upg = {}},
+			{sbp = SBP.AXIS.PUMA, upg = {}},
+			{sbp = SBP.ELITE.ARMOURCAR_222, upg = {}},
+		},
+		{ --[[ 2 ]]
+			{sbp = SBP.ELITE.PANZER_SUPPORT, upg = {}},
+			{sbp = SBP.ELITE.HALFTRACK_SNIPER, upg = {}},
+			{sbp = SBP.ELITE.PANZERGRENADIER, upg = {}},
+		},
+		{ --[[ 3 ]]
+			{sbp = SBP.ELITE.HETZER, upg = {}},
+			{sbp = SBP.ELITE.ARMOURCAR_222, upg = {}},
+			{sbp = SBP.ELITE.ARMOURCAR_222, upg = {}},
+		},
+	}
+	
+	
+	t_k88s_panzers = {}
+	for i=1, 3 do
+		t_k88s_panzers[i] = {
+			t_panzer_group 				= World_CopyTable(t_group[i]),			-- makes a copy of the table, so as not to modify it accidentally.
+			tank_combat_id 				= false,							-- tank combat id is used for controlling tank behavior
+			eg_retreat 					= teg_rt_base[i],					-- location to which the tanks will retreat if threatened.
+			target_offset				= false,							-- the offset which the tanks will occupy for the location that they move to
+			target_offset_dist			= 45,								-- the offset distance from the attack/move target that the tanks will move to
+			timer_respawn				= "K88 PANZER RESPAWN"..i,			-- amount of time that determines how quickly the tanks will respawn.
+			timer_respawn_amount		= (i*1.5)*60,
+		}
+	end
+	
+	local idx = 1
+	for i=1, table.getn(t_k88s_panzers) do
+		
+		t_k88s_panzers[i].t_sgroup = SGroup_CreateTable("sg_k88_panzer_group"..i.."_%d", table.getn(t_k88s_panzers[i].t_panzer_group))
+		t_k88s_panzers[i].pos_idle = Util_GetPosition(tmkr_sp_tank[idx])
+		
+		for k, this in pairs(t_k88s_panzers[i].t_panzer_group) do 
+			this.sgroup 				= t_k88s_panzers[i].t_sgroup[k]
+			this.spawn 					= Util_GetPosition(tmkr_sp_tank[idx])
+			idx = idx + 1
+		end
+		
+	end
+	
+	-- table of snipers that also provide field of vision for the 88s.
+	for i=1, table.getn(tmkr_sp_k88_sniper) do
+		
+		-- add some regular infantry to the hill
+		local sbp = SBP.ELITE.LUFTWAFFE
+		-- only use snipers on hard
+		if g_difficulty == 4 and ( i <= 2 or i >= 7 ) then sbp = SBP.AXIS.SNIPER end
+		
+		t_k88s.snipers[i] = {
+			sgroup 				= tsg_k88_sniper[i],
+			sbp					= sbp,
+			spawn				= tmkr_sp_k88_sniper[i],
+			eg_retreat			= eg_k88_bunker1,
+		}
+	end
+	
+	-- make the first group the leading group
+	t_k88s.tsg_panzer_lead = t_k88s_panzers[1].t_sgroup
+	-- set the offset for the other groups
+	t_k88s_panzers[2].target_offset = OFFSET_LEFT
+	t_k88s_panzers[3].target_offset = OFFSET_RIGHT
+	
+	-- set up intel event tables
+	t_k88s.event_fallback = {
+		{ACTOR.CXP1.Blackmore, 1391220}, 
+	}
+
+end
+
+function Kill88s_DelayStart()
+	
+	-- check if any of the squads in the k88s start group are under attack, then start this objective
+	if SGroup_IsEmpty(sg_k88s_start) == false then
+		-- if SGroup_IsDoingAttack(sg_k88s_start, ANY, 10) then
+		if SGroup_IsUnderAttack(sg_k88s_start, ANY, 10) then
+			t_k88s.fg_start = true
+		end
+	end
+	
+	if t_k88s.fg_start == true then
+		Objective_Start(OBJ_Kill88s)
+		Rule_RemoveMe()
+		return
+	end
+
+end
+
+-- preset any units or events needed before the kickoff, but you do not
+-- want them to occur at the outset of the map.
+-- Example: Often units are needed to exist before the objective start (because they start the objective)
+-- then spawn those units here when they need to be spawned
+function Kill88s_Preset()
+
+	Util_CreateSquads(player2, tsg_88s[5], SBP.AXIS.FLAK_88, tmkr_sp_88[5])
+	Util_CreateSquads(player2, tsg_88s[6], SBP.AXIS.FLAK_88, tmkr_sp_88[6])
+	
+	SGroup_AddGroup(sg_k88s_start, tsg_88s[5])
+	SGroup_AddGroup(sg_k88s_start, tsg_88s[6])
+	
+	for k, this in pairs(t_k88s_recce) do 
+		-- switched to Random Ligh Vehicle
+		Util_CreateSquads(player2, this.sgroup, Goodwood_RandLightVehSBP(), this.spawn)
+		Cmd_SquadPath(this.sgroup, this.path, true, true, true, 0)
+		SGroup_AddGroup(sg_k88s_start, this.sgroup)
+	end
+	
+	for k, this in pairs(t_k88s.snipers) do 
+		Util_CreateSquads(player2, this.sgroup, this.sbp, this.spawn)
+		Cmd_Ability(this.sgroup, ABILITY.AXIS.CAMOUFLAGE)
+--~ 		SGroup_SetAutoTargetting(this.sgroup, "hardpoint_01", false) -- tell the snipers to not shoot at anything. DISABLED
+	end
+	
+end
+
+-- does what it says
+function Goodwood_RandLightVehSBP() 
+	local SBPs = {SBP.AXIS.PUMA, SBP.ELITE.ARMOURCAR_221, SBP.ELITE.ARMOURCAR_223, SBP.ELITE.HALFTRACK_MORTAR}
+	local rand = World_GetRand(1, table.getn(SBPs))
+	return SBPs[rand]
+end
+
+-- start the related action
+function Kill88s_Kickoff()
+
+	-- spawn panzer groups
+	--for i=1, table.getn(t_k88s_panzers) do 
+		-- placeholder - deg - only spawn 1 set from the start
+		local i = 1
+		for k, this in pairs(t_k88s_panzers[i].t_panzer_group) do 
+			Util_CreateSquads(player2, this.sgroup, this.sbp, this.spawn)
+			Modify_UnitSpeed(this.sgroup, .7)
+		end	
+	--end
+	
+	TankCombat_SetThreats(t_cw_tank_threats)
+	
+	-- spawn the rest of the 88s on the hill.
+	for k, this in pairs(t_flak88s) do
+		if SGroup_IsEmpty(this.sgroup) and ( k ~= 7 and k~= 2 ) then
+			Util_CreateSquads(player2, this.sgroup, this.sbp, this.spawn)
+		end
+	end
+	
+	Rule_AddInterval(RT_DetermineRepair, 3)
+	-- 88 Behaviors
+	Rule_AddInterval(Kill88s_Manager, 5)
+	Rule_AddInterval(Kill88s_Expose88s, 3)
+	Rule_AddInterval(Kill88s_Flak1_Retreat, 15)
+	
+	Objective_Start(OBJ_TankDeaths, false)
+	
+	-- play ambient intels
+	Timer_Start(t_pzrD.timerID, 12)
+	Rule_AddInterval(PanzerDivision_AmbientIntel, 1)
+	
+end
+
+
+-- check to see if all the 88s have died
+function Kill88s_WinCheck()
+	
+	local count = 0
+	local b_all_dead = true
+	for k, this in pairs(t_flak88s) do 
+		if ( k ~= 7 and k~= 2 ) then
+			if SGroup_IsEmpty(this.sgroup) == false then
+				b_all_dead = false
+			else
+				count = count + 1
+			end
+		end
+	end
+	
+	-- no longer based on table size
+	-- Objective_SetCounter(OBJ_Kill88s, count, table.getn(t_flak88s))
+	Objective_SetCounter(OBJ_Kill88s, count, 6)
+	
+	if b_all_dead == true then
+		Objective_Complete(OBJ_Kill88s)
+		Rule_RemoveMe()
+	end
+	
+end
+
+-- this is a rule that runs other functions that 
+-- check the various status for this objective.
+function Kill88s_Manager()
+	
+	if Objective_IsComplete(OBJ_Kill88s) then
+		Rule_RemoveMe()
+		return
+	end
+
+	Kill88s_PlayerIsAttacking()
+	Kill88s_PanzerManager()
+	Kill88s_UpdatePanzerIdlePosition()
+	Kill88s_RecceManager()
+	Kill88s_SniperManager()
+	
+end
+
+-- if the player manages to capture the point on the hill without taking out
+-- all the 88s, then reveal the 88s to the player.
+function Kill88s_Expose88s()
+
+	if Player_OwnsEGroup(player1, eg_k88_strat_point) == false then
+		return
+	end
+	
+	if Objective_IsComplete(OBJ_Kill88s) then
+		Rule_RemoveMe()
+		return
+	end
+
+	OBJ_Kill88s.map_id = {}
+	for i=1, table.getn(tsg_88s) do 
+		
+		if SGroup_IsEmpty(tsg_88s[i]) == false then
+			OBJ_Kill88s.map_id[i] = Objective_AddUIElements(OBJ_Kill88s, tsg_88s[i], true, 1400222, true)
+		end
+		
+	end
+	Rule_RemoveMe()
+end
+
+function Kill88s_Flak1_Retreat()
+	-- the HQ squad for Soliers
+	local sgroup = tsg_88s[1]
+	if SGroup_IsEmpty(sgroup) then
+		Rule_RemoveMe()
+	elseif SGroup_IsUnderAttack(sgroup, false, 10) then
+		-- if the squad is not dead run it away when its attacked
+		Cmd_AbandonTeamWeapon(sgroup, true)
+		Cmd_Retreat(sgroup, Marker_GetPosition(mkr_sp_tank_respawn3), mkr_sp_tank_respawn3, true)
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+
+-- this function focuses on managing what the 3 tanks groups are doing
+-- on the map, such as updating their current target and respawning. 
+function Kill88s_PlayerIsAttacking()
+		
+	for i=1, table.getn(t_k88s_panzers) do 
+		
+		for k, this in pairs(t_k88s_panzers[i].t_panzer_group) do
+			if SGroup_IsEmpty(this.sgroup) == false 
+			and SGroup_IsUnderAttack(this.sgroup, ANY, 5) then
+				SGroup_Clear(sg_temp)
+				SGroup_GetLastAttacker(this.sgroup, sg_temp)
+				if SGroup_IsEmpty(sg_temp) == false then
+					
+					SGroup_AddGroup(t_k88s.sg_panzer_target, sg_temp)
+					return true
+				end
+			end
+		end
+	end
+	
+	SGroup_Clear(t_k88s.sg_panzer_target)
+	return false
+
+end
+
+-- this is a simple manager to organize the pumas that are guarding the 88s on the ridge.
+-- the intention is to have the pumas move to a location that is within the range of the 88s,
+-- when they come under attack.
+function Kill88s_RecceManager()
+
+	for k, this in pairs(t_k88s_recce) do 
+		if SGroup_IsEmpty(this.sgroup) == false
+		and SGroup_IsEmpty(this.sg_retreat) == false then
+		
+			local pos = SGroup_GetOffsetPosition(this.sg_retreat, this.retreat_offset, this.offset_dist)
+			
+			if SGroup_IsUnderAttack(this.sgroup, ANY, 5) 
+			and Prox_AreSquadsNearMarker(this.sgroup, pos, ANY, 10) == false then
+				Cmd_Move(this.sgroup, this.sg_retreat, nil, nil, nil, this.retreat_offset, this.offset_dist)
+			end
+		
+		end
+	end
+	
+
+end
+-- snipers provide line of sight for the 88s.  If they come under
+-- fire, they they should retreat to a respective nearby bunker.
+-- if they are not being attacked, then they should get out and move back to the location
+-- for which they were spotting.
+function Kill88s_SniperManager()
+
+	for k, this in pairs(t_k88s.snipers) do
+		
+		if SGroup_IsEmpty(this.sgroup) == false then
+		
+			if SGroup_IsUnderAttack(this.sgroup, ANY, 30)
+			and SGroup_IsMoving(this.sgroup, ANY) == false
+			and SGroup_IsInHoldEntity(this.sgroup, ANY) == false
+			and EGroup_IsEmpty(this.eg_retreat) == false then
+				print("Kill88s_SniperManager: Get Inside.")
+				Cmd_Ability(this.sgroup, ABILITY.AXIS.CAMOUFLAGE)
+				Cmd_Garrison(this.sgroup, this.eg_retreat, true)
+--~ 				SGroup_SetAutoTargetting(this.sgroup, "hardpoint_01", true)
+			elseif SGroup_IsUnderAttack(this.sgroup, ANY, 30) == false then
+				
+				if SGroup_IsInHoldEntity(this.sgroup, ANY) then
+					Cmd_Ungarrison(this.sgroup, this.spawn)
+				elseif SGroup_IsMoving(this.sgroup, ANY) == false
+				and Prox_AreSquadsNearMarker(this.sgroup, this.spawn, ANY, 15) == false then
+					print("Kill88s_SniperManager: Go to Spawn Point.")
+					Cmd_Ability(this.sgroup, ABILITY.AXIS.CAMOUFLAGE)
+					Cmd_Move(this.sgroup, this.spawn)
+--~ 					SGroup_SetAutoTargetting(this.sgroup, "hardpoint_01", false)
+				end
+
+			end
+		
+		end
+		
+	end
+
+end
+
+-- manages the respawning and overall movement of the the panzers that 
+-- guard the left hand (western side of the map)
+function Kill88s_PanzerManager()
+
+	-- searches through the various panzer groups
+	-- and determines if they are currently in a tank group
+	-- which indicates that they are actively moving somewhere.
+	-- if not, then they move to some location as determined by the PanzerMoveToPos function
+	-- and assign them to a tank combat group.
+	-- Additionally, check to see if a group gets reinforcements
+	for k, this in pairs(t_k88s_panzers) do 
+		
+		if Timer_Exists(this.timer_respawn) == false
+		or Timer_GetRemaining(this.timer_respawn) <= 0 then
+			Kill88s_SpawnPanzerGroup(this.t_panzer_group)
+			Timer_Start(this.timer_respawn, this.timer_respawn_amount)
+		end
+		
+		-- check if the combat group has already been moving to a location
+		-- and check if the combat group is moving towards a location that is not an attack target, but
+		-- an attack target exists
+		if this.tank_combat_id == false 
+		or TankCombat_GroupExists(this.tank_combat_id) == false
+		or (this.non_combat_target == true and SGroup_IsEmpty(t_k88s.sg_panzer_target) == false) then
+			
+			
+			local target = Kill88s_GetPanzerMoveToPos(this)
+			
+			-- check if the tanks are already at their location
+			-- and there is no target, then do not add them to a new combat group
+			local b_near_target = false
+			for i=1, table.getn(this.t_sgroup) do 
+				
+				if SGroup_IsEmpty(t_k88s.sg_panzer_target)
+				and Prox_AreSquadMembersNearMarker(this.t_sgroup[i], Util_GetPosition(target), ANY, 15) then
+					b_near_target = true
+					break
+				end
+				
+			end
+			
+			if b_near_target == false then
+				
+				-- if the group exists for some reason then remove it
+				if this.tank_combat_id ~= false and TankCombat_GroupExists(this.tank_combat_id) then
+					TankCombat_RemoveGroup(this.tank_combat_id)
+				end
+				
+				local retreatTarget = Util_GetRandomPosition(mkr_tank_ambTrigger4, 20)
+				if EGroup_IsEmpty(this.eg_retreat) == false then
+					retreatTarget = Util_GetPosition(this.eg_retreat)
+				end
+				this.tank_combat_id = TankCombat_AddGroup(this.t_sgroup, target, retreatTarget)
+			end
+		end
+	end
+	
+
+end
+
+-- this function searches through the number of possibilities of targets 
+-- and determines the best target for the formation of tanks to move to
+function Kill88s_GetPanzerMoveToPos(t_panzers)
+
+	local target = t_k88s.pos_panzer_idle
+	-- if any of the tanks are under attack, then move to the attacker
+	if SGroup_IsEmpty(t_k88s.sg_panzer_target) == false then
+		
+		-- if this group is the leading element of attackers then their attack
+		if t_panzers.target_offset == false then
+			target = Util_GetPosition(t_k88s.sg_panzer_target)
+		else
+			target = SGroup_GetOffsetPosition(t_k88s.sg_panzer_target, t_panzers.target_offset, t_panzers.target_offset_dist)
+		end
+		
+		-- since we have determined that the target is an enemy, stop processing and return this position
+		t_panzers.non_combat_target = false
+		return target
+		
+	end
+
+	-- note: the lead group of panzers always use the default target
+	-- otherwise move the tanks to an offset position of the leading group of tank
+	if t_panzers.target_offset ~= false then
+		
+		for k, sgroup in pairs(t_k88s.tsg_panzer_lead) do 
+			if SGroup_IsEmpty(sgroup) == false then
+				target =  World_GetOffsetPosition(t_k88s.pos_panzer_idle, Marker_GetPosition(mkr_south), t_panzers.target_offset, t_panzers.target_offset_dist)
+			end
+		end
+
+	end
+
+	-- otherwise, if everything fails, just give them the idle position
+	t_panzers.non_combat_target = true
+	return target
+
+end
+
+-- *** TODO *** Add Functionality to order infantry off of 88s and get them to move to various bunkers,
+-- when artillery is attacking them.
+
+-- the panzers will move to an "idle" position if they are not under attack
+-- on the left side of the map.  This position changes depending on which territory
+-- points the player owns.
+function Kill88s_UpdatePanzerIdlePosition()
+
+	if Player_OwnsEGroup(player2, eg_pzr_idle_pos1) then
+		t_k88s.pos_panzer_idle = Util_GetPosition(mkr_k88_pzr_attack1)
+	elseif Player_OwnsEGroup(player2, eg_pzr_idle_pos2)
+	and Player_OwnsEGroup(player2, eg_pzr_idle_pos3) then
+		t_k88s.pos_panzer_idle = Util_GetPosition(mkr_k88_pzr_attack2)
+	elseif Player_OwnsEGroup(player2, eg_pzr_idle_pos4)
+	and Player_OwnsEGroup(player2, eg_pzr_idle_pos5) then
+		t_k88s.pos_panzer_idle = Util_GetPosition(mkr_k88_pzr_attack3)
+	else
+		t_k88s.pos_panzer_idle = Util_GetPosition(mkr_k88_pzr_attack4)
+	end
+
+end
+
+function Kill88s_SpawnPanzerGroup(t_group)
+	for k, this in pairs(t_group) do
+		if SGroup_IsEmpty(this.sgroup) and Prox_ArePlayersNearMarker(player1, mkr_ax_entry8, false, 40) == false then
+			Util_CreateSquads(player2, this.sgroup, this.sbp, mkr_ax_entry8)
+			Cmd_AttackMove(this.sgroup, this.spawn)
+			Cmd_DoPlan(this.sgroup, "tank-axis-plan.squadai")
+			break
+		end
+	end
+
+end
+
+
+-- order the rest of the vehicles to retreat and be removed from the game world when they get to the exit location
+function K88_RetreatPanzers()
+
+	local b_all_dead = true
+	
+	for k, this in pairs(t_k88s_panzers) do 
+		
+		TankCombat_RemoveGroup(this.tank_combat_id)
+		
+		for i=1, table.getn(this.t_sgroup) do
+			local sgroup = this.t_sgroup[i]
+			if SGroup_IsEmpty(sgroup) == false then
+				b_all_dead = false
+				if SGroup_IsMoving(sgroup, ANY) == false then
+					Cmd_Move(sgroup, mkr_sp_tank_respawn1, nil, mkr_sp_tank_respawn1)
+					if t_k88s.event_fallback ~= false then
+						Util_AutoIntel(t_k88s.event_fallback)
+						t_k88s.event_fallback = false
+					end
+				elseif Prox_AreSquadsNearMarker(sgroup, mkr_sp_tank_respawn1, ANY, 20) 
+				and SGroup_IsOnScreen(player1, sgroup, ANY, 0.8) == false then
+					SGroup_DestroyAllSquads(sgroup)
+				end
+				
+			end
+		end
+		
+	end
+	
+	if b_all_dead == true then
+		Rule_RemoveMe()
+	end
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function ClearBourg_DelayStart()
+	
+	ClearBourg_Preset()
+	Objective_Start(OBJ_ClearBourg)
+
+end
+
+-------------------------------------------------------------------------
+-- Clear Bourguebus 
+-------------------------------------------------------------------------
+-- Short descriptive name of what the player is cht_eventsed to do
+-- give a brief description of win conditions and loose conditions if any 
+-- also describe the kind of challenges the player will face
+-------------------------------------------------------------------------
+function Initialize_OBJ_ClearBourg()
+
+	OBJ_ClearBourg = {
+		
+		SetupUI = function() 
+			-- mark a point or position
+			OBJ_ClearBourg.mapElementID = Objective_AddUIElements(OBJ_ClearBourg, mkr_vicPoint_objArrow, true, 1400243, true)
+		end,
+		
+		OnStart = function()
+			
+			-- announce the goal
+			-- Util_AutoIntel(t_clearBourg.event_start)
+			
+			-- win/lose check
+			Rule_AddInterval(ClearBourg_WinCheck, 5)
+			
+			-- start related action
+			ClearBourg_Kickoff()
+			
+			-- intel rule
+			Rule_AddInterval(ClearBourg_StartIntel, 1)
+			
+		end,
+		
+		OnComplete = function()
+			
+			-- assuming that the player has completed all the pertinent objectives...
+			g_win = true
+			
+			Rule_AddInterval(Goodwood_EndMissionIntel, 1)
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			
+		end,
+		
+		Title = 1400240,
+		Description = 1400241,
+		TitleEnd = 1400242,
+		Type = OT_Primary,
+		
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_ClearBourg)
+	-- Initialize Data
+	ClearBourg_Init()
+	
+end
+
+-- intel for the start of Bourg
+function ClearBourg_StartIntel()
+	if Event_IsAnyRunning() == false then
+		Util_StartIntel(EVENTS.CaptureBourg)
+		Rule_RemoveMe()
+	end
+end
+
+-------------------------------------------------------------------------
+-- Objective Name - Functions 
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Obj data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function ClearBourg_Init()
+
+	-- define sgroups, egroups, etc associated with this obj
+	sg_clearBourg_jagds = SGroup_CreateTable("sg_clearBourg_jagds%d", 4)
+	sg_clearBourg_jagdTemp = SGroup_CreateIfNotFound("sg_clearBourg_jagdTemp")
+	sg_clearBourg_jagdAll = SGroup_CreateIfNotFound("sg_clearBourg_jagdAll")
+	
+	sg_clearBourg_fallsh = SGroup_CreateTable("sg_clearBourg_fallsh%d", 4)
+	sg_clearBourg_fallshAll = SGroup_CreateIfNotFound("sg_clearBourg_fallshAll")
+	
+    t_clearBourg = {
+		timerID = 873641872361,
+		fg_jagds_allDead		= false,			-- flag to indicate that all the jagdpanthers are dead
+		fg_pointCaptured		= false,			-- flag to indicate that the flag is captuered
+		jagdsAccur = 2,
+		jagdsSpeed = .6,
+		jagdsDamage = 2,
+		jagds = {
+			{sgroup = sg_clearBourg_jagds[1], dest = mkr_tank_ambush1, trigger = mkr_tank_ambTrigger1, face = mkr_tank_ambTrigger1, point = mkr_ambush_rally1},
+			{sgroup = sg_clearBourg_jagds[2], dest = mkr_tank_ambush2, trigger = mkr_tank_ambTrigger2, face = mkr_ax_entry2, point = mkr_ambush_rally2},
+			{sgroup = sg_clearBourg_jagds[3], dest = mkr_tank_ambush3, trigger = mkr_tank_ambTrigger3, face = mkr_tank_ambush4, point = mkr_ambush_rally3},
+			{sgroup = sg_clearBourg_jagds[4], dest = mkr_tank_ambush4, trigger = mkr_tank_ambTrigger4, face = mkr_tank_ambTrigger4, point = mkr_ambush_rally4},
+		},
+		fallsh = {
+			-- the number of groups used affects the difficulty
+			{sgroup = sg_clearBourg_fallsh[1], src = mkr_falsh_spawn1, dest = mkr_ambush_rally3},
+			{sgroup = sg_clearBourg_fallsh[2], src = mkr_falsh_spawn2, dest = mkr_ambush_rally2},
+			{sgroup = sg_clearBourg_fallsh[2], src = mkr_falsh_spawn3, dest = mkr_ambush_rally1},
+			{sgroup = sg_clearBourg_fallsh[1], src = mkr_falsh_spawn4, dest = mkr_ambush_rally4},
+		},
+	}
+	-- set up intel event tables
+	t_clearBourg.event_start = {
+		{ACTOR.GenericAlly, 000000}, 
+	}
+
+end
+
+-- preset any units or events needed before the kickoff, but you do not
+-- want them to occur at the outset of the map.
+-- Example: Often units are needed to exist before the objective start (because they start the objective)
+-- then spawn those units here when they need to be spawned
+function ClearBourg_Preset()
+
+	-- spawn squads
+	Rule_AddInterval(ClearBourg_JagdpantherSpawn, 4)
+
+end
+
+function ClearBourg_JagdpantherSpawn()
+	local done = true
+	for k,v in pairs(t_clearBourg.jagds) do 
+		if SGroup_IsEmpty(v.sgroup) then
+			done = false
+			
+			-- josh wants two SP Tigers
+			local sbp = SBP.ELITE.JAGDPANTHER
+			if k == 2 or k == 3 then sbp = SBP.ELITE.KING_TIGER_ARNHEM end
+			
+			if Prox_ArePlayersNearMarker(player1, v.dest, false, 40) == false and Player_CanSeePosition(player1, Marker_GetPosition(v.dest)) == false then
+				-- spawn the squad at the hiding place
+				Util_CreateSquads(player2, v.sgroup, sbp, v.dest)
+				SGroup_AddGroup(sg_clearBourg_jagdAll, v.sgroup)
+				Cmd_Move(v.sgroup, v.dest, NO_QUEUE, NIL_DELETE, v.face)
+			else
+				-- spawn the squad and have it roll into place
+				Util_CreateSquads(player2, v.sgroup, sbp, mkr_ax_entry6)
+				Cmd_Move(v.sgroup, v.dest, NO_QUEUE, NIL_DELETE, v.face)
+			end
+			Modify_UnitSpeed(v.sgroup, t_clearBourg.jagdsSpeed)
+			Modify_WeaponAccuracy(v.sgroup, "hardpoint_01", t_clearBourg.jagdsAccur)
+			Modify_WeaponDamage(v.sgroup, "hardpoint_01", t_clearBourg.jagdsDamage)
+		end
+	end
+	
+	if done then Rule_RemoveMe() end
+end
+
+-- example of how to finish an Obj
+function ClearBourg_WinCheck()
+	-- may add a proper marker when I have access to the map - deg
+	t_clearBourg.clearTarget = mkr_tank_ambush3
+	-- one of them must be set to true before the player can win or lose the objective
+	if t_clearBourg.fg_jagds_allDead then
+		
+		if Prox_ArePlayersNearMarker(player2, t_clearBourg.clearTarget, false, 80) == false then
+			
+			-- grant the point
+			EGroup_InstantCaptureStrategicPoint(eg_bourg_vp, player1)
+			-- the player has just won
+			Objective_Complete(OBJ_ClearBourg)
+			
+			Rule_RemoveMe()
+			
+		else
+			-- message to clear out the town
+		end
+		
+	elseif t_clearBourg.lose == true then
+		
+		-- the player has just failed
+		Objective_Fail(OBJ_ClearBourg)
+		
+		Rule_RemoveMe()
+		
+	end
+	
+end
+
+
+-- start the related action
+function ClearBourg_Kickoff()
+	
+	-- watch the flag
+	Rule_AddInterval(ClearBourg_VP_Check, 1)
+	-- action that starts with the Obj being granted
+	Rule_AddInterval(ClearBourg_JagdManager, 12)
+	Rule_AddInterval(ClearBourg_FallshManager, 32)
+	
+	-- add the medal obj
+	Rule_AddOneShot(PanzerDivision_DelayStart, 3)
+	
+	-- ambient intel
+	Timer_Start(t_clearBourg.timerID, 120)
+	Rule_AddInterval(ClearBourg_AmbientIntel, 1)
+	
+end
+	
+function ClearBourg_AmbientIntel()
+	local count = table.getn(EVENTS.BourgAmbient)
+	if count == 0 or Objective_IsComplete(OBJ_ClearBourg) then
+		Rule_RemoveMe()
+	else
+		if Event_IsAnyRunning() then
+			if Timer_GetRemaining(t_clearBourg.timerID) < 20 then
+				Timer_Add(t_clearBourg.timerID, World_GetRand(30, 60))
+			end
+		elseif Timer_GetRemaining(t_clearBourg.timerID) == 0 then
+			Player_GetAll(player1)
+			if SGroup_IsUnderAttack(sg_allsquads, false, 5) then
+				local rand = World_GetRand(1, count)
+				Util_StartAmbient(EVENTS.BourgAmbient[rand])
+				table.remove(EVENTS.BourgAmbient, rand)
+			end
+		end
+	end
+end
+
+-- monitor the flag
+function ClearBourg_VP_Check()
+
+	if Objective_IsComplete(OBJ_ClearBourg) then
+		Rule_RemoveMe()
+	else
+		if EGroup_IsCapturedByPlayer(eg_bourg_vp, player1, false) and t_clearBourg.fg_pointCaptured == false then
+			t_clearBourg.fg_pointCaptured = true
+		elseif EGroup_IsCapturedByPlayer(eg_bourg_vp, player1, false) == false and t_clearBourg.fg_pointCaptured == true then
+			t_clearBourg.fg_pointCaptured = false
+		end
+	end
+	
+end
+
+-- manages the Jagdpanthers
+-- if they come under attack and
+-- if they are dead
+function ClearBourg_JagdManager()
+	local dead = true
+	for k,v in pairs(t_clearBourg.jagds) do 
+		if SGroup_IsEmpty(v.sgroup) == false then
+			dead = false
+			-- if hurt
+			if SGroup_GetAvgHealth(v.sgroup) < .05 then
+				-- 50% chance to blow up
+				if World_GetRand(1, 2) == 1 then
+					SGroup_Kill(v.sgroup)
+				else -- 50% chance to run
+					Cmd_Move(v.sgroup, mkr_ax_entry7, NO_QUEUE, mkr_ax_entry7)
+				end
+				
+			-- last one left?
+			elseif SGroup_Count(sg_clearBourg_jagdAll) == 1 then
+				Cmd_Move(v.sgroup, mkr_ax_entry7, NO_QUEUE, mkr_ax_entry7)
+				t_clearBourg.fg_jagds_leaving = true
+				
+			-- if under attack
+			elseif SGroup_IsUnderAttack(v.sgroup, false, 10) then
+				if SGroup_IsMoving(v.sgroup, false) == false then
+					if World_GetRand(1, 3) > 1 then
+						--Cmd_Move(v.sgroup, sg_clearBourg_jagdTemp, NO_QUEUE, NIL_DELETE, NIL_FACE, OFFSET_FRONT, World_GetRand(18, 28))
+						Cmd_Move(v.sgroup, v.sgroup, NO_QUEUE, NIL_DELETE, NIL_FACE, OFFSET_BACK, World_GetRand(5, 10))
+					else
+						SGroup_Clear(sg_clearBourg_jagdTemp)
+						SGroup_GetLastAttacker(v.sgroup, sg_clearBourg_jagdTemp)
+						if SGroup_IsEmpty(sg_clearBourg_jagdTemp) == false then
+							Cmd_AttackMove(v.sgroup, sg_clearBourg_jagdTemp)
+						end
+					end
+				end
+				
+			-- use it as a flag to keep from repeating - deg
+			elseif v.trigger ~= false 
+			and ( Prox_ArePlayersNearMarker(player1, v.trigger, false, 15) or Player_CanSeePosition(player1, Marker_GetPosition(v.dest)) ) then
+			--and ( Prox_ArePlayersNearMarker(player1, v.trigger, false, 15) == false or Player_CanSeePosition(player1, v.dest) ) then
+				Cmd_Move(v.sgroup, v.trigger)
+				v.trigger = false
+				
+			-- has the flag been captured?
+			elseif t_clearBourg.fg_pointCaptured == true and SGroup_IsMoving(v.sgroup, false) == false then
+				Cmd_Move(v.sgroup, v.point)
+				
+			elseif v.trigger == false and Objective_IsComplete(OBJ_PanzerDivision) 
+			and World_GetRand(1, 4) == 1 and SGroup_Count(sg_clearBourg_jagdAll) <= 3 then
+				Player_GetAll(player1)
+				if SGroup_IsEmpty(sg_allsquads) == false then
+					Cmd_AttackMove(v.sgroup, sg_allsquads)
+				end
+			end
+		end
+	end
+	
+	-- are they dead?
+	if dead or t_clearBourg.fg_jagds_leaving == true then
+		t_clearBourg.fg_jagds_allDead = true
+		Rule_RemoveMe() 
+	end
+
+end
+
+
+
+function ClearBourg_FallshManager()
+	
+	-- remove if the jagds are dead
+	if t_clearBourg.fg_jagds_allDead == true or t_clearBourg.fg_jagds_leaving == true then
+		Cmd_Retreat(sg_clearBourg_fallshAll, Marker_GetPosition(mkr_ax_entry7), mkr_ax_entry7)
+		Rule_RemoveMe() 
+		
+	-- start when the point is captured
+	-- possible additional condition to wait until the panzer division obj is done too
+	elseif t_clearBourg.fg_pointCaptured == true --[[ and Objective_IsComplete(OBJ_PanzerDivision) ]]then
+		-- pick a spawn point
+		for k,v in pairs(t_clearBourg.fallsh) do 
+			-- make sure no one is near it 
+			if Prox_ArePlayersNearMarker(player1, v.src, false, 40) == false then
+				-- spawn the troops
+				-- DIFFICULTY
+				local num = 2
+				for i = 1, num do 
+					if SGroup_Count(v.sgroup) < num then
+						-- spawn the squad at the hiding place
+						Util_CreateSquads(player2, v.sgroup, SBP.ELITE.FALLSCHIRMJAGER, v.src)
+						SGroup_AddGroup(sg_clearBourg_fallshAll, v.sgroup)
+						Cmd_AttackMove(v.sgroup, v.dest, false, nil, 10)
+						Cmd_MoveToThenCapture(v.sgroup, eg_bourg_vp, true)
+					end
+				end
+				break
+			end
+		end
+	elseif t_clearBourg.fg_pointCaptured == false and SGroup_IsEmpty(sg_clearBourg_fallshAll) == false then
+		for k,v in pairs(t_clearBourg.fallsh) do 
+			if SGroup_IsEmpty(v.sgroup) == false then
+				if SGroup_IsUnderAttack(v.sgroup, false, 10) then
+					Cmd_Move(v.sgroup, v.sgroup, NO_QUEUE, NIL_DELETE, NIL_FACE, OFFSET_BACK, 10, 10)
+				else
+					Cmd_Move(v.sgroup, v.dest, NO_QUEUE, NIL_DELETE, NIL_FACE, NIL_OFFSET, NIL_DIST, 20)
+				end
+			end
+		end
+		
+	end
+
+end
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- PANZER DIVISION
+-------------------------------------------------------------------------
+-- The player needs to face the foremost, strongest aspect of the Panzer
+-- Division and defeat them in head on head combat.
+-------------------------------------------------------------------------
+function Initialize_OBJ_PanzerDivision()
+
+	OBJ_PanzerDivision = {
+		
+		SetupUI = function() 
+			-- mark a point or position
+			-- OBJ_PanzerDivision.mapElementID = Objective_AddUIElements(OBJ_PanzerDivision, mkr_marker, true, 000000, true)
+		end,
+		
+		OnStart = function()
+			
+			-- announce the goal
+			-- Util_AutoIntel(t_pzr_division.EventStart)
+			
+			-- win/lose check
+			Rule_AddInterval(PanzerDivision_WinCheck, 5)
+			
+			-- start related action
+			PanzerDivision_Kickoff()
+			
+		end,
+		
+		OnComplete = function()
+			
+			-- tell the player they did good
+			Rule_AddInterval(PanzerDivision_DeadIntel, 1)
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			
+		end,
+		
+		Title = 1400300,
+		Description = 1400310,
+		TitleEnd = 1400320,
+		Type = OT_Secondary,
+		
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_PanzerDivision)
+	-- Initialize Data
+	PanzerDivision_Init()
+	
+end
+
+-- when the obj is done
+function PanzerDivision_DeadIntel()
+	if Event_IsAnyRunning() == false and Objective_IsComplete(OBJ_ClearBourg) == false then
+		Util_StartIntel(EVENTS.PanzerDivCrippled)
+		Rule_RemoveMe()
+	end
+end
+-------------------------------------------------------------------------
+-- Panzer Division - Functions 
+-------------------------------------------------------------------------
+
+
+function PanzerDivision_Init()
+
+	-- define sgroups, egroups, etc associated with this obj
+	tmkr_ax_entry = Marker_GetTable("mkr_ax_entry%d")
+	tsg_pd_center = SGroup_CreateTable("sg_pd_center%d", 4)
+	tsg_pd_flank_left = SGroup_CreateTable("sg_pd_flank_left%d", 2)
+	tsg_pd_flank_right = SGroup_CreateTable("sg_pd_flank_right%d", 2)
+	
+	sg_pd_allPanzers = SGroup_CreateIfNotFound("sg_pd_allPanzers")
+	sg_pd_allPanzersRun = SGroup_CreateIfNotFound("sg_pd_allPanzersRun")
+	
+	sg_pd_target = SGroup_CreateIfNotFound("sg_pd_target")
+	
+	sg_ally_hq = SGroup_CreateIfNotFound("sg_ally_hq")
+	tmkr_pd_regroup = Marker_GetTable("mkr_pd_regroup%d")
+	sg_player_hq = SGroup_CreateIfNotFound("sg_player_hq")
+	
+	-- these are tables for the different groups of 
+	-- center tanks that the player will have to face and destroy
+	t_pzrD = {
+		
+		-- timer for ambient intel
+		timerID = 76182354,
+		
+		-- filled in below
+		center_group = {},
+		
+		-- this is the group of tanks on the left of the center group
+		flank_left = {
+			{
+				sgroup				= tsg_pd_flank_left[1],
+				sbp					= SBP.ELITE.ARMOURCAR_222,
+				upg					= {},
+				spawn				= mkr_ax_entry5
+			},
+			{
+				sgroup				= tsg_pd_flank_left[2],
+				sbp					= SBP.ELITE.ARMOURCAR_222,
+				upg					= {},
+				spawn				= mkr_ax_entry6
+			},
+		},
+		
+		-- this is the group of tanks on the right of the center tanks
+		flank_right = {
+			{
+				sgroup				= tsg_pd_flank_right[1],
+				sbp					= SBP.ELITE.PANZERGRENADIER,
+				upg					= {},
+				spawn				= mkr_ax_entry7
+			},
+			{
+				sgroup				= tsg_pd_flank_right[2],
+				sbp					= SBP.ELITE.PANZERGRENADIER,
+				upg					= {},
+				spawn				= mkr_ax_entry8
+			},
+		},
+		
+	}
+	
+	t_pzrD.center_group[1] = {
+		{
+			sbp					= SBP.AXIS.TIGER,
+			upg					= {},
+		},
+		{
+			sbp					= SBP.AXIS.PANZER,
+			upg					= {},
+		},
+		{
+			sbp					= SBP.AXIS.PANZER,
+			upg					= {},
+		},
+		{
+			sbp					= SBP.ELITE.PANZER_SUPPORT,
+			upg					= {},
+		},
+	}
+	
+	t_pzrD.center_group[2] = {
+		{
+			sbp					= SBP.AXIS.PANTHER,
+			upg					= {},
+		},
+		{
+			sbp					= SBP.AXIS.PANZER,
+			upg					= {},
+		},
+		{
+			sbp					= SBP.AXIS.PANZER,
+			upg					= {},
+		},
+		{
+			sbp					= SBP.ELITE.PANZER_SUPPORT,
+			upg					= {},
+		},
+	}
+	
+	t_pzrD.center_group[3] = {
+		{
+			sbp					= SBP.AXIS.TIGER,
+			upg					= {},
+		},
+		{
+			sbp					= SBP.AXIS.PANTHER,
+			upg					= {},
+		},
+		{
+			sbp					= SBP.AXIS.PANZER,
+			upg					= {},
+		},
+		{
+			sbp					= SBP.ELITE.PANZER_SUPPORT,
+			upg					= {},
+		},
+	}
+
+	for i=1, table.getn(t_pzrD.center_group) do
+		for k, this in pairs(t_pzrD.center_group[i]) do 
+			this.sgroup = tsg_pd_center[k]
+			this.spawn = tmkr_ax_entry[k]
+		end
+	end
+	
+	
+	
+	-- this template is used for the TankCombatGroup code,
+	-- as a customized formation for the center group.
+	-- NOTE: there are four tanks in the center group, but 
+	-- this formation only specifies 3 because the first 
+	-- one is automatically defined by code (as the center)
+	local t_formation_template = {
+		{
+			offset			= OFFSET_BACK_RIGHT,
+			offset_def		= false,					-- do not flank anyone
+			offset_retreat 	= OFFSET_BACK_RIGHT,
+			offset_dist		= 10,
+			role			= TR_PACER,
+		},
+		{
+			offset			= OFFSET_LEFT,
+			offset_def		= false,					-- do not flank anyone		
+			offset_retreat 	= OFFSET_RIGHT,
+			offset_dist		= 20,
+			role			= TR_PACER,
+		},	
+		{
+			offset			= OFFSET_BACK_LEFT,
+			offset_def		= false,					-- do not flank anyone
+			offset_retreat 	= OFFSET_BACK_RIGHT,
+			offset_dist		= 10,
+			role			= TR_PACER,
+		},
+	}
+	
+	local panzer_division_states = {
+		{	-- PURPOSE: the default behavior for the tanks is to move and attack its intended target as determined by the function PD_GetActiveTarget()
+			state		= "default",										-- the name of the state
+			ExecState 	= function() PD_DefaultBehavior() end,				-- the function to execute for the center of the tank
+			CheckState 	= function() return PD_DefaultCheck() end,			-- the function that checks if the current state is valid
+			priority 	= 1													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: the behavior that determines the tank maneuvering if any of the panzers are under attack
+			state		= "under_attack",									-- the name of the state
+			ExecState 	= function() PD_UnderAttackBehavior() end,			-- the function to execute for the center of the tank
+			CheckState 	= function() return PD_UnderAttackCheck() end,		-- the function that checks if the current state is valid
+			priority 	= 3													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		{	-- PURPOSE: checks and determines whether or not the tanks should move to their regrouping point.
+			state		= "regroup",										-- the name of the state
+			ExecState 	= function() PD_RegroupBehavior() end,				-- the function to execute for the center of the tank
+			CheckState 	= function() return PD_RegroupCheck() end,			-- the function that checks if the current state is valid
+			priority 	= 5													-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+	}
+	
+	-- get the allied HQ
+	local Get_HQ = function(player, sgroupName, markerName)
+		Player_GetAll(player, sgroupName)
+		SGroup_Filter(sgroupName, SBP.CW.HQ, FILTER_KEEP)
+		if SGroup_IsEmpty(sgroupName) == false then
+			return sgroupName
+		else 
+			return markerName
+		end
+	end
+	
+	-- this is a list of targets that the panzers will attack (in this order) as they
+	-- move to attack and squash the player's attempt to annihilate the panzer division.
+	-- attack_string is text that is displayed to inform the player of what the panzer division is attacking
+	-- so that he can prepare for the attack.
+	t_pzrD.targets = {
+		{
+			target 			= mkr_sol_ambush,
+			attack_string	= 1390960,
+		},
+		{
+			target 			= mkr_k88_pzr_attack4,
+			attack_string	= 1390970,
+		},
+		{
+			target 			= mkr_sp_k88_recce1,
+			attack_string	= 1390830,
+		},
+		{
+			target 			= mkr_k88_pzr_attack5,
+			attack_string	= 1391130,
+		},
+	}
+	
+	for k, this in pairs(t_pzrD.targets) do 
+		this.timer			= "TIMER TARGET ATTACK"..k				-- timer that tracks how long the tanks will pursue a particular target
+		this.timer_amount	= 2*60									-- amount of time to pursue the target
+		this.activated		= false									-- flag to track whether or not the target has been used, to prevent it from be used twice.
+	end
+	
+	local base = 24
+    t_pzr_division = {
+		timerID = "panzer_spawn_timer_ID",
+		required_kills			= Util_DifVar( {base+10, base+10, base+6, base+4} ),					-- this is the number of tanks that the player is required to kill to complete objective.
+		tc_role_id				= TankCombat_CreateRoleGroup(),			-- this creates a customized role group for the tank combat manager
+		t_states				= panzer_division_states,				-- these are the various statest that control the overall behavior of all the panzers fort this objective
+		t_active_target			= t_pzrD.targets[1],						-- points to the table of the active target that the panzers are or will be attacking 
+		sg_target				= sg_pd_target,							-- sgroup containing a target that is or was recently attacking the tanks (used for flanking purposes)
+		fg_regroup				= false,								-- this flag tracks when the tanks should be regrouping
+		pos_regroup				= Util_GetPosition(mkr_pd_regroup1),	-- this is the center position at which the tanks will regroup
+		timer_regroup			= "PD REGROUP_TIMER",					-- timer to track the regrouping behavior of the tanks
+		timer_regroup_amount	= 3*60,								-- max amount of time tanks will spend regrouping 
+		center_idx				= 1,									-- index used to track which type of SBPs to spawn for the center group of panzers
+	}
+	
+	for k, this in pairs(t_formation_template) do 
+		TankCombat_AddRole(t_pzr_division.tc_role_id, this.offset, this.offset_def, this.offset_retreat, this.offset_dist, this.offset_def_dist, this.role)
+	end
+	
+	-- this is the overriding table that controls the 3 groups of panzers
+	-- and dictates where they move and in relation to each other.
+	t_pzr_division.panzers = {
+		{
+			t_group				= t_pzrD.center_group[1],
+			t_sgroup			= tsg_pd_center,
+			offset				= false,
+			tc_role_id			= t_pzr_division.tc_role_id,
+			target				= t_pzr_division.t_active_target.target,
+		},
+		{
+			t_group				= t_pzrD.flank_right,
+			t_sgroup			= tsg_pd_flank_right,
+			offset				= OFFSET_RIGHT,
+			offset_dist			= 40,
+			target				= t_pzr_division.t_active_target.target,
+		},
+		{
+			t_group				= t_pzrD.flank_left,
+			t_sgroup			= tsg_pd_flank_left,
+			offset				= OFFSET_LEFT,
+			offset_dist			= 40,
+			target				= t_pzr_division.t_active_target.target,
+		},
+	}
+
+	-- set up intel event tables
+	t_pzr_division.event_start = {
+		{ACTOR.GenericAlly, 000000}, 
+		{ACTOR.GenericAlly, 000000},
+	}
+	
+	t_pzr_division.event_end = {
+		{ACTOR.GenericAlly, 000000}, 
+		{ACTOR.GenericAlly, 000000},
+	}
+	
+	-- nislet to indicate
+	t_pzr_division.nislet_hq_arrived = {
+		{camPos	= Util_GetPosition(mkr_player_start2), waitType = NISLET_TIME, waitValue = 6},
+		{camPos = t_pzr_division.player_cam, waitType = NISLET_TIME, waitValue = 2},
+	}
+	
+	t_pzr_division.event_regroup = {
+		{ACTOR.CXP1.Blackmore, 1391210},
+	}
+	
+	-- currently no reason not to do this - deg
+	PanzerDivision_Preset()
+end
+
+-- ** TODO ** preset forces that will occupy the
+-- town of Bourguebus (furthest from the player) so that
+-- the source of the panzer division is guarded somewhat.
+function PanzerDivision_Preset()
+
+	-- Preset the timer just so that it exists
+	Timer_Start(t_pzr_division.timerID, 1)
+
+end
+
+-- example of how to finish an Obj
+function PanzerDivision_WinCheck()
+	
+	-- one of them must be set to true before the player can win or lose the objective
+	if Objective_GetCounter(OBJ_PanzerDivision) >= t_pzr_division.required_kills then
+		
+		SGroup_AddGroup(sg_pd_allPanzersRun, sg_pd_allPanzers)
+		
+		Objective_Complete(OBJ_PanzerDivision)
+		Rule_RemoveMe()
+		
+	-- if the bourg is cleared
+	elseif Objective_IsComplete(OBJ_ClearBourg) then 
+		-- fail the obj
+		Objective_Complete(OBJ_PanzerDivision, false)
+		Rule_RemoveMe()
+	end
+	
+end
+
+function PanzerDivision_DelayStart()
+
+	Objective_Start(OBJ_PanzerDivision)
+
+end
+
+-- start the related action
+function PanzerDivision_Kickoff()
+
+	Timer_Start(t_pzr_division.t_active_target.timer, t_pzr_division.t_active_target.timer_amount)
+	t_pzr_division.t_active_target.activated = true
+	-- PD_UpdateMinimapBlip(t_pzr_division.t_active_target.target)
+	
+	-- *** TODO Add starting intel to indicate panzer division is attacking *** 
+	
+	-- start the appropriate rules
+	Rule_AddOneShot(PD_Deployment, 2)	
+	StateMachine_AddTable(t_pzr_division.t_states)
+	
+	-- set the counter for the number of tank kills the player need to perform
+	Objective_SetCounter(OBJ_PanzerDivision, 0, t_pzr_division.required_kills)
+	
+end
+	
+function PanzerDivision_AmbientIntel()
+	local count = table.getn(EVENTS.CombatAmbient)
+	if count == 0 or Objective_IsComplete(OBJ_PanzerDivision) then
+		Rule_RemoveMe()
+	else
+		if Event_IsAnyRunning() then
+			if Timer_GetRemaining(t_pzrD.timerID) < 20 then
+				Timer_Add(t_pzrD.timerID, World_GetRand(30, 60))
+			end
+		elseif Timer_GetRemaining(t_pzrD.timerID) == 0 then
+			Player_GetAll(player1)
+			if SGroup_IsUnderAttack(sg_allsquads, false, 5) then
+				local rand = World_GetRand(1, count)
+				Util_StartAmbient(EVENTS.CombatAmbient[rand])
+				table.remove(EVENTS.CombatAmbient, rand)
+			end
+		end
+	end
+end
+
+function PD_Deployment()
+	
+	for k, this in pairs(t_pzr_division.panzers) do
+		PD_SpawnSquads(this.t_group)
+	end
+
+end
+
+-- spawns and moves the panzers appropriately.
+function PD_SpawnSquads(t_table)
+	if Objective_IsComplete(OBJ_PanzerDivision) == false then
+		for k, this in pairs(t_table) do 
+			-- the timer is a new element to keep them from spawning too frequently - deg
+			if Timer_GetRemaining(t_pzr_division.timerID) == 0 
+			and SGroup_IsEmpty(this.sgroup) 
+			-- the proximity is new to keep them from spawning while the player is nearby - deg
+			and Prox_ArePlayersNearMarker(player1, this.spawn, false, 60) == false then
+				Util_CreateSquads(player2, this.sgroup, this.sbp, this.spawn)
+				Modify_UnitSpeed(this.sgroup, .8)
+				Cmd_DoPlan(this.sgroup, "tank-axis-plan.squadai")
+				SGroup_AddGroup(sg_pd_allPanzers, this.sgroup)
+				
+				Cmd_Move(this.sgroup, SGroup_GetOffsetPosition(this.sgroup, OFFSET_FRONT, 20))
+				Rule_AddSGroupEvent(PD_PanzerKilled, this.sgroup, GE_SquadKilled)
+				
+				Timer_Add(t_pzr_division.timerID, World_GetRand(20, 36))
+				break
+			end
+		end
+	end
+end
+
+-- updates the counter every time one of the fearsome panzers from the
+-- panzer division is killed
+function PD_PanzerKilled()
+	if Objective_IsComplete(OBJ_PanzerDivision) == false then
+		count = Objective_GetCounter(OBJ_PanzerDivision)
+		Objective_SetCounter(OBJ_PanzerDivision, count + 1, t_pzr_division.required_kills)
+	end
+end
+
+-- this function determines what targets
+-- the tanks will move to and attack.  Those targets may be a location that they try to control
+-- or it might be a target that is attacking one of the tanks in the group.
+function PD_GetActiveTarget()
+
+	-- checks to see if any of the panzers in the panzer division is under attack
+	-- and marks the attackers at the correct target.
+	for i=1, table.getn(t_pzr_division.panzers) do 
+		
+		for k, this in pairs(t_pzr_division.panzers[i].t_group) do
+			if SGroup_IsEmpty(this.sgroup) == false 
+			and SGroup_IsUnderAttack(this.sgroup, ANY, 5) then
+				
+				pos = SGroup_GetPosition(this.sgroup)
+				
+				if SGroup_IsEmpty(t_pzr_division.sg_target) then
+					SGroup_Clear(sg_temp)
+					SGroup_GetLastAttacker(this.sgroup, sg_temp)
+					if SGroup_IsEmpty(sg_temp) == false then
+						SGroup_AddGroup(t_pzr_division.sg_target, sg_temp)
+					end
+				end
+				
+				if SGroup_IsEmpty(t_pzr_division.sg_target) == false then
+					return t_pzr_division.sg_target
+				end
+				
+			end
+		end
+	end
+	
+	-- none of the panzers are attacking, so make sure that the target is empty (for checking elsewhere)
+	SGroup_Clear(t_pzr_division.sg_target)
+	local t_active = t_pzr_division.t_active_target
+	
+	-- if the target is a building, and it has been destroyed,
+	-- then skip the timer to the end to force this
+	-- function to choose a new target
+	if scartype(t_active.target) == ST_SGROUP then
+		if SGroup_IsEmpty(t_active.target) 
+		and Timer_Exists(t_active.timer) then
+			Timer_Advance(t_active.timer, Timer_GetRemaining(t_active.timer))
+		end
+	end
+
+	return t_pzr_division.t_active_target.target
+
+end
+
+-- assigns the objective minimap blip to the appropriate location
+function PD_UpdateMinimapBlip(var)
+
+	Objective_RemoveUIElements(OBJ_PanzerDivision, OBJ_PanzerDivision.map_id)
+	OBJ_PanzerDivision.map_id = Objective_AddUIElements(OBJ_PanzerDivision, var, true, false)
+
+end
+
+-------------------------------------------------------------------------
+-- ****************** PANZER DIVISION BEHAVIORS ********************** --
+-------------------------------------------------------------------------
+
+-- the default behavior of the tanks is to attack a specific object or location
+-- for a period of time
+function PD_DefaultBehavior()
+	
+	for k, this in pairs(t_pzr_division.panzers) do
+		
+		local target = PD_GetActiveTarget()
+		this.target = target
+		
+		if scartype(target) == ST_SGROUP then
+			print("PD_DefaultBehavior: target is an SGROUP")
+		end
+		
+		if this.tank_combat_id == false
+		or TankCombat_GroupExists(this.tank_combat_id) == false then
+			
+			-- flag to keep the combat manager from continually adding the squads to a TankCombat group
+			-- if they are already at their specified attacking location
+			local b_near_target = false
+			
+			-- note: the lead group of panzers always use the default target
+			-- a "false" offset indicates that this group is the lead group
+			-- otherwise move the tanks to an offset position of the position of the thing that they are attacking
+			if this.offset ~= false then
+				target =  World_GetOffsetPosition(Util_GetPosition(this.target), Marker_GetPosition(mkr_south), this.offset, this.offset_dist)
+			end
+			
+			-- check if the tanks are already at their location
+			-- and there is no target, then do not add them to a new combat group
+			for i=1, table.getn(this.t_sgroup) do 
+				
+				if SGroup_IsEmpty(this.t_sgroup[i]) == false
+				and Prox_AreSquadMembersNearMarker(this.t_sgroup[i], Util_GetPosition(target), ANY, 30) then
+					b_near_target = true
+					break
+				end
+				
+			end
+			
+			-- if the tanks are not at their target location, then add them to a new TankCombat Group
+			if b_near_target == false then
+				
+				-- if the group exists for some reason then remove it
+				if this.tank_combat_id ~= false and TankCombat_GroupExists(this.tank_combat_id) then
+					TankCombat_RemoveGroup(this.tank_combat_id)
+				end
+				
+				this.tank_combat_id = TankCombat_AddGroup(this.t_sgroup, target, nil, this.tc_role_id)
+				TankCombat_EnableRetreat(this.tank_combat_id, false)
+			end
+			
+		elseif target ~= TankCombat_GetAttackTarget(this.tank_combat_id) then
+			
+			-- update the attack target for the tanks if necessary.
+			TankCombat_SetAttackTarget(this.tank_combat_id, target)
+			
+		end
+		
+	end	
+	
+end
+
+-- this behavior always needs to return true if the other behaviors fail.
+function PD_DefaultCheck()
+	
+	return true
+end
+
+
+
+
+
+----------------------------------------------------------------------------------------
+-- *** PANZER DIVISION UNDER ATTACK BEHAVIOR
+----------------------------------------------------------------------------------------
+
+-- this forces all the tanks to attack and defend each other if any of the tanks come under
+-- attack, this is the action for the behavior
+function PD_UnderAttackBehavior()
+	
+	-- get the currently active target
+	local sg_target = PD_GetActiveTarget()
+	local target
+	print("PD_UnderAttackBehavior")
+	
+	-- check to make sure that the target is an SGroup, if not...
+	-- then this behavior should be aborted
+	if scartype(sg_target) ~= ST_SGROUP then
+		print("PD_UnderAttackBehavior: Current Target is NOT an SGroup")
+		return
+	end
+	
+	for k, this in pairs(t_pzr_division.panzers) do
+	
+		-- if the target tank has died or been killed for some reason...
+		if SGroup_IsEmpty(sg_target) then
+			return
+		end
+		
+		-- check if the group has a tankcombat id, and if it does, is it attacking the correct target?
+		if this.tank_combat_id ~= false 
+		and TankCombat_GroupExists(this.tank_combat_id) then
+			if this.target ~= sg_target then
+				TankCombat_RemoveGroup(this.tank_combat_id)
+			end
+		end
+		
+		-- if the tank combat group does not in an attack group, then add them to 
+		-- one that will attack the correct target
+		if this.tank_combat_id == false 
+		or TankCombat_GroupExists(this.tank_combat_id) == false then
+			
+			this.target = sg_target
+			
+			if this.offset == false then
+				target = Util_GetPosition(sg_target)
+			else
+				target = SGroup_GetOffsetPosition(sg_target, this.offset, this.offset_dist)
+			end	
+							
+			this.tank_combat_id = TankCombat_AddGroup(this.t_sgroup, target, nil, this.tc_role_id)
+			TankCombat_EnableRetreat(this.tank_combat_id, false)
+		
+		end
+		
+	end		
+	
+	
+end
+
+-- check to see if any of the active tanks are under attack
+function PD_UnderAttackCheck()
+	
+	for i=1, table.getn(t_pzr_division.panzers) do
+		
+		for k, this in pairs(t_pzr_division.panzers[i].t_group) do
+			
+			if SGroup_IsEmpty(this.sgroup) == false 
+			and SGroup_IsUnderAttack(this.sgroup, ANY, 5) then
+				
+				return true
+			end
+			
+		end
+		
+	end
+	
+	return false
+	
+end
+
+----------------------------------------------------------------------------------------
+-- *** PANZER DIVISION REGROUP BEHAVIOR
+----------------------------------------------------------------------------------------
+-- this behavior dictates whether or not the tanks should return to 
+-- a predetermined location to regroup and respawn the destroyed/missing tanks
+function PD_RegroupCheck()
+	if Objective_IsComplete(OBJ_PanzerDivision) == false then
+		-- when is the regrouping phase finished?
+		-- 1) When all the tanks have been spawned and arrive at the spawn location
+		-- 2) Or when the regrouping timer has finished.
+		
+		-- check if all the tanks in the ** CENTER ** group are alive or dead
+		local all_dead = true
+		for k, sgroup in pairs(t_pzr_division.panzers[1].t_sgroup) do
+			if SGroup_IsEmpty(sgroup) == false then
+				all_dead = false
+				break
+			end
+		end
+		if all_dead == true then
+			PD_StartRegrouping()
+			return true
+		end
+		
+		-- check to see if the active target timer is running, and 
+		-- whether or not the regrouping phase has been initialized
+		if t_pzr_division.fg_regroup == false then
+			if Timer_Exists(t_pzr_division.t_active_target.timer)
+			and Timer_GetRemaining(t_pzr_division.t_active_target.timer) > 0 then
+				return false
+			else
+				PD_StartRegrouping()
+				return true
+			end
+		end
+		
+		-- transitional check to force the tanks to stop regrouping if
+		-- the timer has expired for regrouping
+		if Timer_Exists(t_pzr_division.timer_regroup)
+		and Timer_GetRemaining(t_pzr_division.timer_regroup) == 0 then
+			PD_StopRegrouping()
+			return false
+		end	
+		
+		-- check if all the tanks exist, and if they are within range of the 
+		-- regrouping position
+		for k, this in pairs(t_pzr_division.panzers) do
+			for i=1, table.getn(this.t_sgroup) do 
+				if SGroup_IsEmpty(this.t_sgroup[i]) then
+					return true
+				end
+				
+				if Prox_AreSquadsNearMarker(this.t_sgroup[i], t_pzr_division.pos_regroup, ANY, 80) == false then
+					return true
+				end
+			end
+		
+		end
+		
+		PD_StopRegrouping()
+		return false
+	end
+end
+
+-- this function initiates the regrouping behavior
+-- and sets all the correct variables, or updates the 
+-- center tank group with the appropriate SBPs and upgrades.
+function PD_StartRegrouping()
+	
+	if t_pzr_division.fg_regroup == true then
+		return
+	end
+	
+	local num = t_pzr_division.center_idx
+	if t_pzr_division.center_idx < table.getn(t_pzrD.center_group) then
+		num = num + 1
+		t_pzr_division.center_idx = num
+	end
+	
+	for k, this in pairs(t_pzr_division.panzers[1].t_group) do
+		this.sbp = t_pzrD.center_group[num][k].sbp
+		this.upg = t_pzrD.center_group[num][k].upg
+	end
+
+	local rand = World_GetRand(1, table.getn(tmkr_pd_regroup))
+	t_pzr_division.pos_regroup = Util_GetPosition(tmkr_pd_regroup[rand])
+	
+	-- ** ADD IN INTEL EVENT about regrouping ***
+	PD_UpdateMinimapBlip(t_pzr_division.pos_regroup)
+	-- Util_AutoIntel(t_pzr_division.event_regroup)
+	
+	Timer_Start(t_pzr_division.timer_regroup, t_pzr_division.timer_regroup_amount)
+	t_pzr_division.fg_regroup = true
+
+end
+
+-- stops the regrouping process and picks the next target 
+-- for the tanks to start attacking (assuming that they 
+-- are not under attack)
+function PD_StopRegrouping()
+
+	t_pzr_division.fg_regroup = false
+	
+	-- next, if a new target needs to be be picked, loop through the list of
+	-- targets and choose that one.  
+	for k, this in pairs(t_pzrD.targets) do 
+		if Timer_Exists(this.timer) == false 
+		and this.activated == false then
+			t_pzr_division.t_active_target = this
+			Timer_Start(this.timer, this.timer_amount)
+			this.activated = true
+			
+			-- ** ADD IN INTEL EVENT about new attack location ***
+			PD_UpdateMinimapBlip(this.target)
+			local intel = {
+				{ACTOR.CXP1.GenericCommonwealth, this.attack_string}
+			}
+			-- Util_AutoIntel(intel)
+			return
+		end
+	end
+	
+	-- However, if the currnet target is the
+	-- last target, then don't try to choose a new one.
+	-- just reset the target to the player's heaviest concentration of units and attack that location.
+	local tmax = table.getn(t_pzrD.targets)
+	t_pzr_division.t_active_target.target = Util_GetPosition(Player_GetSquadConcentration(player1))
+	Timer_Start(t_pzrD.targets[tmax].timer, t_pzrD.targets[tmax].timer_amount)
+	PD_UpdateMinimapBlip(t_pzr_division.t_active_target.target)
+
+end
+
+-- this executes the regrouping behavior, which
+-- respawns the missing panzers and moves all the tanks
+-- to the appropriate location near the regrouping site.
+function PD_RegroupBehavior()
+
+	-- there is a timer that also gives them time to regroup
+	-- in case the player is harassing the tanks too much
+	
+	b_regroup = true
+	-- move all the panzers to their specific regroup location
+	
+	for k, this in pairs(t_pzr_division.panzers) do
+	
+		-- if the panzers have died, then respawn the ones that are dead
+		-- there also needs to be a spawn timer to prevent the player from continually
+		-- attacking and killing a tank during the regroup phase.  Or the spawning needs
+		-- to be dynamically/randomly chosen.
+		-- flag to keep the combat manager from continually adding the squads to a TankCombat group
+		-- if they are already at their specified attacking location
+		
+		local target = t_pzr_division.pos_regroup
+		local b_near_target = false
+					
+		-- note: the lead group of panzers always use the default target
+		-- otherwise move the tanks to an offset position of the position at which they are regrouping
+		if this.offset ~= false then
+			target =  World_GetOffsetPosition(t_pzr_division.pos_regroup, Marker_GetPosition(mkr_south), this.offset, this.offset_dist)
+		end
+		
+		-- check if the tanks are already at their location
+		for i=1, table.getn(this.t_sgroup) do 
+			
+			if SGroup_IsEmpty(this.t_sgroup[i]) == false
+			and Prox_AreSquadMembersNearMarker(this.t_sgroup[i], target, ANY, 30) then
+				b_near_target = true
+				break
+			end
+			
+		end
+		
+		-- if they are not at their regroup location, then move there.
+		-- check if the group has a tankcombat id, and if it does, is it the target they are moving towards?
+		-- then remove it, if not.
+		if this.tank_combat_id ~= false 
+		and TankCombat_GroupExists(this.tank_combat_id) then
+			if this.target ~= t_pzr_division.pos_regroup then
+				TankCombat_RemoveGroup(this.tank_combat_id)
+			end
+		end
+		
+		-- ** TODO ** this needs a spawn timer
+		-- spawn any tanks that have been destroyed
+		PD_SpawnSquads(this.t_group)
+		
+		
+		-- if the tanks are not at their target location, then add them to a new TankCombat Group
+		-- to move to the regroup position
+		if b_near_target == false then
+			if this.tank_combat_id == false 
+			or TankCombat_GroupExists(this.tank_combat_id) == false then
+				
+				-- spawn any squads that might be missing
+				-- ** TODO ** this might need a respawn timer
+				PD_SpawnSquads(this.t_group)
+				this.target = t_pzr_division.pos_regroup
+				
+				if this.offset == false then
+					target = Util_GetPosition(this.target)
+				else
+					target = World_GetOffsetPosition(this.target, Util_GetPosition(mkr_south), this.offset, this.offset_dist)
+				end	
+								
+				this.tank_combat_id = TankCombat_AddGroup(this.t_sgroup, target, nil, this.tc_role_id)
+				TankCombat_EnableFormUp(this.tank_combat_id, false)
+				TankCombat_EnableRetreat(this.tank_combat_id, false)
+			
+			end
+		end
+	end
+
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+-- ************************** ALLY PLAYER **************************** --
+-------------------------------------------------------------------------
+-- controls and maintains the basic behavior for the CPU controlled, 
+-- allied player on the map.
+-------------------------------------------------------------------------
+function Ally_Init()
+
+	tmkr_sp_ally = Marker_GetTable("mkr_sp_ally%d")
+	tsg_ally = SGroup_CreateTable("sg_ally%d", table.getn(tmkr_sp_ally))
+	sg_ally_capture = SGroup_CreateIfNotFound("sg_ally_capture")
+	sg_goodwood_allyHQ = SGroup_CreateTable("sg_goodwood_allyHQ%d", 3)
+	sg_ally_pointcapture_squads = SGroup_CreateIfNotFound ("sg_ally_pointcapture_squads")
+
+	
+	t_ally = {
+		timer_respawn 				= "ALLY RESPAWN TIMER",			-- timer that passes before allied units get respawned.
+		timer_respawn_amount		= 1*60,							-- amount of time.
+	}
+	
+	t_ally_squads = {
+		-- squads that will get spawned and replaced as they die
+		{	
+			sbp				= SBP.CW.TOMMIES,
+			upg				= {},
+			sgroup 			= tsg_ally[1],
+			spawn			= tmkr_sp_ally[1],
+			player			= player3,
+		},
+		{	
+			sbp				= SBP.CW.FIREFLY, 
+			upg				= {},
+			sgroup 			= tsg_ally[2],
+			spawn			= tmkr_sp_ally[2],
+			player			= player3,
+		},
+		{	
+			sbp				= SBP.CW.FIREFLY, 
+			upg				= {},
+			sgroup 			= tsg_ally[3],
+			spawn			= tmkr_sp_ally[3],
+			player			= player3,
+		},
+		{	
+			sbp				= SBP.CW.CHURCHILL_CROC, 
+			upg				= {},
+			sgroup 			= tsg_ally[4],
+			spawn			= tmkr_sp_ally[4],
+			player			= player3,
+		},
+		{	
+			sbp				= SBP.CW.SAPPER, 
+			upg				= {},
+			sgroup 			= tsg_ally[5],
+			spawn			= tmkr_sp_ally[5],
+			player			= player3,
+		},
+		-- squads for capturing Fours HQ building (script controlled, not AI)
+		{	
+			sbp				= SBP.CW.TOMMIES,
+			upg				= {},
+			sgroup 			= sg_ally_capture,
+			spawn			= mkr_sp_capture_squad,
+			player			= player4,
+		},
+		{	
+			sbp				= SBP.CW.LIEUTENANT, 
+			upg				= {},
+			sgroup 			= sg_ally_capture,
+			spawn			= mkr_sp_capture_squad,
+			player			= player4,
+		},
+		-- squads for capturing points on the map (script controlled, not AI)
+		{	
+			sbp				= SBP.CW.TOMMIES,
+			upg				= {},
+			sgroup 			= sg_ally_pointcapture_squads,
+			spawn			= mkr_sp_capture_squad,
+			player			= player4,
+		},
+		{	
+			sbp				= SBP.CW.LIEUTENANT, 
+			upg				= {},
+			sgroup 			= sg_ally_pointcapture_squads,
+			spawn			= mkr_sp_capture_squad,
+			player			= player4,
+		},
+	}
+	
+	t_AllyHQ = {
+		{sgroup = sg_goodwood_allyHQ[1], sbp = SBP.CW.HQ, 			destination = mkr_fours_ally_hq,			setup = false},
+		{sgroup = sg_goodwood_allyHQ[2], sbp = SBP.CW.INFANTRY_HQ, 	destination = mkr_fours_ally_soldiershq, 	setup = false},
+		{sgroup = sg_goodwood_allyHQ[3], sbp = SBP.CW.ARMOUR_HQ, 	destination = mkr_fours_ally_armouredhq, 	setup = false},
+	}
+	
+	-- List of points for ally player to capture in sequential order. NRiley (04/19/07)
+	t_Ally_CapturePoints = {
+		eg_fours_supply4,
+		eg_fours_supply3,
+		eg_fours_supply2,
+		eg_fours_supply1,
+		eg_fours_supply5,
+		eg_left_supply6,
+		eg_left_supply8,
+		eg_centre_supply7,
+		eg_centre_supply9,
+	}
+	
+end
+
+function Ally_Preset()
+	
+	for k, this in pairs(t_ally_squads) do 
+		Util_CreateSquads(this.player, this.sgroup, this.sbp, mkr_sp_capture_squad)
+	end
+	
+end
+
+function Ally_Kickoff()
+
+	Rule_AddInterval(Ally_Manager, 10)
+
+end
+
+-- respawns units for the AI to use.
+function Ally_Respawn()
+
+	if Timer_Exists(t_ally.timer_respawn) == false
+	or Timer_GetRemaining(t_ally.timer_respawn) == 0 then
+		
+		for k, this in pairs(t_ally_squads) do 
+			if SGroup_IsEmpty(this.sgroup) then
+				Util_CreateSquads(this.player, this.sgroup, this.sbp, this.spawn)				
+			end
+		end		
+	
+		Timer_Start(t_ally.timer_respawn, t_ally.timer_respawn_amount)
+	end
+
+end
+
+-- orders the capture squad to capture city of fours
+function Ally_CaptureTown()
+
+	if Player_OwnsEGroup(player4, eg_town2)
+	or Player_OwnsEGroup(player1, eg_town2)
+	or Player_OwnsEGroup(player3, eg_town2) then
+		return
+	end
+
+	if Player_OwnsEGroup(player2, eg_town2) == false and EGroup_Count(eg_town2) >= 1 then
+		Cmd_Garrison(sg_ally_capture, eg_town2, true)
+		return
+	end
+
+	if EGroup_IsEmpty(eg_town2) == false then
+		if SGroup_IsEmpty(sg_ally_capture) == false and SGroup_IsMoving(sg_ally_capture, ANY) == false
+			and SGroup_IsUnderAttack(sg_ally_capture, ANY, 5) == false then
+			Cmd_AttackMove(sg_ally_capture, eg_town2)
+			Cmd_RevertOccupiedBuilding(sg_ally_capture, eg_town2, true)
+		end
+	end
+
+end
+
+function Ally_Manager()
+
+	Ally_CaptureTown()
+	Ally_Respawn()
+	Ally_CapturePoints ()
+
+end
+
+function Ally_CreateAndMoveHQ()
+	
+	-- Create Player HQs for Player 3 if they don't exist already
+	for k, this in pairs (t_AllyHQ) do
+		if SGroup_Count (this.sgroup) == 0 then
+			Util_CreateSquads(player3, this.sgroup, this.sbp, mkr_sp_ally3)
+			Util_SetCommonwealthHQMobility(this.sgroup, true)
+			Cmd_Move (this.sgroup, this.destination)
+		else
+			print('moving HQ')
+			Cmd_Move (this.sgroup, this.destination)
+		end
+	end
+	
+	-- Add the SetupHQ and DestroyWatch rules if they don't exist already to monitor the HQs' status.
+	if Rule_Exists (Ally_SetupHQ) == false then Rule_AddInterval(Ally_SetupHQ, 2) end
+	if Rule_Exists (Ally_DestroyWatch) == false then Rule_AddInterval(Ally_DestroyWatch, 1) end
+	
+	Rule_RemoveMe()
+	
+end
+
+function Ally_DestroyWatch()
+
+	if timeToRemove == true then
+		Rule_RemoveMe()
+		return
+	end
+	
+	Ally_CreateAndMoveHQ()
+	
+end
+
+function Ally_SetupHQ()
+	
+	local done = false
+	
+	for k, this in pairs (t_AllyHQ) do
+		
+		if Prox_AreSquadsNearMarker(this.sgroup, this.destination, ANY, 10) and this.setup == false then
+			Cmd_Stop (this.sgroup)
+			Util_SetCommonwealthHQMobility (this.sgroup, false, false)
+			this.setup = true
+			done = false
+			break
+		end
+		
+	end
+	
+	if done == true then Rule_RemoveMe() end
+	
+end
+	
+function Ally_CapturePoints()
+
+	for k, this in pairs (t_Ally_CapturePoints) do
+		if Player_OwnsEGroup (player2, this) and SGroup_IsCapturing (sg_ally_pointcapture_squads, ANY) == false then
+			Cmd_AttackMoveThenCapture (sg_ally_pointcapture_squads, this)
+			break
+		end	
+	end
+	
+end
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+-- REPAIR TEAM (RT)
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+function RepairTeamInit()
+
+	teg_rt_base = EGroup_GetWBTable("eg_rt_base%d")
+	tsg_repair_team = SGroup_CreateTable("sg_repair_team%d", 3)
+	tsg_base_inf = SGroup_CreateTable("sg_base_inf%d", table.getn(teg_rt_base))
+	sg_vehicles_to_repair = SGroup_CreateIfNotFound("sg_vehicles_to_repair")
+	
+	-- put squads into ambient buildings and upgrade the buildings, these are the repair, fallback stations
+	for i=1, table.getn(teg_rt_base) do 
+		Util_CreateSquads(player2, tsg_base_inf[i], SBP.AXIS.HEAVYMG, teg_rt_base[i])
+		Cmd_InstantUpgrade(teg_rt_base[i], UPG.AXIS.CONVERT_AMBIENT_BUILDING)
+	end
+
+	-- order of the vehicles in this table determines the order
+	-- that the infantry will repair the vehicles
+	t_rt_vehicle_sbps = {		
+		SBP.AXIS.TIGER,
+		SBP.AXIS.PANTHER,
+		SBP.AXIS.PANZER,
+		SBP.AXIS.PUMA,
+		SBP.AXIS.HALFTRACK,
+	}
+	
+	t_rt = {
+		repair_percent 			= 0.999,
+	}
+	
+	t_repair_team = {}
+	for i=1, table.getn(tsg_repair_team) do 
+		t_repair_team[i] = {
+			sgroup				= tsg_repair_team[i],
+			eg_repair 			= teg_rt_base[1],
+			sg_target			= false,
+			fg_active			= false,
+			sbp 				= SBP.AXIS.PIONEER,
+		}
+	end
+	
+
+end
+
+
+-- this function determines if there are any vehicles near the bases to repair
+function RT_DetermineRepair()
+
+	for i=1, table.getn(teg_rt_base) do 
+		-- determine if there are any vehicles nearby that need repair
+		if RT_IsBaseValid(teg_rt_base[i]) then
+		
+			Player_GetAllSquadsNearMarker(player2, sg_vehicles_to_repair, EGroup_GetPosition(teg_rt_base[i]), 80)
+			SGroup_Filter(sg_vehicles_to_repair, t_rt_vehicle_sbps, FILTER_KEEP)
+			if SGroup_IsEmpty(sg_vehicles_to_repair) == false then
+			
+				-- this checks a squad to see if it falls below the threshold, and if so removes them
+				-- from the sgroup of vehicles to repair
+				local _FilterHealth = function(gid, idx, sid)
+					local currentHealth = 0
+					local maxHealth = 0
+					
+					currentHealth = Squad_GetHealth(sid)
+					maxHealth = Squad_GetHealthMax(sid)
+					if maxHealth > 0 and currentHealth/maxHealth > t_rt.repair_percent then
+						SGroup_Remove(gid, sid)
+					end
+					
+				end
+				
+				-- loop through the various available vehicles and determine which ones
+				-- fall under the threshold
+				SGroup_ForEach(sg_vehicles_to_repair, _FilterHealth)
+				
+				if SGroup_IsEmpty(sg_vehicles_to_repair) == false then
+					
+					t_repair_team.eg_repair = teg_rt_base[i]
+					RT_RepairTeamActive()
+					return
+				end
+			end
+		end
+		
+	end
+	
+	-- if the code makes it through without finding any vehicles to repair, then
+	-- make sure all the repair engineers are gone.
+	RT_RepairTeamInactive()
+	
+end
+
+-- this function spawns pioneers that are near the bases to move and repair nearby tanks
+function RT_RepairTeamActive()
+	
+	-- spawns, or orders the various 
+	local _RepairVehicles = function(gid, idx, sid)
+	
+		-- if there aren't any team members available for repair,
+		-- then don't process the rest of the squads
+		if t_repair_team[idx] == nil then
+			return
+		end
+		
+		local sgroup = t_repair_team[idx].sgroup
+		SGroup_Clear(sg_temp)
+		
+		if EGroup_IsEmpty(t_repair_team[idx].eg_repair) == false then
+			
+			-- if the repair team is dead, spawn them.
+			if SGroup_IsEmpty(sgroup) then
+				Util_CreateSquads(player2, sgroup, t_repair_team[idx].sbp, t_repair_team[idx].eg_repair, EGroup_GetPosition(t_repair_team[idx].eg_repair), nil, 2)
+			elseif SGroup_IsInHoldEntity(sgroup, ANY) then
+				Cmd_UngarrisonSquad(sgroup, EGroup_GetPosition(t_repair_team[idx].eg_repair))
+			elseif Squad_GetActiveCommand(SGroup_GetSpawnedSquadAt(sgroup, 1)) ~= SQUADSTATEID_Ability then
+				Cmd_Ability(sgroup, ABILITY.REPAIR, gid)		
+			end
+		end
+	
+	end
+	
+	SGroup_ForEach(sg_vehicles_to_repair, _RepairVehicles)
+
+end
+
+-- loops through the various team members and orders them
+-- back into a building to despawn
+function RT_RepairTeamInactive()
+
+	for i=1, table.getn(t_repair_team) do 
+		local sgroup = t_repair_team[i].sgroup
+	
+		if SGroup_IsEmpty(sgroup) == false then		
+			if SGroup_IsInHoldEntity(sgroup, ALL) then
+				SGroup_DestroyAllSquads(sgroup)
+			elseif EGroup_IsEmpty(t_repair_team[i].eg_repair) == false then
+				-- make the location that they despawn at, better at choosing that location
+				Cmd_Garrison(sgroup, t_repair_team[i].eg_repair)
+			end
+		
+		end
+	end
+
+end
+
+function RT_IsBaseValid(eg_base)
+
+	if EGroup_IsEmpty(eg_base) then
+		return false
+	end
+
+	if Player_OwnsEGroup(player2, eg_base) == false then
+		return false
+	end
+
+	return true
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- TANK DEATHS
+-------------------------------------------------------------------------
+-- Currently this objective just tracks the number of the player's tanks
+-- that die during the mission.  You cannot win or fail it, and it doesn't
+-- have any consequence.
+-------------------------------------------------------------------------
+function Initialize_OBJ_TankDeaths()
+
+	OBJ_TankDeaths = {
+		
+		SetupUI = function() 
+			-- mark a point or position
+			-- OBJ_TankDeaths.mapElementID = Objective_AddUIElements(OBJ_TankDeaths, mkr_marker, true, 000000, true)
+		end,
+		
+		OnStart = function()
+			
+			-- announce the goal
+			-- Util_AutoIntel(t_tank_deaths.EventStart)
+			
+			-- win/lose check
+			Rule_AddInterval(TankDeaths_WinCheck, 1)
+			
+			-- start related action
+			TankDeaths_Kickoff()
+			
+		end,
+		
+		OnComplete = function()
+			
+			-- tell the player they did good
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			
+		end,
+		
+		Title = 1400330,
+		Description = 1400340,
+		TitleEnd = 1400350, 
+		Type = OT_Medal,
+		MedalID	= MEDALS.CXP1.GOODWOOD,
+		
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_TankDeaths)
+	-- Initialize Data
+	TankDeaths_Init()
+	
+end
+
+-------------------------------------------------------------------------
+-- Tank Deaths - Functions 
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Obj data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function TankDeaths_Init()
+
+	-- define sgroups, egroups, etc associated with this obj
+	sg_td_all_tanks = SGroup_CreateIfNotFound("sg_td_all_tanks")
+	sg_td_temp = SGroup_CreateIfNotFound("sg_td_temp")
+	
+    t_tank_deaths = {
+		tank_deaths = 0,
+		max_deaths = Util_DifVar( {10*1, 10*1, 10*1.5, 10*2} ),			-- number of tanks that the player can lose
+	}
+
+end
+
+
+function TankDeaths_Preset()
+
+	-- spawn squads
+	
+	-- start enemy behavior
+	
+	-- do other cool things
+
+end
+
+-- example of how to finish an Obj
+function TankDeaths_WinCheck()
+	
+	local count = t_tank_deaths.tank_deaths
+
+	-- the player can only win this objective at the end of the mission
+	if g_win == true and count <= t_tank_deaths.max_deaths then
+		Objective_Complete(OBJ_TankDeaths, false)
+	elseif count > t_tank_deaths.max_deaths then
+		Objective_Fail(OBJ_TankDeaths, false)
+	end
+	
+end
+
+
+-- start the related action
+function TankDeaths_Kickoff()
+
+	-- action that starts with the Obj being granted
+	Objective_SetCounter(OBJ_TankDeaths, 0, t_tank_deaths.max_deaths)
+	Rule_AddInterval(TankDeaths_AddDeathEvent, 1)
+	
+end
+
+function TankDeaths_AddDeathEvent()
+
+	SGroup_Clear(sg_td_temp)
+	Player_GetAll(player1, sg_td_temp)
+	print(SGroup_Count(sg_td_temp))
+	SGroup_Filter(sg_td_temp, t_cw_tank_threats, FILTER_KEEP)
+	print(SGroup_Count(sg_td_temp))
+	SGroup_RemoveGroup(sg_td_temp, sg_td_all_tanks)
+	print("temp group has "..SGroup_Count(sg_td_temp).." and complete group has "..SGroup_Count(sg_td_all_tanks))
+	
+	if SGroup_IsEmpty(sg_td_temp) == false then
+		print("adding a death event-----------------------------------------------------------------")
+		Rule_AddSGroupEvent(TankDeaths_DeathEvent, sg_td_temp, GE_SquadKilled)
+		SGroup_AddGroup(sg_td_all_tanks, sg_td_temp)
+	end
+
+end
+
+
+function TankDeaths_DeathEvent()
+	print("someone dead, death total = "..t_tank_deaths.tank_deaths)
+	t_tank_deaths.tank_deaths = t_tank_deaths.tank_deaths+1
+	Objective_SetCounter(OBJ_TankDeaths, t_tank_deaths.tank_deaths, t_tank_deaths.max_deaths)
+
+end
+
+
+
+-------------------------------------------------------------------------
+-- ************************ MISC MISSION FUNCS *********************** --
+-------------------------------------------------------------------------
+
+function Goodwood_EndMissionIntel()
+	if Event_IsAnyRunning() == false then
+		Util_StartIntel(EVENTS.GameOver1)
+		Util_StartIntel(EVENTS.GameOver2)
+		Rule_AddInterval(Goodwood_EndMissionNIS, 1)
+		Rule_RemoveMe()
+	end
+end
+
+function Goodwood_EndMissionNIS()
+	if Event_IsAnyRunning() == false then
+		-- closing NIS 
+		Util_StartNIS(EVENTS.NIS02)
+		Rule_AddInterval(Goodwood_EndMissionFinal, 1)
+		Rule_RemoveMe()
+	end
+end
+
+function Goodwood_EndMissionFinal()
+	if Event_IsAnyRunning() == false then
+		Rule_RemoveMe()
+		Game_EndSP(g_win)
+	end
+end
+
+
+-------------------------------------------------------------------------
+
+-- FOW Reveal
+
+-------------------------------------------------------------------------
+-- used to extend the FOW around all designated points
+-- owned by the player
+function FOWReveal_Init()
+	
+	sg_fow_axisAll = SGroup_CreateIfNotFound("sg_fow_axisAll")
+	t_fow = {
+		timerID = 1001,
+		timerID2 = 1002,
+	}
+end
+
+function FOWReveal_RandomReconPlane()
+	if Objective_IsComplete(OBJ_ClearBourg) == true then
+		Rule_RemoveMe()
+	elseif Objective_IsStarted(OBJ_Kill88s) then
+		Player_GetAll(player2, sg_fow_axisAll)
+		local count = SGroup_CountSpawned(sg_fow_axisAll)
+		if count > 0 then
+			local rand = World_GetRand(1, count)
+			local squad = SGroup_GetSpawnedSquadAt(sg_fow_axisAll, rand)
+			if squad ~= nil then
+				local pos = Squad_GetPosition(squad)
+				FOWReveal_PlaneFlight(pos) 
+			end
+		end
+	end
+end
+
+function FOWReveal_PlaneFlight(location) 
+	if Timer_GetRemaining(t_fow.timerID2) == 0 then
+		-- trigger a spotter plane
+		local ability = ABILITY.COMMANDER_TREE.ALLIES.RECON
+		-- switch it up as the timer goes longer
+		if Timer_GetRemaining(t_fow.timerID) == 0 then
+			if World_GetRand(1, 3) ~= 1 then ability = ABILITY.COMMANDER_TREE.ALLIES.STRAFE_MG end
+		elseif	Timer_GetElapsed(t_fow.timerID) > 10*60 then
+			if World_GetRand(1, 3) == 3 then ability = ABILITY.COMMANDER_TREE.ALLIES.STRAFE_MG end
+		end
+		
+		Cmd_Ability(player1, ability, location, Marker_GetDirection(mkr_p1_HQspawn1), true)
+		-- set the delay
+		local delay = World_GetRand(30, 45)
+		Timer_Start(t_fow.timerID2, delay)
+	end
+end
+
+
+
+
+
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+-- ************************** STATE MACHINE ************************** --
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+--- this is a simple architect script that accepts tables in a specific format,
+--- and calls various functions within the table based on their state and priority.
+-- Its intention is to manage the state of various actions and conditions as dictated
+-- by the functions within the tables.
+function StateMachine_AddTable(states)
+	
+	if _state_machine_id == nil then
+		_state_machine_id = 1000
+	end
+	
+	if t_state_machine == nil then
+		t_state_machine = {}
+	end
+	
+	_state_machine_id = _state_machine_id + 1
+	
+    local t_mgr = {
+		id						= _state_machine_id,			-- the id of the current tank object
+		fg_remove				= false,
+		fg_behavior_state 		= "default",					-- current state of the panzer group
+		t_states				= states,		 				-- the table with all the various states and the functions to call for them
+	}
+	
+	table.insert(t_state_machine, t_mgr)
+	
+	if Rule_Exists(StateMachine_Manager) == false then
+		Rule_AddInterval(StateMachine_Manager, 2)
+	end
+	
+	return _state_machine_id
+
+end
+
+function StateMachine_Manager()
+
+	if table.getn(t_state_machine) == 0 then
+		Rule_RemoveMe()
+		return
+	end
+
+	for i=table.getn(t_state_machine), 1, -1 do 
+	
+		if t_state_machine[i].fg_remove == true then
+			table.remove(t_state_machine, i)
+		else
+			StateMachine_DetermineState(t_state_machine[i])
+			StateMachine_ExecuteState(t_state_machine[i])
+		end
+
+	end
+
+
+end
+
+function StateMachine_ExecuteState(t_mgr)
+
+	for k, this in pairs(t_mgr.t_states) do 
+	
+		if this.state == t_mgr.fg_behavior_state then
+			
+			if g_debug == true then
+				print("STATE MACHINE ("..t_mgr.id..") >>> "..this.state)
+			end
+			
+			-- run the appropriate functions
+			this.ExecState()
+			break
+		end
+	
+	end
+
+end
+
+function StateMachine_DetermineState(t_mgr)
+
+	local current_priority = 0
+	
+	for k, this in pairs(t_mgr.t_states) do 
+	
+		if this.CheckState() == true then
+			if this.priority > current_priority then
+				t_mgr.fg_behavior_state = this.state
+				current_priority = this.priority
+			end
+		end
+	
+	end
+
+end
+
+function StateMachine_GetState(id)
+
+	for i=table.getn(t_state_machine), 1, -1 do 
+	
+		if t_state_machine[i].id == id then
+			return t_state_machine[i].fg_behavior_state
+		end
+
+	end
+
+end

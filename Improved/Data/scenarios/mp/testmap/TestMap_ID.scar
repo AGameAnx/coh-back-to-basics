@@ -1,0 +1,19 @@
+function OnInitID()
+	
+	for i=1,World_GetPlayerCount() do
+		local p = World_GetPlayerAt(i)
+		Player_SetResource(p, RT_Manpower, 100000)
+		Player_SetResource(p, RT_Munition, 100000)
+		Player_SetResource(p, RT_Fuel,     100000)
+		Player_SetResource(p, RT_Command,  100)
+		Player_SetPopCapOverride(p, 500)
+		Modify_PlayerProductionRate(p, 100)
+	end
+	
+	-- [[ Markers ]]
+
+	-- [[ Squad Groups ]]
+
+	-- [[ Entity Groups ]]
+
+end

@@ -1,0 +1,3394 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+--
+-- Script File for Mission 07 - V2 Rocket
+--
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+import("ScarUtil.scar")
+-- custom file for table ID's in addition to the default WB generated file
+import("M07_V2_Rocket_IDTables.scar")
+
+-------------------------------------------------------------------------
+-- GLOBAL VARIABLES
+-------------------------------------------------------------------------
+
+-------------------------------------------------------------------------
+-- STARTUP SCRIPTS
+-------------------------------------------------------------------------
+
+-- Called immediately on startup, this just sets out some parameters for the mission
+function OnGameSetup()
+	-- set up the players
+	player1 = Setup_Player(1, 279300, TRACE_ALLIES, 1)
+	player2 = Setup_Player(2, 279301, TRACE_AXIS, 2)
+	player3 = Setup_Player(3, 279301, TRACE_AXIS, TEAM_NEUTRAL)
+	
+	print ("-------------------------------------------------------------------------------------------------")
+	print ("------------------------------------- MISSION 7 STARTED -----------------------------------------")
+	print ("-------------------------------------------------------------------------------------------------")
+end
+
+
+-- Called immediately on starting up a saved game
+function OnGameRestore()
+	-- assign player IDs again
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+	player3 = World_GetPlayerAt(3)
+
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+end
+
+
+-- Called once things have been initialised proper, and is used to trigger off the game script
+function OnInit()
+	--[[ DEBUGGING ]] --
+	g_DEBUG_MODE = false -- toggle true or false depending on whether or not to play NIS and toggle the debug features of this map.
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	if g_DEBUG_MODE == true then
+		FOW_Enable(true)
+		Scar_DebugConsoleExecute("bind([[ALT+I]], [[Scar_DoString('Util_InvulnerableSelection(true)')]])")
+		Scar_DebugConsoleExecute("bind([[ALT+N]], [[Scar_DoString('Util_InvulnerableSelection(false)')]])")
+	end
+	
+	Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS01)')]])")
+	Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS02)')]])")
+	
+	--[[ TEMPORARY ]]
+	SBP_ALLIES_AIRBOURNE_M07 = BP_GetSquadBlueprint("sbps/races/allies/soldiers/airborne_infantry_sp_m07.lua")
+	
+	--[[ AUDIO/SOUND ]]
+	g_MissionSpeechPath = "Mission07"
+	-- soldiers talk really quietly in night missions.
+	-- at some point we might want to turn this on and off at different points in the mission
+	Sound_PreCacheSinglePlayerSpeech(g_MissionSpeechPath)
+	-- mute the sound before the NIS plays
+	Util_MuteAmbientSound(true)
+	
+	--[[ PRESET GAME STATE ]]
+	AutoCinematic(true, 0)
+	
+	--[[ REGISTER OBJECTIVES ]]
+ 	M07_Objective_Register()
+	
+	--[[ MOD INITIAL STATS ]]
+	M07_Set_StatMods()
+	
+	--[[ SET RESTRICTIONS ]]
+	M07_Restrictions()
+	
+	--[[ SET INITIAL MOOD ]]
+	M07_Mood()
+	
+	--[[ SET DIFFICULTY ]]
+	M07_Difficulty()
+	
+	--[[ TECH TREE ]]
+	TechTreeSetup()
+	
+	--[[ MISSION PRESETS ]]
+	M07_Mission_Preset()
+	
+	--[[ GAME START CHECK ]]
+	Rule_Add(M07_Mission_Start)
+end
+
+Scar_AddInit(OnInit)
+
+function M07_Objective_Register()
+	--[[ *** MUST INITIALIZE THE OBJ TABLE BEFORE REGISTERING *** ]]
+	Initialize_OBJ_DestroyV2Rocket()
+	Initialize_OBJ_DestroyOxygenTanks()
+	Initialize_OBJ_EntranceDistraction()
+	Initialize_OBJ_HoldMainEntrance()
+	Initialize_OBJ_KillBaseCommander()
+end
+
+function M07_Set_StatMods()
+	-- modifying the player's resource rates
+	Modify_PlayerResourceRate(player1, RT_Manpower, 1)
+	Modify_PlayerResourceRate(player1, RT_Munition, 1) 
+	Modify_PlayerResourceRate(player1, RT_Fuel, 1)
+	
+	-- modifying the resource gifts that a player gets from instant items
+	Modify_PlayerResourceGift(player1, RT_Munition, 1)
+	Modify_PlayerResourceGift(player1, RT_Fuel, 1)
+end
+
+function M07_Restrictions()
+	--[[ UN/RESTRICT UPGRADES ]]
+	Cmd_InstantUpgrade(player1, UPG.ALLIES.GRENADE)
+	
+	--[[ RESOURCES 	]]
+	Player_SetResource(player1, RT_Manpower, 600)
+	Player_SetResource(player1, RT_Munition, 300)
+	Player_SetResource(player1, RT_Fuel, 100)
+	Player_SetResource(player1, RT_Action, 0)
+
+
+	-- enable Airborne squads to paradrop
+	Modify_Enable_ParadropReinforcements(player1, true)
+	
+	--[[ CAMERA ]]
+	-- clamping camera to specific area of the map to help with optimization
+	Camera_ClampToMarker(mkr_camera_clamp)
+
+	--[[ UN/RESTRICT FOW 
+	World_EnablePlayerToPlayerFOW(player1, player3, true)
+	]]
+	
+	--[[ UN/RESTRICT POP CAP ]]
+	Player_SetPopCapOverride(player1, 50)
+	
+	--[[ UN/RESTRICT UI ]]
+	-- disabling the company commander tree until the CC tree is implemented in game
+--~ 	UI_BindingSetEnabled("company_commander", false)
+	
+	--[[ SETUP COMMANDER TREE ]]
+	-- stops player1 from earning action points by killing enemy squads
+--~ 	Player_StopEarningActionPoints(player1)
+
+	
+	-- upgrade the airborne infantry, but lock it out since it is not actually being used.
+	Player_SetAbilityAvailability(player1, ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_PARADROP, ITEM_REMOVED)
+	
+	--[[ UN/RESTRICT SBPS	]]
+end
+
+function M07_Mood()
+	Player_SetDefaultSquadMoodMode(player1, MM_ForceTense)
+	Player_SetDefaultSquadMoodMode(player2, MM_ForceCalm)
+end
+
+function M07_Difficulty()
+	-- get the difficulty
+	g_DIFFICULTY = Game_GetSPDifficulty()  -- set a global difficulty variable
+	print("********* DIFFICULTY: "..g_DIFFICULTY)
+	
+	-- set health bonus for player 1
+	Setup_Difficulty(player1, g_DIFFICULTY) -- pass the player and difficulty global variable into the Set Health function
+	Setup_Difficulty(player2, g_DIFFICULTY) -- do it for each player that you have defined
+	
+	t_difficulty = {
+		bd_spawn_time        = Util_DifVar( {2*60, 1.5*60, 1*60, 0.75*60} ), -- amount of time required before spawning base defense soldiers
+		bd_squad_num         = Util_DifVar( {1, 1, 2, 3} ),                  -- number of squads to spawn for the base defense
+		sniper_vulnerability = Util_DifVar( {2.5, 2, 1.5, 1} ),              -- the vulnerability factor on the snipers
+		sniper_number        = Util_DifVar( {1, 2, 2, 3} ),                  -- number of snipers to spawn
+		sniper_wpn_cooldown  = Util_DifVar( {2, 1.5, 1, 1} ),                -- weapon cooldown time for the snipers
+		sthd_attack_num      = Util_DifVar( {1, 1, 2, 2} ),                  -- number of squads to spawn from the guard tower to spawn and attack the player on alert
+		sbp_aa_def           = Util_DifVar( {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER, SBP.AXIS.STORMTROOPER, SBP.AXIS.KNIGHTSCROSS} ), -- types of squads to defend the AA Guns
+	}
+end
+
+-------------------------------------------------------------------------
+-- [[ MISSION Preset ]]
+-------------------------------------------------------------------------
+
+function M07_Mission_Preset()
+	team1 = Player_GetTeam(player1)
+	
+	-- [[ STARTING CAMERA ]]
+	Camera_ResetToDefault()
+	
+	-- [[ PLAYER'S STARTING UNITS ]]
+	t_player_start_units = {
+		{ sgroup = sg_player_start[1], sbp = SBP_ALLIES_AIRBOURNE_M07, mkr_sp = mkr_player_start[1], },
+	}
+	
+	--[[ GLOBAL VARIABLES ]]
+	g_LOCKOUT_ABILITY = ABILITY.SP.PARADROP_ANYWHERE
+	g_ROOF_MORTAR_ATTACK = "g_ROOF_MORTAR_ATTACK"
+	g_PLAYER_NEAR_V2_VEH = false
+	g_PLAYER_NEAR_V2_INF = false
+	g_AUTOSAVE_DELAY = 10								-- amount of time to wait before kicking in the autosave
+	
+	for i=1, table.getn(t_player_start_units) do 
+		Util_CreateSquadsAtMarker(player1, 	t_player_start_units[i].sgroup, t_player_start_units[i].sbp, t_player_start_units[i].mkr_sp, 1)
+	end
+
+	EGroup_SetInvulnerable(OxygenTanks, true, -1)
+	EGroup_SetInvulnerable(V2Rocket_LaunchPad, true, -1)
+
+	-- hide Sgroup for the NIS
+	SGroup_Hide(sg_ax_aa6, true)
+	
+	----------------------------------------------
+	-- Setup item pickups for the player to find
+	----------------------------------------------
+	
+	-- german weapons
+	for i=1, table.getn(mkr_pickup) do 
+		Util_CreateEntities(nil, eg_pickup[i], Util_RandomWeaponEBP(), mkr_pickup[i], 1)
+	end
+	
+	-- munitions spawns
+	for i=1, table.getn(mkr_pickup_mun) do
+		Util_CreateEntities(nil, eg_pickup_mun[i], EBP.PICKUP.MUNITIONS, mkr_pickup_mun[i], 1)
+	end
+	
+	-- manpower spawns
+	for i=1, table.getn(mkr_pickup_mp) do
+		Util_CreateEntities(nil, eg_pickup_mp[i], EBP.PICKUP.MANPOWER, mkr_pickup_mp[i], 1)
+	end
+	
+	-- setup lights to be turned off
+	for i=1, table.getn(t_eg_barracks_lights) do 
+		for k=1, table.getn(t_eg_barracks_lights[i]) do 
+			EGroup_SetAnimatorState(t_eg_barracks_lights[i][k], "Light", "Off")
+		end
+	end
+
+	-- entrance lights
+	for i=1, table.getn(eg_light_ent) do
+		EGroup_SetAnimatorState(eg_light_ent[i], "Light", "Off")
+	end
+	
+	-- setup the sync weapon data
+	M07_SyncWeaponSetup()
+	
+	-- spawn the snipers guarding the rocket
+	for i=1, t_difficulty.sniper_number do 
+		Util_CreateSquadsAtMarker(player2, sg_v2_sniper[i], SBP.AXIS.SNIPER, mkr_sp_sniper[i], 1)
+		Modify_Vulnerability(sg_v2_sniper[i], t_difficulty.sniper_vulnerability)
+		Modify_WeaponCooldown(sg_v2_sniper[i], "hardpoint_01", t_difficulty.sniper_wpn_cooldown)
+	end
+	
+	-- lockout the player from dropping directly on the V2 Rocket
+	for i=1, table.getn(mkr_para_lockout) do 
+		Player_AddAbilityLockoutZone(player1, g_LOCKOUT_ABILITY, mkr_para_lockout[i])
+		Player_AddAbilityLockoutZone(player1, ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_PARADROP_AT, mkr_para_lockout[i])
+	end
+	
+	-- make sure the launchpad cannot be destroyed by conventional means.
+	EGroup_SetInvulnerable(V2Rocket_LaunchPad, true)
+end
+
+
+-------------------------------------------------------------------------
+-- [[ MISSION START ]]
+-------------------------------------------------------------------------
+
+function M07_Mission_Start()
+	-- start the first NIS
+	if g_DEBUG_MODE == false then
+		Util_StartNIS(EVENTS.NIS01)
+	end
+	
+	Rule_Add(M07_Mission_StartAfterNIS)
+	Rule_RemoveMe()
+end
+
+function M07_Mission_StartAfterNIS()
+	if not Event_IsAnyRunning() then
+		-- music
+		Util_PlayMusic("SOUND/Music/SP/M07/M07_Ob1_TakeGate", 4, 0)
+		
+		-------------------------------------------------------------------------
+		-- OBJECTIVE FUNCTIONS
+		-------------------------------------------------------------------------
+		Rule_AddOneShot(OBJ_DV2_AddNewObjDelay, 2)
+		
+		-- unhide the Flak Cannon
+		SGroup_Hide(sg_ax_aa6, false)
+		
+		-- start checking for the oxygen tanks
+		Rule_AddInterval(OBJ_DOT_AddNewObjDelay, 2.5)
+		
+		-- start checking to see if AA Gun is being attacked
+		OBJ_AA_Setup()
+		-- setup the barracks sectors
+		OBJ_STHD_Setup()
+		-- setup the mobile base defenses
+		
+		Rule_AddInterval(OBJ_KBC_AddNewObj, 3.1)
+		
+		-------------------------------------------------------------------------
+		-- GENERAL MISSION LOGIC
+		-------------------------------------------------------------------------
+		-- start the entrance attacks and the stronghold checks
+		-- Tell Panzer to start patrolling
+		Rule_AddOneShot(M07_Panzer_Patrol, 2.0)
+		Rule_AddInterval(M07_TruckCrashStart, 2)
+		Rule_AddInterval(M07_MortarAttacking, 5)
+		Rule_AddInterval(M07_RocketLaunch, 2*60)
+		M07_BD_Setup()
+		
+		-- add help text for the player after a squad of paratroopers dies
+		SGroup_Clear(sg_temp)
+		Player_GetAll(player1, sg_temp)
+		Rule_RemoveMe()
+	end
+end
+
+function M07_AutosaveDelay()
+	--[[ AUTOSAVE ]]
+	if Rule_Exists(M07_Autosave) == false then
+		Rule_Add(M07_Autosave)
+	end
+end
+
+-------------------------------------------------------------
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- PRIMARY OBJECTIVE
+-- DESTROY V2 ROCKET LAUNCH ASSEMBLY
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The goal of this map is to destroy the V2 launch assembly by
+-- wiring it with a satchel charge.
+-- The player cannot lose this mission
+-- The goal of this mission is to provide a really createive 
+--  purely infantry infiltration mission.
+-------------------------------------------------------------------------
+function Initialize_OBJ_DestroyV2Rocket()
+	OBJ_DestroyV2Rocket = {
+		SetupUI = function()
+			OBJ_DestroyV2Rocket.MapElementID = Objective_AddUIElements(OBJ_DestroyV2Rocket, mkr_v2_hint, true, 279007, true)
+		end,
+		OnStart = function()
+			-- announce the goal
+			Rule_AddInterval(OBJ_DV2_AddSpeechDelay, 2)
+			-- add completion check
+			OBJ_DV2_Start()
+		end,
+		
+		OnComplete = function()
+			-- destroy all the enemy squads
+			Player_GetAll(player2, sg_temp)
+			SGroup_DestroyAllSquads(sg_temp)
+			
+			-- destroy all the enemy squads
+			Player_GetAll(player1, sg_temp)
+			SGroup_DestroyAllSquads(sg_temp)
+			
+			-- tell the player they did well
+			Util_StartNIS(EVENTS.NIS02)
+			HintPoint_RemoveAll()
+			Rule_RemoveAll() -- Mission is Over
+		end,
+		OnFail = function()
+			-- the player cannot fail this mission
+		end,
+		OnSitRep = function()
+			
+		end,
+		
+		Title 				= 279005,
+		Description 		= 279030,
+		Type				= OT_Primary,
+		Icon 				= IT_P_Attack,
+		SniperAttackTimer 	= "SNIPER ATTACK TIMER",
+		SniperTimerLength 	= 1*60,
+
+		SitRep =
+		{
+			Movie = "SR_07-01",
+			Force = true,
+			SpeechTiming =
+			{
+				{ 1.25, ACTOR.Thompson, 270500 },
+				{ 5.5, ACTOR.Thompson, 270510 },
+				{ 10.85, ACTOR.Thompson, 270520 },
+				{ 16.9, ACTOR.Thompson, 270530 },
+				{ 20.9, ACTOR.Thompson, 270540 },
+				{ 26.8, ACTOR.Thompson, 270550 },
+				{ 31.5, ACTOR.Thompson, 270560 },
+				{ 36.9, ACTOR.Thompson, 270570 },
+			},
+		},
+	}
+	
+	Objective_Register(OBJ_DestroyV2Rocket)
+	OBJ_DV2Setup()
+end
+
+function OBJ_DV2Setup()
+	local defenders = {
+		{ sbp = SBP.AXIS.KNIGHTSCROSS, upg = false },
+		{ sbp = SBP.AXIS.STORMTROOPER, upg = UPG.AXIS.GREN_PANZERSCHRECK },
+		{ sbp = SBP.AXIS.STORMTROOPER, upg = UPG.AXIS.GREN_PANZERSCHRECK },
+		{ sbp = SBP.AXIS.SNIPER, upg = false },
+	}
+	sg_v2_defenders = SGroup_CreateTable("sg_v2_defenders%d", table.getn(defenders))
+	
+	t_dv2_def = {}
+	for i=1, table.getn(defenders) do 
+		t_dv2_def[i] = {
+			sgroup 		= sg_v2_defenders[i],
+			sbp			= defenders[i].sbp,
+			upg 		= defenders[i].upg,
+			spawned 	= false,
+		}
+	end
+	
+	g_TIMER_DV2_DEF = "g_TIMER_DV2_DEF"
+	g_TIMER_DV2_DEF_LENGTH = 5
+end
+
+
+function OBJ_DV2_AddNewObjDelay()
+	if Event_IsAnyRunning() == false then
+		Objective_Start(OBJ_DestroyV2Rocket, true)
+		
+		-- delay the entrance assault so that it doesn't show up on top of the other objective
+		Rule_AddInterval(OBJ_ED_AddNewObjDelay, 10)
+		Rule_RemoveMe()
+	end
+end
+
+function OBJ_DV2_AddSpeechDelay()
+	if Event_IsAnyRunning() == false then
+		Util_StartIntel(EVENTS.OBJ_DV2_START)
+		Rule_RemoveMe()
+	end
+end
+
+-- Checks whether the player has destroyed the V2 Rocket assembly
+function OBJ_DV2_WinCondition()
+	print("************* V2 ROCKET DESTROYED! ***************** ")
+	Objective_Complete(OBJ_DestroyV2Rocket, false)
+end
+
+function OBJ_DV2_Start()
+	-- add intel events here
+	EGroup_NotifyOnPlayerDemolition(V2Rocket_LaunchPad, OBJ_DV2_WinCondition)
+	
+	Rule_AddInterval(OBJ_DV2_IsPlayerCloseToRocket, 3.5)
+	Rule_AddInterval(OBJ_DV2_SnipersAttacking, 5)
+end
+
+function OBJ_DV2_SnipersAttacking()
+	for i=table.getn(sg_v2_sniper),1,-1 do 
+		if SGroup_IsEmpty(sg_v2_sniper[i]) then
+			table.remove(sg_v2_sniper, i)
+		elseif SGroup_IsDoingAttack(sg_v2_sniper[i], ANY, 5) 
+		and Timer_GetRemaining(OBJ_DestroyV2Rocket.SniperAttackTimer) <= 0 then
+			--[[ DIALOGUE ]]
+			Util_StartStinger(EVENTS.OBJ_DV2_SnipersAttacking)
+			EventCue_Create(CUE.ATTACKED, 279237, 279237, sg_v2_sniper[i])
+			Timer_Start(OBJ_DestroyV2Rocket.SniperAttackTimer, OBJ_DestroyV2Rocket.SniperTimerLength)
+		end
+	end
+end
+
+function OBJ_DV2_IsPlayerCloseToRocket()
+	-- check to see if the player is near the V2 Rocket for any reason
+	Player_GetAllSquadsNearMarker(player1, sg_temp, mkr_v2_prox)
+	
+	if SGroup_IsEmpty(sg_temp) == false then
+		g_PLAYER_NEAR_V2 = true
+	else
+		g_PLAYER_NEAR_V2 = false
+	end
+	
+	-- if the stronghold has not been alerted to the player's presence,
+	-- then return
+	if t_stronghold[7].first_attack ~= true then
+		return
+	end
+	
+	-- check if the player is really close to the rocket and attempting to demolish it
+	Player_GetAllSquadsNearMarker(player1, sg_temp, Marker_V2Rocket)
+	Player_GetAllSquadsNearMarker(player1, sg_temp2, Marker_V2Rocket)
+	
+	-- checks if all the buildings are dead around the rocket or if the player has entered the area near the 
+	-- the V2 Rocket launch site.
+	if ((EGroup_IsEmpty(eg_barracks7_1) or Player_OwnsEGroup(player2, eg_barracks7_1) == false)
+	and (EGroup_IsEmpty(eg_barracks7_2) or Player_OwnsEGroup(player2, eg_barracks7_2) == false))
+	or (SGroup_IsEmpty(sg_temp) == false or SGroup_IsEmpty(sg_temp2) == false) then
+		-- play music to indicate that the player is close
+		Util_PlayMusic("SOUND/music/sp/M07/M07_Ob3_DestroyRocket", 4, 0)
+		
+		g_PLAYER_NEAR_V2_VEH = true
+		OBJ_STHD_VehicleActivateAll()
+		if Rule_Exists(OBJ_DV2_SpawnV2Defenders) == false then
+			Rule_AddInterval(OBJ_DV2_SpawnV2Defenders, 1)
+		end
+		g_PLAYER_NEAR_V2 = true
+		Rule_RemoveMe()
+	end
+end
+
+function OBJ_DV2_SpawnV2Defenders()
+	for i in pairs(t_dv2_def) do
+		local sgroup = t_dv2_def[i].sgroup
+		local upg = t_dv2_def[i].upg
+		
+		if t_dv2_def[i].spawned == false
+		and Timer_GetRemaining(g_TIMER_DV2_DEF) <= 0 then
+			Util_CreateSquadsAtMarker(player2, sgroup, t_dv2_def[i].sbp, mkr_sp_v2_defenders, 1)
+		
+			if upg ~= false then
+				Cmd_InstantUpgrade(sgroup, upg)
+			end
+			
+			Cmd_AttackMove(sgroup, Marker_V2Rocket)
+			t_dv2_def[i].spawned = true
+			
+			Timer_Start(g_TIMER_DV2_DEF, g_TIMER_DV2_DEF_LENGTH)
+		end
+	end
+	if Rule_Exists(OBJ_DV2_MoveV2Defenders) == false then
+		Rule_AddInterval(OBJ_DV2_MoveV2Defenders, 2)	
+	end
+end
+
+function OBJ_DV2_MoveV2Defenders()
+	for i in pairs(t_dv2_def) do 
+		local sgroup = t_dv2_def[i].sgroup
+	
+		if SGroup_IsEmpty(sgroup) == false
+		and SGroup_IsMoving(sgroup, ANY) == false
+		and SGroup_IsUnderAttack(sgroup, ANY, 10) == false then
+			Cmd_AttackMove(sgroup, Marker_V2Rocket)
+		end
+	end
+end
+
+-------------------------------------------------------------
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- SECONDARY OBJECTIVE
+-- DESTROY THE LIQUID OXYGEN TANKS
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The goal of this objective is to destroy the liquid oxygen tanks
+-- for command points by wiring it with a satchel charge.
+-------------------------------------------------------------------------
+function Initialize_OBJ_DestroyOxygenTanks()
+	OBJ_DestroyOxygenTanks = {
+		SetupUI = function()
+			OBJ_DestroyOxygenTanks.MapElementID = Objective_AddUIElements(OBJ_DestroyOxygenTanks, OxygenTanks, true, 279103, true, -15)
+--~ 			HintMouseover_Add(279103, mkr_oxygen_tanks, 10, true)
+		end,
+		OnStart = function()
+			-- announce the goal
+			Util_StartIntel(EVENTS.OBJ_DOT_Start)
+			-- add completion check
+			EGroup_NotifyOnPlayerDemolition(OxygenTanks, OBJ_DOT_Complete)
+		end,
+		OnComplete = function()
+			-- tell the player they did well
+--~ 			HintMouseover_Remove(279103, mkr_oxygen_tanks)
+			--[[ AUTOSAVE ]]
+--~ 			g_AUTOSAVE = 279354
+--~ 			if Rule_Exists(M07_AutosaveDelay) == false then
+--~ 				Rule_AddOneShot(M07_AutosaveDelay, g_AUTOSAVE_DELAY)
+--~ 			end
+		end,
+		OnFail = function()
+			-- the player cannot fail this objective
+		end,
+		OnSitRep = function()
+			
+		end,
+		
+		Title 				= 279100,
+		Description 		= 279110,
+		Type				= OT_Secondary,
+		Icon 				= IT_S_Default,		
+		CommandRewardAmount = 1,
+		HintID 				= nil,			
+	}
+	Objective_Register(OBJ_DestroyOxygenTanks)
+end
+
+function OBJ_DOT_AddNewObjDelay()
+	if EGroup_IsOnScreen(player1, OxygenTanks, ANY, 0.6) 
+	and Player_CanSeeEGroup(player1, OxygenTanks, ANY) then
+		Objective_Start(OBJ_DestroyOxygenTanks, true)
+		Rule_RemoveMe()
+	end
+end
+
+-- Checks whether the player has destroyed the V2 Rocket assembly
+function OBJ_DOT_Complete()
+	EGroup_Kill(OxygenTanks)
+	Objective_Complete(OBJ_DestroyOxygenTanks, true)
+end
+
+-------------------------------------------------------------
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- DESTROY ANTI-AIRCRAFT GUNS
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The goal of this section is to track the AA guns and give appropriate updates
+-------------------------------------------------------------------------
+
+function OBJ_AA_Setup()
+	local _Rule_SetSquadEvent = function (groupid, idx, squad)
+		Rule_AddSquadEvent(OBJ_AA_Destroyed, squad, GE_SquadKilled)
+	end
+	
+	g_CURRENT_AA = 1
+	g_AA_FIRST_TIME = true
+	
+	t_aa_guns ={}
+	for i in pairs(sg_ax_aa) do 
+		t_aa_guns[i] = {
+			sgroup 			= sg_ax_aa[i],
+			mkr_drop 		= mkr_aagun[i],
+			mkr_prox 		= mkr_aa_def[i],
+			prox_dist 		= 40,
+			state 			= 0,
+			t_mkr_lockout 	= mkr_aa_lockout[i],
+			sync_weapon_id 	= SyncWeapon_GetFromSGroup(sg_ax_aa[i]),
+			sw_mgr 			= t_sw_aa_mgr[i],
+			defended 		= false,
+			sbp_defender 	= t_difficulty.sbp_aa_def,
+			sg_def 			= sg_aa_defense[i],
+			barracks_idx 	= nil,
+			eg_barracks 	= nil,
+			pos 			= SGroup_GetPosition_EVEN_IF_EMPTY(sg_ax_aa[i]),
+			
+			-- function for managing what happens when the actual AA GUN is under attack
+			counter 		= -1,				-- the counter to iterate a number of checks
+			counter_max 	= 2,				-- the max number of times to check
+			fnc_ai_routine 	= function() end,	-- a function to call when the max number of checks is reached
+			fnc_reset 		= function() end,	-- a function to call to tell the sgroup what to do when not being attacked
+
+			-- this manager, tracks the squads that are helping to DEFEND the aagun, so that if
+			-- the DEFENDERS are under attack, they'll get help from the sector as well
+			def_uattack_mgr	= {
+				-- function for managing what happens when they are under attack
+				sgroup 			= sg_aa_defense[i],
+				counter 		= -1,				-- the counter to iterate a number of checks
+				counter_max 	= 2,				-- the max number of times to check
+				fnc_ai_routine 	= function() end,	-- a function to call when the max number of checks is reached
+				fnc_reset 		= function() end,	-- a function to call to tell the sgroup what to do when not being attacked
+			},
+		}
+		
+		FOW_RevealSGroupOnly(t_aa_guns[i].sgroup, -1)
+		SGroup_ForEach(t_aa_guns[i].sgroup, _Rule_SetSquadEvent)
+		Modify_WeaponCooldown(sg_ax_aa[i], "hardpoint_01", 0.5)
+		Modify_WeaponDamage(sg_ax_aa[i], "hardpoint_01", 0.25)
+	end
+	
+	-- Modify the range on the AA guns near the V2 site so the player can't drop there too easily
+	Modify_WeaponRange(sg_ax_aa10, "hardpoint_01", 2.0)				-- Gun on the roof near the stairs
+	Modify_WeaponRange(sg_ax_aa7, "hardpoint_01", 1.5)				-- Gun on the ground near the V2 launchpad entrance
+	Modify_WeaponRange(sg_ax_aa8, "hardpoint_01", 1.5)				-- Gun on the ground near the V2 launchpad entrance
+	
+	
+	-- indices to the appropriate barracks near the AA Guns
+	t_aa_guns[1].eg_barracks = eg_barracks5
+	t_aa_guns[1].barracks_idx = 5
+	t_aa_guns[1].fnc_ai_routine = function() OBJ_AA_UnderAttack(1) end
+	
+	t_aa_guns[2].eg_barracks = eg_barracks1
+	t_aa_guns[2].barracks_idx = 1
+	t_aa_guns[2].fnc_ai_routine = function() OBJ_AA_UnderAttack(2) end
+
+	t_aa_guns[3].eg_barracks = eg_barracks6
+	t_aa_guns[3].barracks_idx = 6
+	t_aa_guns[3].fnc_ai_routine = function() OBJ_AA_UnderAttack(3) end
+
+	t_aa_guns[4].eg_barracks = eg_barracks5
+	t_aa_guns[4].barracks_idx = 5
+	t_aa_guns[4].fnc_ai_routine = function() OBJ_AA_UnderAttack(4) end
+
+	t_aa_guns[5].eg_barracks = eg_barracks4
+	t_aa_guns[5].barracks_idx = 4
+	t_aa_guns[5].fnc_ai_routine = function() OBJ_AA_UnderAttack(5) end
+	
+	t_aa_guns[6].eg_barracks = eg_barracks8
+	t_aa_guns[6].barracks_idx = 8
+	t_aa_guns[6].fnc_ai_routine = function() OBJ_AA_UnderAttack(6) end
+	
+	t_aa_guns[7].eg_barracks = eg_barracks7
+	t_aa_guns[7].barracks_idx = 7
+	t_aa_guns[7].fnc_ai_routine = function() OBJ_AA_UnderAttack(7) end
+
+	t_aa_guns[8].eg_barracks = eg_barracks7
+	t_aa_guns[8].barracks_idx = 7
+	t_aa_guns[8].fnc_ai_routine = function() OBJ_AA_UnderAttack(8) end
+
+	t_aa_guns[9].eg_barracks = eg_barracks2
+	t_aa_guns[9].barracks_idx = 2
+	t_aa_guns[9].fnc_ai_routine = function() OBJ_AA_UnderAttack(9) end
+
+	t_aa_guns[10].eg_barracks = eg_barracks8
+	t_aa_guns[10].barracks_idx = 8
+	t_aa_guns[10].fnc_ai_routine = function() OBJ_AA_UnderAttack(10) end
+
+	t_aa_guns[11].eg_barracks = eg_barracks3
+	t_aa_guns[11].barracks_idx = 3 
+	t_aa_guns[11].fnc_ai_routine = function() OBJ_AA_UnderAttack(11) end
+	
+	t_aa_guns[12].eg_barracks = eg_barracks8
+	t_aa_guns[12].barracks_idx = 8
+	t_aa_guns[12].fnc_ai_routine = function() OBJ_AA_UnderAttack(12) end
+	
+	for i in pairs(t_aa_guns) do
+		t_aa_guns[i].def_uattack_mgr.fnc_ai_routine = t_aa_guns[i].fnc_ai_routine
+		Util_AddUnderAttackItem(t_aa_guns[i])
+	end
+end
+
+function OBJ_AA_Destroyed()
+	-- since it is not known which AA Gun was destroyed, loop through all of them and update the correct one.
+	for i in pairs(t_aa_guns) do 
+		if t_aa_guns[i].state == 0 and SGroup_IsEmpty(t_aa_guns[i].sgroup) then
+			t_aa_guns[i].state = 1
+			
+			-- [[DIALOGUE ]]
+			Util_StartStinger(EVENTS.OBJ_AA_Destroyed)
+			EventCue_Create(CUE.NORMAL, 279140, 279140, t_aa_guns[i].pos)
+			
+			break
+		end
+	end
+end
+
+function OBJ_AA_UnderAttack(idx)
+	local sgroup = t_aa_guns[idx].sg_def
+	local mkr = t_aa_guns[idx].mkr_prox
+	if t_aa_guns[idx].state == 0  then
+		SGroup_Clear(sg_attack_target)
+		SGroup_GetLastAttacker(t_aa_guns[idx].sgroup, sg_attack_target)
+		OBJ_STHD_AlertBarracks(t_aa_guns[idx].barracks_idx, sg_attack_target)
+		
+		if SGroup_IsEmpty(sgroup) and t_aa_guns[idx].defended == false then
+			print("OBJ_AA_UnderAttack: Sending Defense to AAGUN"..idx)
+			
+			local guard_tower = OBJ_STHD_GetAvailableGuardTower(t_aa_guns[idx].barracks_idx)
+			
+			-- nothing left from which to spawn units
+			if guard_tower == false then
+				return
+			end
+			
+			local egroup = guard_tower.egroup
+			local eg_pos = Util_GetPosition_EVEN_IF_EMPTY(guard_tower.pos)
+			
+			if EGroup_IsEmpty(egroup) == false then
+				Util_CreateSquadsAndGarrisonExit(player2, sgroup, t_aa_guns[idx].sbp_defender, egroup, 1, eg_pos, true, 2)
+				M07_MoveToDefensePoint(t_aa_guns[idx].sw_mgr, sgroup)
+				Util_AddUnderAttackItem(t_aa_guns[idx].def_uattack_mgr)
+			end
+			
+			t_aa_guns[idx].defended = true
+			
+		elseif SGroup_IsEmpty(sgroup) == false
+		and SGroup_IsMoving(sgroup, ANY) == false
+		and SGroup_IsUnderAttack(sgroup, ANY, 5) == false then
+			M07_MoveToDefensePoint(t_aa_guns[idx].sw_mgr, sgroup)
+		end
+	end
+end
+
+-------------------------------------------------------------
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- STRONGHOLDS/BARRACKS -- these control the various sectors around the base
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The goal of this objective is to destroy the points from which the AXIS will spawn
+-- and attack the player.
+-------------------------------------------------------------------------
+
+function OBJ_STHD_Setup()
+	-- [[ ENEMY STARTING UNITS ]]
+	-- set up Tables
+	g_CURRENT_STRONGHOLD = 1	
+	g_GT_NUM_DESTROYED = 0			-- number of guard towers destroyed
+	g_GT_NUM_TOTAL = 0				-- number of guard towers, total
+	g_GT_ENCOUNTER = 0				-- counter to track number of times to tell the player about guard towers
+	g_STOP_ENT_ATTACK_PERC = 0.3 	-- percentage that the base defense will stop attacking the entrance
+	g_GT_ENCOUNTER_TOTAL = 3		-- max number of times to give intel to the player
+	g_STHD_PATROL_IDX = 1			-- index for the patrollings squads rule
+	g_GT_DESTROYED_IDX = 1			-- index for the guard tower destroyed rule 
+	g_GT_SPOTTED_IDX = 1			-- index for the guard tower spotted rule
+
+	t_stronghold = {}
+	for i in pairs(eg_barracks) do
+		t_stronghold[i] = {
+			marker 			= Marker_GetTable("mkr_barracks"..i.."_spawn%d"),
+			egroup 			= eg_barracks[i],				-- the egroup
+			obj_ui_id 		= nil,							-- ping location
+			t_sgroups 		= sg_barracks[i],				-- barracks infantry sgroups
+			t_sg_def 		= sg_barracks_def[i],			-- sgroups used just for setting up defense
+			inf_mgr 		= {},							-- an under attack manager for the infantry
+			inf_def_mgr 	= {},							-- an under attack manager for the defensive infantry
+			sg_garrison 	= sg_barracks_garrison[i], 		-- sgroups devoted to garrisoning the barracks
+			path_patrol 	= t_path_barracks[i].patrol,	-- the particular path for this barracks to follow
+			tmr_patrol		= "STRONGHOLD PATROL TIMER",	-- a timer to track when patrols will be spawned from guard towers
+			tmr_patrol_min	= 30,							-- minimum timer change for the patrol
+			tmr_patrol_max	= 60,							-- max timer change for patrol
+			first_attack	= false,						-- flag to detect whether or not the sector has been alerted
+			check_destroyed	= false,						-- flag to tell the rule to start checking for destroyed building
+			
+			-- Guard Tower data
+			eg_guard 		= t_eg_barracks_gt[i],			-- table of guard towers to occupy
+			gt_destroyed 	= {},							-- flag for whether or not the tower is destroyed
+			gt_pos			= {},							-- position of the guard tower if it is destroyed
+			mkr_gt			= Marker_GetTable("mkr_gt"..i.."_%d"),	-- marker for which to squads need to move to 
+			gt_spotted		= {},							-- flag to track whether a guard tower has been spotted
+			gt_num_dest		= 0, 							-- number of guard towers destroyed
+			gt_sp_tmr		= "GUARD TOWER SPAWN TIMER"..i,	-- timer that tracks how quickly the defenses spawn from the guard towers
+			gt_sp_counter	= 1,							-- counter to track the number of defense points that have been spawned
+			gt_sp_flag		= false,						-- flag to track whether or not the guard tower MGs should be spawned
+			gt_alarm		= false,						-- flag to track whether or not the alarm is on
+			
+			sync_weapons 	= {},							-- table of machine guns to setup when barracks are attacked
+			diff_rating 	= 1,							-- difficulty rating (internal map rating that is separate from the overall game difficulty within all the various barracks)
+			lights 			= t_eg_barracks_lights[i],		-- table of the various lights that turn on when the barracks is activated
+			timer 			= "Barracks Spawn Timer"..i,	-- timer for respawning units
+			timer_min 		= 30,							-- minimum timer (used for randomness)
+			timer_max 		= 45,							-- maximum timer (used for randomness)
+			attack_amount	= t_difficulty.sthd_attack_num,		-- diff handle, number of squads to spawn to attack player
+			pos				= EGroup_GetPosition_EVEN_IF_EMPTY(eg_barracks[i]), -- position of the tower (for when it is destroyed)
+		}
+		
+		-- setting up aggressive units
+		local t_sg = sg_barracks[i]
+		for j in pairs(t_sg) do
+			t_stronghold[i].inf_mgr[j] = 
+			{
+				sgroup = t_sg[j],						-- an sgroup to check
+				counter = -1,							-- the counter to iterate a number of checks
+				counter_max = 2,						-- the max number of times to check
+				fnc_ai_routine = OBJ_STHD_AlertBarracks,-- a function to call when the max number of checks is reached
+				fnc_reset = function() end,				-- a function to call to tell the sgroup what to do when not being attacked
+				barracks = true,
+				barracks_idx = i,
+			}
+		end
+		
+		-- setting up defensive units
+		local t_sg = sg_barracks_def[i]
+		for j in pairs(t_sg) do
+			t_stronghold[i].inf_def_mgr[j] = 
+			{
+				sgroup = t_sg[j],						-- an sgroup to check
+				counter = -1,							-- the counter to iterate a number of checks
+				counter_max = 2,						-- the max number of times to check
+				fnc_ai_routine = OBJ_STHD_AlertBarracks,-- a function to call when the max number of checks is reached
+				fnc_reset = function() end,				-- a function to call to tell the sgroup what to do when not being attacked
+				barracks = true,
+				barracks_idx = i,
+			}
+		end
+		
+		for j in pairs(t_stronghold[i].eg_guard) do 
+			t_stronghold[i].gt_destroyed[j] = false
+			t_stronghold[i].gt_pos[j] = EGroup_GetPosition_EVEN_IF_EMPTY(t_stronghold[i].eg_guard[j])
+			t_stronghold[i].gt_spotted[j] = false
+			g_GT_NUM_TOTAL = g_GT_NUM_TOTAL + 1
+		end
+		
+	end
+	
+	GRD_TOWER = 1
+	SYNC_WPN = 2
+	
+	-- setup the defenses for the various strongholds
+	-- NOTE: the guard towers must be first in the list or they
+	-- will not get occupied quickly enough by the MGs to prevent 
+	-- the player from occupying them.
+	-- Location: GRAVEL PIT
+	t_stronghold[1].def_pt = {
+		{point = t_eg_barracks_gt[1][1], class = GRD_TOWER},
+		{point = t_sync_weapon_mgr[4], class = SYNC_WPN},
+	}
+	
+	-- Location: SOUTHERN BARRACKS
+	t_stronghold[2].def_pt = {
+		{point = t_eg_barracks_gt[2][1], class = GRD_TOWER},
+		{point = t_sync_weapon_mgr[2], class = SYNC_WPN},
+	}
+	
+	-- Location: CONSTRUCTION YARD
+	t_stronghold[3].def_pt = {
+		{point = t_eg_barracks_gt[3][1], class = GRD_TOWER},
+		{point = t_sync_weapon_mgr[3], class = SYNC_WPN},
+		{point = t_sync_weapon_mgr[29], class = SYNC_WPN},
+	}
+	
+	-- Location: NORTHERN BARRACKS
+	t_stronghold[4].def_pt = {
+		{point = t_eg_barracks_gt[4][1], class = GRD_TOWER},
+		{point = t_eg_barracks_gt[4][2], class = GRD_TOWER},
+		{point = t_sync_weapon_mgr[31], class = SYNC_WPN},	
+	}
+	
+	-- Location: RAILYARD
+	t_stronghold[5].def_pt = {
+		{point = t_eg_barracks_gt[5][1], class = GRD_TOWER},
+		{point = t_sync_weapon_mgr[7], class = SYNC_WPN},
+	}
+	
+	-- Location: OXYGEN TANKS
+	t_stronghold[6].def_pt = {
+		{point = t_eg_barracks_gt[6][1], class = GRD_TOWER},
+		{point = t_eg_barracks_gt[6][2], class = GRD_TOWER},
+		{point = t_sync_weapon_mgr[1], class = SYNC_WPN},
+	}
+	
+	-- Location: V2 ROCKET
+	t_stronghold[7].def_pt = {
+		{point = t_eg_barracks_gt[7][1], class = GRD_TOWER},
+		{point = t_eg_barracks_gt[7][2], class = GRD_TOWER},
+		{point = t_sync_weapon_mgr[23], class = SYNC_WPN},
+	}
+	
+	-- Location: ROOF
+	t_stronghold[8].def_pt = {
+		{point = t_sync_weapon_mgr[14], class = SYNC_WPN},
+		{point = t_sync_weapon_mgr[15], class = SYNC_WPN},
+	}
+	
+	------------------
+	-- VEHICLES
+	------------------
+	
+	-- customize the particular vehicle for each marker
+	-- SBPS match the marker number
+	local sbps = {
+		{ SBP.AXIS.PANZER, false, 5, "path_veh2", },                             -- 1
+		{ SBP.AXIS.OSTWIND, false, 5, "path_veh3", },							 -- 2
+		{ SBP.AXIS.HALFTRACK, UPG.AXIS.HALFTRACK_FLAMETHROWER, 5, "path_veh2",}, -- 3
+		{ SBP.AXIS.PANZER, false, 6, "path_veh1", },                             -- 4
+		{ SBP.AXIS.PUMA, false, 4, "path_veh3", },                               -- 5
+		{ SBP.AXIS.OSTWIND, false, 6, "path_veh1", },                            -- 6
+		{ SBP.AXIS.PANZER, false, 7, "path_veh4", },                             -- 7
+		{ SBP.AXIS.HALFTRACK, UPG.AXIS.HALFTRACK_FLAMETHROWER, 6, "path_veh1",}, -- 8
+	}
+	
+	t_sthd_veh_mgr = {}
+	for i in pairs(sbps) do 
+		t_sthd_veh_mgr[i] = {
+			sgroup 			= sg_veh[i],
+			sbp				= sbps[i][1],
+			upg			 	= sbps[i][2],
+			mkr_sp			= mkr_sp_veh[i],
+			sthd_id			= sbps[i][3],
+			occupied		= false,				-- flag to detect whether or not an occupation team has been spawned
+			active			= false,				-- flag to determine whether an object has been spawned or not.
+			sg_crew			= sg_veh_crew[i],		-- crew devoted to occupying the vehicle
+			sg_target		= sg_veh_target[i],		-- target for the vehicle to attack when it is activated
+			mkr_v2			= mkr_veh_v2_def[i],	-- the marker for which the vehicle will go to defend the V2
+			v2_move			= false,				-- flag to check whether vehicle is following V2 path
+			path			= sbps[i][4],			-- path that vehicles will use if activated but not fighting
+		}	
+		
+		if t_sthd_veh_mgr[i].sbp == SBP.AXIS.OSTWIND then
+			t_sthd_veh_mgr[i].occupied = true
+		end
+	end
+	
+	SGroup_AddGroup(t_sthd_veh_mgr[1].sgroup, sg_panzer2)
+	SGroup_SetPlayerOwner(sg_panzer2, player2)
+	SGroup_AddGroup(t_sthd_veh_mgr[2].sgroup, sg_ostwind)
+	SGroup_SetPlayerOwner(sg_ostwind, player2)
+	
+	for i in pairs(t_sthd_veh_mgr) do 
+		OBJ_STHD_SpawnVehicle(i)
+	end
+	
+	------------------
+	-- ADD RULES
+	------------------
+	Rule_AddInterval(OBJ_STHD_Patrol, 0.67)
+	Rule_AddInterval(OBJ_STHD_GuardTowerDestroyed, 0.57)
+	Rule_AddInterval(OBJ_STHD_GuardTowerSpotted, 0.89)
+	Rule_AddInterval(OBJ_STHD_GuardTowerCheckPlayerProx, 0.47)
+	Rule_AddInterval(OBJ_STHD_VehicleCheckPlayerApproach, 1.43)
+	Rule_AddInterval(OBJ_STHD_ChecksDefenseSpawn, 0.69)
+end
+
+
+
+function OBJ_STHD_SetupDefenses(sthd_id, index)
+	-- find an available guard tower from which to spawn squads
+--~ 	print("OBJ_STHD_SetupDefenses, calling OBJ_STHD_GetAvailableGuardTower")
+	local guard_tower = OBJ_STHD_GetAvailableGuardTower(sthd_id)
+	
+	-- nothing left from which to spawn units
+	if guard_tower == false then
+		return
+	end
+	
+--~ 	print("OBJ_STHD_SetupDefenses -- Guard Tower Found? Sector>>"..sthd_id)
+	local egroup = guard_tower.egroup
+	local eg_pos = Util_GetPosition_EVEN_IF_EMPTY(guard_tower.pos)
+	
+	local def_pt = t_stronghold[sthd_id].def_pt[index]
+	local sgroup = t_stronghold[sthd_id].t_sg_def[index]
+		
+	if def_pt.class == GRD_TOWER
+	and EGroup_IsEmpty(def_pt.point) == false 
+	and Player_OwnsEGroup(player1, def_pt.point) == false then
+		Util_CreateSquadsAndGarrison(player2, sgroup, SBP.AXIS.HEAVYMG, def_pt.point, 1, true)
+		Util_AddUnderAttackItem(t_stronghold[sthd_id].inf_def_mgr[index])
+	elseif def_pt.class == SYNC_WPN then 
+		local sw_mgr = def_pt.point
+		--brw 08/18/07 not checking the spawn point from which squads are created because that is done up above
+		-- and the function just returns if the egroup is missing -- see the function OBJ_STHD_GetAvailableGuardTower
+		Util_CreateSquadsAndGarrisonExit(player2, sgroup, SBP.AXIS.GRENADIER, egroup, 1, eg_pos, true, 3)
+		M07_MoveToDefensePoint(sw_mgr, sgroup)
+		Util_AddUnderAttackItem(t_stronghold[sthd_id].inf_def_mgr[index])
+	end
+end
+
+function OBJ_STHD_ChecksDefenseSpawn()
+	for i=1, table.getn(t_stronghold) do
+		local sthd = t_stronghold[i]
+		local timer = sthd.gt_sp_tmr
+		
+		if sthd.gt_sp_flag == true
+		and sthd.gt_sp_counter <= table.getn(sthd.def_pt) then
+			local idx = sthd.gt_sp_counter
+			local def_pt = sthd.def_pt[idx]
+			
+			if def_pt.class == GRD_TOWER then
+				print("OBJ_STHD_ChecksDefenseSpawn: Guard Tower Defense, Sector>>"..i..", Spawn Counter: "..sthd.gt_sp_counter)
+				OBJ_STHD_SetupDefenses(i, idx)
+				sthd.gt_sp_counter = idx + 1
+			elseif sthd.first_attack == true
+			and Timer_GetRemaining(timer) <= 0 then
+				print("OBJ_STHD_ChecksDefenseSpawn: SW Defense, Spawn Counter: "..sthd.gt_sp_counter)
+				sthd.check_destroyed = true
+				OBJ_STHD_SetupDefenses(i, idx)
+				sthd.gt_sp_counter = idx + 1
+				Timer_Start(timer, World_GetRand(3, 7))	
+			end
+		end
+	end
+end
+
+-- sets up a patrol for the barracks that wander around a sector and 
+function OBJ_STHD_Patrol()
+	if g_STHD_PATROL_IDX > table.getn(t_stronghold) then
+		g_STHD_PATROL_IDX = 1
+	end
+
+	local sthd = t_stronghold[g_STHD_PATROL_IDX]
+	local sg_patrol = sthd.t_sgroups[1] -- patrol is always the first group
+	if SGroup_IsEmpty(sg_patrol) 
+	and Timer_GetRemaining(sthd.tmr_patrol) <= 0 then
+		-- find an available guard tower from which to spawn squads
+		local guard_tower = OBJ_STHD_GetAvailableGuardTower(g_STHD_PATROL_IDX)
+		
+		-- if a guard tower exists...
+		if guard_tower ~= false then
+			print("OBJ_STHD_Patrol: Guard Tower Valid -- Requesting Squads")
+			local egroup = guard_tower.egroup
+			local eg_pos = Util_GetPosition_EVEN_IF_EMPTY(guard_tower.pos)
+
+			--brw 08/18/07 not checking the spawn point from which squads are created because that is done up above
+			-- and the function just returns if the egroup is missing -- see the function OBJ_STHD_GetAvailableGuardTower
+			Util_CreateSquadsAndGarrisonExit(player2, sg_patrol, SBP.AXIS.VOLKSGRENADIER, egroup, 1, eg_pos)
+			Util_AddUnderAttackItem(sthd.inf_mgr[1])
+		end
+		Timer_Start(sthd.tmr_patrol, World_GetRand(sthd.tmr_patrol_min, sthd.tmr_patrol_max))
+	elseif SGroup_IsMoving(sg_patrol, ANY) == false then
+		Cmd_SquadPath(sg_patrol, sthd.path_patrol, true, true, true, 5)
+	end
+	
+	g_STHD_PATROL_IDX = g_STHD_PATROL_IDX + 1
+end
+
+
+function OBJ_STHD_AlertBarracks(idx, plyr_target)
+	-- if there is no target to attack, then stop attacking them
+	if SGroup_IsEmpty(plyr_target) then
+		return
+	end
+	
+	print("Found player units in Sector: "..idx)
+	local pos = Util_GetPosition_EVEN_IF_EMPTY(plyr_target)
+	
+	-- Sounds the alarm and lights up the area appropriately
+	if t_stronghold[idx].first_attack == false then
+		t_stronghold[idx].first_attack = true
+		--activate the strongholds to indicate that they need to be populated
+		t_stronghold[idx].gt_sp_flag = true
+		
+		OBJ_STHD_ActivateFloodLights(t_stronghold[idx].lights)
+		
+		-- reveal FOW in the area
+		EventCue_Create(CUE.NORMAL, 279225, 279225, mkr_barracks[idx])
+		Util_StartStinger(EVENTS.OBJ_STHD_BarracksAlerted)
+		
+		-- Activate Alarm Sound
+		t_stronghold[idx].gt_alarm = true
+		
+		-- don't try to set off the alarm for the roof because it won't work
+		if idx ~= 8 then
+			for i in pairs(t_stronghold[idx].eg_guard) do 
+				
+				local gt = t_stronghold[idx].eg_guard[i]
+				if EGroup_IsEmpty(gt) == false then
+					EGroup_SetAnimatorState(gt, "sfx_alarm", "alarmon")
+				end			
+			end
+		end
+	
+	-- separating attacks from normal squad spawning to the first time a barracks is activated
+	-- to avoid any conflicting errors that are occuring when setting up defenses might conflict
+	-- with a random spawn choice.
+	elseif Timer_GetRemaining(t_stronghold[idx].timer) <= 0 then
+		
+		-- special case to force all defenders to defend the V2 Rocket if that area
+		if g_PLAYER_NEAR_V2 == true then
+			idx = 7
+			pos = Marker_GetPosition(Marker_V2Rocket)
+		end
+		
+		M07_BD_Alert(idx, pos)
+		
+		for i=1, t_stronghold[idx].attack_amount do 
+			OBJ_STHD_SpawnAndAttack(idx, pos, i)
+		end	
+		
+		local tmin = t_stronghold[idx].timer_min
+		local tmax = t_stronghold[idx].timer_max
+--		print("***** ***** ****** RESTARTING TIMER ***** ***** *******")
+		Timer_Start(t_stronghold[idx].timer, World_GetRand(tmin,tmax))
+	end
+end
+
+-- spawns a squad from the barracks with the sg_id of the type defined in the 
+-- setup function for strongholds.   Orders the squad to perform one of several 
+-- actions: GARRISON, MOVE TO DEFENSE POINT, ATTACK,
+-- the action predetermines the SBP for the unit
+function OBJ_STHD_SpawnAndAttack(idx, var, sg_id)
+	local pos
+	local sg_target
+	
+	-- if the variable is an sgroup then set the sgroup target
+	if scartype(var) == ST_SGROUP then
+		sg_target = var
+		pos = Util_GetPosition_EVEN_IF_EMPTY(var)
+	-- otherwise assume that it is a position
+	else
+		pos = var
+	end
+	
+	-- *** TODO - Update the mkr to get the position next to the guard tower
+	-- rather than the overall barracks position
+	local sbp
+	local sgroup = t_stronghold[idx].t_sgroups[sg_id]
+	local mkr
+	local def_pt_idx
+	
+	-- this is a quick check to make sure everyone is dead (other than the patrol)
+	-- befor spawning a new group of enemies, to make it look more coordinated.
+	for i=1, t_stronghold[idx].attack_amount do  
+		local sgroup = t_stronghold[idx].t_sgroups[i]
+		if SGroup_IsEmpty(t_stronghold[idx].t_sgroups[i]) == false then
+			return
+		end
+	end
+	
+	local attack = World_GetRand(1,2)
+	
+	-- *** Also can be used as a difficulty handle, if needed
+	sbp = SBP.AXIS.VOLKSGRENADIER
+	
+	-- find an available guard tower from which to spawn squads
+	local guard_tower = OBJ_STHD_GetAvailableGuardTower(idx)
+	
+	-- there is nothing from which to spawn units
+	if guard_tower == false then
+		return
+	end
+	
+	local egroup = guard_tower.egroup
+	local eg_pos = Util_GetPosition_EVEN_IF_EMPTY(guard_tower.pos)
+	
+	-- if the sgroup is empty, choose an SBP, then 
+	if SGroup_IsEmpty(sgroup) then
+		-- OCCUPY A DEFENSIVE POINT (POSSIBLY AN MG NEST)
+		-- special case, we only want this to occur when a new squad is created
+		-- because I don't want the unit them picking up and moving the HMG (or other item)
+		if attack == 1 then
+			
+			mkr = Util_GetClosestMarker(pos, mkr_ax_defend)
+--~ 			print("Closest Marker: "..Marker_GetName(mkr))
+			for i in pairs(t_sync_weapon_mgr) do
+				if t_sync_weapon_mgr[i].mkr == mkr then
+--~ 					print("OBJ_STHD_SpawnAndAttack: Found matching marker!")
+					if t_sync_weapon_mgr.sw_id ~= false then
+						sbp = SBP.AXIS.GRENADIER
+					end
+
+					--brw  08/18/07 not checking the spawn point from which squads are created because that is done up above
+					-- and the function just returns if the egroup is missing -- see the function OBJ_STHD_GetAvailableGuardTower
+					Util_CreateSquadsAndGarrisonExit(player2, sgroup, sbp, egroup, 1, eg_pos, true, 3)
+					Util_AddUnderAttackItem(t_stronghold[idx].inf_mgr[sg_id])
+					M07_MoveToDefensePoint(t_sync_weapon_mgr[i], sgroup)
+					-- End function because nothing else needs to happen for this attack
+					return
+				end
+			end
+		else
+			--brw  08/18/07 not checking the spawn point from which squads are created because that is done up above
+			-- and the function just returns if the egroup is missing -- see the function OBJ_STHD_GetAvailableGuardTower
+			-- just crease the squad and move them to the player's location.
+			Util_CreateSquadsAndGarrisonExit(player2, sgroup, sbp, egroup, 1, eg_pos, true)
+			Util_AddUnderAttackItem(t_stronghold[idx].inf_mgr[sg_id])
+		end
+	end
+	
+	if SGroup_IsEmpty(sgroup) == false 
+	and not SGroup_IsMoving(sgroup, ANY) then
+		Cmd_AttackMove(sgroup, pos, true, nil, 10)
+	end
+end
+
+-- determines if a guard tower is available for spawning and 
+--  returns that to the player, otherwise it returns "nil"
+function OBJ_STHD_GetAvailableGuardTower(idx)
+	-- special case because the entrance has no guard towers
+	if idx == 9 then
+		return false
+	end
+	
+	print("OBJ_STHD_GetAvailableGuardTower for Sector>>"..idx)
+	for j=1, table.getn(t_stronghold[idx].eg_guard) do 
+		local temp = t_stronghold[idx].eg_guard[j]
+		
+		if not t_stronghold[idx].gt_destroyed[j]
+		and EGroup_IsEmpty(temp) == false
+		and Player_OwnsEGroup(player1, temp) == false then
+			
+			return {egroup = temp, pos = t_stronghold[idx].mkr_gt[j]}
+		end
+	end
+	return false
+end
+
+-- checks to see if a guard tower has been destroyed
+-- and plays the appropriate speech event/event cue
+function OBJ_STHD_GuardTowerDestroyed()
+	if g_GT_DESTROYED_IDX > table.getn(t_stronghold) then
+		g_GT_DESTROYED_IDX = 1
+	end
+	
+	local sthd = t_stronghold[g_GT_DESTROYED_IDX]
+	for j=1, table.getn(sthd.eg_guard) do 
+		local egroup =  sthd.eg_guard[j]
+		
+		-- checks if the guard tower is empty or destroyed
+		-- and whether or not it is on the rooftop (they aren't considered guard towers)
+		if g_GT_DESTROYED_IDX ~= 8
+		and  sthd.check_destroyed == true
+		and  sthd.gt_destroyed[j] == false
+		and (EGroup_IsEmpty(egroup) or Player_OwnsEGroup(player2, egroup) == false) then
+			sthd.gt_destroyed[j] = true
+			
+			if  sthd.gt_hint_id ~= nil then
+				HintPoint_Remove( sthd.gt_hint_id)
+				sthd.gt_hint_id = nil
+			end
+			--[[ START STINGER ]]
+			if EGroup_IsEmpty(egroup) then
+				Util_StartStinger(EVENTS.OBJ_STHD_GuardTowerDestroyed)
+			else
+				Util_StartStinger(EVENTS.OBJ_STHD_GuardTowerCleared)
+			end
+			
+			g_GT_NUM_DESTROYED = g_GT_NUM_DESTROYED + 1
+			
+			EventCue_Create(CUE.ATTACKED, 279226, 279226,  sthd.gt_pos[j])
+		end
+	end
+	g_GT_DESTROYED_IDX = g_GT_DESTROYED_IDX + 1
+end
+
+
+-- checks to see if a certain guard tower has been destroyed
+-- and plays the appropriate speech/event cue
+function OBJ_STHD_GuardTowerSpotted()
+	if g_GT_SPOTTED_IDX > table.getn(t_stronghold) then
+		g_GT_SPOTTED_IDX = 1
+	end
+	
+	local sthd = t_stronghold[g_GT_SPOTTED_IDX]
+	for j=1, table.getn(sthd.eg_guard) do
+		local egroup = sthd.eg_guard[j]
+		
+			-- if the guard tower hasn't been spotted
+			-- and it isn't empty
+			-- and it's not on the rooftop (8, rooftop buildings aren't considered guard towers)
+		if g_GT_SPOTTED_IDX ~= 8 
+		and sthd.gt_spotted[j] ~= true
+		and EGroup_IsEmpty(egroup) == false
+		and Player_OwnsEGroup(player2, egroup) then
+		Player_GetAllSquadsNearMarker(player1, sg_temp, EGroup_GetPosition_EVEN_IF_EMPTY(egroup), 30)
+			if SGroup_IsEmpty(sg_temp) == false
+			and Player_CanSeeEGroup(player1, egroup, ANY) then
+				--[[ DIALOGUE ]]
+				-- first time a guard tower is spotted, tell the player that 
+				-- there are reinforcements coming from the tower
+				if g_FIRST_GT_ENCOUNTER == nil then
+					Util_StartIntel(EVENTS.OBJ_STHD_GuardTowerFirstSpotted)
+				sthd.gt_hint_id = HintPoint_Add(egroup, true, 279220)
+					g_FIRST_GT_ENCOUNTER = false
+				elseif g_GT_ENCOUNTER <= g_GT_ENCOUNTER_TOTAL then
+					Util_StartStinger(EVENTS.OBJ_STHD_GuardTowerSpotted)
+					g_GT_ENCOUNTER = g_GT_ENCOUNTER + 1
+				end
+				
+				EventCue_Create(CUE.ATTACKED, 279229, 279229, egroup, 279220)
+				sthd.gt_spotted[j] = true
+			end
+		end
+	end
+	g_GT_SPOTTED_IDX = g_GT_SPOTTED_IDX + 1
+end
+
+
+function OBJ_STHD_GuardTowerCheckPlayerProx()
+	if g_CURRENT_STRONGHOLD > table.getn(t_stronghold) then
+		g_CURRENT_STRONGHOLD = 1
+	end
+	
+	local egroups = t_stronghold[g_CURRENT_STRONGHOLD].eg_guard
+	
+--~ 	print("Checking Sector: "..g_CURRENT_STRONGHOLD)
+	for i in pairs(egroups) do 
+		if t_stronghold[g_CURRENT_STRONGHOLD].first_attack ~= true then
+			if EGroup_IsEmpty(egroups[i]) == false then
+				Player_GetAllSquadsNearMarker(player1, sg_temp, EGroup_GetPosition_EVEN_IF_EMPTY(egroups[i]), 50)
+				
+				if SGroup_IsEmpty(sg_temp) == false
+				and Player_OwnsEGroup(player1, egroups[i]) == false
+				and Player_OwnsEGroup(player2, egroups[i]) == false then
+					t_stronghold[g_CURRENT_STRONGHOLD].gt_sp_flag = true
+					break
+				end
+			end
+		end
+	end
+	g_CURRENT_STRONGHOLD = g_CURRENT_STRONGHOLD + 1
+end
+
+-----------------------------------------------------------------------
+-- Vehicle Occupation
+-----------------------------------------------------------------------
+
+function OBJ_STHD_SpawnVehicle(idx)
+	local sgroup = t_sthd_veh_mgr[idx].sgroup
+	local sbp = t_sthd_veh_mgr[idx].sbp
+	local mkr = t_sthd_veh_mgr[idx].mkr_sp
+	local upg = t_sthd_veh_mgr[idx].upg
+	local player = player3
+	
+	if SGroup_IsEmpty(sgroup) then
+		Util_CreateSquadsAtMarker(player2, sgroup, sbp, mkr, 1)
+	end
+	if sbp ~= SBP.AXIS.OSTWIND then
+		SGroup_SetAutoTargetting(sgroup, "hardpoint_01", false)
+	end
+	if upg ~= false then
+		Cmd_InstantUpgrade(sgroup, upg)
+	end
+end
+
+function OBJ_STHD_VehicleCheckPlayerApproach()
+	local bln_remove = true
+	
+	for i in pairs(t_sthd_veh_mgr) do
+		-- if player squads are near the vehicle then activate it.
+		local mkr = t_sthd_veh_mgr[i].mkr_sp
+		
+		if t_sthd_veh_mgr[i].active == false then
+--~ 			print("OBJ_STHD_VehicleCheckPlayerApproach"..i)
+			local target = t_sthd_veh_mgr[i].sg_target
+		
+			Player_GetAllSquadsNearMarker(player1, target, Marker_GetPosition(mkr), 30)
+			if SGroup_IsEmpty(target) == false 
+			or SGroup_IsUnderAttack(t_sthd_veh_mgr[i].sgroup, ANY, 10) then
+				print("OBJ_STHD_VehicleCheckPlayerApproach"..i..": Activating Vehicle")
+				if Rule_Exists(OBJ_STHD_VehicleOccupation) == false then
+					Rule_AddInterval(OBJ_STHD_VehicleOccupation, 1.6)
+				end
+			
+				t_sthd_veh_mgr[i].active = true
+			end
+		end
+		
+		-- checks to see if this vehicle has been activated or not
+		if t_sthd_veh_mgr[i].active == false then 
+			bln_remove = false
+		end
+	end
+	
+	-- remove this rule if all the vehicles are activated
+	if bln_remove then
+		Rule_RemoveMe()
+	end
+end
+
+function OBJ_STHD_VehicleOccupation()
+	for i in pairs(t_sthd_veh_mgr) do 
+		local sgroup = t_sthd_veh_mgr[i].sgroup
+		
+		if t_sthd_veh_mgr[i].active == true
+		and SGroup_IsEmpty(sgroup) == false then
+	
+			local mkr = t_sthd_veh_mgr[i].mkr_sp
+			local sg_crew = t_sthd_veh_mgr[i].sg_crew
+		
+			-- checks to see if the occupying squad has been spawned yet.
+			if t_sthd_veh_mgr[i].occupied == false then
+				local gt = OBJ_STHD_GetAvailableGuardTower(t_sthd_veh_mgr[i].sthd_id)
+				if gt ~= false then
+					-- brw 08/18/07 not checking the spawn point from which squads are created because that is done up above
+					-- and the function just returns if the egroup is missing -- see the function OBJ_STHD_GetAvailableGuardTower
+					Util_CreateSquadsAndGarrisonExit(player2, sg_crew, SBP.AXIS.GRENADIER, gt.egroup, 1, gt.pos, true, 3)
+				end
+				t_sthd_veh_mgr[i].occupied = true
+				
+			-- check to see if a crew has been sent out to occupy the vehicle.	
+			elseif t_sthd_veh_mgr[i].occupied == true 
+			and SGroup_IsEmpty(sg_crew) == false then
+				if Prox_AreSquadsNearMarker(sg_crew, Marker_GetPosition(mkr), ANY, 7) then
+					SGroup_SetPlayerOwner(sgroup, player2)
+					SGroup_DestroyAllSquads(sg_crew)
+					SGroup_SetAutoTargetting(sgroup, "hardpoint_01", true)
+				elseif SGroup_IsMoving(sg_crew, ANY) == false then
+					Cmd_Move(sg_crew, mkr)
+				end
+				
+			-- check to see if the vehicle has been occupied, and give it things to do
+			elseif SGroup_IsMoving(sgroup, ANY) == false then
+				if g_PLAYER_NEAR_V2_VEH == false then
+					if SGroup_IsUnderAttack(sgroup, ANY, 10) == false then
+				
+						local target = t_sthd_veh_mgr[i].sg_target
+						-- attack the target that was near the vehicle first
+						if SGroup_IsEmpty(target) == false then
+							Cmd_AttackMove(sgroup, target)
+							
+						-- otherwise just patrol on the appropriate path
+						else
+							Cmd_SquadPath(sgroup, t_sthd_veh_mgr[i].path, true, true, true, 10)
+						end
+					end
+				else
+					-- DEFEND THE ROCKET
+					if t_sthd_veh_mgr[i].v2_move == false then
+						Cmd_SquadPath(sgroup, "path_defend_v2", true, false, false, 0) 
+						t_sthd_veh_mgr[i].v2_move = true
+					elseif Prox_AreSquadsNearMarker(sgroup, t_sthd_veh_mgr[i].mkr_v2, ANY, 20) == false then
+--~ 						print("OBJ_STHD_VehicleOccupation: Veh#"..i.."Ordering vehicle to marker to defend marker")
+						Cmd_Move(sgroup, t_sthd_veh_mgr[i].mkr_v2)
+					end
+				end
+			end
+		end
+	end
+end
+
+function OBJ_STHD_VehicleActivateAll()
+	Rule_Remove(OBJ_STHD_VehicleCheckPlayerApproach)
+	for i in pairs(t_sthd_veh_mgr) do
+		-- if the vehicle does not exist, assume that it is dead
+		if SGroup_IsEmpty(t_sthd_veh_mgr[i].sgroup) == false then
+			-- if the vehicle is not active, then quickly activate, depending on whether or not 
+			-- the player is around to see the crew occupy it
+			if t_sthd_veh_mgr[i].active == false 
+			and Player_CanSeeSGroup(player1, t_sthd_veh_mgr[i].sgroup, ANY) == false then
+				SGroup_SetPlayerOwner(t_sthd_veh_mgr[i].sgroup, player2)
+				t_sthd_veh_mgr[i].occupied = true
+			end
+			
+			t_sthd_veh_mgr[i].active = true
+			SGroup_SetAutoTargetting(t_sthd_veh_mgr[i].sgroup, "hardpoint_01", true)
+		end
+	end
+	
+	if Rule_Exists(OBJ_STHD_VehicleOccupation) == false then
+		Rule_AddInterval(OBJ_STHD_VehicleOccupation, 1.6)
+	end
+end
+
+
+-----------------------------------------------------------------------
+-- Activating Flood Lights
+-----------------------------------------------------------------------
+
+-- function sets up a table to delay the activation of lights
+-- in the base.
+function OBJ_STHD_ActivateFloodLights(lights)
+	-- check to see if the particular table has any lights
+	if lights == nil or table.getn(lights) <= 0  then
+		return
+	end
+	
+	for i=table.getn(lights), 1, -1 do 
+		if EGroup_IsEmpty(lights[i]) then
+			table.remove(lights, i)
+		end
+	end
+	
+	print("Activating Lights!")
+	local count = table.getn(lights)
+	local t_length = 2
+	local interval = t_length/count
+	local curr_interval = interval
+	
+	if t_light_mgr == nil then
+		t_light_mgr = {}
+	end
+	
+	local my_lights = {}
+	for i in pairs(lights) do 
+		my_lights[i] = {
+			egroup = lights[i],
+			activate_time = t_length - curr_interval,
+			active = false,
+			timer_id = "Flood Light Timer",
+			timer_length = t_length,
+		}
+		curr_interval = curr_interval + interval
+		
+	end
+	
+	local temp_mgr = {
+		timer_id = "Flood Light Timer"..World_GetRand(1,1000),
+		counter = 1,
+		timer_length = t_length,
+		lights = my_lights,
+	}
+	
+	table.insert(t_light_mgr, temp_mgr)
+	Timer_Start(temp_mgr.timer_id, temp_mgr.timer_length)
+	
+	if Rule_Exists(OBJ_STHD_TurnOnLights) == false then
+		Rule_AddInterval(OBJ_STHD_TurnOnLights, 0.1)
+	end
+end
+
+-- this function runs a quick loop through the sim
+-- which tracks the lights and turns them on in a sequentially delayed manner.
+function OBJ_STHD_TurnOnLights()
+	for k=table.getn(t_light_mgr), 1, -1 do
+		local timer_id = t_light_mgr[k].timer_id
+		local count = t_light_mgr[k].counter
+		local length = t_light_mgr[k].timer_length
+		local lights = t_light_mgr[k].lights
+		
+		if not lights[count].active and Timer_GetRemaining(timer_id) <= lights[count].activate_time then
+			if EGroup_IsEmpty(lights[count].egroup) == false then
+			EGroup_SetAnimatorState(lights[count].egroup, "Light", "On")
+			end
+			lights[count].active = true
+			t_light_mgr[k].counter = t_light_mgr[k].counter + 1
+		end
+		
+		if Timer_GetRemaining(timer_id) == 0 then
+			table.remove(t_light_mgr, k)
+		end
+	end
+	
+	if table.getn(t_light_mgr) == 0 then
+		Rule_RemoveMe()
+	end
+end
+
+-------------------------------------------------------------
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- BASE DEFENSE
+-- These are specific enemies that come to support a sector.
+-- they may be droopped off by vehicles.
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--[[ TODO: Needs to react if the player destroys the HQ
+	TODO: Add in a method to deactivate the timer and base defense
+	if the threat is eliminated
+]]
+-------------------------------------------------------------
+
+function M07_BD_Setup()
+	t_bd_mgr = {
+		timer 				= "BASE_DEFENSE_MGR",			-- timer to manage when the BDs are mobilized
+		timer_length 		= t_difficulty.bd_spawn_time,	-- length of timer before BDs are mobilized to attack the player
+		timer_veh			= "BASE_DEFENSE_VEH",			-- used to delay the vehicle departure, so that they don't block each other
+		timer_veh_length 	= 5,							-- time for the vehicle timer
+		timer_return		= "BASE_DEFENSE_RETURN",		-- timer used to determine when the squads should return to the HQ
+		return_length		= 3*60,							-- amount of time for the return timer
+		sg_veh				= sg_bd_veh,					-- sgroups pointing to all the vehicles
+		sg_inf				= sg_bd_inf,					-- sgroups pointing to all the base defense infantry
+		sg_captain			= sg_bd_captain,				-- sgroup pointing to the captain of the base defenses (*** NOT USED)
+		egroup				= eg_bd_hq[1],					-- the current egroup for which the HQ is situated
+		veh_sectors			= {7, 1, 3, 4, 5, 9},			-- sectors (barracks indexes) which must be traveled to by vehicle
+		inf_loadout			= 3,							-- loadout of squads, difficulty handle
+		inf_num				= t_difficulty.bd_squad_num,	-- number of infantry that are spawned per sgroup
+		mkr_hq				= mkr_bd_hq[1],					-- marker near the HQ that the infantry move to when spawned
+		inf_sbp				= SBP.AXIS.GRENADIER,			-- difficulty handle for type of troops
+		mkr_pickup			= mkr_bd_pickup[1],				-- point the infantry move to from which to get into the vehicles
+		t_pickup			= {},							-- temporary table to track the picking up of infantry
+		t_loading			= {},							-- temporary table to track which infantry are loaded (?)
+		mkr_barracks		= nil,							-- location of the marker for the sector that tells the halftracks to unload
+		paths				= t_path_barracks,				-- table of paths to the various sectors paired with the sector number
+		curr_barracks		= nil,							-- the current sector number, that the BD are defending
+		alerted				= false,						-- whether or not the BD has been alerted
+		on_foot				= true,							-- whether the infantry should be travelling on foot or by vehicle
+		pos_attack			= nil,							-- the location of the attack after the infantry have been dropped off
+		arrival_alert		= false,						-- a flag to track the event cue playing of the BD arrival at a sector
+		eg_despawn			= nil,							-- egroup from which the squads will despawn
+		tmr_spawn			= "BASE_DEFENSE_SPAWN",			-- a timer to track when to spawn each of the base defense squads (within a set)
+		tmr_spawn_length	= 10,							-- number of seconds to wait between spawning each of the squads (within a mobilized group)
+		spawn_idx			= 1,							-- index to keep track of what squad has been spawned
+	}
+	
+	for i in pairs(mkr_sp_bd_veh) do 
+		Util_CreateSquadsAtMarker(player2, t_bd_mgr.sg_veh[i], SBP.AXIS.HALFTRACK, mkr_sp_bd_veh[i], 1)
+	end
+	
+	Rule_AddInterval(M07_BD_EntranceCheck, 5)
+end
+
+function M07_BD_Alert(idx, position)
+	-- check if they have already been alerted,
+	if t_bd_mgr.alerted == false and EGroup_IsEmpty(t_bd_mgr.egroup) == false then
+		
+		-- is it better to go on foot to the sector?
+		for i in pairs(t_bd_mgr.veh_sectors) do
+			if idx == t_bd_mgr.veh_sectors[i] then
+				t_bd_mgr.on_foot = false
+				break
+			end
+		end
+		
+		--[[ DIALOGUE ]]
+		-- set a global variable to tell the events file what 
+		-- 	string to play for when the Axis are spawned
+		g_ACTIVE_SECTOR = idx 
+		
+		-- set who is alerting
+		t_bd_mgr.curr_barracks = idx
+		
+		-- get the timer ready to go for when to mobilize forces
+		Timer_Start(t_bd_mgr.timer, t_bd_mgr.timer_length)
+		
+		-- set all the correct data to the correct barracks
+		t_bd_mgr.mkr_barracks = mkr_bd_dropoff[idx]
+		
+		-- indicate that the BD has already been alerted in case
+		-- others are trying to alert
+		t_bd_mgr.alerted = true
+		
+		-- record the position where the BD needs to attack after
+		-- being dropped off
+		t_bd_mgr.pos_attack = position
+		
+		if Rule_Exists(M07_BD_CheckMobilization) == false then
+			Rule_AddInterval(M07_BD_CheckMobilization, 5)
+		end
+	end
+end
+
+-- checks whether or not to spawn base defenses to attack the player.
+function M07_BD_CheckMobilization()
+	if Timer_GetRemaining(t_bd_mgr.timer) <= 0 then
+		print("M07_BD_CheckTimer: Completed -- Base Defense Activated")
+		t_bd_mgr.t_pickup = {}
+		Rule_AddInterval(M07_BD_SpawnAndLoad, 1.1)
+		
+		--warning from the Germans as to the player's location
+		--[[ DIALOGUE ]]
+		Util_StartStinger(EVENTS.M07_BD_NearSector)
+--~ 		EventCue_Create(CUE.NORMAL, 279236, 279236, t_bd_mgr.mkr_pickup)
+--~ 		FOW_RevealMarker(t_bd_mgr.mkr_pickup, 15)
+		
+		Rule_RemoveMe()
+	end
+end
+
+-- Spawns the appropriate infantry then loads them into the correct vehicle.
+function M07_BD_SpawnAndLoad()
+	if Timer_GetRemaining(t_bd_mgr.tmr_spawn) > 0 then
+		return
+	end
+	
+	if t_bd_mgr.spawn_idx > table.getn(t_bd_mgr.sg_inf) then
+		if Rule_Exists(M07_BD_CheckTimerReturn) == false then
+			Rule_AddInterval(M07_BD_CheckTimerReturn, 6)
+		end
+		
+		if Rule_Exists(M07_BD_CheckInfReturnToHQ) then
+			Rule_Remove(M07_BD_CheckInfReturnToHQ)
+		end
+		
+		if Rule_Exists(M07_BD_CheckPickup) == false then
+			Rule_AddInterval(M07_BD_CheckPickup, 1)
+		end
+		
+		Timer_Start(t_bd_mgr.timer_return, t_bd_mgr.return_length)
+		
+		-- reset all the spawning variables
+		t_bd_mgr.spawn_idx = 1
+	
+		Rule_RemoveMe()
+		return
+	end
+	
+	local idx = t_bd_mgr.spawn_idx
+	t_bd_mgr.spawn_idx = idx + 1
+	local sg = t_bd_mgr.sg_inf[idx]
+	
+	if EGroup_IsEmpty(t_bd_mgr.egroup) == false then
+		if SGroup_IsEmpty(sg) then
+			Util_CreateSquadsAndGarrisonExit(player2, sg, t_bd_mgr.inf_sbp, t_bd_mgr.egroup, t_bd_mgr.inf_num, t_bd_mgr.mkr_hq, true, t_bd_mgr.inf_loadout)
+		end
+		
+		if t_bd_mgr.on_foot == false 
+		and SGroup_IsEmpty(t_bd_mgr.sg_veh[idx]) == false then
+			Cmd_AttackMove(sg, Marker_GetPosition(t_bd_mgr.mkr_pickup), true)
+			table.insert(t_bd_mgr.t_pickup, {sgroup = sg, state = 0})
+		else
+			Cmd_AttackMove(sg, t_bd_mgr.pos_attack, true, nil, 10)
+		end
+	end
+	
+	Timer_Start(t_bd_mgr.tmr_spawn, t_bd_mgr.tmr_spawn_length)
+end
+
+function M07_BD_CheckPickup()
+	local path = t_bd_mgr.paths[t_bd_mgr.curr_barracks].bd_veh
+	
+	bln_loaded = true
+	for i in pairs(t_bd_mgr.t_pickup) do 
+		
+		local sgroup = t_bd_mgr.t_pickup[i].sgroup
+			
+		if SGroup_IsEmpty(sgroup) == false 
+		and Prox_AreSquadsNearMarker(sgroup, Marker_GetPosition(t_bd_mgr.mkr_pickup), ANY, 15)
+		and SGroup_IsEmpty(t_bd_mgr.sg_veh[i]) == false 
+		and t_bd_mgr.t_pickup[i].state == 0 then
+			print("Infantry Load your Vehicle!"..SGroup_GetName(sgroup))
+			Cmd_AttackMove(t_bd_mgr.sg_veh[i], mkr_sp_bd_veh[i], true)
+			Cmd_Garrison(sgroup, t_bd_mgr.sg_veh[i], true, true)
+			t_bd_mgr.t_pickup[i].state = 1
+			
+		-- if there is no vehicle to get in, then just run to the location
+		elseif SGroup_IsEmpty(t_bd_mgr.sg_veh[i]) then
+			print("Ignoring Vehicle, moving to the sector!"..i)
+			Cmd_AttackMove(t_bd_mgr.sg_inf[i], t_bd_mgr.pos_attack, true, nil, 10)
+			t_bd_mgr.t_pickup[i].state = 2
+		elseif SGroup_IsInHoldSquad(sgroup, ALL)
+		and t_bd_mgr.t_pickup[i].state == 1
+		and	Timer_GetRemaining(t_bd_mgr.timer_veh) <= 0 then
+			print("Vehicle Move to Sector!"..i)
+			Cmd_Stop(t_bd_mgr.sg_veh[i])
+			Cmd_SquadPath(t_bd_mgr.sg_veh[i], path, false, false, true, 0)
+			Timer_Start(t_bd_mgr.timer_veh, t_bd_mgr.timer_veh_length)
+			t_bd_mgr.t_pickup[i].state = 2
+		end
+		
+		-- checks to make sure that everyone is loaded up and ready to go,
+		-- then it starts the arrival check
+		if t_bd_mgr.t_pickup[i].state ~= 2 then
+			bln_loaded = false
+		end
+		
+		if SGroup_IsEmpty(sgroup) then
+			table.remove(t_bd_mgr.t_pickup, i)
+		end
+	end
+	
+	if Rule_Exists(M07_BD_CheckBarracksArrival) == false then
+		Rule_AddInterval(M07_BD_CheckBarracksArrival, 3)
+	end
+	
+	if bln_loaded == true then
+		Rule_RemoveMe()
+	end
+end
+
+-- checks to see if the vehicle has arrived at the pre-determined destination and 
+-- unloads the infantry, then sends the vehicles back to the pickup location.
+-- getting the infantry to the drop off point is more important than getting them back
+function M07_BD_CheckBarracksArrival()
+	bln_unloaded = true
+	for i=1,table.getn(t_bd_mgr.t_pickup) do 
+		if SGroup_IsEmpty(t_bd_mgr.sg_veh[i]) == false then
+			-- if the halftrack has squads to unload
+			if SGroup_IsHoldingAny(t_bd_mgr.sg_veh[i]) then
+				bln_unloaded = false
+				
+				-- check if they are near the appropriate location or under attack.  If so, then unload those squads
+				if Prox_AreSquadsNearMarker(t_bd_mgr.sg_veh[i], Marker_GetPosition(t_bd_mgr.mkr_barracks), ANY, 20)
+				or SGroup_IsUnderAttack(t_bd_mgr.sg_veh[i], ANY, 10)
+				or SGroup_IsDoingAttack(t_bd_mgr.sg_veh[i], ANY, 10) then
+--~ 					print("M07_BD_CheckBarracksArrival: Ordering Halftrack"..i.." to unload infantry")
+--~ 					Cmd_Stop(t_bd_mgr.sg_veh[i])
+					Command_Squad(player2, t_bd_mgr.sg_veh[i], SCMD_UnloadSquads, false)
+						
+					if Rule_Exists(M07_BD_CheckInfantryAttack) == false then
+						Rule_AddInterval(M07_BD_CheckInfantryAttack, 1.6)
+					end
+	
+				end
+			-- if the halftracks are NOT loaded with infantry, but not moving
+			-- then order them back home.
+			elseif SGroup_IsMoving(t_bd_mgr.sg_veh[i], ANY) == false then
+--~ 				print("M07_BD_CheckBarracksArrival: Ordering Halftrack"..i.." back to pick up point")
+				Cmd_AttackMove(t_bd_mgr.sg_veh[i], mkr_sp_bd_veh[i])
+			end
+		end
+	end
+	
+	if bln_unloaded then
+		Rule_RemoveMe()
+	end
+end
+
+-- this function make sure that the infantry are moving towards their attack target
+function M07_BD_CheckInfantryAttack()
+	local bln_dead = true
+	
+	for i in pairs(t_bd_mgr.sg_inf) do
+		if SGroup_IsEmpty(t_bd_mgr.sg_inf[i]) == false then
+			bln_dead = false
+			if SGroup_IsUnderAttack(t_bd_mgr.sg_inf[i], ANY, 10) == false 
+			and SGroup_IsMoving(t_bd_mgr.sg_inf[i], ANY) == false then
+				
+				if t_bd_mgr.curr_barracks == 9 
+				and Player_OwnsEGroup(player2, eg_rp_entrance) == false
+				and Squad_GetActiveCommand(SGroup_GetRandomSpawnedSquad(t_bd_mgr.sg_inf[i])) ~= SQUADSTATEID_Capture then
+--~ 					print("M07_BD_CheckInfantryAttack: Ordering infantry to retake the entrance")
+					Cmd_AttackMoveThenCapture(t_bd_mgr.sg_inf[i], eg_rp_entrance)
+				elseif Prox_AreSquadsNearMarker(t_bd_mgr.sg_inf[i], t_bd_mgr.pos_attack, ANY, 12) 
+				and Timer_Exists(t_bd_mgr.timer_return) then
+					Timer_Advance(t_bd_mgr.timer_return, Timer_GetRemaining(t_bd_mgr.timer_return))
+				else
+--~ 					print("M07_BD_CheckInfantryAttack: Ordering infantry to attack the enemy")
+					Cmd_AttackMove(t_bd_mgr.sg_inf[i], t_bd_mgr.pos_attack, nil, nil, 10)
+				end
+			end
+		end
+	end
+	
+	if bln_dead and Timer_Exists(t_bd_mgr.timer_return) then
+		Timer_Advance(t_bd_mgr.timer_return, Timer_GetRemaining(t_bd_mgr.timer_return))
+		Rule_RemoveMe()
+	end
+end
+
+-- this timer checks to see if the infantry need to head back to the base after they have checked out an area where the 
+-- player should be present
+function M07_BD_CheckTimerReturn()
+	-- check to see if the timer is running
+	if Timer_GetRemaining(t_bd_mgr.timer_return) > 0 then
+		return
+	end
+	
+	-- checks to see if the squad is under attack or capturing a point
+	-- and tells them to ignore whatever returning commands they might be getting.
+	for i in pairs(t_bd_mgr.sg_inf) do
+		if SGroup_IsEmpty(t_bd_mgr.sg_inf[i])== false then
+			if SGroup_IsUnderAttack(t_bd_mgr.sg_inf[i], ANY, 10)
+			or SGroup_IsDoingAttack(t_bd_mgr.sg_inf[i], ANY, 10)
+			or Squad_GetActiveCommand(SGroup_GetRandomSpawnedSquad(t_bd_mgr.sg_inf[i])) == SQUADSTATEID_Capture then
+				return
+			end
+		end
+	end
+	
+	if Rule_Exists(M07_BD_CheckInfReturnToHQ) == false then
+		Rule_AddInterval(M07_BD_CheckInfReturnToHQ, 2)
+	end
+	
+	-- core of the function: orders the squad to get out of whatever vehicle they
+	-- might be occupying and to return to the closest guard tower to garrison it.
+	bln_done = true
+	
+	for i in pairs(t_bd_mgr.sg_inf) do
+		if SGroup_IsEmpty(t_bd_mgr.sg_inf[i]) == false then
+			if SGroup_IsUnderAttack(t_bd_mgr.sg_inf[i], ANY, 10) == false 
+			and SGroup_IsMoving(t_bd_mgr.sg_inf[i], ANY) == false then
+				-- if the squad is in a vehicle, then get out.
+				if SGroup_IsHoldingAny(t_bd_mgr.sg_veh[i])
+				and Rule_Exists(M07_BD_CheckBarracksArrival) == false then
+					print("M07_BD_CheckTimerReturn: Ordering Vehicles to Unload")
+					Cmd_Stop(t_bd_mgr.sg_veh[i])
+					Command_Squad(player2, t_bd_mgr.sg_veh[i], SCMD_UnloadSquads, false)
+				end
+				
+				-- order the squad to occupy the closest guard tower
+				Cmd_Stop(t_bd_mgr.sg_inf[i])
+				
+				local egroup = M07_BD_FindClosestGuardTower()
+				if egroup ~= false then
+					Cmd_Garrison(t_bd_mgr.sg_inf[i], egroup, true, false)
+				else
+					Cmd_AttackMove(t_bd_mgr.sg_inf[i], Marker_V2Rocket)
+				end
+				
+				if Rule_Exists(M07_BD_CheckInfantryAttack) then
+					Rule_Remove(M07_BD_CheckInfantryAttack)
+				end
+				
+				bln_done = false
+			end
+		end
+	end
+	
+	if bln_done == true then
+		Rule_RemoveMe()
+	end
+end
+
+function M07_BD_FindClosestGuardTower()
+	-- first just try the guard tower they were ordered to go to
+	local temp = OBJ_STHD_GetAvailableGuardTower(t_bd_mgr.curr_barracks)
+	
+	if temp ~= false then
+		return temp.egroup
+	end
+	
+	-- then just search through all the strongholds from highest to lowest
+	-- to determine a location to go to.
+	for i=1, table.getn(t_stronghold) do
+		temp = OBJ_STHD_GetAvailableGuardTower(i)
+		if temp ~= false then
+			return temp.egroup
+		end
+	end
+	
+	if EGroup_IsEmpty(t_obj_kbc_mgr.egroup) == false then
+		return t_obj_kbc_mgr.egroup
+	end
+	
+	-- *** TODO, what happens if these guys have no place to go to despawn?
+	print("No Guard Towers Left!  What do we do?")
+	return false
+end
+
+-- Checks to see if the infantry are inside the building HQ, and
+-- if they are then it despawns them--for their next run
+function M07_BD_CheckInfReturnToHQ()
+	local bln_despawn = true
+	for i in pairs(t_bd_mgr.sg_inf) do
+		if SGroup_IsEmpty(t_bd_mgr.sg_inf[i]) == false then	
+			if SGroup_IsInHoldEntity(t_bd_mgr.sg_inf[i], ALL) then
+				SGroup_DestroyAllSquads(t_bd_mgr.sg_inf[i])
+			elseif SGroup_IsMoving(t_bd_mgr.sg_inf[i], ANY) == false 
+			and SGroup_IsUnderAttack(t_bd_mgr.sg_inf[i], ANY, 10) == false 
+			and Squad_GetActiveCommand(SGroup_GetRandomSpawnedSquad(t_bd_mgr.sg_inf[i])) ~= SQUADSTATEID_Capture then
+				print("M07_BD_CheckInfReturnToHQ: Trying to order squads to return to HQ building")
+				Cmd_Stop(t_bd_mgr.sg_inf[i])
+				
+				local egroup = M07_BD_FindClosestGuardTower()
+				
+				if egroup ~= false then
+					Cmd_Garrison(t_bd_mgr.sg_inf[i], egroup, true)
+				else
+					Cmd_AttackMove(t_bd_mgr.sg_inf[i], Marker_V2Rocket)
+				end
+			end
+			bln_despawn = false
+		end
+	end
+	
+	if bln_despawn then
+		t_bd_mgr.alerted = false
+		t_bd_mgr.arrival_alert = false
+		Rule_RemoveMe()
+	end
+end
+
+function M07_BD_EntranceCheck()
+	-- stop attacking the entrance if the player has taken out a certain percentage of the guard towers
+	if Objective_IsComplete(OBJ_HoldMainEntrance)
+	or g_GT_NUM_DESTROYED/g_GT_NUM_TOTAL >= g_STOP_ENT_ATTACK_PERC then
+		Rule_Remove(M07_BD_EntranceCheck)
+		return
+	end
+
+	if Player_OwnsEGroup(player2, eg_rp_entrance) == false then
+		M07_BD_Alert(9, EGroup_GetPosition_EVEN_IF_EMPTY(eg_rp_entrance))
+	end
+end
+
+-------------------------------------------------------------
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- ENTRANCE DISTRACTION
+-- SECONDARY OBJECTIVE
+-- player is supposed to attack the entrance to make the
+-- enemy and hold the strategic point
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------------------------------------
+function Initialize_OBJ_EntranceDistraction()
+	OBJ_EntranceDistraction = {
+		SetupUI = function()
+			OBJ_EntranceDistraction.RP_PingID = Objective_AddUIElements(OBJ_EntranceDistraction, eg_rp_entrance, true, 279483, true, 2)
+		end,
+		OnStart = function()
+			Rule_AddInterval(OBJ_ED_AddSpeechDelay, 2)
+			OBJ_ED_Start()
+		end,
+		OnComplete = function()
+			--[[ AUTOSAVE ]]
+			g_AUTOSAVE = 279351
+			if Rule_Exists(M07_AutosaveDelay) == false then
+				Rule_AddOneShot(M07_AutosaveDelay, g_AUTOSAVE_DELAY)
+			end
+			-- music
+			Util_PlayMusic("sound/music/sp/m07/M07_Ob2_FindRocket", 4, 0)
+		end,
+		OnFail = function()
+			-- the player cannot fail this objective
+		end,
+		OnSitRep = function()
+			
+		end,
+		
+		Title 					= 279470,
+		Description 			= 279471,
+		Type					= OT_Secondary,
+		Icon 					= IT_S_Default,
+		CommandRewardAmount		= 1,
+		PingID					= {},
+		RP_PingID				= nil,
+	}
+	Objective_Register(OBJ_EntranceDistraction)
+	OBJ_ED_EntranceSetup()
+end
+
+function OBJ_ED_EntranceSetup()
+	t_entrance_mgr = {
+		sgroups 			= sg_entrance_atkr,
+		active_sthd 		= eg_entrance1,
+		timer_id 			= "ENTRANCE RESPAWN TIMER",
+		timer_min 			= 20,
+		timer_max 			= 45,
+		active 				= true,														-- tracks whether or not the entrance is "active"
+		sbp 				= SBP.AXIS.VOLKSGRENADIER,									-- squad type, difficulty handle
+		sg_atk_wait 		= {},														--??
+		loadout 			= 3, 														-- squad size, difficulty handle,
+		aa_sw_id 			= SyncWeapon_GetFromEGroup(eg_entrance_aa),					-- aa gun sync weapon id
+		sg_plyr_attack 		= SGroup_CreateIfNotFound("sg_plyr_attack"),				-- player to attack
+		wall_count	 		= EGroup_Count(LAYER_EntranceWall),							-- tracks the number of objects in the egroup to track whether one has been destroyed
+		def_count	 		= 0,	 													-- number of squads that have been spawned to attack the entrance
+		def_max				= 12,	 													-- max number of respawns
+		player_pos			= Marker_GetPosition(mkr_pt_entrance_attack),				-- the location of the player
+		player_pos_old		= Marker_GetPosition(mkr_pt_entrance_attack),				-- to track whether or not the player's position has changed recently
+		tmr_sp				= "ENTRANCE TOWER SPAWN TIMER", 							-- timer to track the squads as they spawn from the guard towers
+		sg_attacker			= sg_obj_ed_attacker,										-- the squad that last attacked the AI player
+		on_path				= {},														-- variable to check if a squad is following a path or not
+	}
+	
+	EGroup_SetInvulnerable(eg_entrance_sw6, true, -1)
+	
+	Util_CreateSquadsAndGarrison(player2, sg_entrance_def1, SBP.AXIS.HEAVYMG, eg_entrance2, 1, true)
+	Util_CreateSquadsAndGarrison(player2, sg_entrance_def2, SBP.AXIS.HEAVYMG, eg_entrance1, 1, true)
+	
+	for i=1, table.getn(sg_entrance_atkr) do 
+		SGroup_AddGroup(sg_entrance_atkr[i], sg_entrance_def[i])
+		t_entrance_mgr.on_path[i] = false
+	end
+end
+
+function OBJ_ED_AddNewObjDelay()
+	if Event_IsAnyRunning() == false then
+		Objective_Start(OBJ_EntranceDistraction, true)
+		Rule_RemoveMe()
+	end
+end
+
+function OBJ_ED_AddSpeechDelay()
+	if Event_IsAnyRunning() == false then
+		-- announce the goal
+		Util_StartIntel(EVENTS.OBJ_ED_Start)
+		Rule_RemoveMe()
+	end
+end
+
+function OBJ_ED_Start()
+	Rule_AddInterval(OBJ_ED_EntranceStartCheck, 0.6)
+	Rule_AddInterval(OBJ_ED_CheckFlakGunCapture, 1)
+	Rule_AddInterval(OBJ_ED_AttackGuardTowers, 2.5)
+	Rule_AddInterval(OBJ_ED_CheckComplete, 1)
+end
+
+function OBJ_ED_EntranceStartCheck()
+	if SGroup_IsUnderAttack(sg_entrance_def1, ANY, 10) 
+	or SGroup_IsUnderAttack(sg_entrance_def2, ANY, 10)
+	or SGroup_IsUnderAttack(sg_entrance_def3, ANY, 10) 	
+	or SGroup_IsUnderAttack(sg_entrance_def4, ANY, 10) 
+	or SGroup_IsUnderAttack(sg_entrance_officer, ANY, 10)
+	or EGroup_Count(LAYER_EntranceWall) < t_entrance_mgr.wall_count
+	then
+		-- [[ DIALOGUE ]]
+		Util_StartIntel(EVENTS.OBJ_ED_AttackAA)
+		EventCue_Create(CUE.ATTACKED, 279231, 279231, Marker_Entrance)
+		
+		Player_SetDefaultSquadMoodMode( player2, MM_ForceTense)
+		M07_MoveToDefensePoint(t_sw_entrance_mgr[1], sg_entrance_def1)
+		M07_MoveToDefensePoint(t_sw_entrance_mgr[2], sg_entrance_def2)
+		
+		Cmd_Move(sg_entrance_officer, Marker_GetPosition(mkr_entrance_officer), false, mkr_entrance_officer)
+		
+		FOW_RevealMarker(Marker_Entrance, -1)
+		
+		OBJ_STHD_ActivateFloodLights(eg_light_ent)
+		
+		Rule_AddInterval(OBJ_ED_EntranceCheck, 2.5)
+		
+		Rule_RemoveMe()
+	end
+end
+
+function OBJ_ED_EntranceCheck()
+	---------------------
+	-- RESPAWN LOGIC
+	-- check to see if there are squads still around not doing anything and make them attack the player
+	---------------------
+	
+	if Timer_GetRemaining(t_entrance_mgr.timer_id) > 0 then
+		return 
+	end 
+	
+	local egroup
+	for i in pairs(eg_entrance) do
+		if EGroup_IsEmpty(eg_entrance[i]) == false
+		and Player_OwnsEGroup(player2, eg_entrance[i]) then
+			egroup = eg_entrance[i]
+		end
+	end
+	
+	-- if there is no building to spawn units from then stop trying to attack the player
+	if egroup == nil then
+		Rule_RemoveMe()
+		return
+	end
+	
+	-- player is attacking one of the entrance defenders or over 50% of the entrance defenders are dead
+	if OBJ_ED_IsPlayerAttackingEntrance() then
+		t_entrance_mgr.active = true
+		if OBJ_ED_AreEntranceAttackersAtMax() == false then
+			-- send troops to bolster entrance defenses
+			OBJ_ED_SpawnAndAttackEntrance(egroup, Marker_GetPosition(mkr_pt_entrance_attack))
+			
+			-- start timer so we don't spawn another squad right away
+			local tmin = t_entrance_mgr.timer_min
+			local tmax = t_entrance_mgr.timer_max
+			
+			Timer_Start(t_entrance_mgr.timer_id, World_GetRand(tmin,tmax))
+		end
+	end	
+end
+
+function OBJ_ED_IsPlayerAttackingEntrance()
+	for i=1,table.getn(sg_entrance_atkr) do 
+		if SGroup_IsUnderAttack(sg_entrance_atkr[i], ANY, 10)
+		or SGroup_IsDoingAttack(sg_entrance_atkr[i], ANY, 10)
+		or SGroup_IsEmpty(sg_entrance_atkr[i]) then
+			SGroup_Clear(sg_attack_target)
+			SGroup_GetLastAttacker(sg_entrance_atkr[i], sg_attack_target)
+			
+			if SGroup_IsEmpty(sg_attack_target) == false then
+				t_entrance_mgr.player_pos = SGroup_GetPosition_EVEN_IF_EMPTY(sg_attack_target)
+				SGroup_AddGroup(t_entrance_mgr.sg_attacker, sg_attack_target)
+				return true
+			end
+		end
+	end
+	Player_GetAllSquadsNearMarker(player1, sg_temp, mkr_entrance_player_detect)
+	if SGroup_IsEmpty(sg_temp) == false then
+		t_entrance_mgr.player_pos = SGroup_GetPosition_EVEN_IF_EMPTY(sg_temp)
+		return true
+	end
+	return false
+end
+
+function OBJ_ED_SpawnAndAttackEntrance(egroup, pos)
+	local sgroup
+	local sw_mgr 
+	local eg_pos = mkr_eg_entrance1
+	local t_sw_mgr = {}
+	
+	-- copy the indexes for the t_sw_entrance_mgr
+	-- so that we can remove each index that is unoccupied and send
+	-- all the infantry to different locations when they move to attack the entrance.
+	for i in pairs(t_sw_entrance_mgr) do 
+		t_sw_mgr[i] = i
+	end
+	
+	for i in pairs(t_entrance_mgr.sgroups) do
+		if SGroup_IsEmpty(t_entrance_mgr.sgroups[i]) 
+		and Timer_GetRemaining(t_entrance_mgr.tmr_sp) <= 0 then				-- DALY HACK
+			sgroup = t_entrance_mgr.sgroups[i]
+			
+			-- update the counter to track the number of squads that has been spawned
+			t_entrance_mgr.def_count = t_entrance_mgr.def_count + 1
+			
+			-- assign a default location in case all points are somehow occupied
+			sw_mgr = t_sw_entrance_mgr[1]
+			
+			if Rule_Exists(OBJ_ED_AttackPlayer) == false then
+				Rule_AddInterval(OBJ_ED_AttackPlayer, 5.47)
+			end
+	
+			if not SyncWeapon_IsOwnedByPlayer(t_entrance_mgr.aa_sw_id, player1) 
+			and not SyncWeapon_IsOwnedByPlayer(t_entrance_mgr.aa_sw_id, player2) 
+			and t_entrance_mgr.def_pt6 ~= true then
+				print("OBJ_ED_SpawnAndAttackEntrance..Occupy AA Gun")
+				sw_mgr = t_sw_entrance_mgr[t_sw_mgr[6]]
+				-- remove the defensive points so that the AI stops occupying any of them
+				if g_DIFFICULTY < GD_HARD then
+					t_entrance_mgr.def_pt6 = true
+				end
+			elseif 	M07_DefensePointOccupied(t_sw_entrance_mgr[t_sw_mgr[2]]) == false
+			and t_entrance_mgr.def_pt2 ~= true then 
+				sw_mgr = t_sw_entrance_mgr[t_sw_mgr[2]]
+				print("OBJ_ED_SpawnAndAttackEntrance..Occupy MG2")
+				-- remove the defensive points so that the AI stops occupying any of them
+				if g_DIFFICULTY < GD_HARD then
+					t_entrance_mgr.def_pt2 = true
+				end	
+			elseif 	M07_DefensePointOccupied(t_sw_entrance_mgr[t_sw_mgr[1]]) == false
+			and t_entrance_mgr.def_pt1 ~= true then
+				print("OBJ_ED_SpawnAndAttackEntrance..Occupy MG1")
+
+				sw_mgr = t_sw_entrance_mgr[t_sw_mgr[1]]
+				-- remove the defensive points so that the AI stops occupying any of them
+				if g_DIFFICULTY < GD_HARD then
+					t_entrance_mgr.def_pt1 = true
+				end
+			else
+				local rand = World_GetRand(1, table.getn(t_sw_mgr))
+				sw_mgr = t_sw_entrance_mgr[t_sw_mgr[rand]]
+			end
+			
+			if EGroup_IsEmpty(egroup) == false then
+				Util_CreateSquadsAndGarrisonExit(player2, sgroup, t_entrance_mgr.sbp, egroup, 1, eg_pos, true, t_entrance_mgr.loadout)
+				M07_MoveToDefensePoint(sw_mgr, sgroup)
+				Timer_Start(t_entrance_mgr.tmr_sp, World_GetRand(2, 5))														-- DALY HACK
+			end
+		end
+	end
+end
+
+function OBJ_ED_AttackPlayer()
+	---------------------
+	-- ATTACK LOGIC
+	-- check to see if there are squads still around not doing anything and make them attack the player
+	---------------------
+	
+	-- run this to get the last position of the player
+	OBJ_ED_IsPlayerAttackingEntrance()
+	
+	for i=1,table.getn(t_entrance_mgr.sgroups) do
+		local sgroup = t_entrance_mgr.sgroups[i]
+		
+		if SGroup_IsEmpty(sgroup) == false
+		and SGroup_IsUnderAttack(sgroup, ANY, 10) == false
+		and SGroup_IsInHoldEntity(sgroup, ANY) == false then
+				-- check to see if the last attacker exists and attack him
+			if SGroup_IsEmpty(t_entrance_mgr.sg_attacker) == false
+		and SGroup_IsMoving(sgroup, ANY) == false then
+--~ 					Cmd_Stop(sgroup)
+				Cmd_AttackMove(sgroup, SGroup_GetPosition_EVEN_IF_EMPTY(t_entrance_mgr.sg_attacker))
+--~ 					print("OBJ_ED_AttackPlayer: Attack the Squads!"..i)
+				t_entrance_mgr.on_path[i] = false
+			-- check if he is near the last spotted location of the player, and
+			-- if the squad is not moving then go to that location
+			-- and to see if the squads haven't already checked the player's old position
+			elseif t_entrance_mgr.player_pos_old ~= t_entrance_mgr.player_pos
+			and Prox_AreSquadsNearMarker(sgroup, t_entrance_mgr.player_pos, ANY, 10) == false
+			and (SGroup_IsMoving(sgroup, ANY) == false or t_entrance_mgr.on_path[i] == true) then
+--~ 					print("OBJ_ED_AttackPlayer: Move to Player's Location!"..i)
+--~ 					Cmd_Stop(sgroup)
+				Cmd_AttackMove(sgroup, t_entrance_mgr.player_pos, nil, nil, 10)
+				t_entrance_mgr.on_path[i] = false
+			end
+--~ 			else
+				
+			-- otherwise just put them on the path to run around the area and look for the player
+			if SGroup_IsMoving(sgroup, ANY) == false
+			and t_entrance_mgr.on_path[i] == false then
+--~ 					Cmd_Stop(sgroup)
+				Cmd_SquadPath(sgroup, "path_entrance", true, true, true, 10)
+				t_entrance_mgr.on_path[i] = true
+				t_entrance_mgr.player_pos_old = t_entrance_mgr.player_pos
+--~ 					print("OBJ_ED_AttackPlayer: Follow a Path!"..i)
+			end
+		end
+	end
+end
+
+function OBJ_ED_AreEntranceAttackersAtMax()
+	for i in pairs(sg_entrance_atkr) do 
+		if SGroup_IsEmpty(sg_entrance_atkr[i]) then
+			return false
+		end
+	end
+	return true
+end
+
+function OBJ_ED_CheckComplete()
+	-- and if all the guard towers at the entrance are destroyed
+	bln_entrance = true
+	for i in pairs(eg_entrance) do 
+		if EGroup_IsEmpty(eg_entrance[i]) or Player_OwnsEGroup(player2, eg_entrance[i]) == false then
+			Objective_RemoveUIElements(OBJ_EntranceDistraction, OBJ_EntranceDistraction.PingID[i]) 
+		else
+			bln_entrance = false
+		end
+	end
+	
+	if bln_entrance == false then
+		return
+	end
+	
+	-- if the player hasn't captured the strategic point yet...
+	if Player_OwnsEGroup(player1, eg_rp_entrance) == false then
+		return
+	end
+	
+	Rule_RemoveMe()
+	OBJ_ED_Complete()	
+	Rule_Remove(OBJ_ED_EntranceCheck)
+	Rule_Remove(OBJ_ED_AttackPlayer)
+end
+
+function OBJ_ED_AttackGuardTowers()
+	for i in pairs(eg_entrance) do 
+		if Event_IsAnyRunning() == false 
+		and EGroup_IsEmpty(eg_entrance[i]) == false
+		and Player_CanSeeEGroup(player1, eg_entrance[i], ANY) 
+		and EGroup_IsOnScreen(player1, eg_entrance[i], ANY, 0.5)
+		then
+			OBJ_ED_StartGTIntel()
+			Rule_RemoveMe()
+			break
+		end
+	end
+end
+	
+function OBJ_ED_StartGTIntel()
+	if EGroup_Count(LAYER_EntranceWall) == t_entrance_mgr.wall_count then
+		g_WALL_BREACHED = false
+	end
+	
+	-- [[ DIALOGUE ]]
+	Util_StartIntel(EVENTS.OBJ_ED_AttackGuardTowers)
+	
+	if g_WALL_BREACHED == false then
+		Rule_AddInterval(OBJ_ED_CheckWallBreached, 1)
+	end
+	
+	for i=1,table.getn(eg_entrance) do  
+		OBJ_EntranceDistraction.PingID[i] = Objective_AddUIElements(OBJ_EntranceDistraction, eg_entrance[i], false, 279475, true)
+	end
+	
+	if Rule_Exists(OBJ_ED_CheckComplete) == false then
+		Rule_AddInterval(OBJ_ED_CheckComplete, 1)
+	end
+end
+
+function OBJ_ED_CheckFlakGunCapture()
+	if SyncWeapon_IsOwnedByPlayer(t_entrance_mgr.aa_sw_id, player1) == false then
+		return
+	end
+	Rule_RemoveMe()
+end
+
+function OBJ_ED_CheckWallBreached()
+	if Objective_IsComplete(OBJ_EntranceDistraction) then
+		Rule_RemoveMe()
+		return
+	end
+	-- Check if the wall has been breached
+	if EGroup_Count(LAYER_EntranceWall) < t_entrance_mgr.wall_count then
+		Util_StartStinger(EVENTS.OBJ_ED_WallBreached)
+		Rule_RemoveMe()
+	end
+end
+
+function OBJ_ED_Complete()
+	--[[ DIALOGUE ]]
+	Util_StartIntel(EVENTS.OBJ_ED_Complete)
+	Objective_Complete(OBJ_EntranceDistraction)
+	
+	if t_entrance_mgr.wall_hint ~= nil then
+		HintPoint_Remove(t_entrance_mgr.wall_hint)
+	end
+	
+	-- grant the player some additional resources to attack the base with
+	Player_AddResource(player1, RT_Munition, 300)
+	Player_AddResource(player1, RT_Manpower, 300)
+	
+	Rule_AddInterval(OBJ_HME_AddNewObjDelay, 1)
+	Rule_Remove(OBJ_ED_CheckWallBreached)
+	Rule_Remove(OBJ_ED_AttackGuardTowers)
+	Rule_Remove(OBJ_ED_CheckComplete)
+	Rule_Remove(OBJ_ED_EntranceCheck)
+end
+
+-------------------------------------------------------------
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+-- SECONDARY OBJECTIVE - HOLD MAIN ENTRANCE
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- If the player takes out the main entrance defenses and captures the strategic point
+-- then he needs to hold that strategic point
+-------------------------------------------------------------------------
+function Initialize_OBJ_HoldMainEntrance()
+	OBJ_HoldMainEntrance = {
+		SetupUI = function()
+			OBJ_HoldMainEntrance.PingID = Objective_AddUIElements(OBJ_HoldMainEntrance, eg_rp_entrance, false, 279260, true, 2)
+		end,
+		OnStart = function()
+			-- announce the goal
+			Util_StartIntel(EVENTS.OBJ_HME_Start)
+		end,
+		OnComplete = function()
+			Util_StartIntel(EVENTS.OBJ_HME_Complete)
+			Rule_Remove(OBJ_HME_SquadsAtEntrance)
+		end,
+		OnFail = function()
+			-- the player cannot fail this objective
+		end,
+		OnSitRep = function()
+			
+		end,
+		
+		Title 					= 279250,
+		Description 			= 279251,
+		Type					= OT_Secondary,
+		Icon 					= IT_S_Default,
+		CommandRewardAmount		= 1,
+		PingID					= nil,
+	}
+	Objective_Register(OBJ_HoldMainEntrance)
+	OBJ_HME_Setup()
+end
+
+function OBJ_HME_Setup()
+	-- difficulty handle, tweak upgrades or reinforcement types
+	-- note that there must always be an even number of reinforcements
+	-- since two come at one time
+	local reinforcement_sbp = {
+		{ sbp = SBP.ALLIES.ENGINEER, upg = {UPG.ALLIES.ENGINEER_FLAMETHROWER}, },
+		{ sbp = SBP.ALLIES.HALFTRACK, upg = {UPG.ALLIES.HALFTRACK_QUAD} },
+		{ sbp = SBP.ALLIES.HALFTRACK, upg = {UPG.ALLIES.HALFTRACK_QUAD} },
+		{ sbp = SBP.ALLIES.SHERMAN, upg = {UPG.ALLIES.SHERMAN_MG} },
+		{ sbp = SBP.ALLIES.GREYHOUND, upg = {UPG.ALLIES.GREYHOUND_ARMOR, UPG.ALLIES.GREYHOUND_MG}},
+		{ sbp = SBP.ALLIES.SHERMAN, upg = {UPG.ALLIES.SHERMAN_MG}}
+	}
+	
+	t_obj_hme_mgr = {
+		sgroups 			= sg_obj_hme,					-- the sgroup that contains the spawned reinforcements
+		mkr_sp				= {mkr_obj_hme_sp1, mkr_obj_hme_sp2}, -- markers to spawn the reinforcements
+		sbps				= reinforcement_sbp,			-- table of the sbps of the reinforcements
+		upgrade				= {},							-- table of upgrades for the reinforcements
+		reinf_length		= 10*60,							-- amount of time before reinforcements arrive
+		t_time				= {5*60, 3*60, 1*60},			-- amount of time before the next cue is played regarding reinforcement
+		time_cue			= {279256, 279256, 279255},		-- the localization text to use when giving the reinforcement timer (paired with t_time)
+		time_restart		= 5,							-- the time that needs to be on the clock to restart the timer
+		t_autosave			= {279357},						-- table of autosave strings
+		count				= 1,							-- the current number or level of reinforcements that have arrived
+		point_lost			= false,						-- flag to track whether the point is not owned by the player
+		loadout				= 1,							-- loadout for reinforcements
+		timer_squads		= "OBJ HME SQUAD TIMER",		-- timer to avoid spamming speech events
+		hint_id				= nil,							-- hint id for the hint point on the strat point
+		first_reinforce		= true, 						-- flag to track when the first set of reinforcements arrive
+		camera_pos			= nil,							-- stores the player's camera position (for use later)
+		timer_arrival		= "OBJ HME ARRIVAL TIMER", 		-- reinforcement arrival timer, for the first time the squads arrive
+		popcap_base			= 50,							-- base popcap for the player
+		popcap_inc			= 5, 							-- increase in the popcap, when a set of reinforcements arrive
+	}
+end
+
+function OBJ_HME_AddNewObjDelay()
+	if Event_IsAnyRunning() == false then
+		Rule_RemoveMe()
+		Objective_Start(OBJ_HoldMainEntrance, true)
+		Rule_AddInterval(OBJ_HME_SquadsAtEntrance, 7.5)
+		OBJ_HME_Start()
+	end
+end
+
+function OBJ_HME_Start()
+	Objective_StartTimer(OBJ_HoldMainEntrance, COUNT_DOWN, t_obj_hme_mgr.reinf_length)
+	Rule_AddInterval(OBJ_HME_CheckReinforcements, 0.93)
+	Rule_AddInterval(OBJ_HME_CheckPointOwnership, 1.26)
+end
+
+function OBJ_HME_CheckReinforcements()
+	if Objective_IsComplete(OBJ_HoldMainEntrance) then
+		Rule_RemoveMe()
+		return
+	end	
+	
+	local num = Objective_GetTimerSeconds(OBJ_HoldMainEntrance)
+
+	-- check if there is still time left on the timer
+	if table.getn(t_obj_hme_mgr.t_time) > 0
+	and num <= t_obj_hme_mgr.t_time[1] then
+		Objective_PauseTimer(OBJ_HoldMainEntrance)
+		
+		local num = t_obj_hme_mgr.t_time[1]
+		if t_obj_hme_mgr.t_time[1] >= 60 then
+			num = t_obj_hme_mgr.t_time[1]/60
+		end
+		
+		num = Loc_ConvertNumber(num)
+		local text = Loc_FormatText(t_obj_hme_mgr.time_cue[1], num)
+		
+		Obj_CreatePopup(OBJ_HoldMainEntrance.ID, text)
+		
+		table.remove(t_obj_hme_mgr.t_time, 1)
+		table.remove(t_obj_hme_mgr.time_cue, 1)
+		
+		Rule_AddOneShot(OBJ_HME_RestartTimer, t_obj_hme_mgr.time_restart)
+	end
+	
+	-- check to see if the timer has run out yet.
+	if Objective_GetTimerSeconds(OBJ_HoldMainEntrance) > 0 then
+		return
+	end
+	
+	for i in pairs(t_obj_hme_mgr.sgroups) do
+		local sbp = t_obj_hme_mgr.sbps[t_obj_hme_mgr.count].sbp
+		local upg = t_obj_hme_mgr.sbps[t_obj_hme_mgr.count].upg
+		
+		Util_CreateSquadsAtMarker(player1, t_obj_hme_mgr.sgroups[i], sbp , t_obj_hme_mgr.mkr_sp[i], t_obj_hme_mgr.loadout)
+		
+		for j in pairs(upg) do 
+			Cmd_InstantUpgrade(t_obj_hme_mgr.sgroups[i], upg[j])
+		end
+		
+		Cmd_AttackMove(t_obj_hme_mgr.sgroups[i], mkr_obj_hme_move)
+		t_obj_hme_mgr.count = t_obj_hme_mgr.count + 1
+	end
+	
+	-- if this is the first arrival of reinforcements show the player that they came to him
+	if t_obj_hme_mgr.first_reinforce == true then
+		-- first reinforcement
+		
+		if Rule_Exists(OBJ_HME_CheckReinforcementArrival) == false then
+			Rule_AddInterval(OBJ_HME_CheckReinforcementArrival, 0.5) 
+		end
+		
+		Timer_Start(t_obj_hme_mgr.timer_arrival, 60)
+		t_obj_hme_mgr.first_reinforce = false
+		
+		-- stop telling the AI to attack the entrance
+		Rule_Remove(M07_BD_EntranceCheck)
+	else
+		--[[ DIALOGUE ]]
+		Util_StartIntel(EVENTS.OBJ_HME_ReinforcementsArrived)
+		Obj_CreatePopup(OBJ_HoldMainEntrance.ID, 279257)
+		
+		-- clear out the sgroups so as to not to accidentally control the player's units
+		for i in pairs(t_obj_hme_mgr.sgroups) do 
+			SGroup_Clear(t_obj_hme_mgr.sgroups[i])
+		end
+		
+		-- create more engineers if the player has lost the squad of engineers for some reason
+		Player_GetAll(player1, sg_temp)
+		SGroup_Filter(sg_temp, {SBP.ALLIES.ENGINEER, SBP.ALLIES.MEDIC}, FILTER_KEEP)
+		
+		if SGroup_Count(sg_temp) < 2 then
+			Util_CreateSquadsAtMarker(player1, sg_obj_hme_engineers, SBP.ALLIES.ENGINEER, t_obj_hme_mgr.mkr_sp[1], 1)
+			Util_CreateSquadsAtMarker(player1, sg_obj_hme_engineers, SBP.ALLIES.MEDIC, t_obj_hme_mgr.mkr_sp[1], 1)
+			Cmd_InstantUpgrade(sg_obj_hme_engineers, UPG.ALLIES.ENGINEER_FLAMETHROWER)
+			Cmd_AttackMove(sg_obj_hme_engineers, mkr_obj_hme_move)
+		end
+	end
+	
+	t_obj_hme_mgr.popcap_base = t_obj_hme_mgr.popcap_base + t_obj_hme_mgr.popcap_inc
+	Player_SetPopCapOverride(player1, t_obj_hme_mgr.popcap_base)
+	Objective_StartTimer(OBJ_HoldMainEntrance, COUNT_DOWN, t_obj_hme_mgr.reinf_length)
+	
+	-- reset the timer cues for the next set of reinforcements
+	t_obj_hme_mgr.t_time			= {5*60, 3*60, 1*60}
+	t_obj_hme_mgr.time_cue			= {279256, 279256, 279255}
+	
+	if t_obj_hme_mgr.count > table.getn(t_obj_hme_mgr.sbps) then
+		--[[ AUTOSAVE ]]
+		if table.getn(t_obj_hme_mgr.t_autosave) > 0 then
+			g_AUTOSAVE = t_obj_hme_mgr.t_autosave[1]
+			if Rule_Exists(M07_AutosaveDelay) == false then
+				Rule_AddOneShot(M07_AutosaveDelay, g_AUTOSAVE_DELAY)
+			end	
+			table.remove(t_obj_hme_mgr.t_autosave, 1)
+		end
+		
+		OBJ_HME_Complete()
+		Rule_RemoveMe()
+	end
+end
+
+function OBJ_HME_RestartTimer()
+	Objective_ResumeTimer(OBJ_HoldMainEntrance)
+end
+
+function OBJ_HME_CheckReinforcementArrival()
+	-- check if the squads have moved up to the entrance before sending 
+	-- the player's camera to look there.
+	if Prox_AreSquadsNearMarker(t_obj_hme_mgr.sgroups[2], Marker_GetPosition(mkr_obj_hme_move), ANY, 20) then
+		t_obj_hme_mgr.camera_pos = Camera_GetTargetPos()
+		Util_StartNIS(EVENTS.OBJ_HME_FirstReinforce)
+		Obj_CreatePopup(OBJ_HoldMainEntrance.ID, 279257)
+		
+		-- clear out the sgroups so as to not to accidentally control the player's units
+		for i in pairs(t_obj_hme_mgr.sgroups) do 
+			SGroup_Clear(t_obj_hme_mgr.sgroups[i])
+		end
+		Rule_RemoveMe()
+	end
+	
+	-- if rule doesn't execute within the given amount of time, then 
+	-- something about the reinforcements did not happen
+	if Timer_GetRemaining(t_obj_hme_mgr.timer_arrival) <= 0 then
+		Rule_RemoveMe()
+	end
+end
+
+function OBJ_HME_CheckPointOwnership()
+	if Player_OwnsEGroup(player1, eg_rp_entrance) == false 
+	and t_obj_hme_mgr.point_lost == false then
+		Objective_StopTimer(OBJ_HoldMainEntrance)
+		
+		--[[ DIALOGUE ]]
+		Util_StartIntel(EVENTS.OBJ_HME_LostPoint)
+		
+		t_obj_hme_mgr.point_lost = true
+		Rule_Remove(OBJ_HME_CheckReinforcements)
+		
+		Objective_RemoveUIElements(OBJ_HoldMainEntrance, OBJ_HoldMainEntrance.PingID)
+		OBJ_HoldMainEntrance.PingID = Objective_AddUIElements(OBJ_HoldMainEntrance, eg_rp_entrance, true, 279483, true, 2)
+	
+		EventCue_Create(CUE.MAP, 279258, 279258, eg_rp_entrance)
+		
+		Rule_Remove(OBJ_HME_SquadsAtEntrance)
+	elseif Player_OwnsEGroup(player1, eg_rp_entrance) 
+	and t_obj_hme_mgr.point_lost then
+		Objective_StartTimer(OBJ_HoldMainEntrance, COUNT_DOWN, t_obj_hme_mgr.reinf_length)
+		
+		--[[ DIALOGUE ]]
+		Util_StartIntel(EVENTS.OBJ_HME_RecapturedPoint)
+		
+		if Rule_Exists(OBJ_HME_CheckReinforcements) == false then
+			Rule_AddInterval(OBJ_HME_CheckReinforcements, 1)
+		end
+		
+		Objective_RemoveUIElements(OBJ_HoldMainEntrance, OBJ_HoldMainEntrance.PingID)
+		OBJ_HoldMainEntrance.PingID = Objective_AddUIElements(OBJ_HoldMainEntrance, eg_rp_entrance, false, 279260, true, 2)
+		
+		t_obj_hme_mgr.point_lost = false
+		Rule_AddInterval(OBJ_HME_SquadsAtEntrance, 7.5)
+	end
+end
+
+
+function OBJ_HME_Complete()
+	Rule_Remove(OBJ_HME_CheckPointOwnership)
+	Objective_Complete(OBJ_HoldMainEntrance, true)
+end
+
+-- this function checks the number of squads at the entrance gives the player updates about their status
+function OBJ_HME_SquadsAtEntrance()
+	if Timer_GetRemaining(t_obj_hme_mgr.timer_squads) > 0 then
+		return
+	end
+	if Event_IsAnyRunning() then
+		return
+	end
+	
+	Player_GetAllSquadsNearMarker(player1, sg_plyr_entrance, EGroup_GetPosition_EVEN_IF_EMPTY(eg_rp_entrance), 50)
+	if SGroup_CountSpawned(sg_plyr_entrance) <= 0 then
+		-- [[ DIALOGUE ]]
+		Util_StartStinger(EVENTS.OBJ_HME_NoSquads)
+		-- event cue
+		EventCue_Create(CUE.NORMAL, 279233, 279233, Marker_Entrance)
+	
+		Timer_Start(t_obj_hme_mgr.timer_squads, 30)
+	elseif SGroup_CountSpawned(sg_plyr_entrance) == 1 then
+		-- [[ DIALOGUE ]]
+		Util_StartStinger(EVENTS.OBJ_HME_OneSquad)
+		Timer_Start(t_obj_hme_mgr.timer_squads, 30)
+	end
+	
+	if g_OBJ_HME_RECAPTURE_AA == nil and SyncWeapon_IsOwnedByPlayer(t_entrance_mgr.aa_sw_id, player1) == false then
+		--[[ DIALOGUE]]
+		Util_StartStinger(EVENTS.OBJ_HME_RecaptureAAGun)
+		EventCue_Create(CUE.NORMAL, 279234, 279234, SyncWeapon_GetPosition(t_entrance_mgr.aa_sw_id))
+		
+		g_OBJ_HME_RECAPTURE_AA = true
+		Timer_Start(t_obj_hme_mgr.timer_squads, 30)
+	end
+end
+
+-------------------------------------------------------------
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~	
+-- MEDAL OPPORTUNITY - Kill the base commander
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------------------------------------------------
+
+function Initialize_OBJ_KillBaseCommander()
+	OBJ_KillBaseCommander = {
+		SetupUI = function()
+			OBJ_KillBaseCommander.PingID = Objective_AddUIElements(OBJ_KillBaseCommander, t_obj_kbc_mgr.egroup, true, 279163, true)
+		end,
+		OnStart = function()
+			--[[ AUTOSAVE ]]
+--~ 			g_AUTOSAVE = 279352
+--~ 			if Rule_Exists(M07_AutosaveDelay) == false then
+--~ 				Rule_AddOneShot(M07_AutosaveDelay, g_AUTOSAVE_DELAY)
+--~ 			end	
+			
+			--[[ DIALOGUE ]]
+			Util_StartIntel(EVENTS.OBJ_KBC_Start)
+		end,
+		OnComplete = function()
+			--[[ DIALOGUE ]]
+			Util_StartIntel(EVENTS.OBJ_KBC_Complete)
+
+			--[[ AUTOSAVE ]]
+--~ 			g_AUTOSAVE = 279353
+--~ 			if Rule_Exists(M07_AutosaveDelay) == false then
+--~ 				Rule_AddOneShot(M07_AutosaveDelay, g_AUTOSAVE_DELAY)
+--~ 			end
+		end,
+		OnFail = function()
+			-- the player cannot fail this objective
+		end,
+		OnSitRep = function()
+			
+		end,
+		
+		Title 					= 279160,
+		Description 			= 279161,
+		Type					= OT_Medal,
+		MedalID					= MEDALS.AIR_MEDAL,
+		Icon 					= IT_M_Default,
+		CommandRewardAmount		= 1,
+		PingID					= nil,
+	}
+	
+	Objective_Register(OBJ_KillBaseCommander)
+	OBJ_KBC_Setup()
+end
+
+function OBJ_KBC_Setup()
+	g_OBJ_KBC_SATCHEL_THROWN = false
+	
+	t_obj_kbc_mgr = {
+		sg_cmdr 				= sg_obj_kbc_commander,		-- the commander that needs to be killed
+		sg_protectors			= sg_obj_kbc_protectors,	-- the protectors of the commander
+		protector_loadout		= 3,						-- the number of squad members for the protectors
+		prot_threshold			= nil,						-- the threshold at which the number of protectors left will cause the commander to run
+		egroup					= eg_bd_hq1,				-- the current egroup that the commander inhabits
+		eg_perc_health			= 0.5,						-- the percent of health at which they will abandon the hq
+		cmdr_perc_health		= 0.75,						-- the precent health of the commander to force him from the building
+		mkr_unload				= mkr_bd_hq1,				-- marker where they will exit to when exiting the building
+		cmdr_mod				= nil,						-- modifier id for the commander in case we want to remove it 
+		cmdr_vulnerability		= 0.6,						-- difficulty handle for the medal, modify this to make the commander difficult to kill (0.25 is too low)
+		inf_mgr					= {},						-- infantry manager for the officer to help alert the sector when they are under attack
+	}
+	
+	for i in pairs(t_obj_kbc_mgr.sg_protectors) do 
+		t_obj_kbc_mgr.inf_mgr[i] = {
+			sgroup = t_obj_kbc_mgr.sg_protectors[i],-- an sgroup to check
+			counter = -1,							-- the counter to iterate a number of checks
+			counter_max = 1,						-- the max number of times to check
+			fnc_ai_routine = OBJ_STHD_AlertBarracks,-- a function to call when the max number of checks is reached
+			fnc_reset = function() end,				-- a function to call to tell the sgroup what to do when not being attacked
+			barracks = true,
+			barracks_idx = 8,
+		}
+	end
+	
+	Util_CreateSquadsAndGarrison(player2, t_obj_kbc_mgr.sg_cmdr, SBP.AXIS.OFFICER, t_obj_kbc_mgr.egroup, 1, true, 1)
+	t_obj_kbc_mgr.cmdr_mod = Modify_Vulnerability(t_obj_kbc_mgr.sg_cmdr, t_obj_kbc_mgr.cmdr_vulnerability)
+	
+	sg_protectors_all = SGroup_CreateIfNotFound("sg_protectors_all")
+	
+	for i in pairs(t_obj_kbc_mgr.sg_protectors) do 
+		Util_CreateSquadsAndGarrison(player2, t_obj_kbc_mgr.sg_protectors[i], SBP.AXIS.KNIGHTSCROSS, t_obj_kbc_mgr.egroup, 1, true, t_obj_kbc_mgr.protector_loadout)
+		Util_AddUnderAttackItem(t_obj_kbc_mgr.inf_mgr[i])
+		SGroup_AddGroup(sg_protectors_all, t_obj_kbc_mgr.sg_protectors[i])
+	end
+	
+	t_obj_kbc_mgr.prot_threshold			= SGroup_TotalMembersCount(sg_protectors_all) * 0.5
+end
+
+-- checks if the player is near the base commander HQ
+function OBJ_KBC_AddNewObj()
+	if EGroup_IsOnScreen(player1, t_obj_kbc_mgr.egroup, ANY, 0.8) 
+	and Player_CanSeeEGroup(player1, t_obj_kbc_mgr.egroup, ANY)
+	and Event_IsAnyRunning() == false then
+		Objective_Start(OBJ_KillBaseCommander)
+		OBJ_KBC_Start()
+		Rule_RemoveMe()
+	end
+end
+
+function OBJ_KBC_Start()
+	Rule_AddInterval(OBJ_KBC_CheckComplete, 2)
+	Rule_AddInterval(OBJ_KBC_CheckBarracksExit, 1.5)
+	Rule_AddInterval(OBJ_KBC_AddSquadEventToParatroopers, 1.5)
+end
+
+-- checks
+function OBJ_KBC_CheckBarracksExit()
+	-- *** TODO - what if the other HQ has been destroyed?
+	-- *** What if the player has occupied the other HQ?
+	-- send them to the rocket!
+	if EGroup_GetAvgHealth(t_obj_kbc_mgr.egroup) <= t_obj_kbc_mgr.eg_perc_health
+	or SGroup_GetAvgHealth(t_obj_kbc_mgr.sg_cmdr) <= t_obj_kbc_mgr.cmdr_perc_health
+	or SGroup_TotalMembersCount(sg_protectors_all) <= t_obj_kbc_mgr.prot_threshold
+	or g_OBJ_KBC_SATCHEL_THROWN ~= false then
+		if SGroup_IsEmpty(t_obj_kbc_mgr.sg_cmdr) == false then
+			Cmd_Ungarrison(t_obj_kbc_mgr.egroup, Marker_GetPosition(t_obj_kbc_mgr.mkr_unload))
+			
+			if t_obj_kbc_mgr.egroup ~= eg_bd_hq2 then
+				t_obj_kbc_mgr.egroup = eg_bd_hq2
+				t_obj_kbc_mgr.mkr_unload = mkr_bd_hq2
+				
+				-- move the base defense spawn point as well
+				t_bd_mgr.egroup = eg_bd_hq2
+				t_bd_mgr.mkr_hq = mkr_bd_hq2
+				
+				-- reduce the protector's threshold to almost nothing
+				t_obj_kbc_mgr.prot_threshold = 1
+				t_obj_kbc_mgr.cmdr_perc_health = 0.25
+				
+				-- tell the rooftop squads that the tower has been "destroyed"
+				t_stronghold[8].gt_destroyed[1] = true
+			else
+				t_obj_kbc_mgr.egroup = nil
+				
+				-- stop spawning troops from the HQ, the player has ousted the base commander
+				EGroup_Clear(t_bd_mgr.egroup)
+				
+				-- tell the rooftop squads that the 2nd t`wer has been "destroyed"
+				t_stronghold[8].gt_destroyed[2] = true
+			end
+			
+			-- remove the UI elements from the building
+			Objective_RemoveUIElements(OBJ_KillBaseCommander, OBJ_KillBaseCommander.PingID)
+			
+			if SGroup_IsEmpty(t_obj_kbc_mgr.sg_cmdr) == false then
+				EventCue_Create(CUE.NORMAL, 279167, 279167, t_obj_kbc_mgr.sg_cmdr)
+				OBJ_KillBaseCommander.PingID = Objective_AddUIElements(OBJ_KillBaseCommander, t_obj_kbc_mgr.sg_cmdr, true, 279162, true)
+			end
+			
+			g_OBJ_KBC_SATCHEL_THROWN = false
+			
+			t_obj_kbc_mgr.cmdr_perc_health = 0.5
+			
+			if Rule_Exists(OBJ_KBC_Escape) == false then
+				Rule_AddInterval(OBJ_KBC_Escape, 3)
+			end
+			
+			Rule_RemoveMe()
+		end
+	end
+end
+
+function OBJ_KBC_Escape()
+	-- if the commander is dead, then these guys just need to fight it out
+	if SGroup_IsEmpty(t_obj_kbc_mgr.sg_cmdr) then
+		Rule_RemoveMe()
+		return
+	end
+	
+	-- check to make sure that the squads are moving into the building if
+	-- the building exists
+	if t_obj_kbc_mgr.egroup ~= nil 
+	and EGroup_IsEmpty(t_obj_kbc_mgr.egroup) == false
+	and Player_OwnsEGroup(player1, t_obj_kbc_mgr.egroup) == false then
+		-- checks to make sure that the squad is getting into the garrisoned building
+		if SGroup_IsEmpty(t_obj_kbc_mgr.sg_cmdr) == false 
+		and SGroup_IsMoving(t_obj_kbc_mgr.sg_cmdr, ANY) == false
+		and SGroup_IsInHoldEntity(t_obj_kbc_mgr.sg_cmdr, ANY) == false then
+			Cmd_Garrison(t_obj_kbc_mgr.sg_cmdr, t_obj_kbc_mgr.egroup, true, true)
+		end
+		
+		-- move the protectors into the next HQ building
+		-- may need to delay them so that they trail behind the commander?
+		for i in pairs(t_obj_kbc_mgr.sg_protectors) do 
+			local sgroup = t_obj_kbc_mgr.sg_protectors[i]
+			if SGroup_IsEmpty(sgroup) == false 
+			and SGroup_IsMoving(sgroup, ANY) == false
+			and SGroup_IsInHoldEntity(sgroup, ANY) == false then
+				Cmd_Garrison(sgroup, t_obj_kbc_mgr.egroup, true, true)
+			end
+		end
+		
+	-- otherwise they just need to run near the V2 Rocket
+	else
+		if SGroup_IsEmpty(t_obj_kbc_mgr.sg_cmdr) == false 
+		and SGroup_IsMoving(t_obj_kbc_mgr.sg_cmdr, ANY) == false then
+			Cmd_Retreat(t_obj_kbc_mgr.sg_cmdr, Marker_GetPosition(mkr_ax_defend23))
+		end
+		
+		-- move the protectors into the next HQ building
+		-- may need to delay them so that they trail behind the commander?
+		for i in pairs(t_obj_kbc_mgr.sg_protectors) do 
+			local sgroup = t_obj_kbc_mgr.sg_protectors[i]
+			
+			if SGroup_IsEmpty(sgroup) == false 
+			and SGroup_IsMoving(sgroup, ANY) == false then
+				Cmd_Move(sgroup, mkr_ax_defend23)
+			end
+		end
+	end
+
+	-- checks to see if the commander is in a building or near the V2 Rocket Marker
+	if t_obj_kbc_mgr.egroup == nil or EGroup_IsEmpty(t_obj_kbc_mgr.egroup) then 
+		if Prox_AreSquadsNearMarker(t_obj_kbc_mgr.sg_cmdr, Marker_GetPosition(mkr_ax_defend23), ANY, 20) == false then
+			return
+		end
+	elseif SGroup_IsInHoldEntity(t_obj_kbc_mgr.sg_cmdr, ANY) == false then
+		return
+	end
+	
+	-- check to see if the protectors are in their respective building
+	for i=1,table.getn(t_obj_kbc_mgr.sg_protectors) do 
+		local sgroup = t_obj_kbc_mgr.sg_protectors[i]
+		
+		if SGroup_IsEmpty(sgroup) == false then
+			if t_obj_kbc_mgr.egroup == nil or EGroup_IsEmpty(t_obj_kbc_mgr.egroup) then
+				if Prox_AreSquadsNearMarker(sgroup, Marker_GetPosition(mkr_ax_defend23), ANY, 20) == false then
+					return
+				end
+			elseif SGroup_IsInHoldEntity(sgroup, ANY) == false then
+				return
+			end
+		end
+	end
+	
+	if t_obj_kbc_mgr.egroup ~= nil and EGroup_IsEmpty(t_obj_kbc_mgr.egroup) == false then
+		Objective_RemoveUIElements(OBJ_KillBaseCommander, OBJ_KillBaseCommander.PingID)
+		OBJ_KillBaseCommander.PingID = Objective_AddUIElements(OBJ_KillBaseCommander, t_obj_kbc_mgr.egroup, true, 279163, true)
+		Rule_AddInterval(OBJ_KBC_CheckBarracksExit, 1.5)
+	end
+	
+	Rule_RemoveMe()
+end
+
+-- checks if the base commander is dead, and whether the medal is complete
+function OBJ_KBC_CheckComplete()
+	if SGroup_IsEmpty(t_obj_kbc_mgr.sg_cmdr) then
+		Objective_Complete(OBJ_KillBaseCommander)
+		Rule_Remove(OBJ_KBC_AddSquadEventToParatroopers)
+		
+		-- clear out the base defense spawn point to stop the 
+		-- Axis from mobilizing their base defenses
+		EGroup_Clear(t_bd_mgr.egroup)
+		Rule_RemoveMe()
+	end
+end
+
+-- Detects whether paratroopers or any other squads are near the HQ building and give them
+-- the appropriate squad event to detect whether or not they are throwing a satchel.
+function OBJ_KBC_AddSquadEventToParatroopers()
+	if t_obj_kbc_mgr.egroup == nil or EGroup_IsEmpty(t_obj_kbc_mgr.egroup) then
+		Rule_RemoveMe()
+		return
+	end
+	
+	Player_GetAllSquadsNearMarker(player1, sg_temp, EGroup_GetPosition_EVEN_IF_EMPTY(t_obj_kbc_mgr.egroup), 25)
+	SGroup_RemoveGroup(sg_temp, sg_paratroopers_satchel)
+	if SGroup_IsEmpty(sg_temp) == false then
+		Rule_AddSGroupEvent(OBJ_KBC_DetectAbility, sg_temp, GE_AbilityExecuted)
+		SGroup_AddGroup(sg_paratroopers_satchel, sg_temp)
+	end
+end
+
+-- the event to be called when a squad that is near the HQ executes an ability,
+--  it will tell the commander and his cronies that a satchel charge has been thrown at them
+--  and that they should get out
+function OBJ_KBC_DetectAbility(caster, abilityid, target)
+	-- do not bother checking if a satchel charge has been thrown
+	-- if the hq that the base commander is in, does not exist
+	if t_obj_kbc_mgr.egroup == nil or EGroup_IsEmpty(t_obj_kbc_mgr.egroup) then
+		return
+	end	
+
+	print("OBJ_KBC_DetectAbility!")
+	if abilityid == ABILITY.ALLIES.SATCHEL_CHARGE then
+		if (scartype(target) == ST_ENTITY and Entity_GetGameID(target) == Entity_GetGameID(EGroup_GetSpawnedEntityAt(t_obj_kbc_mgr.egroup, 1)))
+		or (scartype(target) == ST_SCARPOS and World_DistanceEGroupToPoint(t_obj_kbc_mgr.egroup, target, true) < 12) then
+		
+			if Rule_Exists(OBJ_KBC_DelayLeavingBuilding) == false then
+				Rule_AddOneShot(OBJ_KBC_DelayLeavingBuilding, 2.5)
+			end
+		end
+	end
+end
+
+function OBJ_KBC_DelayLeavingBuilding()
+	g_OBJ_KBC_SATCHEL_THROWN = true
+end
+
+---------------------------------------------------------------------------------
+-- MISCELLANEOUS
+---------------------------------------------------------------------------------
+function M07_Panzer_Patrol()
+	-- tell them to Attack move along paths (in a loop)
+	Cmd_SquadPath(Axis_Panzer_01, "Axis_PanzerPatrol_01", true, true, true, 0)
+	Util_CreateSquadsAtMarker(player2, sg_motorcycle_patrol, SBP.AXIS.MOTORCYCLE, mkr_sp_motorcycle, 1)
+	Cmd_SquadPath(sg_motorcycle_patrol, "path_motorcycle", true, true, true, 0)
+end
+
+function M07_TruckCrashStart()
+	Player_GetAllSquadsNearMarker(player1, sg_temp, mkr_truck_crash)
+	
+	if SGroup_IsEmpty(sg_temp) == false or SGroup_IsUnderAttack(sg_truck_crash, ANY, 10) then
+		Cmd_SquadPath(sg_truck_crash, "path_truck_crash", true, true, false, 0)
+		Rule_AddInterval(M07_TruckCrashCheck, 5)
+		Rule_RemoveMe()
+	end
+end
+
+function M07_TruckCrashCheck()
+	if SGroup_IsEmpty(sg_truck_crash) then
+		Rule_RemoveMe()
+		return
+	end
+	if SGroup_IsMoving(sg_truck_crash, ANY) and SGroup_IsUnderAttack(sg_truck_crash, ANY, 10) then
+		Cmd_CriticalHit(player2, sg_truck_crash, CRIT.VEH.CONTROL_FAST, CRIT.DAMAGE_RED)
+		Rule_RemoveMe()
+	end
+end
+
+function M07_MortarAttacking()
+	if SGroup_IsEmpty(sg_roof_mortar1) then
+		Rule_RemoveMe()
+		return
+	end
+	
+	if g_DIFFICULTY < GD_HARD then
+		SGroup_Kill(sg_roof_mortar1)
+	end
+	
+	if Timer_GetRemaining(g_ROOF_MORTAR_ATTACK) <= 0 
+	and SGroup_IsDoingAttack(sg_roof_mortar1, ANY, 10) then
+		EventCue_Create(CUE.ATTACKED, 279238, 279238, sg_roof_mortar1)
+		Timer_Start(g_ROOF_MORTAR_ATTACK, 60)
+	end
+end
+
+function M07_Autosave()
+	if Event_IsAnyRunning() == false then
+		Scar_Autosave(g_AUTOSAVE)
+		Rule_RemoveMe()
+	end
+end
+
+-------------------------------------------------------------------------
+--[[ V2 Rocket Launch During Mission ]]
+-------------------------------------------------------------------------
+
+
+function M07_RocketLaunch()
+	if Objective_IsComplete(OBJ_DestroyV2Rocket) then
+		Rule_RemoveMe()
+		return
+	end
+	
+	Player_GetAllSquadsNearMarker(player1, sg_temp, mkr_prox_v2)
+	
+	if SGroup_IsEmpty(sg_temp) 
+	and g_LAUNCH_RUNNING == nil
+	then
+		Util_StartIntel(EVENTS.NIS_V2_LAUNCH)
+		Rule_AddOneShot(M07_RocketLaunchUnlock, 15)
+		g_LAUNCH_RUNNING = true
+	end
+	
+	-- if the player is anywhere near the launching rocket, then stop launching rockets
+	if SGroup_IsEmpty(sg_temp) == false then
+		Rule_RemoveMe()
+	end
+end
+
+function M07_RocketLaunchUnlock()
+	g_LAUNCH_RUNNING = nil
+end
+
+
+-------------------------------------------------------------------------
+--[[ Team Weapon Setup ]]
+-------------------------------------------------------------------------
+
+function M07_SyncWeaponSetup()
+	-- sync weapon types
+	g_SW = {
+		NONE = 0,
+		HEAVY_MG = 2,
+		MORTAR = 3,
+	}
+	
+	-- various defense points around the map,
+	-- they may or may not have machine guns
+	t_sync_weapon_mgr = {}
+	for i in pairs(mkr_ax_defend) do 
+		t_sync_weapon_mgr[i] = {
+			mkr = mkr_ax_defend[i],
+			sw_id = false,
+			ebp = false,
+			sync_type = g_SW.NONE,
+			egroup = eg_defend_mg[i],
+		}
+		
+		if eg_defend_mg[i] ~= false then
+			t_sync_weapon_mgr[i].sync_type = g_SW.HEAVY_MG
+			t_sync_weapon_mgr[i].ebp = EBP.PICKUP.AXIS.HMG
+			t_sync_weapon_mgr[i].sw_id = SyncWeapon_GetFromEGroup(t_sync_weapon_mgr[i].egroup)
+		end
+	end
+	
+	-- specific defense points around the entrance
+	t_sw_entrance_mgr = {}
+	for i in pairs(mkr_entrance_def) do 
+		t_sw_entrance_mgr[i] = {
+			mkr = mkr_entrance_def[i],
+			sw_id = false,
+			ebp = false,
+			sync_type = g_SW.NONE,
+			egroup = eg_entrance_sw[i],
+		}
+		
+		if eg_entrance_sw[i] ~= false then
+			t_sw_entrance_mgr[i].sync_type = g_SW.HEAVY_MG
+			t_sw_entrance_mgr[i].ebp = EBP.PICKUP.AXIS.HMG
+			t_sw_entrance_mgr[i].sw_id = SyncWeapon_GetFromEGroup(t_sw_entrance_mgr[i].egroup)
+		end
+	end
+	
+	-- specific to the defense points around the aa guns
+	t_sw_aa_mgr = {}
+	for i in pairs(mkr_aa_def) do 
+		t_sw_aa_mgr[i] = {
+			mkr = mkr_aa_def[i],
+			sw_id = false,
+			ebp = false,
+			sync_type = g_SW.NONE,
+			egroup = eg_aa_mg[i],
+		}
+		
+		if eg_aa_mg[i] ~= false then
+			t_sw_aa_mgr[i].sync_type = g_SW.HEAVY_MG
+			t_sw_aa_mgr[i].ebp = EBP.PICKUP.AXIS.HMG
+			t_sw_aa_mgr[i].sw_id = SyncWeapon_GetFromEGroup(t_sw_aa_mgr[i].egroup)
+		end
+	end
+end
+
+-- a squad of units are ordered to move to a defensive point.
+-- this checks to see if there is a sync weapon/mg there, then
+-- orders the squad to occupy it, otherwise, they just set up base
+-- there.
+function M07_MoveToDefensePoint(sw_mgr, sgroup)
+	if sw_mgr.sw_id ~= false 
+	and SyncWeapon_Exists(sw_mgr.sw_id)
+	and SyncWeapon_IsOwnedByPlayer(sw_mgr.sw_id, player1) == false 
+	and SyncWeapon_IsOwnedByPlayer(sw_mgr.sw_id, player2) == false then
+--~ 		print("M07_MoveToDefensePoint: "..SGroup_GetName(sgroup).." occupying an MG at "..EGroup_GetName(sw_mgr.egroup))
+		EGroup_Add(sw_mgr.egroup, SyncWeapon_GetEntity(sw_mgr.sw_id))
+		Cmd_CaptureTeamWeapon(sgroup, sw_mgr.egroup, true)
+		return true
+	else
+--~ 		print ("M07_MoveToDefensePoint: Squad ignoring team weapon, just moving to defense point")
+		Cmd_AttackMove(sgroup, Marker_GetPosition(sw_mgr.mkr), true, nil, 15)
+	end
+	
+	return false
+end
+
+function M07_DefensePointOccupied(sw_mgr)
+	if sw_mgr.sw_id ~= false
+	and SyncWeapon_Exists(sw_mgr.sw_id)
+	and SyncWeapon_IsOwnedByPlayer(sw_mgr.sw_id, player1) == false 
+	and SyncWeapon_IsOwnedByPlayer(sw_mgr.sw_id, player2) == false then
+		return false
+	end
+	
+	Player_GetAllSquadsNearMarker(player2, sg_temp, Marker_GetPosition(sw_mgr.mkr), 5)
+	if SGroup_IsEmpty(sg_temp) == false then
+		return false
+	end
+	
+	Player_GetAllSquadsNearMarker(player1, sg_temp, Marker_GetPosition(sw_mgr.mkr), 5)
+	if SGroup_IsEmpty(sg_temp) == false then
+		return false
+	end
+	
+	return true
+end
+
+-------------------------------------------------------------------------
+--[[ Random Util Stuff ]]
+-------------------------------------------------------------------------
+
+-- performs the Instant Upgrade but uses a randomly selected weapon, but there is chance 
+-- that no upgrade will be performed
+function Util_GrantRandomUpgrade(sgroup)
+	local upgrades = {UPG.AXIS.STORM_MP44, UPG.AXIS.GREN_PANZERSCHRECK, 0, 0}
+	local rand = World_GetRand(1, table.getn(upgrades))
+	if upgrades[rand] ~=0 then
+		Cmd_InstantUpgrade(sgroup, upgrades[rand])
+	end
+end
+
+-- returns a random SBP for infantry
+function Util_RandomInfSBP()
+	local sbps = {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER}
+	local rand = World_GetRand(1, table.getn(sbps))
+	return sbps[rand]
+end
+
+-- returns a random weapon pickup
+function Util_RandomWeaponEBP()
+	local ebps = {EBP.PICKUP.AXIS.PANZERSCHRECK, EBP.PICKUP.AXIS.LMG_44, EBP.PICKUP.AXIS.MORTAR, EBP.PICKUP.AXIS.LMG_42}
+	local rand = World_GetRand(1, table.getn(ebps))
+	return ebps[rand]
+end
+
+-- finds the closest egroup from t_egroups to the variable var, then stores that in the egroup
+function Util_GetClosestEGroup(var, egroup, t_egroups)
+	local dist
+	local closest = 99999
+	local result = t_egroups[1]
+	
+	for i=1, table.getn(t_egroups) do
+		if EGroup_IsEmpty(t_egroups[i]) == false then
+			dist = World_DistancePointToPoint(Util_GetPosition_EVEN_IF_EMPTY(var), EGroup_GetPosition_EVEN_IF_EMPTY(t_egroups[i]))
+			if dist < closest then
+				closest = dist
+				result = t_egroups[i]
+			end
+		end
+	end
+	
+	EGroup_Clear(egroup)
+	EGroup_AddEGroup(egroup, result)
+end
+
+-- returns a random offset, same as Util_GetRandomPosition
+-- but for a position value
+function Util_GetRandOffset(pos, dist)
+	if (scartype(pos) == ST_MARKER) then
+		pos = Marker_GetPosition(pos)
+	end
+	
+	local newpos = pos
+	newpos.x = World_GetRand(dist*-1, dist)
+	newpos.z = World_GetRand(dist*-1, dist)
+	return newpos
+end
+
+-----------------------------------------------------
+-- RULES TO MANAGE WHEN VARIOUS OBJECTS ARE UNDER ATTACK
+-----------------------------------------------------
+
+function Util_AddUnderAttackItem(t_defender_mgr)
+	--[[
+	-- the t_defender_mgr should have the following
+		t_defender_mgr = 
+		{
+			sgroup = nil,					-- an sgroup to check
+			counter = 0,					-- the counter to iterate a number of checks
+			counter_max = 0,				-- the max number of times to check
+			fnc_ai_routine = function() end,	-- a function to call when the max number of checks is reached
+			fnc_reset = function() end,		-- a function to call to tell the sgroup what to do when not being attacked
+			-- special parameters for barracks
+			barracks = false,
+			barracks_idx = nil,
+		}
+	]]
+	
+	if t_under_attack_mgr == nil then
+		t_under_attack_mgr = {}
+	end
+	
+	table.insert(t_under_attack_mgr, t_defender_mgr)
+	
+	if Rule_Exists(Util_UnderAttackCheck) == false then
+		Rule_AddInterval(Util_UnderAttackCheck, 1.73)
+	end
+end
+
+function Util_RemoveUnderAttackItem(t_def_mgr)
+	for i=t_under_attack_mgr, 1, -1 do 
+		if t_def_mgr == t_under_attack_mgr[i] then
+			table.remove(t_under_attack_mgr, i)
+			return true
+		end
+	end
+	return false
+end
+
+function Util_UnderAttackCheck()
+	for i=table.getn(t_under_attack_mgr), 1, -1 do 	
+		-- used so that I don't have to access the table for every call, and it makes the code faster to read
+		local t_defender_mgr = t_under_attack_mgr[i]
+		local sg = t_defender_mgr.sgroup
+		local counter = t_defender_mgr.counter
+		
+		if SGroup_IsEmpty(sg) then
+--~ 			print("Util_UnderAttackCheck -- Defender Is Dead: ")
+			if t_defender_mgr.barracks then
+				SGroup_Clear(sg_ua_target)
+				SGroup_GetLastAttacker(sg, sg_ua_target)
+				t_defender_mgr.fnc_ai_routine(t_defender_mgr.barracks_idx, sg_ua_target)
+			else
+				t_defender_mgr.fnc_ai_routine()
+			end
+			table.remove(t_under_attack_mgr, i)
+		elseif SGroup_IsEmpty(sg) == false 
+		and (SGroup_IsUnderAttack(sg, ANY, 5) or SGroup_IsDoingAttack(sg, ANY, 5)) then
+			if counter <= t_defender_mgr.counter_max then
+				-- increment the counter for this sgroup
+				t_defender_mgr.counter = counter + 1
+--~ 				print("Util_UnderAttackCheck -- Not Yet: "..SGroup_GetName(sg))
+			
+			-- if the counter reaches the threshold, and the group is still under attack, then perform its AI routine
+			elseif counter > t_defender_mgr.counter_max then
+				-- special case under attack check that will pass in additional parameters to the AI 
+				-- routine for the barracks
+				if t_defender_mgr.barracks then
+					SGroup_Clear(sg_ua_target)
+					SGroup_GetLastAttacker(sg, sg_ua_target)
+					
+					-- if there is no "last attacker" figure out what he is shooting at
+					if SGroup_IsEmpty(sg_ua_target) then
+						Squad_GetAttackTargets(SGroup_GetSpawnedSquadAt(sg, 1), sg_ua_target)
+					end
+					
+					t_defender_mgr.fnc_ai_routine(t_defender_mgr.barracks_idx, sg_ua_target)
+				else
+					t_defender_mgr.fnc_ai_routine()
+				end
+				print("Util_UnderAttackCheck: Run the Routine for "..SGroup_GetName(sg))
+				t_defender_mgr.counter = 0
+				
+			-- otherwise, if he was under attack, and is no longer under attack,
+			--  reset everything
+			end
+		elseif SGroup_IsEmpty(sg) == false
+		and t_defender_mgr.counter == 0
+		and (SGroup_IsUnderAttack(sg, ANY, 10) == false or SGroup_IsDoingAttack(sg, ANY, 10)) then
+			-- otherwise reset everything
+--~ 			print("Util_UnderAttackCheck: The rule is being reset")
+			t_defender_mgr.counter = -1
+			t_defender_mgr.fnc_reset()
+		end
+	end
+	
+	if table.getn(t_under_attack_mgr) <= 0 then
+		Rule_RemoveMe()
+	end
+end
+
+-- [[ DEBUGGING FUNCTIONS ]]
+function Test()
+	for i in pairs(mkr_pickup) do 
+		Util_CreateEntities(nil, eg_pickup[i], Util_RandomWeaponEBP(), mkr_pickup[i], 1)
+	end
+end

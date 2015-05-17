@@ -1,0 +1,4997 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+-- Caen Assault
+
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+import("ScarUtil.scar")
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ SETUP ]]
+
+-------------------------------------------------------------------------
+
+function OnGameSetup()
+	-- string numbers should reference dat files
+	-- "allies_commonwealth" "allies" "axis" "axis_panzer_elite"
+	player1 = Setup_Player(1, 1309080, "allies_commonwealth", 1)
+	player2 = Setup_Player(2, 1309081, "axis", 2)
+	player3 = Setup_Player(3, 1309082, "allies_commonwealth", 1)
+	player4 = Setup_Player (4, 1309081, "axis_panzer_elite", 2)
+	
+end
+
+function OnGameRestore()
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+	player3 = World_GetPlayerAt(3)
+	player4 = World_GetPlayerAt(4)
+	
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+end
+
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ ONINIT ]]
+
+-------------------------------------------------------------------------
+
+function OnInit()
+	g_MissionSpeechPath="Caen\\sp2\\Mission6"
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	-- a constant that stores the mission number for use with
+	-- setting the global speech paths, tech tree setup, and 
+	-- the player's starting resources
+	MISSION_NUMBER = 0106
+	
+	--[[ PRESET GAME STATE ]]
+	Setup_MissionPreset(MISSION_NUMBER)
+	
+	--[[ PRESET COUNTER ATTACK ELEMENTS ]]
+	CaenAssault_CounterAttack()
+	
+	--[[ PRESET DEBUG CONDITIONS ]]
+	CaenAssault_Debug()
+	
+	--[[ REGISTER OBJECTIVES ]]
+	CaenAssault_ObjectiveRegister()
+	
+	--[[ MOD INITIAL STATS ]]
+	CaenAssault_ModifyStats()
+	
+	--[[ SET RESTRICTIONS ]]
+	CaenAssault_Restrictions()
+	
+	--[[ SET AI ]]
+	CaenAssault_CpuInit()
+	
+	--[[ SET DIFFICULTY ]]
+	CaenAssault_Difficulty()
+	
+	--[[ MISSION PRESETS ]]
+	CaenAssault_MissionPreset()
+	
+	--[[ GAME START CHECK ]]
+	Rule_Add(CaenAssault_MissionStart)
+
+end
+
+Scar_AddInit(OnInit)
+
+function CaenAssault_CounterAttack()
+	
+	-- despawn the 'No Man's Land' territory points
+	local points = {eg_noMans_pt1, eg_noMans_pt2, eg_noMans_pt3, eg_noMans_pt4, eg_noMans_pt5, eg_noMans_pt6}
+	--for i = 1, table.getn(points) do EGroup_DeSpawn(points[i]) end
+	
+	-- give the points to the Axis
+	for i = 1, table.getn(points) do EGroup_InstantCaptureStrategicPoint(points[i], player2) end
+	
+	-- set owner
+	EGroup_SetPlayerOwner(eg_recon_bunkersAll, player2)
+	
+	-- make the following invulnerable
+	local egroups = {eg_bridge1_traps, eg_bridge2_traps, eg_bridge3_traps, eg_cathedral_stairtraps}
+	for i = 1, table.getn(egroups) do EGroup_SetInvulnerable(egroups[i], true) end
+	
+	-- make the bunkers almost invulnerable
+	modid_bunker = Modify_ReceivedDamage(eg_recon_bunkersAll, 0.2)
+	-- reduce bunker range
+	Modify_WeaponRange(eg_recon_bunkersAll, "hardpoint_01", 0.7)
+	
+	
+--~ 	----------------------------------------------------------------------------------------------------------
+--~ 	-- Victory Point placement
+--~ 	
+--~ 	----------------------------------------------------------------------------------------------------------
+--~ 	
+--~ 	-- egroups for the strategic, victory, and territory points to be swapped
+--~ 	eg_victory_point1 = EGroup_CreateIfNotFound("eg_victory_point1")
+--~ 	eg_victory_point2 = EGroup_CreateIfNotFound("eg_victory_point2")
+--~ 	eg_victory_point3 = EGroup_CreateIfNotFound("eg_victory_point3")
+--~ 	eg_territory1 = EGroup_CreateIfNotFound("eg_territory1")
+--~ 	eg_territory2 = EGroup_CreateIfNotFound("eg_territory2")
+--~ 	eg_territory3 = EGroup_CreateIfNotFound("eg_territory3")
+--~ 	eg_victory_points_all = EGroup_CreateIfNotFound("eg_victory_points_all")
+--~ 	
+--~ 	-- table containing the egroups for the victory points
+--~ 	t_victory_points = {
+--~ 		{point = eg_noMans_pt5, vp = eg_victory_point1, territory = eg_territory1}, 	-- point = point to be despawned
+--~ 		{point = eg_noMans_pt3, vp = eg_victory_point2, territory = eg_territory2},		-- vp = victory point to be spawned
+--~ 		{point = eg_noMans_pt2, vp = eg_victory_point3, territory = eg_territory3},		-- territory = the invisible control structure
+--~ 	}
+--~ 	
+--~ 	
+--~ 	FOW_RevealAll()
+--~ 	
+--~ 	-- Despawn the points near the defensive line and swap them with Victory Points, also spawn the invisible territory structures
+--~ 	for k, v in pairs(t_victory_points) do 
+--~ 		local pos = EGroup_GetPosition(v.point)
+--~ 		print("hiding point "..k.." ------------------------------")
+--~ 		EGroup_DeSpawn(v.point)
+--~ 		-- create VP
+--~ 		Util_CreateEntities(player2, v.vp, EBP.STRAT_POINT.VICTORY_SP, pos, 1)
+--~ 		-- create territory
+--~ 		Util_CreateEntities(player2, v.territory, EBP.STRAT_POINT.INVISIBLE_NO_RESOURCE, pos, 1)
+--~ 		-- add all of the vps to the egroup
+--~ 		EGroup_AddEGroup(eg_victory_points_all, v.vp)
+--~ 	end
+--~ 	
+--~ 	FOW_UnRevealAll()
+	
+end
+
+function CaenAssault_Debug()
+	
+	-- looks for the command line option [-debug]
+	if Misc_IsCommandLineOptionSet("debug") then
+		
+		g_debug = true
+		
+		-- reveal FOW
+		
+	end
+	
+	Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS01)')]])")
+	
+end
+
+function CaenAssault_ObjectiveRegister()
+
+	--[[ *** MUST INITIALIZE THE OBJ TABLE BEFORE REGISTERING *** ]]
+	Initialize_OBJ_Bridgehead()
+	NoMans_Init()
+	Initialize_OBJ_Help()
+	Outer_Init()
+	Initialize_OBJ_Recon()
+	Initialize_OBJ_Nebelwerfers()
+	
+end
+
+function CaenAssault_ModifyStats()
+	
+	--[[ saved as example - deg
+	Player_SetDefaultSquadMoodMode(player1, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player2, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player3, MM_ForceTense)
+	
+	-- shorten vision ranges
+	Modify_PlayerSightRadius(player1, 0.75)
+
+	-- mod resource rates
+	t_player1_res_mods= {}
+	t_player1_res_mods[1] = Modify_PlayerResourceRate(player1, RT_Manpower, 2)
+	t_player1_res_mods[2] = Modify_PlayerResourceRate(player1, RT_Munition, 2)
+	t_player1_res_mods[3] = Modify_PlayerResourceRate(player1, RT_Fuel, 1)
+	
+	]]	
+	
+	-- Modify the Nebelwerfer's range
+	Modify_AbilityMaxCastRange(player2, ABILITY.AXIS.NEB_BARRAGE, 10)
+end
+
+function CaenAssault_Restrictions()
+
+	--[[ UN/RESTRICT UPGRADES 
+	Cmd_InstantPlayerUpgrade(player1, UPG.ALLIES.STICKY_BOMB, ITEM_UNLOCKED)
+	]]
+	
+	--[[ RESOURCES ]]
+	Player_SetResource(player1, RT_Manpower, 300)
+	Player_SetResource(player1, RT_Munition, 300)
+	Player_SetResource(player1, RT_Fuel, 200)
+	
+	--[[ UN/RESTRICT ABILITIES ]]
+	Player_SetAbilityAvailability(player1, ABILITY.CW.HQ_REINFORCE, ITEM_REMOVED)
+	Player_SetAbilityAvailability(player1, ABILITY.SP.GLIDER_COMMANDOS_SP, ITEM_REMOVED)
+	--Player_SetSquadProductionAvailability(player1, SBP.CW.ARMOUR_HQ, ITEM_REMOVED)
+	Player_SetSquadProductionAvailability(player1, SBP.CW.FIREFLY, ITEM_REMOVED)
+	
+	-- COMMANDER TREE
+	UI_ForceCommanderTreeChoice(player1, UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY)
+	
+	-- UN/RESTRICT POP CAP
+	Player_SetPopCapOverride(player1, 80)
+
+	--[[ UN/RESTRICT UI 
+	UI_BindingSetEnabled("company_commander", false)
+	UI_BindingSetEnabled("squadcap", false)
+	]]
+	
+	--[[ UN/RESTRICT SBPS ]]
+	--local sbps = {SBP.CW.CHURCHILL, SBP.CW.CHURCHILL_AVRE, SBP.CW.CHURCHILL_CROC, SBP.CW.CROMWELL, SBP.CW.FIREFLY, SBP.CW.COMMAND_CROMWELL }
+	--for i = 1, table.getn(sbps) do
+	--	Player_SetSquadProductionAvailability(player1, sbps[i], ITEM_REMOVED)
+	--end
+end
+
+
+
+function CaenAssault_CpuInit()
+
+	--[[ left as an example
+	
+	-- set up Player3 AI  
+	Util_AI_Setup(player3, {Util_DifVar({10, 15, 20, 30}), 5}, player3, Game_GetSPDifficulty(), 7, Util_DifVar({1, 2, 3, 5}), 2, 3)
+	
+	-- Set up AI's resources
+	Player_SetResource(player3, RT_Manpower, 1000)
+	Player_SetResource(player3, RT_Munition, 100)
+	Player_SetResource(player3, RT_Fuel, 100)
+	
+	-- tell AI to go after strongest threat instead of the weakest
+	AI_DoString( player3, "s_personality.attack_prefer_threat = true" )
+	AI_DoString( player3, "s_personality.defend_prefer_threat = true" )
+
+	-- tell AI not to "defend" territories outside of the ring around its base
+	AI_EnableComponent(player3, false, COMPONENT_ForwardDefending)
+	
+	-- disable use of comapny commander menu and abilities
+	AI_DoString( player3, "s_commandtree_enabled = false" )
+	AI_DoString( player3, "s_playerabilities_enabled = false" )
+	
+	AI_EnableComponent(player3, false, COMPONENT_Attacking)
+	
+	]]
+
+end
+
+
+
+function CaenAssault_Difficulty()
+
+	-- get the difficulty
+	g_difficulty = Game_GetSPDifficulty()  -- set a global difficulty variable
+	print("********* DIFFICULTY: "..g_difficulty)
+
+	-- set health bonus for player 1
+	Setup_Difficulty(player1, g_difficulty) -- pass the player and difficulty global variable into the Set Health function
+	Setup_Difficulty(player2, g_difficulty) -- do it for each player that you have defined
+	Setup_Difficulty(player3, g_difficulty) -- do it for each player that you have defined
+	Setup_Difficulty(player4, g_difficulty) -- do it for each player that you have defined
+
+	--[[ left as an example 
+	
+	t_difficulty = {
+		base_def_spawn 			= Util_DifVar( {2*60, 1.5*60, 1*60, 0.75*60} ),			-- amount of time required before spawning base defense soldiers
+		base_def_squad_num		= Util_DifVar( {1, 1, 2, 3} ),							-- number of squads to spawn for the base defense
+		sniper_vulnerability 	= Util_DifVar( {2.5, 2, 1.5, 1} ),						-- the vulnerability factor on the snipers
+		sniper_number			= Util_DifVar( {1, 2, 2, 3} ),							-- number of snipers to spawn
+		sniper_wpn_cooldown		= Util_DifVar( {2, 1.5, 1, 1} ),						-- weapon cooldown time for the snipers
+		stronghold_attack_num	= Util_DifVar( {1, 1, 2, 2} ),							-- number of squads to spawn from the guard tower to spawn and attack the player on alert
+		aa_def_sbps				= Util_DifVar( {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER, SBP.AXIS.STORMTROOPER, SBP.AXIS.KNIGHTSCROSS} ), -- types of squads to defend the AA Guns
+	}
+	
+	]]
+	
+end
+
+
+-------------------------------------------------------------------------
+
+-- MISSION Preset 
+
+-------------------------------------------------------------------------
+
+function CaenAssault_MissionPreset()
+	sg_p1Start 	= SGroup_CreateTable("sg_p1Start%d", 5)
+	eg_chateau_pickup = EGroup_CreateIfNotFound("eg_chateau_pickup")
+	sg_officers = SGroup_CreateIfNotFound("sg_officers")	-- the sgroup of the player's captains and lieutenants
+	sg_temp = SGroup_CreateIfNotFound("sg_temp")
+	eg_temp = EGroup_CreateIfNotFound("eg_temp")
+	eg_caen_a_mines = EGroup_CreateIfNotFound("eg_caen_a_mines")
+	
+	
+	-- sgroup for the wall flak 88s
+	sg_wall_flaks = SGroup_CreateIfNotFound("sg_wall_flaks")
+	
+	last_nebel_warning = World_GetGameTime()	-- set placeholder time for the nebelwerfer warning speech
+	
+	fg_first_vp_captured = false	-- flag for the first time the player has captured a victory point - used to trigger counterattacks
+	
+	-- make the buildings for Caen B invulnerable so that they are not destroyed in this mission
+	EGroup_SetInvulnerable(eg_protectedfor_CaenB, true)
+
+	-- timers
+	timer_reminder_text = 1  -- timer for the reminder text
+	timer_panzerDelay = 2
+	timer_counterattack_infantry = 3	-- timer for when the counterattack infantry ramp up to max difficulty
+	
+	-- this counts how many of the initial player units have been spawned
+	bridgehead_count = 1
+	bridgehead_armour_count = 1
+	
+	fg_flaks_spawned = false	-- flag whether the wall flaks have been spawned
+	
+	-- increase the range of the bunkers
+	--Modify_WeaponRange(eg_recon_bunkersAll, "hardpoint_01", 1.15)
+	-- increase the sight radius of the victory points
+	Modify_SightRadius(eg_victory_points_all, 4)
+	
+	t_mines = {
+		mkr_strong4_mine1,
+		mkr_strong4_mine2,
+		mkr_strong4_mine4,
+		mkr_strong3_mine1,
+		mkr_strong3_mine2,
+		mkr_strong3_mine3,
+		mkr_strong2_mine2,
+		mkr_strong2_mine1,
+		mkr_strong2_mine3,
+		mkr_strong1_mine2,
+		mkr_strong1_mine4,
+	}
+	
+	-- spawn the mines
+	for n = 1, table.getn(t_mines) do
+		Util_CreateEntities(player2, eg_caen_a_mines, EBP.AXIS.MINES, t_mines[n], 2)
+	end
+	
+	-- tables for the markers that infantry retreat to when the bombing runs start
+	t_strong_points = {
+		mkr_strong_area1,
+		mkr_strong_area2,
+		mkr_strong_area3,
+		mkr_strong_area4,
+	}
+	
+	t_attack_points1 = {
+		mkr_bombingrun_2c,
+		mkr_bombingrun_2b,
+	}
+	
+	t_attack_points2 = {
+		mkr_bombingrun_3a,
+		mkr_bombingrun_3b,
+	}
+	
+	t_attack_points3 = {
+		mkr_bombingrun_4a,
+		mkr_bombingrun_4b,
+	}
+	
+	t_retreat_points1 = {
+		mkr_strongpoint_infantry4a,
+		mkr_strongpoint_infantry4b,
+		mkr_strongpoint_infantry4c,
+		mkr_strong1_mine4,
+		mkr_bombingrun_1b,
+	}
+	
+	t_retreat_points2 = {
+		mkr_strongpoint_infantry3a,
+		mkr_strongpoint_infantry3b,
+		mkr_strongpoint_infantry3c,
+		mkr_strong2_mine2,
+		mkr_bombingrun_2b,
+		mkr_bombingrun_2c,
+	}
+	
+	t_retreat_points3 = {
+		mkr_strongpoint_infantry2a,
+		mkr_strongpoint_infantry2b,
+		mkr_strongpoint_infantry2c,
+		mkr_strong3_mine1,
+		mkr_bombingrun_3a,
+		mkr_bombingrun_3b,
+	}
+	
+	t_retreat_points4 = {
+		mkr_strongpoint_infantry1a,
+		mkr_strongpoint_infantry1b,
+		mkr_strongpoint_infantry1c,
+		mkr_strong4_mine1,
+		mkr_bombingrun_4c,
+		mkr_strong_area4,
+	}
+	
+	-- table for the flak 88s that stop the player from
+	t_wall_flaks = {
+		{sgroup = sg_wall_flaks, mkr = mkr_wall_flak1},
+		{sgroup = sg_wall_flaks, mkr = mkr_wall_flak2},
+		{sgroup = sg_wall_flaks, mkr = mkr_wall_flak3},
+		{sgroup = sg_wall_flaks, mkr = mkr_wall_flak4},
+	}
+	
+	Util_CreateEntities(player2, eg_chateau_pickup, EBP.PICKUP.AXIS.PANZERSCHRECK, mkr_chateau_pickup1, 1)
+		
+	t_caenAssault = {
+		p1_initSBPs = {SBP.CW.LIEUTENANT, SBP.CW.COMMANDOS, SBP.CW.TOMMIES, SBP.CW.TOMMIES},
+		p1_initNum = 1,
+		infantryReinf = {
+			{sbp = SBP.CW.STUART, offset = false,},
+			{sbp = SBP.CW.TOMMIES, offset = OFFSET_LEFT,},
+			--{sbp = SBP.CW.SAPPER, offset = OFFSET_RIGHT,},
+		}
+	}
+
+	
+	for k,this in pairs(t_caenAssault.infantryReinf) do 
+		this.sgroup = SGroup_CreateIfNotFound("sg_bridge_reinf"..k)
+	end
+	
+	-- despawn the mines on the map that are used for Caen Clear
+	if EGroup_IsEmpty(eg_caen_minesALL) == false then
+		EGroup_DeSpawn(eg_caen_minesALL)
+	end
+	
+	-- upgrades for the caen bombing run ability button
+	Player_SetUpgradeAvailability(player1, UPG.SP.MARK_STRONGPOINT, ITEM_UNLOCKED)
+	Cmd_InstantUpgrade(player1, UPG.SP.CAEN_BOMBING_RUNS)
+	Player_SetAbilityAvailability(player1, ABILITY.SP.CAEN_START_BOMBING_RUNS, ITEM_REMOVED)
+	
+	
+	flashid_overwatch = UI_FlashAbilityButton(ABILITY.CW.PDR_25_OVERWATCH, true, BT_UI_Weak_AbilityBtn)
+	
+	
+	----------------------------------------------------------------------------------------------------------
+	-- Victory Point placement
+	
+	----------------------------------------------------------------------------------------------------------
+	
+	-- egroups for the strategic, victory, and territory points to be swapped
+	eg_victory_point1 = EGroup_CreateIfNotFound("eg_victory_point1")
+	eg_victory_point2 = EGroup_CreateIfNotFound("eg_victory_point2")
+	eg_victory_point3 = EGroup_CreateIfNotFound("eg_victory_point3")
+	eg_territory1 = EGroup_CreateIfNotFound("eg_territory1")
+	eg_territory2 = EGroup_CreateIfNotFound("eg_territory2")
+	eg_territory3 = EGroup_CreateIfNotFound("eg_territory3")
+	eg_victory_points_all = EGroup_CreateIfNotFound("eg_victory_points_all")
+	
+	eg_caen_NoPoints = EGroup_CreateTable("eg_caen_NoPoints%d", 7)
+	
+	-- table containing the egroups for the victory points
+	t_victory_points = {
+		{point = eg_noMans_pt5, vp = eg_victory_point1, territory = eg_territory1}, 	-- point = point to be despawned
+		{point = eg_noMans_pt3, vp = eg_victory_point2, territory = eg_territory2},		-- vp = victory point to be spawned
+		{point = eg_noMans_pt2, vp = eg_victory_point3, territory = eg_territory3},		-- territory = the invisible control structure
+	}
+	
+	t_caen_points = {
+		{egroup = eg_caen_pt1, t_egroups = false, ebp = false, pos = false},
+		{egroup = eg_caen_pt2, t_egroups = false, ebp = false, pos = false},
+		{egroup = eg_caen_pt3, t_egroups = {eg_caen_cathedralVP}, ebp = false, pos = false},
+		{egroup = eg_caen_pt4, t_egroups = {eg_caen_crossroadsVP, LAYER_NIS_07_01_Opts, LAYER_N08_02_SHOT4}, ebp = false, pos = false},
+		{egroup = eg_caen_pt5, t_egroups = {eg_caen_courtyardVP, LAYER_N08_02_SHOT4, LAYER_N08_02_SHOT3}, ebp = false, pos = false},
+		{egroup = eg_caen_pt6, t_egroups = {LAYER_N08_02_SHOT3, LAYER_N08_02_SHOT4}, ebp = false, pos = false},
+		{egroup = eg_caen_pt7, t_egroups = {eg_caen_islandVP}, ebp = false, pos = false},
+	}
+	for k,v in pairs(t_caen_points) do 
+		v.pos = EGroup_GetPosition(v.egroup)
+		v.ebp = Entity_GetBlueprint(EGroup_GetSpawnedEntityAt(v.egroup, 1))
+		EGroup_DestroyAllEntities(v.egroup)
+		Util_CreateEntities(player2, eg_caen_NoPoints[k], EBP.STRAT_POINT.INVISIBLE_NO_RESOURCE, v.pos, 1)
+	
+	end
+	
+	FOW_RevealAll()
+	-- swap the victory points in
+	Rule_AddOneShot(SwapVictoryPoints, 1)
+	
+
+	t_attack_points = {
+		eg_victory_point1,
+		eg_victory_point2,
+		eg_victory_point3,
+	}
+	
+	----------------------------------------------------------------------------------------------------------
+	-- NIS Speech
+	
+	----------------------------------------------------------------------------------------------------------
+	t_events = {}
+	-- the first sitrep that happens before the mission starts
+	t_events.sitrep1_start = { 
+		{camPos = mkr_offmap1, waitType = NISLET_TIME, waitValue = 5}, 
+		{camPos = mkr_offmap1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Cutting, 1350500}},	-- Bright and early to you Major. 
+		{camPos = mkr_offmap1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Cutting, 1350510}},	-- Elements of the 1st and 12th SS Panzers, reinforced by the 16th Luftwaffe Field Division, have eastablished a defensive line throughout Caen.
+		{camPos = mkr_offmap1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Cutting, 1350530}},	-- Seems the bombing made Jerry dig in harder, Caen won't fall without a good fight.
+		{camPos = mkr_offmap1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Blackmore, 1350540}},	-- 3rd Battalion will advance into Caen and elimiate all Axis defenses. We can expect heavy casualties.
+		{camPos = mkr_offmap1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Blackmore, 1350541}},	-- This will not be an easy fight, we will pay dearly for Caen
+		{camPos = mkr_offmap1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Blackmore, 1350560}},	-- Have Lt. Tennant and his compnay establish a base of operations, in the ruins of the Chateau.
+		{camPos = mkr_offmap1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Blackmore, 1350570}},	-- We will launch our assault on Caen from here.
+		{camPos = mkr_offmap1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Blackmore, 1350550}},	-- B Coy will be supporting our adavance on the left flank. Keep an eye on them.  
+	}
+	-- the second sitrep that happens after the player has secured the bridgehead
+	t_events.sitrep2_start = { 
+		{camPos = mkr_chateau_pickup1, waitType = NISLET_TIME, waitValue = 5}, 
+		{camPos = mkr_chateau_pickup1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Cutting, 1350800}},	-- That shelling has really created a bloody mess for our lads.
+		{camPos = mkr_chateau_pickup1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Cutting, 1350801}},	-- Jerry's hole up in the rubble like rats.
+		{camPos = mkr_chateau_pickup1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Cutting, 1350810}},	-- Recce reports show this whole area is riddled with Snipers, MGs, and concealled weapon teams creating a massive kill zone.
+		{camPos = mkr_chateau_pickup1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Cutting, 1350820}},	-- Until we identify those Axis Positions proceeding into Caen may be a problem. 
+		{camPos = mkr_chateau_pickup1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Blackmore, 1350830}},	-- Have the Battalion to conduct a reconnaissance in force of the area.
+		{camPos = mkr_chateau_pickup1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Blackmore, 1350841}},	-- <alt>Our objective is to neutralize the main defensive positions and secure these locations.
+		{camPos = mkr_chateau_pickup1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Blackmore, 1350850}},	-- Once identifid, call in fighter-bombers to smash Jerry back into the stone age.
+		{camPos = mkr_chateau_pickup1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Blackmore, 1350860}},	-- Until that defensive line is destoryed, we cannot risk the Royal Dragoon's tanks.
+		{camPos = mkr_chateau_pickup1, waitType = NISLET_VO, waitValue = {ACTOR.CXP1.Blackmore, 1350870}},	-- So much for a fucking good morning.
+	}
+	
+	g_sr01_finished = false
+	Rule_AddInterval(CaenAssault_P1_InitialCharge, 1)
+	-- adds the rule to add the monitoring to newly produced officers
+--~ 	Rule_AddInterval(Recon_AddCheckOfficers, 8)
+	
+	-- if areas of your script need to be kicked off early
+	Bridgehead_Preset()
+	NoMans_Preset()
+	Help_Preset()
+	Outer_Preset()
+	Recon_Preset()
+	
+end
+
+
+function SwapVictoryPoints()
+	-- Despawn the points near the defensive line and swap them with Victory Points, also spawn the invisible territory structures
+	for k, v in pairs(t_victory_points) do 
+		local pos = EGroup_GetPosition(v.point)
+		print("hiding point "..k.." ------------------------------")
+		EGroup_DeSpawn(v.point)
+		-- create VP
+		Util_CreateEntities(player2, v.vp, EBP.STRAT_POINT.VICTORY_SP, pos, 1)
+		-- create territory
+		Util_CreateEntities(player2, v.territory, EBP.STRAT_POINT.INVISIBLE_NO_RESOURCE, pos, 1)
+		-- add all of the vps to the egroup
+		EGroup_AddEGroup(eg_victory_points_all, v.vp)
+		
+		
+	end
+	
+	Rule_AddOneShot(UnrevealVP, 1)
+	
+end
+
+
+function UnrevealVP()
+	FOW_UnRevealAll()
+end
+
+-------------------------------------------------------------------------
+
+-- MISSION START 
+
+-------------------------------------------------------------------------
+
+function CaenAssault_MissionStart()
+	Rule_RemoveMe()
+	Util_StartNIS(NIS_OPENING_BLACK, CaenAssault_MissionStartNisOver)
+	
+	--Rule_Add(FirstSitrep)
+end
+
+-- the first sitrep, plays before the gameplay starts
+--~ function FirstSitrep()
+--~ 	if Event_IsAnyRunning() == false then
+--~ 		--Util_AutoNISlet( NISLET_GAME2BLACK, t_events.sitrep1_start )
+--~ 		
+--~ 		
+--~ 		 
+--~ 		--Objective_ForceSitRep(OBJ_Bridgehead)
+--~ 		
+--~ 		Rule_RemoveMe()
+--~ 		Rule_Add(CaenAssault_MissionStartNisOver)
+--~ 	end
+--~ end
+
+function SecondNIS()
+	-- play the mini-NIS at the start of the mission
+	Util_StartNIS(EVENTS.NIS01A)
+	
+end
+
+-- the first sitrep, plays before the gameplay starts
+function SecondSitrep()
+	if Event_IsAnyRunning() == false then
+		--Util_AutoNISlet( NISLET_GAME2GAME, t_events.sitrep2_start )
+		Rule_RemoveMe()
+		
+		-- delay Recon objective
+		Rule_Add(CaenAssault_DelayRecon)
+	end
+end
+		
+
+-- starts the gameplay
+function CaenAssault_MissionStartNisOver()
+
+	Objective_Start(OBJ_Bridgehead, false)
+	
+	-- delay first objective
+	Rule_AddOneShot(CaenAssault_DelayObjTitle, 5)
+	
+	-- start the player's infantry charge
+
+--~ 	Rule_AddOneShot(SecondNIS, 2)
+	
+	-- start ally behavior
+	Rule_AddInterval(Help_HMG_Manager, 5)
+	Rule_AddInterval(Help_HmgGuard_Manager, 13)
+	Rule_AddInterval(Help_Ally_Manager, 7)
+	Rule_AddInterval(Help_Ally_PauseSpawn, 35)
+
+end
+
+
+function CaenAssault_DelayObjTitle()
+	
+	-- announce the goal
+	Util_StartIntel(EVENTS.Bridgehead_Charge)
+	
+	-- display the objective title
+	Rule_Add(DisplayObjectiveTitle)
+	
+	-- win/lose check
+	Rule_AddInterval(Bridgehead_WinCheck, 3)
+			
+	-- start related action
+	Bridgehead_Kickoff()
+			
+	-- mark the point at the chateau to tell the player to capture it
+	bridgehead_hint_id = Objective_AddUIElements(OBJ_Bridgehead, eg_chateau_point, false, 1359122, true, 2)
+	
+end
+
+function DisplayObjectiveTitle()
+	if Event_IsAnyRunning() == false then
+		Rule_RemoveMe()
+		Obj_CreatePopup(OBJ_Bridgehead.ID, OBJ_Bridgehead.Title)
+		Sound_Play2D(SOUND_OBJ_ADDED)
+	end
+end
+
+function CaenAssault_P1_InitialCharge()
+
+	if g_sr01_finished == true then
+		local sbp = t_caenAssault.p1_initSBPs
+		local num = t_caenAssault.p1_initNum
+		local sgroup = sg_p1Start[num]
+		--local marker = mkr_chateau_hqWalk2
+		local marker = mkr_initial_charge1
+		
+		-- determine where the infantry will charge to
+		if bridgehead_count > 2 and bridgehead_count <= 4 then
+			marker = mkr_initial_charge2
+		elseif bridgehead_count > 4 then
+			marker = mkr_initial_charge3
+		end
+		
+		
+		--if table.getn(sbp) < 1 then
+		if bridgehead_count > table.getn(sbp) then
+			Rule_RemoveMe()
+			
+		else
+			-- create the starting units for player 1
+			Util_CreateSquads(player1, sgroup, sbp[bridgehead_count], mkr_offmap1, marker, 1, nil, true)
+			--Cmd_Move(sgroup, marker, true, nil, nil, k, 5, 7)
+			if sbp[bridgehead_count] == SBP.CW.SAPPER then Cmd_InstantUpgrade(sgroup, UPG.CW.PIAT) end
+			if sbp[bridgehead_count] == SBP.CW.TOMMIES and num == 3 then Cmd_InstantUpgrade(sgroup, UPG.CW.BREN) end
+			if sbp[bridgehead_count] == SBP.CW.TOMMIES and num == 4 then Cmd_InstantUpgrade(sgroup, UPG.CW.RIFLE_GRENADE) end
+			--table.remove(sbp, 1)
+			t_caenAssault.p1_initNum = num+1
+			
+			-- new counter to count how many have spawned
+			bridgehead_count = bridgehead_count + 1
+			
+			Rule_ChangeInterval(CaenAssault_P1_InitialCharge, 1.5)
+		end
+	end
+end
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- Objective: Bridgehead
+-------------------------------------------------------------------------
+-- The player's units arrive on the battlefield. The player needs to clear out enemies around the chateau. 
+-- The objective ends when the Axis mortars are killed. After completion, the player receives the HQ.
+-------------------------------------------------------------------------
+function Initialize_OBJ_Bridgehead()
+
+	OBJ_Bridgehead = {
+		
+		SetupUI = function() 
+			-- mark a point or position
+			OBJ_Bridgehead.mapElementID = Objective_AddUIElements(OBJ_Bridgehead, eg_chateau_point, true, false, false)
+		end,
+		
+		OnStart = function()
+			Sound_PlayMusic("Music/genericmissionmusic_CXP.bsc",2,0)
+			Sound_PlayStreamed("Ambiences/Ambiences_Streamed/CXP2/SP/Distant_Fighting")
+			Sound_PlayStreamed("Ambiences/Ambiences_Streamed/CXP2/SP/Air_Raid")
+			
+			
+		end,
+		
+		OnComplete = function()
+		
+			Sound_PlayMusic("Music/SP/Caen/Preparation/COH_M01_Cue_02.bsc",0,0)
+			-- tell the player they did good
+			
+			-- start the 2nd sitrep
+			--Rule_Add(SecondSitrep)
+			Rule_Add(CaenAssault_DelayRecon)
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			
+		end,
+		
+		Title = 1359100,
+		Description = 1359110,
+		TitleEnd = 1359103,
+		Type = OT_Primary,
+		
+		SitRep = {
+			Movie = "CXP1_SR_06-01",         
+			Force = true,
+			SpeechTiming =
+			{
+				{ 1,	ACTOR.CXP1.Cutting, 1350500 },	-- Bright and early to you Major. 
+				{ 2,	ACTOR.CXP1.Cutting, 1350510 },	-- Elements of the 1st and 12th SS Panzers, reinforced by the 16th Luftwaffe Field Division, have eastablished a defensive line throughout Caen.
+				{ 11,	ACTOR.CXP1.Cutting, 1350530 },	-- Seems the bombing made Jerry dig in harder, Caen won't fall without a good fight.
+				{ 16,	ACTOR.CXP1.Blackmore, 1350540 },	-- 3rd Battalion will advance into Caen and elimiate all Axis defenses. We can expect heavy casualties. 
+				{ 21,	ACTOR.CXP1.Blackmore, 1350541 },	-- This will not be an easy fight, we will pay dearly for Caen
+				{ 25,	ACTOR.CXP1.Blackmore, 1350560 },	-- Have Lt. Degnan and his compnay establish a base of operations, in the ruins of the Chateau.
+				{ 30,	ACTOR.CXP1.Blackmore, 1350570 },	-- We will launch our assault on Caen from here.
+				{ 33.7,	ACTOR.CXP1.Blackmore, 1350550 },	-- B Coy will be supporting our adavance on the left flank. Keep an eye on them. 
+			},
+
+			PrologueEvent = function()
+				Camera_FocusOnPosition(Util_GetPosition(mkr_offmap1), false)
+				Camera_ResetToDefault()
+				Camera_SetZoomDist(Camera_GetZoomDist()*0.8)
+			end,
+
+			EpilogueEvent = function()
+				Game_FadeToBlack(true, 0)
+				g_sr01_finished = true
+				Camera_MoveToPosition(mkr_opening_camera_pan, true, 0.05)
+				CTRL.Event_Delay(1.5)
+				CTRL.WAIT()
+				
+				Game_FadeToBlack(false, 2)
+				
+				-- stay in letterbox for longer
+				CTRL.Event_Delay(8)
+				CTRL.WAIT()
+				Camera_ResetToDefault()
+			end,
+
+		},
+	}
+	
+
+	
+	-- Register Objective
+	Objective_Register(OBJ_Bridgehead)
+	-- Initialize Data
+	Bridgehead_Init()
+	
+end
+
+-------------------------------------------------------------------------
+-- Bridgehead - Functions 
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Obj data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function Bridgehead_Init()
+
+	-- define sgroups, egroups, etc associated with this obj
+	sg_chateau_p1 			= SGroup_CreateTable("sg_chateau_p1%d", 3)
+	sg_chateau_p1HQ 		= SGroup_CreateTable("sg_chateau_p1HQ%d", 3)
+	sg_chateau_mortar 		= SGroup_CreateTable("sg_chateau_mortar%d", 2)
+	sg_chateau_mortarAll 	= SGroup_CreateIfNotFound("sg_chateau_mortarAll")
+	sg_chateau_hmg 			= SGroup_CreateTable("sg_chateau_hmg%d", 4)
+	sg_chateau_patrol		= SGroup_CreateTable("sg_chateau_patrol%d", 2)
+	sg_chateau_axisAll		= SGroup_CreateIfNotFound("sg_chateau_axisAll")
+	sg_chateau_tank			= SGroup_CreateIfNotFound("sg_chateau_tank")
+	sg_chateau_tankAttacker	= SGroup_CreateIfNotFound("sg_chateau_tankAttacker")
+	sg_chateau_scout		= SGroup_CreateIfNotFound("sg_chateau_scout")
+	sg_chateau_counter		= SGroup_CreateTable("sg_chateau_counter%d", 6)
+	sg_player_hq			= SGroup_CreateIfNotFound("sg_player_hq")
+	sg_player_soldier_hq	= SGroup_CreateIfNotFound("sg_player_soldier_hq")
+	sg_player_armour_hq		= SGroup_CreateIfNotFound("sg_player_armour_hq")
+	sg_player_buildings		= SGroup_CreateIfNotFound("sg_player_buildings")
+	sg_trench_infantry 		= SGroup_CreateIfNotFound("sg_trench_infantry")
+	sg_check_squad1 		= SGroup_CreateIfNotFound("sg_check_squad1")
+	sg_building_infantry 	= SGroup_CreateIfNotFound("sg_building_infantry")
+	sg_bridgehead_counterattack1 	= SGroup_CreateIfNotFound("sg_bridgehead_counterattack1")
+	sg_reinforcements 		= SGroup_CreateIfNotFound("sg_reinforcements")
+	
+	
+	fg_chateau_point_captured = false	-- flag for when the player has captured the point at the chateau
+	fg_reinforcements = false	-- flag for when the player has received reinforcements after losing all of their units
+	fg_player_has_left_area = false	-- whether the player has left the chateau area
+	
+	sw_chateau_hmg = {}
+	local egroup = {eg_chateau_hmg2, eg_chateau_hmg3, eg_chateau_hmg4}
+	for i = 1, 3 do 
+		sw_chateau_hmg[i] = SyncWeapon_GetFromEGroup(egroup[i])
+	end
+	
+    t_bridgehead = {
+	
+		fg_ax_all_dead 			= false,			-- flag to indicate that all the axis units are dead
+		fg_ax_all_retreated 	= false,			-- flag to check whether all the axis units have retreated
+		-- player armour reinforcements
+		p1_armourSBPs = {SBP.CW.STUART},
+		p1_armourNum = 1,
+		p1_hqSBPs = {SBP.CW.TOMMIES, SBP.CW.SAPPER},
+		p1_hqNum = 0,
+		
+		-- enemy actions
+		initResponse = {
+			{sgroup = sg_chateau_patrol[1], rule = function() Bridgehead_Initial_Infantry() end},
+			{sgroup = sg_chateau_patrol[2], rule = function() Bridgehead_Initial_HMG1() end},
+			--{sgroup = sg_chateau_patrol[3], rule = function() Bridgehead_Initial_HMG2() end},
+			{sgroup = sg_chateau_mortar[1], rule = nil},
+			{sgroup = sg_chateau_mortar[2], rule = nil},
+		},
+		
+		initHMG = {
+			{egroup = eg_chateau_hmg2, syncwpn = sw_chateau_hmg[2], sgroup = sg_chateau_hmg[2], pos = mkr_chateau_fallback1},
+			{egroup = eg_chateau_hmg4, syncwpn = sw_chateau_hmg[4], sgroup = sg_chateau_hmg[4], pos = mkr_chateau_fallback2},
+		},
+		
+		-- reinforcements when the player runs out of units
+		reinforcements = {SBP.CW.LIEUTENANT, SBP.CW.TOMMIES, SBP.CW.COMMANDOS},
+	}
+
+	
+	last_mortar_warning = World_GetGameTime()	-- set a default time for the mortar warning
+end
+
+-- preset any units or events needed before the kickoff, but you do not
+-- want them to occur at the outset of the map.
+-- Example: Often units are needed to exist before the objective start (because they start the objective)
+-- then spawn those units here when they need to be spawned
+function Bridgehead_Preset()
+	
+	
+	-- mortars
+	local mkr = {mkr_chateau_mortar1, mkr_chateau_mortar2, mkr_chateau_mortar3}
+	for k,v in pairs(sg_chateau_mortar) do 
+		Util_CreateSquads(player2, v, SBP.AXIS.MORTAR, mkr[k], nil, 1)
+		Cmd_InstantSetupTeamWeapon(v, true)
+		SGroup_AddGroup(sg_chateau_mortarAll, v)
+	end
+	
+	-- pre-placed infantry
+	local mkr = {mkr_chateau_hqWalk1, mkr_chateau_hqWalk2, mkr_chateau_hqWalk3}
+	for k,v in pairs(sg_chateau_patrol) do 
+		Util_CreateSquads(player2, v, SBP.AXIS.VOLKSGRENADIER, mkr[k], nil, 1, World_GetRand(4, 5))
+		Cmd_Move(v, mkr[k], false, NIL_DEST, NIL_FACE, NIL_OFFSET, NIL_DIST, 4)
+		SGroup_AddGroup(sg_chateau_axisAll, v)
+	end
+end
+
+
+
+
+
+-- to win the obj the player must first kill the mortars and then kill the tank that follows
+-- killing the tank is the trigger to complete the objective
+function Bridgehead_WinCheck()
+	
+	Player_GetAll(player1)
+	
+	-- one of them must be set to true before the player can win or lose the objective
+	if ((t_bridgehead.mortarsDead and fg_chateau_point_captured == true) or fg_player_has_left_area == true) and Event_IsAnyRunning() == false then
+		
+		t_bridgehead.complete = true
+		
+		-- intel
+		Util_StartIntel(EVENTS.Bridgehead_MortarsDead)
+		
+		-- the player has just won
+		Objective_Complete(OBJ_Bridgehead)
+		
+		-- re-enable the ability to replace the HQ
+		Player_SetAbilityAvailability(player1, ABILITY.CW.HQ_REINFORCE, ITEM_DEFAULT)
+		
+		Rule_RemoveMe()
+		
+	elseif SGroup_IsEmpty(sg_allsquads) and fg_reinforcements == false then
+		-- the player has lost all of his starting units, so spawn the reinforcements
+		if Rule_Exists(Bridgehead_Reinforcements) == false then
+			Rule_AddInterval(Bridgehead_Reinforcements, 3)
+		end
+	
+	elseif SGroup_IsEmpty(sg_allsquads) and fg_reinforcements == true then
+		
+		-- the player has just failed
+		Objective_Fail(OBJ_Bridgehead)
+		Rule_AddInterval(Caen_GameOver_Fail, 3)
+		
+		Rule_RemoveMe()
+		
+	end
+	
+end
+
+
+-- start the related action
+function Bridgehead_Kickoff()
+
+	-- player gets some armoured backup
+	Rule_AddDelayedInterval(Bridgehead_P1_Armour, 4, 3)
+	
+	-- the checking functions
+	Rule_AddInterval(Bridgehead_MortarCheck, 3)
+	
+	
+	-- check initial attacks
+	Rule_AddDelayedInterval(Bridgehead_InitialCounters, 8, 3)
+	
+	-- track the hmg sync weapons
+	Rule_AddInterval(Bridgehead_HMG_Maneuvers, 5)
+	
+	-- handles the tactical event speech for capturing points
+	last_capture_point_reminder = World_GetGameTime()
+	Rule_AddInterval(Event_CapturePoint, 5)
+	
+	-- check if the chateau point is captured
+	Rule_AddInterval(Bridgehead_CheckPoint, 5)
+	
+	-- start checking for when to start the mortar attacks
+	Rule_AddInterval(Bridgehead_Counterattack, 5)
+	
+	-- reduce the accuracy of the mortars
+	Modify_WeaponAccuracy(sg_chateau_mortarAll, "hardpoint_01", 0.7)
+	
+	-- disable the mortars until they are triggered
+	SGroup_SetAutoTargetting(sg_chateau_mortarAll, "hardpoint_01", false)
+	
+	
+	-- trigger the arrival of the HQ
+	Rule_AddInterval(Bridgehead_HQ_Arrival, 3)
+	
+	-- check if the player has left the chateau area
+	Rule_AddInterval(Bridgehead_AreaCheck, 3)
+
+end
+
+
+-- checks if the player has left the chateau area and if enough time has passed, completes the objective
+function Bridgehead_AreaCheck()
+	
+	if Objective_IsComplete(OBJ_Bridgehead) then
+		Rule_RemoveMe()
+	
+	elseif World_GetGameTime() > 420 then
+		local sg_temp = SGroup_CreateIfNotFound("sg_temp")
+		Player_GetAll()
+		Player_GetAllSquadsNearMarker(player1, sg_temp, mkr_chateau_center, 150)
+		local all_squad_count = SGroup_Count(sg_allsquads)
+		local all_chateau_count = SGroup_Count(sg_temp)
+		
+		-- if there are some of the player's squads outside of the chateau area, end the objective
+		if all_chateau_count < all_squad_count then
+			fg_player_has_left_area = true
+			Rule_RemoveMe()
+		end
+	end
+
+end
+
+
+
+-- checks for when the player has started capturing the first point or has attacked the mortars 
+-- and triggers the mortars' firing and counterattack infantry
+function Bridgehead_Counterattack()
+	
+	local capture_check = false
+	
+	Player_GetAll(player1)
+	
+	-- check if any of the player's squads are capturing the point
+--~ 	if SGroup_IsCapturing(sg_allsquads, ANY) then
+
+	if EGroup_IsCapturedByPlayer(eg_chateau_point, player1, ANY) then
+		capture_check = true
+	end
+	
+	
+	if capture_check == true or SGroup_IsUnderAttack(sg_chateau_mortarAll, ANY, 5) then
+		Rule_RemoveMe()
+		
+		-- reveal the mortars
+		FOW_RevealArea(Util_GetPosition(mkr_chateau_mortar1), 10, -1)
+		FOW_RevealArea(Util_GetPosition(mkr_chateau_mortar2), 10, -1)
+		
+		-- allow the mortars to fire
+		SGroup_SetAutoTargetting(sg_chateau_mortarAll, "hardpoint_01", true)
+		
+		-- mortar warning speech
+		Rule_AddInterval(Bridgehead_Mortar_Warning, 10)
+		
+		-- add threat arrow to the mortars
+		local threatID = ThreatArrow_CreateGroup()
+		ThreatArrow_Add(threatID, sg_chateau_mortarAll)
+		
+		-- spawn counterattacking infantry
+		Util_CreateSquads(player2, sg_bridgehead_counterattack1, SBP.AXIS.GRENADIER, mkr_offmap2, mkr_chateau_center, 1, nil, true)
+		Util_CreateSquads(player2, sg_bridgehead_counterattack1, SBP.AXIS.GRENADIER, mkr_tiger_despawn3, mkr_chateau_fallback2, 1, nil, true)
+	
+	end
+end
+
+
+function Bridgehead_MortarCheck()
+	
+	if SGroup_IsEmpty(sg_chateau_mortar[1]) then
+		FOW_UnRevealArea(Util_GetPosition(mkr_chateau_mortar1), 10)
+	end
+	
+	if SGroup_IsEmpty(sg_chateau_mortar[2]) then
+		FOW_UnRevealArea(Util_GetPosition(mkr_chateau_mortar2), 10)
+	end
+	
+	if SGroup_IsEmpty(sg_chateau_mortarAll)  then
+		
+		-- set flag
+		t_bridgehead.mortarsDead = true
+		
+		-- remaining run away
+		if SGroup_IsEmpty(sg_chateau_axisAll) == false then
+			--Cmd_Move(sg_chateau_axisAll, eg_center_point, NO_QUEUE, NIL_DELETE, NIL_FACE, NIL_OFFSET, NIL_DIST, 30)
+			Cmd_Retreat(sg_chateau_axisAll, mkr_offmap5, mkr_offmap5)
+			Cmd_Retreat(sg_bridgehead_counterattack1, mkr_offmap5, mkr_offmap5)
+		end
+		
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+
+function Bridgehead_TankCreate()
+	
+	if Prox_ArePlayersNearMarker(player1, mkr_prox_panzer, ANY) then
+		Rule_RemoveMe()
+		
+		local spawn = false
+		
+		if Player_CanSeePosition(player1, Util_GetPosition(mkr_panzer_spawn)) == false then
+			spawn = mkr_panzer_spawn
+		else
+			spawn = mkr_offmap9
+		end
+		
+		
+		
+		-- send in the tank
+		Util_CreateSquads(player2, sg_chateau_tank, SBP.AXIS.PANZER, spawn, mkr_chateau_tankGoTo, 1, nil, true)
+		Util_CreateSquads(player2, sg_chateau_counter[5], SBP.AXIS.GRENADIER, spawn, mkr_chateau_tankGoTo, 1, nil, true)
+		Util_CreateSquads(player2, sg_chateau_counter[6], SBP.AXIS.GRENADIER, spawn, mkr_right_trench2)
+		
+		Cmd_SquadPath(sg_chateau_tank, "caen_assault_tank", true, 0, true, 0)
+		Cmd_SquadPath(sg_chateau_counter[5], "caen_assault_tank", true, 0, true, 0)
+		
+		SGroup_AddGroup(sg_chateau_axisAll, sg_chateau_counter[5])
+		SGroup_AddGroup(sg_chateau_axisAll, sg_chateau_counter[6])
+		-- start tank behavior
+		Rule_AddInterval(Bridgehead_TankCheck, 5)
+		-- announce the tank when it gets attacked
+		Rule_AddInterval(Bridgehead_TankAnnounce, 1)
+		
+	end
+
+end
+
+function Bridgehead_TankCheck()
+	local sgroup1 = sg_chateau_tank
+	local sgroup2 = sg_chateau_tankAttacker
+	local sgroup3 = sg_chateau_counter[5]
+	
+	if SGroup_IsEmpty(sgroup1) then
+		-- set flag
+		t_bridgehead.tankDead = true
+		-- remaining guys run away
+		if SGroup_IsEmpty(sg_chateau_axisAll) == false then
+			Cmd_Move(sg_chateau_axisAll, mkr_offmap9, NO_QUEUE, mkr_offmap9, NIL_FACE, NIL_OFFSET, NIL_DIST, NIL_COVER)
+		end
+		Rule_RemoveMe()
+		
+	elseif SGroup_GetAvgHealth(sgroup1) < .3 then
+		Cmd_Move(sgroup1, mkr_offmap9, NO_QUEUE, mkr_offmap9, NIL_FACE, NIL_OFFSET, NIL_DIST, NIL_COVER)
+		Rule_RemoveMe()
+		
+	else
+		if SGroup_IsUnderAttack(sgroup1, false, 10) and SGroup_IsMoving(sgroup1, false) == false and SGroup_IsDoingAttack(sgroup1, false, 10) == false then
+			SGroup_GetLastAttacker(sgroup1, sgroup2)
+			
+			-- this if check was put in here to hopefully prevent a SCAR error when being attacked by a bombing run
+			if SGroup_IsEmpty(sgroup2) == false then
+				Cmd_Move(sgroup1, sgroup2, NO_QUEUE, NIL_DEST, NIL_FACE, OFFSET_RIGHT, World_GetRand(15, 20))
+			end
+		
+		end
+		
+		if SGroup_IsEmpty(sgroup3) and World_GetRand(1,3) < 3 then
+			Util_CreateSquads(player2, sgroup3, SBP.AXIS.GRENADIER, mkr_offmap9, sgroup1, 1, World_GetRand(3, 4), true)
+			SGroup_AddGroup(sg_chateau_axisAll, sgroup3)
+		end
+	end
+end
+
+function Bridgehead_TankAnnounce()
+	if SGroup_IsUnderAttack(sg_chateau_tank, false, 10) then
+		
+		-- add threat arrow
+		local threatID = ThreatArrow_CreateGroup()
+		ThreatArrow_Add(threatID, sg_chateau_tank)
+		
+		Rule_RemoveMe()
+	elseif t_bridgehead.tankDead then
+		Rule_RemoveMe()
+	end
+end
+	
+
+function Bridgehead_P1_Armour()
+
+	local sbp = t_bridgehead.p1_armourSBPs
+	local num = t_bridgehead.p1_armourNum
+	local sgroup = sg_chateau_p1[num]
+	local marker = mkr_chateau_p1VehDeploy
+	
+	if bridgehead_armour_count > table.getn(sbp) then
+		Rule_RemoveMe()
+		
+		
+	else
+		-- create the starting units for player 1
+		Util_CreateSquads(player1, sgroup, sbp[num], mkr_offmap1, nil, 1, nil, true)
+		if sbp[num] == SBP.CW.BREN_CARRIER then Cmd_InstantUpgrade(sgroup, UPG.CW.BREN_CARRIER_MMG) end
+		Cmd_Move(sgroup, marker, true, NIL_DEST, NIL_FACE, num, 10)
+		--table.remove(sbp, 1)
+		t_bridgehead.p1_armourNum = num+1
+		bridgehead_armour_count = bridgehead_armour_count + 1
+	end
+
+end
+
+
+-- this function handles the spawning of the reinforcements if the player has run out of infantry at the start of the mission
+function Bridgehead_Reinforcements()
+	local sbp = t_bridgehead.reinforcements
+	local sgroup = sg_reinforcements
+	local marker = mkr_chateau_p1VehDeploy
+	
+	if table.getn(sbp) == 0 then
+		Rule_RemoveMe()
+		
+		
+	else
+		-- create the reinforcements for player 1
+		Util_CreateSquads(player1, sgroup, sbp[1], mkr_offmap1, nil, 1, nil, true)
+		Cmd_Move(sgroup, marker)
+		table.remove(sbp, 1)
+		
+		-- flag that the reinforcements have spawned
+		if fg_reinforcements == false then
+			fg_reinforcements = true
+			Util_ReinforceEvent(sgroup)
+		end
+	end
+
+
+end
+
+
+
+-- warn the player when 2 or more mortars are firing
+function Bridgehead_Mortar_Warning()	
+	
+	local min_time = 50	-- how much time has to pass before it will display another warning speech event
+	local current_time = World_GetGameTime()
+	local time_passed = current_time - last_mortar_warning 	-- how much time has passed since the last warning speech
+	Player_GetAll(player1)
+	
+	if Objective_IsComplete(OBJ_Bridgehead) then
+		Rule_RemoveMe()
+		
+	elseif SGroup_IsDoingAttack(sg_chateau_mortarAll, ANY, 10) and time_passed >= min_time then
+		last_mortar_warning = World_GetGameTime()
+		Util_StartIntel(EVENTS.Mortars)
+	end
+end
+
+
+function Bridgehead_HQ_Arrival()
+
+	local sbp = t_bridgehead.p1_hqSBPs
+	local num = t_bridgehead.p1_hqNum
+	
+	if table.getn(sbp) < 1 then
+		Rule_RemoveMe()
+		
+	elseif fg_chateau_point_captured == true or fg_player_has_left_area == true then
+		-- hack to spawn an entity with the sbp table
+		if num == 0 then
+			
+			-- HQ ROLLS IN
+			Util_CreateSquads(player1, sg_player_hq, SBP.CW.HQ_REINFORCEMENT, mkr_offmap1, mkr_chateau_hqWalk1)
+       
+			-- display an event cue for the HQ
+			EventCue_Create(CUE.NORMAL, 1359131, 1359140, sg_player_hq)
+			
+			t_bridgehead.p1_hqNum = num+1
+			
+		-- another hack to spawn another entity with the sbp table
+		--elseif num == 0 then
+			-- INFANTRY HQ ROLLS IN
+			--Util_CreateSquads(player1, sg_player_soldier_hq, SBP.CW.INFANTRY_HQ, mkr_offmap1, mkr_chateau_p1VehDeploy)
+			--Util_SetCommonwealthHQMobility(sg_player_soldier_hq, true, true)
+			
+			--t_bridgehead.p1_hqNum = num+1
+			
+		-- finally, to the sbp table
+		else
+			local sgroup = sg_chateau_p1HQ[num]
+			local marker = mkr_chateau_p1VehDeploy
+			-- create the starting units for player 1
+			Util_CreateSquads(player1, sgroup, sbp[1], mkr_offmap1, nil, 1, nil, true)
+			Cmd_Move(sgroup, marker, true, nil, nil, num, 10)
+			if sbp[1] == SBP.CW.SAPPER then Cmd_InstantUpgrade(sgroup, UPG.CW.PIAT) end 
+			table.remove(sbp, 1)
+			t_bridgehead.p1_hqNum = num+1
+		end
+	end
+end
+
+-- track and trigger responses to assaults on the chateau squads
+function Bridgehead_InitialCounters()
+
+	local response = t_bridgehead.initResponse
+	
+	if table.getn(response) < 1 or Objective_IsComplete(OBJ_Bridgehead) then
+		Rule_RemoveMe()
+	else
+		for k,v in pairs(response) do 
+			if SGroup_IsUnderAttack(v.sgroup, false, 10) and v.rule ~= nil then
+				v.rule()
+				table.remove(response, k)
+				break
+			end
+		end
+	end
+
+end
+
+function Bridgehead_Initial_Infantry()
+	-- fall back and get in the trench
+	Cmd_Move(sg_chateau_patrol[1], mkr_chateau_trench1)
+	Caen_AutoRetreat_Add(sg_chateau_patrol[1], 2, mkr_offmap3)
+
+	-- call for help
+	Util_CreateSquads(player2, sg_chateau_counter[1], SBP.AXIS.VOLKSGRENADIER, mkr_offmap2, mkr_chateau_fallback1, 1, World_GetRand(3, 5), true)
+	SGroup_AddGroup(sg_chateau_axisAll, sg_chateau_counter[1])
+	Caen_AutoRetreat_Add(sg_chateau_counter[1], 2, mkr_offmap3)
+end
+
+-- create a squad of grenadiers 
+-- used to help the mortar squads
+function Bridgehead_Initial_Infantry2(source)
+	-- call for help
+	Util_CreateSquads(player2, sg_chateau_counter[1], SBP.AXIS.VOLKSGRENADIER, mkr_offmap3, source, 1, World_GetRand(3, 5), true)
+	SGroup_AddGroup(sg_chateau_axisAll, sg_chateau_counter[1])
+end
+
+function Bridgehead_Initial_HMG1()
+	-- capture the hmg and fall back to a defensive position
+	Cmd_CaptureTeamWeapon(sg_chateau_patrol[2], eg_chateau_hmg2)
+	Cmd_Move(sg_chateau_patrol[2], mkr_chateau_mortar1, true, nil, mkr_chateau_hqWalk2, nil, nil, 12)
+end
+
+function Bridgehead_Initial_HMG2()
+	-- fall back to a defensive position
+	Cmd_Move(sg_chateau_patrol[3], mkr_chateau_fallback2)
+	
+	-- squad appears in the chapel
+	Util_CreateSquads(player2, sg_chateau_counter[2], SBP.AXIS.VOLKSGRENADIER, eg_chateau_hq, nil, 1, 2)
+	SGroup_AddGroup(sg_chateau_axisAll, sg_chateau_counter[2])
+	
+end
+
+
+-- watch the indicated hmg sync ID's and move them around when they become manned
+function Bridgehead_HMG_Maneuvers()
+
+	local hmg = t_bridgehead.initHMG
+	
+	if table.getn(hmg) < 1 or Objective_IsComplete(OBJ_Bridgehead) then
+		Rule_RemoveMe()
+	else
+		for k,v in pairs(hmg) do 
+			-- is the gun still around?
+			if SyncWeapon_Exists(v.syncwpn) then
+				-- is it not world owned?
+				if SyncWeapon_IsOwnedByPlayer(v.syncwpn, nil) == false then
+					-- is the group empty?
+					if SGroup_IsEmpty(v.sgroup) then
+						if SyncWeapon_IsOwnedByPlayer(v.syncwpn, player2) then
+							-- add to the sgroup
+							local squad = Entity_GetSquad(SyncWeapon_GetEntity(v.syncwpn))
+							if squad ~= nil then 
+								SGroup_Add(v.sgroup, squad) 
+								SGroup_AddGroup(sg_chateau_axisAll, v.sgroup)
+							end
+							-- and move to the fallback position
+							Cmd_Move(v.sgroup, v.pos, true, nil, mkr_chateau_center)
+						-- if the group is empty and the gun is not world owned or p2 owned
+						-- p1 must own it so remove this from the table
+						else
+							print("removing sync weapon cause squad is empty and player2 doesn't own the gun")
+							table.remove(hmg, k)
+							break
+						end
+					--elseif SGroup_IsUnderAttack(v.sgroup, false, 10) then
+					elseif SGroup_IsUnderAttack(v.sgroup, false, 10) and SyncWeapon_IsAttacking(v.syncwpn, 10) == false 
+					and SGroup_IsMoving(v.sgroup, ANY) == false then
+						-- move around
+						Cmd_Move(v.sgroup, v.pos, true, nil, mkr_chateau_center)
+						--[[print("removing sync weapon cause squad has successfully been ordered to set up")
+						table.remove(hmg, k)]]
+						break
+					end
+				end					
+			else
+				print("removing sync weapon cause the weapon is destroyed")
+				table.remove(hmg, k)
+				break
+			end
+		end
+	end
+
+end
+
+
+-- This function checks if the chateau point is captured and if it is, remove the hint point
+function Bridgehead_CheckPoint()
+	if EGroup_IsCapturedByPlayer(eg_chateau_point, player1, ANY) then
+		Rule_RemoveMe()
+		Objective_RemoveUIElements(OBJ_Bridgehead, bridgehead_hint_id)
+		fg_chateau_point_captured = true
+	end
+end
+
+
+
+
+
+-------------------------------------------------------------------------
+
+-- No Man's Land
+
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Encounter data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function NoMans_Init()
+	
+	sg_noMans_p1All = SGroup_CreateIfNotFound("sg_noMans_p1All")
+	sg_noMans_temp = SGroup_CreateIfNotFound("sg_noMans_temp")
+	sg_noMans_target = SGroup_CreateTable("sg_noMans_target%d", 99)
+	
+	PHASE_ONE 		= 1
+	PHASE_TWO 		= 2
+	PHASE_THREE 	= 3
+	-- define sgroups, egroups, etc associated with this Encounter
+	t_noMans = {
+		phase = PHASE_ONE,
+		target = {},
+		firstWarning = false,
+		warningLimit = 25,
+		range = {-170, 0},
+	}
+	-- populate the blank table defined above
+	for k,v in pairs(sg_noMans_target) do 
+		table.insert(t_noMans.target, {sgroup = sg_noMans_target[k], delay = 0})
+	end
+
+
+end
+
+-- preset any units or events needed before the kickoff
+function NoMans_Preset()
+
+	-- spawn squads
+	
+	-- start behavior
+	NoMans_Kickoff()
+
+end
+
+-- start the related action
+function NoMans_Kickoff()
+
+	-- trigger initial phase
+	Rule_AddInterval(NoMans_Phase1Attack, 3)
+	
+end
+
+function NoMans_Phase1Attack()
+	local phase = t_noMans.phase
+	local LatitudeFilter = function(sgID, itxID, sqID)
+		local pos = Squad_GetPosition(sqID)
+		local numx = false
+		
+		if pos.z > 90 then
+			numx = -120
+		else
+			numx = -30
+		end
+		
+		
+		-- spawn the flak 88s
+		if pos.x > numx and fg_flaks_spawned == false then
+			for k, this in pairs(t_wall_flaks) do
+				Util_CreateSquads(player2, sg_wall_flaks, SBP.AXIS.FLAK_88_SP, this.mkr)
+				
+			end
+			
+			Modify_WeaponRange(sg_recon_flakAll, "hardpoint_01", 0.5)
+			fg_flaks_spawned = true
+		end
+		
+		--print( t_noMans.range[phase])
+		if pos.x > t_noMans.range[phase] then
+			--print("greater than -170")
+			for k,v in pairs(t_noMans.target) do 
+				--print("iteration "..k)
+				SGroup_Clear(sg_noMans_temp)
+				SGroup_Add(sg_noMans_temp, sqID)
+				if SGroup_IsEmpty(v.sgroup) == false and SGroup_Compare(v.sgroup, sg_noMans_temp) then
+					--print("group already in")
+					break
+				elseif SGroup_IsEmpty(v.sgroup) then
+					SGroup_Add(v.sgroup, sqID) --print("adding group")
+					break 
+				else
+					--print("neither previous case worked")
+				end
+			end
+		end
+	end
+
+	if phase == PHASE_THREE then
+		Rule_RemoveMe()
+	else
+		--print("in else")
+		-- get all the player squads 
+		Player_GetAll(player1, sg_noMans_p1All)
+		-- iterate through the group
+		-- save all those who's position is greater than -170, add to a bombing group
+		SGroup_ForEach(sg_noMans_p1All, LatitudeFilter)
+		
+		-- iterate through the bombing table
+		for k,v in pairs(t_noMans.target) do 
+			-- check each group to see if its still in bad space
+			if SGroup_IsEmpty(v.sgroup) == false then
+				local sgPos = SGroup_GetPosition(v.sgroup)
+				if sgPos.x > t_noMans.range[phase] then
+					--print("group "..k.." in range")
+					-- check to see when it was last bombed
+					if v.delay < 1 then
+						-- warn the player
+						print("firing")
+						NoMans_RandomWarning()
+						
+						-- if its below the threshold, bomb it with the random bomb function and modify its threshold
+						NoMans_RandomBomb_Add(sgPos)
+						t_noMans.target[k].delay = v.delay + World_GetRand(1, 5)
+					end
+				else
+					--print("out of range")
+					--table.remove(t_noMans.target, k)
+					SGroup_Clear(v.sgroup)
+					break
+				end
+				t_noMans.target[k].delay = v.delay-1
+			else
+				--print("dead")
+				--table.remove(t_noMans.target, k)
+				break
+			end
+		end
+	end
+end
+
+-- TODO: this needs work!
+function NoMans_RandomBomb_Add(pos1)
+	-- first hit
+	local pos2 = Caen_GetRandOffset(pos1, World_GetRand(3, 10))
+	Cmd_Ability(player2, NoMans_Random(), pos1, nil, true)
+end
+
+-- 1/3 chance of mortar vs 2/3's chance of howitzer
+function NoMans_Random()
+	local mortar = ABILITY.SP.SINGLE_MORTAR
+	local howitzer = ABILITY.SP.SINGLE_HOWITZER
+	local bombType = {howitzer, mortar, howitzer}
+	local rand = World_GetRand(1, 3)
+	
+	return bombType[rand]
+end
+
+-- alert the player that they are being bombed
+function NoMans_RandomWarning()
+	if t_noMans.firstWarning ~= true then
+		t_noMans.firstWarning = true
+		-- if its the first, warn the player
+		Util_StartIntel(EVENTS.No_Mans_Land_First)
+		-- if its appropriate, warn the player
+	elseif t_noMans.warningLimit < 1 then
+		Util_StartIntel(EVENTS.No_Mans_Land)
+		t_noMans.warningLimit = World_GetRand(10, 30)
+	end
+	t_noMans.warningLimit = t_noMans.warningLimit-1
+end
+
+
+
+
+
+	
+
+-- check if the player has capped enough points or if they are near enough to the ally before triggering the Help objective
+function CaenAssault_DelayHelp()
+
+	local current_time = World_GetGameTime()
+	Player_GetAll(player1)
+	
+	-- Trigger the Help Ally objective if:
+	-- a: 10 minutes pass
+	-- b: player captures 3 territories
+	-- c: player captures a victory point
+	-- d: player attacks the forces attacking the ally
+	-- e: player moves to the point nearby
+	
+	if (Event_IsAnyRunning() == false and 
+	(EGroup_IsCapturedByPlayer(eg_center_point, player1, ALL) and EGroup_IsCapturedByPlayer(eg_noMans_pt4, player1, ALL) and EGroup_IsCapturedByPlayer(eg_noMans_pt1, player1, ALL)))
+	or SGroup_IsUnderAttackByPlayer(sg_help_axisHMGall, player1, 10)
+	or SGroup_IsUnderAttackByPlayer(sg_help_hmgGuard[1], player1, 10)
+	or SGroup_IsUnderAttackByPlayer(sg_help_hmgGuard[2], player1, 10)
+	or SGroup_IsUnderAttackByPlayer(sg_help_hmgGuard[3], player1, 10)
+	or SGroup_IsUnderAttackByPlayer(sg_help_hmgGuard[4], player1, 10)
+	or Prox_AreSquadsNearMarker(sg_allsquads, Util_GetPosition(eg_help_point2), ANY, 70)  
+	or EGroup_IsCapturedByPlayer(eg_victory_points_all, player1, ANY) 
+	or current_time >= 600 then
+	
+		-- start the Help Ally objective
+		Objective_Start(OBJ_Help)
+		Rule_RemoveMe()
+	end
+end
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- Help
+-------------------------------------------------------------------------
+-- The player has to hurry to the other side of the map to help out the ally
+-- who is getting gunned down by HMG fire.
+-------------------------------------------------------------------------
+function Initialize_OBJ_Help()
+
+	OBJ_Help = {
+		
+		SetupUI = function() 
+			-- mark a point or position
+			OBJ_Help.mapElementID = Objective_AddUIElements(OBJ_Help, mkr_help_allyRally1, true, 1359125, true, -1)
+		end,
+		
+		OnStart = function()
+			
+			t_help.objGranted = true
+			
+			-- announce the goal
+			Util_StartIntel(EVENTS.Help_Start)
+			
+			-- win/lose check
+			Rule_AddInterval(Help_WinCheck, 5)
+			
+			-- start related action
+			Help_Kickoff()
+			
+		end,
+		
+		OnComplete = function()
+			Sound_PlayMusic("Music/SP/Caen/trepidation/coh_force_beyond.bsc",2,0)
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			Objective_RemoveUIElements(OBJ_Help, OBJ_Help.mapElementID)
+			
+		end,
+		
+		Title = 1359102,
+		Description = 1359112,
+		TitleEnd = 1359104,
+		Type = OT_Secondary,
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_Help)
+	-- Initialize Data
+	Help_Init()
+	
+end
+
+-------------------------------------------------------------------------
+-- Help - Functions 
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Obj data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function Help_Init()
+
+	-- define sgroups, egroups, etc associated with this obj
+	sg_help_ally 		= SGroup_CreateTable("sg_help_ally%d", 3)
+	sg_help_allyRadio 	= SGroup_CreateIfNotFound("sg_help_allyRadio")
+	sg_help_allyBren 	= SGroup_CreateIfNotFound("sg_help_allyBren")
+	sg_help_allyAll 	= SGroup_CreateIfNotFound("sg_help_allyAll")
+	sg_help_allyCaptain = SGroup_CreateIfNotFound("sg_help_allyCaptain")
+	sg_help_axisHMG 	= SGroup_CreateTable("sg_help_axisHMG%d", 3)
+	sg_help_hmgGuard 	= SGroup_CreateTable("sg_help_hmgGuard%d", 4)
+	sg_help_hmgTemp 	= SGroup_CreateTable("sg_help_hmgTemp%d", 3)
+	sg_help_axisHMGall 	= SGroup_CreateIfNotFound("sg_help_axisHMGall")
+	sg_help_cromwells	= SGroup_CreateIfNotFound("sg_help_cromwells")
+	sg_help_churchills	= SGroup_CreateIfNotFound("sg_help_churchills")
+	
+	-- syncweapon ID's for the 3 hmg's pinning the ally
+	sw_help_hmgs = {}
+	eg_help_hmgs = EGroup_CreateTable("eg_help_hmgs%d", 3)
+	
+	
+    t_help = {
+		fg_axisHMGdead = false,
+		chargeDone = false,
+		objGranted = false,
+		squadTotal = 25,
+		squadCount = 0,
+		chargeDest = {mkr_help_allyGo1, mkr_help_allyGo2, mkr_help_allyGo3},
+		point = {eg_help_point, eg_help_point2, eg_help_point2}
+	}
+	
+	
+	t_help_spawn_armour_hq = {
+		{ sgroup = sg_help_churchills, sbp = SBP.CW.CHURCHILL_SP_CAEN, spawn = mkr_offmap4, dest = mkr_help_cromwell_1},
+		{ sgroup = sg_help_churchills, sbp = SBP.CW.CHURCHILL_SP_CAEN, spawn = mkr_offmap4, dest = mkr_help_cromwell_2},
+		{ sgroup = sg_player_armour_hq, sbp = SBP.CW.ARMOUR_HQ, spawn = mkr_offmap4, dest = mkr_help_center},
+	}
+end
+
+-- preset any units or events needed before the kickoff, but you do not
+-- want them to occur at the outset of the map.
+-- Example: Often units are needed to exist before the objective start (because they start the objective)
+-- then spawn those units here when they need to be spawned
+function Help_Preset()
+	
+	last_help_reminder = World_GetGameTime()
+	
+	-- spawn squads
+	-- hmgs
+	local mkr = {mkr_help_hmg1, mkr_help_hmg2, mkr_help_hmg3}
+	for k,v in pairs(sg_help_axisHMG) do 
+		Util_CreateSquads(player2, v, SBP.AXIS.HEAVYMG, mkr[k], nil, 1)
+		SGroup_AddGroup(sg_help_axisHMGall, v)
+		sw_help_hmgs[k] = SyncWeapon_GetFromSGroup(v)
+		--Cmd_InstantSetupTeamWeapon(v, true)
+	end
+	
+	-- Captain
+	Util_CreateSquads(player3, sg_help_allyRadio, SBP.CW.TOMMIES, mkr_help_allyRally1, nil, 1, 3)
+	-- support
+	Util_CreateSquads(player3, sg_help_allyCaptain, SBP.CW.LIEUTENANT, mkr_help_allyRally1, nil, 1)
+	
+	
+
+end
+
+-- this should track the HMGs
+-- until the obj is granted, this should
+-- detect if the sgroup is killed
+-- if it is killed with the tripod - make a new squad 
+-- if it is killed but the tripod is still alive - make a squad to recapture the gun
+function Help_HMG_Manager()
+
+	-- we should stop remanning the hmg's once the obj is granted
+	if t_help.objGranted == true then
+		Rule_RemoveMe()
+	else
+		local mkr = {mkr_help_hmg1, mkr_help_hmg2, mkr_help_hmg3}
+		for k,v in pairs(sg_help_axisHMG) do 
+			-- is the group empty?
+			if SGroup_IsEmpty(v) then
+				-- if yes, is the gun there?
+				if SyncWeapon_Exists(sw_help_hmgs[k]) then
+					-- world owned?
+					if SyncWeapon_IsOwnedByPlayer(sw_help_hmgs[k], nil) and SGroup_IsEmpty(sg_help_hmgTemp[k]) then
+						-- grab the weapon into an egroup
+						local entity = SyncWeapon_GetEntity(sw_help_hmgs[k])
+						if entity ~= nil then EGroup_Add(eg_help_hmgs[k], entity) end
+						-- create the temp squad to grab the gun
+						Util_CreateSquads(player2, sg_help_hmgTemp[k], SBP.AXIS.GRENADIER, mkr_offmap7, nil, 1, 3)
+						Cmd_Move(sg_help_hmgTemp[k], mkr[k])
+						Cmd_CaptureTeamWeapon(sg_help_hmgTemp[k], eg_help_hmgs[k], true)
+						break
+					elseif SyncWeapon_IsOwnedByPlayer(sw_help_hmgs[k], player2) then
+						-- if its owned by the player, grab the manning squad and reassign
+						local squad = Entity_GetSquad(SyncWeapon_GetEntity(sw_help_hmgs[k]))
+						if squad ~= nil then SGroup_Add(v, squad) end
+					end
+				-- spawn a new one
+				else
+					Util_CreateSquads(player2, v, SBP.AXIS.HEAVYMG, mkr_offmap7, nil, 1)
+					SGroup_AddGroup(sg_help_axisHMGall, v)
+					sw_help_hmgs[k] = SyncWeapon_GetFromSGroup(v)
+					Cmd_Move(v, mkr[k])
+				end
+			end
+		end
+	end
+
+end
+
+-- create some extra guns to help the HMG's 
+-- these guards should also respond to the player attacking by shifting
+-- to cover the rear of the hmg's
+function Help_HmgGuard_Manager()
+
+	if t_help.fg_axisHMGdead == true then
+	
+		Rule_RemoveMe()
+	
+	else
+	
+		local mkr = {mkr_help_hmg1, mkr_help_hmg2, mkr_help_hmg3}
+		
+		for k,v in pairs(sg_help_hmgGuard) do 
+		
+			if t_help.objGranted ~= true and SGroup_IsEmpty(v) then
+				Util_CreateSquads(player2, v, SBP.AXIS.GRENADIER, mkr_offmap5, nil, 1)
+				
+				if EGroup_IsEmpty(t_help_buildings[k]) == false then
+					Cmd_Garrison(v, t_help_buildings[k])
+				
+--~ 				elseif SGroup_IsEmpty(sg_help_axisHMG[k]) then
+--~ 					Cmd_Move(v, mkr[k], false, nil, mkr_help_allyRally1, nil, nil, 5)
+--~ 				else
+--~ 					Cmd_Move(v, sg_help_axisHMG[k], false, nil, mkr_help_allyRally1, OFFSET_FRONT, 5, 5)
+				end
+				break
+				
+			end
+		end
+	end
+end
+
+-- this makes guys to run into the gun and die
+-- it doesn't start counting until after the obj is granted
+function Help_Ally_Manager()
+	
+	if Objective_IsFailed(OBJ_Help) then
+		Rule_RemoveMe()
+	
+	elseif t_help.chargeDone == true and Objective_IsComplete(OBJ_Help) then
+		Rule_RemoveMe()
+		
+		-- give the squads to the player if they're rescued
+		for k, this in pairs(sg_help_ally) do
+			if SGroup_IsEmpty(this) ~= true then
+				SGroup_SetPlayerOwner(this, player1)
+			end
+		end
+		
+		SGroup_SetPlayerOwner(sg_help_allyRadio, player1)
+		SGroup_SetPlayerOwner(sg_help_allyCaptain, player1)
+		
+		-- tell the player he did a good job and that they're getting the Armour HQ
+		Util_StartIntel(EVENTS.Help_Complete)
+		
+		-- Bring in the Armour HQ and Cromwell tanks
+		Rule_AddInterval(Help_SpawnArmourHQ, 3)
+		
+		
+		
+		-- Give access to build Armour HQ
+		--Player_SetSquadProductionAvailability(player1, SBP.CW.ARMOUR_HQ, ITEM_DEFAULT)
+		
+		
+	else
+	-- create a 'pause device' so the carnage isn't constant
+		if t_help.pauseSpawn ~= true or SGroup_IsEmpty(sg_help_allyAll) then
+			for k,v in pairs(sg_help_ally) do 
+				if SGroup_IsEmpty(v) then
+					Util_CreateSquads(player3, v, SBP.CW.TOMMIES, mkr_offmap4, nil, 1, World_GetRand(4, 5))
+					SGroup_AddGroup(sg_help_allyAll, v)
+					Cmd_Move(v, mkr_help_allyRally1, false, nil, nil, k, 6, 10)
+					if t_help.objGranted == true then
+						t_help.squadCount = t_help.squadCount+1
+					end
+					break
+					
+				elseif SGroup_TotalMembersCount(v) < 2 then
+					Cmd_Move(v, mkr_offmap4, false, mkr_offmap4)
+				
+				elseif SGroup_IsUnderAttack(v, false, 10) == false then
+				
+					-- if the corresponding HMG is dead, send that allied squad to capture the point
+					if SGroup_IsEmpty(sg_help_axisHMG[k]) or SGroup_IsRetreating(sg_help_axisHMG[k], ANY) then
+						Cmd_AttackMoveThenCapture(v, t_help.point[k])
+						
+					else
+						Cmd_Move(v, t_help.chargeDest[k], false, nil, nil, nil, nil, 10)
+					end
+				end
+			end
+		end
+	end
+end
+
+
+-- spawns the Armour HQ and Cromwells for the player when they complete the Help Ally objective
+function Help_SpawnArmourHQ()
+	if table.getn(t_help_spawn_armour_hq) == 0 then
+		Rule_RemoveMe()
+		
+	else
+		if t_help_spawn_armour_hq[1].sbp == SBP.CW.ARMOUR_HQ and SGroup_IsEmpty(sg_player_armour_hq) then
+		
+			Util_CreateSquads(player1, t_help_spawn_armour_hq[1].sgroup, t_help_spawn_armour_hq[1].sbp, t_help_spawn_armour_hq[1].spawn, t_help_spawn_armour_hq[1].dest)
+		
+			-- Blip the new Armour HQ	
+			UI_CreateMinimapBlip( SGroup_GetPosition(sg_player_armour_hq), 15, BT_ObjectivePrimary )
+			EventCue_Create(CUE.NORMAL, 1359130, 1359140, sg_player_armour_hq)
+		
+		elseif t_help_spawn_armour_hq[1].sbp ~= SBP.CW.ARMOUR_HQ then
+			Util_CreateSquads(player1, t_help_spawn_armour_hq[1].sgroup, t_help_spawn_armour_hq[1].sbp, t_help_spawn_armour_hq[1].spawn, t_help_spawn_armour_hq[1].dest)
+			
+			if table.getn(t_help_spawn_armour_hq) == 2 then
+				Util_ReinforceEvent(t_help_spawn_armour_hq[1].sgroup)
+			end
+		end
+		
+		table.remove(t_help_spawn_armour_hq, 1)
+	end
+end
+
+
+-- a 'pause device' so the carnage isn't constant
+function Help_Ally_PauseSpawn()
+	--if t_help.fg_axisHMGdead == true then
+	--	Rule_RemoveMe()
+	--else
+		local rand = World_GetRand(1, 3)
+		if rand > 2 then
+			t_help.pauseSpawn = true
+		elseif rand < 2 then
+			t_help.pauseSpawn = false
+		end
+	--end
+end
+
+-- example of how to finish an Obj
+function Help_WinCheck()
+	
+	-- if all of the HMGs are dead then the objective is complete
+	if t_help.fg_axisHMGdead and SGroup_IsEmpty(sg_help_hmgGuard[1]) and SGroup_IsEmpty(sg_help_hmgGuard[2]) and SGroup_IsEmpty(sg_help_hmgGuard[3])  
+	and SGroup_IsEmpty(sg_help_hmgGuard[4]) then
+		
+		-- the player has just won
+		Objective_Complete(OBJ_Help)
+		t_help.chargeDone = true
+		
+		Rule_RemoveMe()
+		
+	-- if too many allied squads have died, the objective has failed
+	elseif t_help.squadCount >= t_help.squadTotal then
+		
+		-- the player has just failed
+		Objective_Fail(OBJ_Help)
+		
+		-- retreat all of the remaining allied squads and remove them
+		for k, this in pairs(sg_help_ally) do
+			
+			if SGroup_IsEmpty(this) == false then
+				Cmd_Move(sg_help_ally[k], mkr_offmap4, false, mkr_offmap4)
+			end
+		end
+		
+		if SGroup_IsEmpty(sg_help_allyRadio) == false then
+			Cmd_Move(sg_help_allyRadio, mkr_offmap4, false, mkr_offmap4)
+		end
+		
+		if SGroup_IsEmpty(sg_help_allyCaptain) == false then
+			Cmd_Move(sg_help_allyCaptain, mkr_offmap4, false, mkr_offmap4)
+		end
+		
+		t_help.chargeDone = true
+		Rule_RemoveMe()
+		
+		-- remove the hintpoints on the buildings
+		HintPoint_Remove(hpid_guard1)
+		HintPoint_Remove(hpid_guard2)
+		HintPoint_Remove(hpid_guard3)
+		HintPoint_Remove(hpid_guard4)
+		
+	end
+	
+	if t_help.squadCount > 0 then
+	
+		-- update counter
+		Objective_SetCounter(OBJ_Help, (t_help.squadTotal - t_help.squadCount) )
+	end
+end
+
+
+-- start the related action
+function Help_Kickoff()
+	
+	-- ambient speech for the Help obejctive
+	Rule_AddInterval(Help_Ambient_Speech, 5)
+	
+	-- action that starts with the Obj being granted
+	Rule_AddInterval(Help_HMG_Track, 2)
+	
+	-- mark the HMGS
+	for k, this in pairs(sg_help_axisHMG) do
+		HintPoint_Add(this, true, 1319717)
+	end
+	
+	hpid_guard3 = HintPoint_Add(eg_building5, false, 1359140)
+	hpid_guard4 = HintPoint_Add(eg_building7, false, 1359140)
+	hpid_guard1 = HintPoint_Add(eg_building2, false, 1359140)
+	hpid_guard2 = HintPoint_Add(eg_building4, false, 1359140)
+	
+	Rule_AddInterval(Check_HMG_Guard_Hintpoints, 2)
+end
+
+function Check_HMG_Guard_Hintpoints()
+	
+	if Objective_IsComplete(OBJ_Help) then
+		Rule_RemoveMe()
+	else
+	
+		for k, v in pairs(sg_help_hmgGuard) do
+			if SGroup_IsEmpty(v) then
+				if k == 1 then
+					HintPoint_Remove(hpid_guard1)
+				elseif k == 2 then
+					HintPoint_Remove(hpid_guard2)
+				elseif k == 3 then
+					HintPoint_Remove(hpid_guard3)
+				elseif k == 4 then
+					HintPoint_Remove(hpid_guard4)
+				end
+			end
+		end
+	end
+end
+
+function Help_HMG_Track()
+	if SGroup_IsEmpty(sg_help_axisHMGall) then
+		t_help.fg_axisHMGdead = true
+		Rule_RemoveMe()
+	end
+end
+
+
+
+
+-------------------------------------------------------------------------
+-- Medal Objective - Nebelwerfers
+-------------------------------------------------------------------------
+-- The player has to destroy the Nebelwerfers
+-------------------------------------------------------------------------
+function Initialize_OBJ_Nebelwerfers()
+
+	OBJ_Nebelwerfers = {
+		
+		SetupUI = function() 
+			-- mark a point or position
+		end,
+		
+		OnStart = function()
+			
+			-- announce the goal
+			
+			
+			-- win/lose check
+			Rule_AddInterval(Nebelwerfers_WinCheck, 5)
+			
+			-- start related action
+			Nebelwerfers_Kickoff()
+			
+		end,
+		
+		OnComplete = function()
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			
+		end,
+		
+		Title = 1359106,
+		Description = 1359113,
+		TitleEnd = 1359107,
+		Type = OT_Medal,
+		MedalID	= MEDALS.CXP1.CAEN_ASSAULT,
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_Nebelwerfers)
+	-- Initialize Data
+	Nebelwerfers_Init()
+	
+end
+
+
+function Nebelwerfers_Init()
+	
+	fg_first_nebelwerfer_attack = true	-- flag indicating whether this is the first time the Nebelwerfers have fired
+	nebelwerfer_max = 3		-- the total number of nebelwerfers
+end
+
+
+function Nebelwerfers_Kickoff()
+	
+
+end
+
+
+-- The objective is complete when the player has killed all of the nebelwerfers
+function Nebelwerfers_WinCheck()
+	
+	local count = 0	-- how many nebelwerfers have been killed
+	
+	if SGroup_IsEmpty(sg_recon_nebelAll) then
+		Rule_RemoveMe()
+		Objective_Complete(OBJ_Nebelwerfers)
+	
+	else
+	
+		for k, this in pairs(sg_recon_nebel) do
+			
+			-- count how many Nebelwerfers the player has destroyed
+			if SGroup_IsEmpty(this) then
+				count = count + 1
+			end
+		end
+		
+		-- update the counter
+		Objective_SetCounter( OBJ_Nebelwerfers, count,  nebelwerfer_max)
+		
+	end
+end
+
+
+-- checks when it's time to start the medal objective
+function Nebelwerfers_Start_Check()
+	
+	if Objective_IsStarted(OBJ_Nebelwerfers) or Rule_Exists(Bombing_Run_Manager) then
+		Rule_RemoveMe()
+	
+	-- start objective if nebelwerfers have attacked
+	elseif fg_first_nebelwerfer_attack == false then
+		Objective_Start(OBJ_Nebelwerfers)
+	
+	-- start objective if nebels have been attacked
+	elseif SGroup_IsUnderAttack(sg_recon_nebelAll, ANY, 10) and Rule_Exists(Bombing_Run_Manager) == false then
+		Objective_Start(OBJ_Nebelwerfers)
+	end
+end
+
+-------------------------------------------------------------------------
+
+-- Outer Urban - the area between the Chateau and Help
+
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Encounter data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function Outer_Init()
+
+	-- define sgroups, egroups, etc associated with this Encounter
+	sg_outer_axisPak = SGroup_CreateTable("sg_outer_axisPak%d", 2) 
+	sg_outer_axisHMG = SGroup_CreateTable("sg_outer_axisHMG%d", 2)
+	sg_outer_axisPuma = SGroup_CreateIfNotFound("sg_outer_axisPuma") 
+	sg_outer_axisMort = SGroup_CreateTable("sg_outer_axisMort%d", 2)
+	sg_outer_axisInf = SGroup_CreateTable("sg_outer_axisInf%d", 3)
+	sg_outer_axisAttacker = SGroup_CreateIfNotFound("sg_outer_axisAttacker") 
+	
+	
+	sw_outer_pak2 = SyncWeapon_GetFromEGroup(eg_chatea_pak2)
+--~ 	sw_outer_pak3 = SyncWeapon_GetFromEGroup(eg_chatea_pak3)
+	
+	t_outer = {
+		deploy = {
+			-- the area outside the chateau
+			{sgroup = sg_outer_axisHMG[1], 	sbp = SBP.AXIS.HEAVYMG, 	src = mkr_offmap6, dest = mkr_help_ambush1, face = mkr_chateau_mortar1, rule = function() end},
+--~ 			{sgroup = sg_outer_axisInf[1], 	sbp = SBP.AXIS.VOLKSGRENADIER, src = mkr_offmap6, dest = mkr_help_ambush2, face = nil, rule = function() end},
+			-- lying in wait at the far side of the second block
+			--{sgroup = sg_outer_axisPuma, 	sbp = SBP.AXIS.PUMA, 		src = mkr_offmap8, dest = mkr_help_ambush3, face = mkr_help_ambush4, rule = function() end},
+			{sgroup = sg_outer_axisMort[1], sbp = SBP.AXIS.MORTAR, 		src = mkr_offmap8, dest = mkr_help_ambush5, face = nil, rule = function() end},
+			-- in a cluster on the edge of No Man's Land on the far side near Help
+			{sgroup = sg_outer_axisHMG[1], 	sbp = SBP.AXIS.HEAVYMG, 	src = mkr_offmap5, dest = mkr_help_ambush4, face = mkr_help_ambush2, rule = function() end},
+			{sgroup = sg_outer_axisMort[2], sbp = SBP.AXIS.MORTAR, 		src = mkr_offmap5, dest = mkr_help_ambush6, face = nil, rule = function() end},
+--~ 			{sgroup = sg_outer_axisInf[2], 	sbp = SBP.AXIS.VOLKSGRENADIER, src = mkr_offmap5, dest = mkr_help_ambush7, face = nil, rule = function() end},
+		},
+	}
+	
+	-- Deploy troops to grab the AT Guns just outside the chateau
+	ATGun_AddGroup(eg_chatea_pak2, player2, nil, nil, 1, mkr_offmap6)
+--~ 	ATGun_AddGroup(eg_chatea_pak3, player2, nil, nil, 1, mkr_offmap6)
+end
+
+-- preset any units or events needed before the kickoff
+function Outer_Preset()
+	
+	-- start enemy behavior
+	Outer_Kickoff()
+	
+end
+
+-- start the related action
+function Outer_Kickoff()
+
+	-- action that starts when this encounter is triggered
+	Rule_AddDelayedInterval(Outer_Deployment, 27, 13)
+	
+	-- Puma that rescues the mortar
+	Rule_AddInterval(SpawnPuma, 3)
+end
+
+-- send out the troops to cover the middle ground
+function Outer_Deployment()
+	
+	if table.getn(t_outer.deploy) < 1 then
+		Rule_RemoveMe()
+	else
+		for k,this in pairs(t_outer.deploy) do 
+			-- create the starting units for the outer area
+			Util_CreateSquads(player2, this.sgroup, this.sbp, this.src, this.dest, 1, NIL_LOAD, NO_ATTACK, this.face, NIL_UPG)
+			this.rule()
+			table.remove(t_outer.deploy, 1)
+			break
+		end
+	end
+
+end
+
+-- wants this {sgroup1, egroup1, sync1}
+function Outer_GrabTeamWeapon_Add(table1)
+
+	if table1 ~= nil then
+		if _grabweapon == nil then
+			_grabweapon = {}
+		end
+		table.insert(_grabweapon, {sgroup = table1[1], egroup = table1[2], sync = table1[3]})
+	end
+	
+	if Rule_Exists(Outer_GrabTeamWeapon) == false then
+		Rule_AddInterval(Outer_GrabTeamWeapon, 1)
+	end
+end
+
+function Outer_GrabTeamWeapon()
+	if table.getn(_grabweapon) < 1 then
+		Rule_RemoveMe()
+	else
+		for k,this in pairs(_grabweapon) do 
+			if SyncWeapon_Exists(this.sync) then
+				if SyncWeapon_IsOwnedByPlayer(this.sync, nil) then 
+					if SGroup_IsEmpty(this.sgroup)== false and SGroup_IsMoving(this.sgroup, false) == false then
+						Cmd_CaptureTeamWeapon(this.sgroup, this.egroup)
+					end
+				elseif SyncWeapon_IsOwnedByPlayer(this.sync, player2) then 
+					if SGroup_IsEmpty(this.sgroup) then
+						local entity = SyncWeapon_GetEntity(this.syncwpn)
+						if entity ~= nil then 
+							local squad = Entity_GetSquad(entity)
+							if squad ~= nil then SGroup_Add(v.sgroup, squad) end
+						end
+					elseif SGroup_IsEmpty(this.sgroup)== false then
+						Cmd_Ability(this.sgroup, ABILITY.AXIS.CAMOUFLAGE_AT)
+						table.remove(_grabweapon, k)
+						break
+					end
+				end
+			else
+				table.remove(_grabweapon, k)
+				break
+			end
+		end
+	end
+end
+
+function Outer_CapturePak(sgroup, egroup, sync)
+	if SyncWeapon_Exists(sync) and SyncWeapon_IsOwnedByPlayer(sync, nil) then
+		local entity = SyncWeapon_GetEntity(sync)
+		if entity ~= nil then EGroup_Add(egroup, entity) end
+		Cmd_CaptureTeamWeapon(sgroup, egroup)
+	end
+end
+
+
+
+-- bring the Puma on to the map when the mortar is attacked
+function SpawnPuma()
+	
+	if SGroup_IsUnderAttack(sg_outer_axisMort[1], ANY, 10) then
+		Util_CreateSquads(player2, sg_outer_axisPuma, SBP.AXIS.PUMA, mkr_offmap8, mkr_help_ambush3)
+		Rule_RemoveMe()
+	end	
+end
+
+
+-- starts the Recon objective
+function CaenAssault_DelayRecon()
+	if Event_IsAnyRunning() == false then
+		Objective_Start(OBJ_Recon)
+		Rule_RemoveMe()
+		
+		-- delay Help objective
+		Rule_AddInterval(CaenAssault_DelayHelp, 3) -- start 3 minutes after this completes
+		
+		-- Panzer Attack
+		Rule_AddInterval(Bridgehead_TankCreate, 3)
+		
+	end
+end
+
+
+
+
+-------------------------------------------------------------------------
+-- Recon
+-------------------------------------------------------------------------
+-- Player must go and 'scout' the territory. To prove the area has been 
+-- we capture a series of points
+-------------------------------------------------------------------------
+function Initialize_OBJ_Recon()
+
+	OBJ_Recon = {
+		
+		SetupUI = function() 
+			-- mark a point or position
+			--OBJ_Recon.mapElementID = Objective_AddUIElements(OBJ_Recon, Util_ScarPos(0,0), true, false, false)
+		end,
+		
+		OnStart = function()
+			
+			-- announce the goal
+			-- Util_AutoIntel(t_recon.event_start)
+			t_recon.fg_objStart = true
+			
+			-- win/lose check
+			Rule_AddInterval(Recon_WinCheck, 5)
+			
+			-- start related action
+			Recon_Kickoff()
+		end,
+			
+		
+		OnComplete = function()
+			
+			Sound_PlayMusic("Music/SP/Caen/motivation/coh_pomp_and_facing.bsc",2,0)
+			
+			-- tell the player they did good and end the mission
+			Rule_AddInterval(Caen_GameOver_End, 1)
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+
+		end,
+		
+		Title = 1359101,
+		Description = 1359111,
+		TitleEnd = 1359101,
+		Type = OT_Primary,
+		
+		SitRep = {
+			Movie = "CXP1_SR_06-02",         
+			Force = true,
+			SpeechTiming =
+			{
+				{ 1,	ACTOR.CXP1.Cutting, 1350800 },	-- That shelling has really created a bloody mess for our lads.
+				{ 3,	ACTOR.CXP1.Cutting, 1350801 },	-- Jerry's hole up in the rubble like rats.
+				{ 6,	ACTOR.CXP1.Cutting, 1350810 },	-- Recce reports show this whole area is riddled with Snipers, MGs, and concealled weapon teams creating a massive kill zone.
+				{ 13.9,	ACTOR.CXP1.Cutting, 1350820 },	-- Until we identify those Axis Positions proceeding into Caen may be a problem. 
+				{ 19.4,	ACTOR.CXP1.Blackmore, 1350830 },	-- Have the Battalion to conduct a reconnaissance in force of the area.
+				{ 24,	ACTOR.CXP1.Blackmore, 1350841 },	-- <alt>Our objective is to neutralize the main defensive positions and secure these locations.
+				{ 30.4,	ACTOR.CXP1.Blackmore, 1350850 },	-- Once identifid, call in fighter-bombers to smash Jerry back into the stone age.
+				{ 35.9,	ACTOR.CXP1.Blackmore, 1350860 },	-- Until that defensive line is destoryed, we cannot risk the Royal Dragoon's tanks.
+				{ 41.2,	ACTOR.CXP1.Blackmore, 1350870 },	-- So much for a fucking good morning.
+			},
+		},
+	}
+	
+	
+	
+	-- Register Objective
+	Objective_Register(OBJ_Recon)
+	-- Initialize Data
+	Recon_Init()
+	
+end
+
+-------------------------------------------------------------------------
+-- Recon - Functions 
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Obj data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function Recon_Init()
+	
+	bombing_run_speech_count = 1 -- count of how many times we triggered the ambient speech for the bombing runs
+	
+	fg_all_vps_captured = false		-- flag for when the player has captured all the vps
+	
+	recon_counter = 0  -- Counter for how many recon sites the player has spotted
+
+	vp_attacker_count = 10	-- used to delay the waves of infantry that try to take back the victory points
+	sg_vp_attacker1 = SGroup_CreateIfNotFound("sg_vp_attacker1")	-- sgroup for attacking infantry
+	sg_vp_attacker2 = SGroup_CreateIfNotFound("sg_vp_attacker2")	-- sgroup for attacking infantry
+	sg_vp_attacker3 = SGroup_CreateIfNotFound("sg_vp_attacker3")	-- sgroup for attacking infantry
+	sg_vp_attacker_support1 = SGroup_CreateIfNotFound("sg_vp_attacker_support1")	-- sgroup for attacking support infantry
+	sg_vp_attacker_support2 = SGroup_CreateIfNotFound("sg_vp_attacker_support2")	-- sgroup for attacking support infantry
+	sg_vp_attacker_support3 = SGroup_CreateIfNotFound("sg_vp_attacker_support3")	-- sgroup for attacking support infantry
+	sg_vp_attackers = SGroup_CreateIfNotFound("sg_vp_attackers")	-- sgroup for all counterattack infantry
+	             
+	-- idle attack related
+	idle_attack_count = 0    -- number of times the idle attack has triggered
+	sg_idle_target = SGroup_CreateIfNotFound("sg_target")   
+	
+	-- sgroup for all the axis units
+	sg_axis_all	= SGroup_CreateIfNotFound("sg_axis_all")
+	
+	-- sgroup for spawning and managing the infantry that guard the strongpoints
+	sg_strongpoint_infantry1 = SGroup_CreateIfNotFound("sg_strongpoint_infantry1")
+	sg_strongpoint_infantry2 = SGroup_CreateIfNotFound("sg_strongpoint_infantry2")
+	sg_strongpoint_infantry3 = SGroup_CreateIfNotFound("sg_strongpoint_infantry3")
+	sg_strongpoint_infantry4 = SGroup_CreateIfNotFound("sg_strongpoint_infantry4")
+
+	-- define sgroups, egroups, etc associated with this obj
+	sg_recon_p1All 	= SGroup_CreateIfNotFound("sg_recon_p1All")
+	sg_recon_flak 	= SGroup_CreateTable("sg_recon_flak%d", 3)
+	sg_recon_flakAll	= SGroup_CreateIfNotFound("sg_recon_flakAll")
+	sg_recon_nebel	= SGroup_CreateTable("sg_recon_nebel%d", 3)
+	sg_recon_nebelAll	= SGroup_CreateIfNotFound("sg_recon_nebelAll")
+		
+	sg_recon_panzer = SGroup_CreateTable("sg_recon_panzer%d", 2)
+	sg_recon_panzerSup = SGroup_CreateTable("sg_recon_panzerSup%d", 3)
+	sg_recon_panzerAll = SGroup_CreateIfNotFound("sg_recon_panzerAll")
+	sg_recon_panzerAttacker = SGroup_CreateIfNotFound("sg_recon_panzerAttacker")
+	
+	sg_recon_scout = SGroup_CreateTable("sg_recon_scout%d", 7)
+	sg_recon_scoutSupport = SGroup_CreateTable("sg_recon_scoutSupport%d", 21)
+	sg_recon_scoutAll = SGroup_CreateIfNotFound("sg_recon_scoutAll")
+	
+	sg_center_axisHMG = SGroup_CreateTable("sg_center_axisHMG%d", 2)
+	sg_center_axisPak = SGroup_CreateTable("sg_center_axisPAK%d", 2)
+	sg_center_axisMort = SGroup_CreateTable("sg_center_axisMort%d", 1)
+	
+	sg_right_axisPak = SGroup_CreateTable("sg_right_axisPAK%d", 2)
+	sg_right_axisHMG = SGroup_CreateTable("sg_right_axisHMG%d", 3)
+	sg_right_axisMort = SGroup_CreateTable("sg_right_axisMort%d", 1)
+	
+	sg_left_axisHMG = SGroup_CreateTable("sg_left_axisHMG%d", 4)
+	sg_left_axisSniper = SGroup_CreateTable("sg_left_axisSniper%d", 2)
+	
+	sw_center_atgun1 = SyncWeapon_GetFromEGroup(eg_center_atgun1)
+	sw_center_atgun2 = SyncWeapon_GetFromEGroup(eg_center_atgun2)
+	sw_right_atgun1 = SyncWeapon_GetFromEGroup(eg_right_atgun1)
+--~ 	sw_right_atgun2 = SyncWeapon_GetFromEGroup(eg_right_atgun2)
+	
+	sg_tank_attack1 = SGroup_CreateIfNotFound("sg_tank_attack1")
+	sg_tank_attack2 = SGroup_CreateIfNotFound("sg_tank_attack2")
+	sg_tank_attack = SGroup_CreateIfNotFound("sg_tank_attack")
+	
+	-- Flags indicating whether each bombing run has triggered
+	fg_bombingrun1 = false
+	fg_bombingrun2 = false
+	fg_bombingrun3 = false
+	fg_bombingrun4 = false
+	fg_area1_bunkers_dead = false
+	fg_area2_bunkers_dead = false
+	fg_area3_bunkers_dead = false
+	fg_area4_bunkers_dead = false
+	fg_first_bombing_run = true
+	fg_bombing_runs_started = false
+	
+	-- count for delaying nebelwerfer attacks
+	delay_nebel_count = 0 
+	
+	-- last time a bombing run was triggered
+	last_bombing_run_time = false
+	
+	-- last marker that the bombing run was triggered at
+	last_marker = false
+	
+	-- sgroup for the flak38 guns
+	sg_recon_flakaa = SGroup_CreateIfNotFound("sg_recon_flakaa")
+	
+
+	-- sgroup for when panzers attack the player
+	sg_panzer_attacker = SGroup_CreateIfNotFound("sg_panzer_attacker")
+	
+	-- sgroup for when the FLak 88s attack the player
+	sg_flak_attacker = SGroup_CreateIfNotFound("sg_flak_attacker")
+	
+	-- table for the capture point reminder speech
+	t_capture_point = {eg_chateau_point, eg_center_point, eg_help_point2, eg_help_point, eg_victory_point1, eg_victory_point2, eg_victory_point3, eg_noMans_pt6, eg_noMans_pt4, eg_noMans_pt1}
+	
+	-- table of markers for all of the trenches, to be used for spawning them
+	t_trenches = {
+		{marker = mkr_left_trench1, egroup = eg_left_trench1},
+		{marker = mkr_left_trench2, egroup = eg_left_trench2},
+--~ 		{marker = mkr_left_trench3, egroup = eg_left_trench3},
+		{marker = mkr_left_trench4, egroup = eg_left_trench4},
+--~ 		{marker = mkr_left_trench5, egroup = eg_left_trench5},
+--~ 		{marker = mkr_left_trench6, egroup = eg_left_trench6},
+		{marker = mkr_left_trench7, egroup = eg_left_trench7},
+--~ 		{marker = mkr_right_trench1, egroup = eg_right_trench1},
+--~ 		{marker = mkr_right_trench2, egroup = eg_right_trench2},
+		{marker = mkr_right_trench3, egroup = eg_right_trench3},
+--~ 		{marker = mkr_right_trench4, egroup = eg_right_trench4},
+--~ 		{marker = mkr_right_trench5, egroup = eg_right_trench5},
+		{marker = mkr_right_trench6, egroup = eg_right_trench6},
+	}
+	
+	-- table of buildings to be garrisoned by Axis infantry
+	t_buildings = {
+		eg_building1,
+--~ 		eg_building2,
+		eg_building3,
+--~ 		eg_building4,
+--~ 		eg_building5,
+		eg_building6,
+	}
+	
+	-- table of buildings to be garrisoned by Axis infantry that fight B-Coy
+	t_help_buildings = {
+		eg_building2,
+		eg_building4,
+		eg_building5,
+		eg_building7,
+	}
+			
+    t_recon = {
+		fg_objStart				= false,			-- flag for start of objective
+		fg_points_spotted		= false,			-- flag for capturing all the points
+		fg_obj_complete		 	= false,			-- flag flag for completing objective 
+		pointProx 				= 80,				-- how close the player needs to be to trigger a strong point as seen
+		supportInterval			= 5,				-- how quickly the support rule gets called
+		supportTimer			= false,
+		NebelthreatID 			= false,
+		update = {title = 1359101, desc = 1359111, active = false}, -- "capture and defend"
+		
+		-- the three areas of defenders 1) Flak 88s 2) Nebelwerfers and 3) Panzers
+		deploy = {
+--~ 			{sgroup = sg_recon_flak[1], sbp = SBP.AXIS.FLAK_88_SP, src = mkr_recon_flak1, dest = nil, face = mkr_offmap8, rule = function() end},
+--~ 			{sgroup = sg_recon_flak[2], sbp = SBP.AXIS.FLAK_88_SP, src = mkr_recon_flak2, dest = nil, face = mkr_offmap8, rule = function() end},
+			--{sgroup = sg_recon_flak[3], sbp = SBP.AXIS.FLAK_88_SP, src = mkr_recon_flak3, dest = nil, face = mkr_offmap8, rule = function() end},
+			
+			--SBP.AXIS.NEBELWERFER
+			--{sgroup = sg_recon_nebel[1], sbp = SBP.AXIS.NEBELWERFER, src = mkr_recon_patrol4, dest = mkr_recon_high1, face = mkr_offmap6, 
+			--rule = function() Caen_RocketStrike_Add(sg_recon_nebel[1], mkr_recon_flak1, "nebel") end},
+--~ 			{sgroup = sg_recon_panzer[1], sbp = SBP.ELITE.HALFTRACK_SNIPER, src = mkr_offmap9, dest = mkr_recon_patrol7, face = mkr_offmap2, rule = function() end},
+			--{sgroup = sg_recon_nebel[2], sbp = SBP.AXIS.NEBELWERFER, src = mkr_recon_patrol5, dest = mkr_recon_high2, face = mkr_offmap6, 
+			--rule = function() Caen_RocketStrike_Add(sg_recon_nebel[2], mkr_recon_flak1, "nebel") end},
+--~ 			{sgroup = sg_recon_panzer[2], sbp = SBP.AXIS.PANZER, src = mkr_offmap9, dest = mkr_recon_patrol8, face = mkr_offmap2, rule = function() end},
+			--{sgroup = sg_recon_nebel[3], sbp = SBP.AXIS.NEBELWERFER, src = mkr_recon_patrol6, dest = mkr_recon_high3, face = mkr_offmap6, 
+			--rule = function() Caen_RocketStrike_Add(sg_recon_nebel[3], mkr_recon_flak1, "nebel") end},
+--~ 			{sgroup = sg_recon_panzer[3], sbp = SBP.AXIS.PANZER, src = mkr_offmap9, dest = mkr_recon_patrol9, face = mkr_offmap2, rule = function() end},
+			
+			{sgroup = sg_recon_nebel[1], sbp = SBP.AXIS.NEBELWERFER, src = mkr_offmap7, dest = mkr_nebelwerfer1, face = mkr_offmap1, 
+			rule = function() Caen_RocketStrike_Add(sg_recon_nebel[1], mkr_recon_flak1, "nebel") end},
+			{sgroup = sg_recon_nebel[3], sbp = SBP.AXIS.NEBELWERFER, src = mkr_offmap9, dest = mkr_nebelwerfer3, face = mkr_offmap1, 
+			rule = function() Caen_RocketStrike_Add(sg_recon_nebel[3], mkr_recon_flak1, "nebel") end},
+			{sgroup = sg_recon_nebel[2], sbp = SBP.AXIS.NEBELWERFER, src = mkr_offmap7, dest = mkr_nebelwerfer2, face = mkr_offmap1, 
+			rule = function() Caen_RocketStrike_Add(sg_recon_nebel[2], mkr_recon_flak1, "nebel") end},
+			
+			
+			-- HMGs, Mortars to protect the Nebelwerfers
+			{sgroup = sg_center_axisHMG[1], sbp = SBP.AXIS.HEAVYMG,	src = mkr_offmap9, dest = mkr_center_hmg1, face = mkr_tiger_ambush4, rule = function() end},
+			{sgroup = sg_center_axisHMG[2], sbp = SBP.AXIS.HEAVYMG,	src = mkr_offmap9, dest = mkr_center_hmg2, face = mkr_chateau_mortar2, rule = function() end},
+			{sgroup = sg_center_axisMort[1], sbp = SBP.AXIS.MORTAR,	src = mkr_offmap9, dest = mkr_center_mortar1, face = nil, rule = function() end},
+			
+			-- HMGs and Mortars for the right side
+--~ 			{sgroup = sg_right_axisHMG[1], sbp = SBP.AXIS.HEAVYMG, src = mkr_offmap9, dest = mkr_right_hmg1, face = mkr_chateau_mortar2, rule = function() end},
+			{sgroup = sg_right_axisHMG[2], sbp = SBP.AXIS.HEAVYMG, src = mkr_offmap9, dest = mkr_right_hmg2, face = mkr_offmap1, rule = function() end},
+--~ 			{sgroup = sg_right_axisHMG[3], sbp = SBP.AXIS.HEAVYMG, src = mkr_offmap9, dest = mkr_right_hmg3, face = mkr_right_trench1, rule = function() end},
+--~ 			{sgroup = sg_right_axisMort[1], sbp = SBP.AXIS.MORTAR, src = mkr_offmap9, dest = mkr_right_mortar1, face = nil, rule = function() end},
+			
+			
+			-- HMGs and Snipers for the left side
+			{sgroup = sg_left_axisHMG[1], sbp = SBP.AXIS.HEAVYMG, src = mkr_offmap7, dest = mkr_left_hmg1, face = mkr_help_hmg1, rule = function() end},
+			{sgroup = sg_left_axisHMG[2], sbp = SBP.AXIS.HEAVYMG, src = mkr_offmap7, dest = mkr_left_hmg2, face = mkr_help_ambush7, rule = function() end},
+--~ 			{sgroup = sg_left_axisHMG[3], sbp = SBP.AXIS.HEAVYMG, src = mkr_offmap7, dest = mkr_left_hmg3, face = mkr_outer_spot5, rule = function() end},
+--~ 			{sgroup = sg_left_axisHMG[4], sbp = SBP.AXIS.HEAVYMG, src = mkr_offmap7, dest = mkr_left_hmg4, face = mkr_help_ambush4, rule = function() end},
+			{sgroup = sg_left_axisSniper[1], sbp = SBP.AXIS.SNIPER, src = mkr_offmap7, dest = mkr_left_sniper1, face = nil, rule = function() end},
+--~ 			{sgroup = sg_left_axisSniper[2], sbp = SBP.AXIS.SNIPER, src = mkr_offmap7, dest = mkr_left_sniper2, face = nil, rule = function() end},
+		},
+		
+		
+		
+		panzers = {sg_recon_panzer[1], sg_recon_panzer[2], sg_recon_panzer[3]},
+		panzerDelay = false,
+		panzerCharge = false,
+		
+		-- Table containing the spawn and destination markers for the volksgrenadier squads
+		markers = {
+			{src = mkr_offmap7, dest = mkr_outer_spot6},
+			{src = mkr_offmap7, dest = mkr_outer_spot5},
+			{src = mkr_offmap7, dest = mkr_outer_spot4},
+			{src = mkr_offmap7, dest = mkr_outer_spot3},
+			{src = mkr_offmap9, dest = mkr_outer_spot2},
+			{src = mkr_offmap9, dest = mkr_outer_spot1},
+		}
+	}
+	
+	-- table for the infantry guarding the strongpoints
+	t_strongpoint_infantry = {
+		{
+			sgroup = sg_strongpoint_infantry1,
+			mkr = mkr_offmap7,
+			flag = 1,
+		},
+		{
+			sgroup = sg_strongpoint_infantry2,
+			mkr = mkr_offmap7,
+			flag = 2,
+		},
+		{
+			sgroup = sg_strongpoint_infantry3,
+			mkr = mkr_offmap9,
+			flag = 3,
+		},
+		{
+			sgroup = sg_strongpoint_infantry4,
+			mkr = mkr_offmap9,
+			flag = 4,
+		},
+	}
+	
+	-- table for spawning the Flak 38s
+	t_recon_flak38 = {
+		{
+			sbp = SBP.ELITE.FLAK_38_SP,
+			marker = mkr_flakaa1,
+			sgroup = sg_recon_flakaa,
+		},
+		{
+			sbp = SBP.ELITE.FLAK_38_SP,
+			marker = mkr_flakaa2,
+			sgroup = sg_recon_flakaa,
+		},
+		{
+			sbp = SBP.ELITE.FLAK_38_SP,
+			marker = mkr_flakaa3,
+			sgroup = sg_recon_flakaa,
+		},
+	}
+	
+	-- Deploy troops to grab the AT Guns
+	ATGun_AddGroup(eg_center_atgun1, player2, nil, nil, 1, mkr_offmap9)
+	ATGun_AddGroup(eg_center_atgun2, player2, nil, nil, 1, mkr_offmap9)
+	ATGun_AddGroup(eg_right_atgun1, player2, nil, nil, 1, mkr_offmap9)
+--~ 	ATGun_AddGroup(eg_right_atgun2, player2, nil, nil, 1, mkr_offmap9)
+	
+	
+	
+	-- moved here because it references the tables above
+	t_recon.points = {
+		{marker = mkr_strong_area1, seen = false, intel = t_recon.event_Spotted, rule = function() Recon_Strong1_Support() end},
+		{marker = mkr_strong_area2, seen = false, intel = t_recon.event_Spotted, rule = function() Recon_Strong2_Support() end},
+		{marker = mkr_strong_area3, seen = false, intel = t_recon.event_Spotted, rule = function() Recon_Strong3_Support() end},
+		{marker = mkr_strong_area4, seen = false, intel = t_recon.event_Spotted, rule = function() Recon_Strong4_Support() end},
+	}
+	
+	-- table for new enemy squads to spawn with function Recon_SpawnSquads, after certain squads have died
+	t_spawn_squads = {
+		{
+			sgroup_check = sg_left_axisHMG[2], 
+			sgroup_new = sg_trench_infantry, 
+			spawn = mkr_offmap7, 
+			mkr = mkr_left_trench5,
+		}, 
+		{
+			sgroup_check = sg_check_squad1, 
+			sgroup_new = sg_trench_infantry, 
+			spawn = mkr_offmap9, 
+			mkr = mkr_right_trench1,
+		},
+	}	
+	
+	-- table for the tanks that guard the left vp
+	t_tank_attack = {
+		{sgroup = sg_tank_attack1, dest = mkr_tank_attack_dest1, spawn = mkr_offmap7, camping = false}, 
+		{sgroup = sg_tank_attack2, dest = mkr_tank_attack_dest2, spawn = mkr_strong4_mine2, camping = false}, 
+	}
+
+end
+
+
+function Recon_Strong1_Support()
+	t_recon.markers[1].dest = mkr_strong_area1
+	t_recon.markers[2].dest = mkr_strong_area1
+end
+
+function Recon_Strong2_Support()
+	t_recon.markers[3].dest = mkr_strong_area2
+	t_recon.markers[4].dest = mkr_strong_area2
+end
+
+function Recon_Strong3_Support()
+	t_recon.markers[5].dest = mkr_strong_area3
+end
+
+function Recon_Strong4_Support()
+	t_recon.markers[6].dest = mkr_strong_area4
+end
+
+
+-- preset any units or events needed before the kickoff, but you do not
+-- want them to occur at the outset of the map.
+-- Example: Often units are needed to exist before the objective start (because they start the objective)
+-- then spawn those units here when they need to be spawned
+function Recon_Preset()
+	
+	vp_count = 0	-- how many vp's the player controls, this is used to determine the strength of the counterattacks
+	
+	-- table for the hintpoints that go on the victory points
+	hpid_victory_point = {}
+	
+	-- start enemy behavior
+	Rule_AddInterval(Recon_Deployment_Initial, 3)
+	
+	-- lay out the no man's defenders
+	--Rule_AddInterval(Recon_Scout_Support, t_recon.supportInterval)
+	--Rule_AddInterval(Recon_VolksManager, 5)
+	
+--~ 	-- spawn the trench infantry
+--~ 	Rule_AddOneShot(Recon_SpawnTrenches, 3)
+	
+	-- spawn the building infantry
+	Rule_AddOneShot(Recon_SpawnGarrisonedTroops, 3)
+	
+	
+	-- spawn the flak 38s
+	--Rule_AddOneShot(Recon_SpawnFlak38s, 8)
+end
+
+-- example of how to finish an Obj
+function Recon_WinCheck()
+	
+	-- reassign any new HQ's to sgroups
+	Player_GetAll(player1)	
+	
+	if SGroup_IsEmpty(sg_player_hq) then
+		SGroup_Duplicate(sg_allsquads, sg_player_hq)
+		SGroup_Filter(sg_player_hq, {SBP.CW.HQ, SBP.CW.HQ_REINFORCEMENT}, FILTER_KEEP)
+	end
+	
+	if SGroup_IsEmpty(sg_player_soldier_hq) then
+		SGroup_Duplicate(sg_allsquads, sg_player_soldier_hq)
+		SGroup_Filter(sg_player_soldier_hq, SBP.CW.INFANTRY_HQ, FILTER_KEEP)
+	end
+	
+	if SGroup_IsEmpty(sg_player_armour_hq) then
+		SGroup_Duplicate(sg_allsquads, sg_player_armour_hq)
+		SGroup_Filter(sg_player_armour_hq, SBP.CW.ARMOUR_HQ, FILTER_KEEP)
+	end
+	
+	SGroup_AddGroup(sg_player_buildings, sg_player_hq)
+	SGroup_AddGroup(sg_player_buildings, sg_player_soldier_hq)
+	SGroup_AddGroup(sg_player_buildings, sg_player_armour_hq)
+
+	
+	if EGroup_IsEmpty(eg_recon_bunkersAll) and (fg_all_vps_captured or fg_bombing_runs_started) then
+		
+		t_recon.fg_obj_complete = true
+		
+		-- retreat all of the axis units
+		Player_GetAll(player2, sg_axis_all)
+		Cmd_Retreat(sg_axis_all)
+--~ 		Cmd_Move(sg_axis_all, mkr_offmap12)
+		
+		-- play the mission end speech
+		Util_StartIntel(EVENTS.End_Mission)
+		
+		-- the player has just won
+		Objective_Complete(OBJ_Recon)
+		
+		t_recon.update = {title = 1359101, desc = 1359111, active = false} -- "capture and defend"
+		Objective_UpdateText(OBJ_Recon, t_recon.update.title, t_recon.update.desc, false) -- silently put it back
+		
+		Rule_RemoveMe()
+		
+	elseif SGroup_IsEmpty(sg_allsquads) then
+		
+		-- the player has just failed
+		Objective_Fail(OBJ_Recon)
+		Rule_AddInterval(Caen_GameOver_Fail, 3)
+		Rule_RemoveMe()
+		
+	end
+	
+end
+
+
+-- spawns the vehicles that come on when the player approaches the right victory point
+function SpawnRightTanks()
+	
+	Player_GetAll(player1)
+	
+	if Prox_AreSquadsNearMarker(sg_allsquads, Util_GetPosition(eg_victory_point3), ANY, 35) then
+		Rule_RemoveMe()
+		Util_CreateSquads(player2, sg_recon_panzer[1], SBP.ELITE.HALFTRACK_SNIPER, mkr_offmap9, mkr_recon_patrol7, 1, nil, false, mkr_offmap2)
+		Util_CreateSquads(player2, sg_recon_panzer[2], SBP.AXIS.PANZER, mkr_offmap9, mkr_recon_patrol8, 1, nil, false, mkr_offmap2)
+		
+		-- activate the tanks
+		for k,v in pairs(sg_recon_panzer) do SGroup_AddGroup(sg_recon_panzerAll, v) end
+		-- handles the three Panzers
+		Rule_AddInterval(Recon_TankManager, 13)
+		
+	end
+end
+
+
+-- start the related action
+function Recon_Kickoff()
+	
+	
+	-- change the phase
+	-- switches artillery to fire at a line further back
+	t_noMans.phase = PHASE_TWO
+	
+	-- set a placeholder time for the last time a bombing run triggered (just so that there is a time to compare against)
+	last_bombing_run_time = World_GetGameTime()
+	
+	-- set a placeholder time for the last time a speech event triggered (just so that there is a time to compare against)
+	last_panzer_warning = World_GetGameTime()
+	last_mark_strongpoint_reminder = World_GetGameTime()
+	last_combat_warning = World_GetGameTime()
+	last_flak_warning = World_GetGameTime()
+	last_counterattack_reminder = World_GetGameTime()
+	
+	-- ping the VP's
+	for k, this in pairs(t_victory_points) do
+	
+		hpid_victory_point[k] = Objective_AddUIElements(OBJ_Recon, this.vp, true, 1359121, true, 6)
+	end
+	
+	-- spawn the trench infantry
+	Rule_AddOneShot(Recon_SpawnTrenches, 3)
+	
+	-- set the counter for how many defensive positions have been bombed
+	Objective_SetCounter( OBJ_Recon, recon_counter, 3 )
+	
+	-- Start reminder checks
+	Rule_AddInterval(Recon_Reminder, 10)
+	
+	-- Flash the mark strongpoint ability button for the player to tell them to use it
+	--UI_FlashAbilityButton(ABILITY.SP.CAEN_MARK_STRONGPOINT, false, BT_UI_Weak_AbilityBtn) 
+	
+	-- Tell the player what to do
+	Util_StartIntel(EVENTS.Recon_Start)
+	
+	-- Check when to spawn the infantry that guard the strongpoint and start their behavior
+	Rule_AddInterval(CheckSpawnStrongpointInfantry, 10)
+	
+	
+	-- check if the player has been idle for too long and then attack them if they have
+	Rule_AddInterval(Recon_IdleAttack, 10)
+	
+	--mark the time for the idle check
+	last_time_active = World_GetGameTime()
+	
+	-- start checking if the bunkers for each defensive position are destroyed
+	Rule_AddInterval(BunkerCheck, 5)
+	
+	-- start checking if it's time to announce the flak 38 guns
+	-- Rule_AddInterval(Recon_AnnounceAAGuns, 3)
+	
+	-- start checking if it's time to announce that the flak 38's have been destroyed
+	-- Rule_AddInterval(Recon_CheckAAGuns, 3)
+	
+	-- tactical event speech for Panzers
+	Rule_AddInterval(Event_Panzers, 5)
+	
+	-- tactical event speech for general combat
+	Rule_AddInterval(Event_Combat, 5)
+	
+	-- tactical event speech for when the player's officer is near a strongpoint
+	-- Rule_AddInterval(Event_OfficerNearMarker, 5)
+	
+	-- checks who has captured the VPs and gives the territory to that player
+	Rule_AddInterval(Territory_Checker, 1)
+	
+	-- update the counter for the VPs and trigger the countdown timer
+	Rule_AddInterval(CheckVictoryPoints, 2)
+	
+	-- spawn infantry to take back the vps from the player
+	Rule_AddInterval(SpawnAttackers, 5)
+	
+	-- speech for when the Axis try to take back a point
+	Rule_AddInterval(Event_Counterattack, 3)
+	
+	-- check when to start the medal objective
+	Rule_AddInterval(Nebelwerfers_Start_Check, 3)
+	
+	-- check when to spawn tanks to attack player near leftmost VP
+	Rule_AddInterval(TankAttack, 3)
+	
+	-- check when to spawn tanks to attack player near rightmost VP
+	Rule_AddInterval(SpawnRightTanks, 3)
+	
+	-- check when to spawn in the infantry on the leftside of the map
+	Rule_AddInterval(Recon_SpawnLeftSide, 3)
+	-- check when to spawn in the infantry on the rightside of the map
+	Rule_AddInterval(Recon_SpawnRightSide, 3)
+	
+end
+
+
+
+-- 
+function Recon_Point_Track()
+	-- track the tracking of each point
+	if t_recon.fg_obj_complete == true then
+		Rule_RemoveMe()
+	else
+		for k,v in pairs(t_recon.points) do 
+			if v.seen == false then
+				if Prox_ArePlayersNearMarker(player1, v.marker, false, t_recon.pointProx) then
+					-- flag 'has been seen'
+					for k, v in pairs(t_recon.points) do
+						v.seen = true
+						
+					end
+					
+					
+					
+					-- Tell the player to use an officer to mark the strong points
+					Util_StartIntel(EVENTS.Recon_Positions_Spotted)
+					-- Give the mark strongpoint ability to officers
+					--Player_SetUpgradeAvailability(player1, UPG.SP.MARK_STRONGPOINT, ITEM_UNLOCKED)
+					--Cmd_InstantUpgrade(player1, UPG.SP.MARK_STRONGPOINT)
+					
+					Objective_UpdateText(OBJ_Recon, LOC("Destroy the Axis Defensive Line"), LOC("Use your officers to mark the Axis defensive positions for bombing."))
+				end
+			--[[else
+				if v.hint ~= false and EGroup_IsCapturedByPlayer(v.egroup, player1, false) then
+					-- remove the tag
+					Objective_RemoveUIElements(OBJ_Recon, v.hint)
+					v.hint = false
+				elseif v.hint == false and EGroup_IsCapturedByPlayer(v.egroup, player2, false) == false then
+					-- re-tag the point
+					v.hint = Objective_AddUIElements(OBJ_Recon, v.egroup, true, LOC("Capture Point"), true)
+				end]]
+			end
+		end
+	end
+	
+	-- track the owner
+	local allSpotted = true
+	
+	for k,v in pairs(t_recon.points) do 
+		if v.seen == false then
+			allSpotted = false
+			break
+		end
+	end
+	
+	t_recon.fg_points_spotted = allSpotted
+	
+end
+
+
+
+
+function Recon_Deployment_Initial()
+
+	if t_noMans.firstWarning == true or t_recon.fg_objStart == true then
+		
+		if table.getn(t_recon.deploy) < 1 then
+			
+			-- stagger the creation of new units
+--~ 			-- activate the tanks
+--~ 			for k,v in pairs(sg_recon_panzer) do SGroup_AddGroup(sg_recon_panzerAll, v) end
+--~ 			-- handles the three Panzers
+--~ 			Rule_AddInterval(Recon_TankManager, 13)
+			
+			-- handles the Nebelwerfers
+			for k,v in pairs(sg_recon_nebel) do SGroup_AddGroup(sg_recon_nebelAll, v) end
+			
+			-- handles the tactical event speech for when the nebelwerfers fire
+			Rule_AddInterval(Recon_NebelAnnounce, 5)
+			
+			-- handles the Flaks
+			for k,v in pairs(sg_recon_flak) do SGroup_AddGroup(sg_recon_flakAll, v) end
+			
+			-- reduce the range of the flak 88's
+			Modify_WeaponRange(sg_recon_flakAll, "hardpoint_01", 0.5)
+			
+			--Rule_AddInterval(Recon_FlakAnnounce, 5)
+			
+			Rule_RemoveMe()
+			
+			-- start checking when to spawn new squads after certain squads have died
+			Rule_AddInterval(Recon_SpawnSquads, 3)
+			
+		else
+			for k,this in pairs(t_recon.deploy) do 
+				-- create the starting units for the outer area
+				Util_CreateSquads(player2, this.sgroup, this.sbp, this.src, this.dest, 1, NIL_LOAD, NO_ATTACK, this.face, NIL_UPG)
+				this.rule()
+				table.remove(t_recon.deploy, 1)
+				break
+			end
+		end
+		
+	end
+end
+
+
+-- the idea here is to take the 3 panzers
+-- created on the right flank and do something
+-- more interesting with them
+
+function Recon_TankManager()
+	
+	-- if the are empty, remove
+	if SGroup_IsEmpty(sg_recon_panzerAll) then
+		Rule_RemoveMe()
+		
+	-- everything else occurs ONLY if the group still has members
+	else
+	-- if they are hurt, retreat
+		for k,sgroup in pairs(t_recon.panzers) do 
+		
+			if SGroup_IsEmpty(sgroup) then 
+				table.remove(t_recon.panzers, k) break
+				
+			elseif SGroup_GetAvgHealth(sgroup) < 0.3  then
+			
+				Cmd_Move(sgroup, mkr_offmap9, false, mkr_offmap9)
+			end
+		end
+		
+	end
+
+end
+
+
+
+-- Announce when the player starts to get hit by the Nebels
+-- and when they are no longer a threat
+function Recon_NebelAnnounce()
+
+	local min_time = 30	-- how much time has to pass before it will display another warning speech event
+	local current_time = World_GetGameTime()
+	local time_passed = current_time - last_nebel_warning 	-- how much time has passed since the last warning speech
+	
+	if SGroup_IsDoingAttack(sg_recon_nebelAll, false, 10) and time_passed >= min_time then
+		last_nebel_warning = World_GetGameTime()
+		Util_StartIntel(EVENTS.Nebelwerfer_Warning)
+		
+		if t_recon.NebelthreatID == false then
+			-- add threat arrow
+			t_recon.NebelthreatID = ThreatArrow_CreateGroup()
+			ThreatArrow_Add(t_recon.NebelthreatID, sg_recon_nebelAll)
+		end
+		
+		-- if this is the first nebelwerfer attack, start the medal objective
+		if fg_first_nebelwerfer_attack == true then
+			fg_first_nebelwerfer_attack = false
+		end
+		
+	elseif SGroup_IsEmpty(sg_recon_nebelAll) then
+		Util_StartIntel(EVENTS.Nebelwerfers_Destroyed)
+		
+		Rule_RemoveMe()
+	
+	elseif Rule_Exists(Bombing_Run_Manager) then
+		Rule_RemoveMe()
+	end
+end
+
+
+-- Announce when the player starts to get hit by the Flak 88s
+-- and when they are no longer a threat
+function Recon_FlakAnnounce()
+	Player_GetAll(player1)
+	SGroup_GetLastAttacker(sg_allsquads, sg_flak_attacker)
+	
+	if SGroup_ContainsBlueprints(sg_flak_attacker, SBP.AXIS.FLAK_88_SP, ANY) then
+		Util_StartIntel(EVENTS.Flak88_Warning)
+		Rule_RemoveMe()
+	end
+end
+
+
+-- Creates masses of Volksgrenadiers to man the line.
+function Recon_Scout_Support()
+	local markers = t_recon.markers
+	
+	
+	if t_recon.fg_obj_complete == true then
+	
+		-- tell everyone to run away
+		for k,sgroup in pairs(sg_recon_scoutSupport) do 
+			if SGroup_IsEmpty(sgroup) == false then
+				Cmd_Move(sgroup, mkr_offmap9, NO_QUEUE, mkr_offmap9, NIL_FACE, NIL_OFFSET, NIL_DIST, NIL_COVER)
+			end
+		end
+		
+		Rule_RemoveMe()
+		
+	else
+		
+		-- manage the support groups
+		for y = 1, table.getn(markers) do 
+		
+			local marker = markers[y]
+			local numsquads = 1  -- Number of squads to spawn per recon group
+			
+			for i = 1, numsquads do 
+			
+				local num = (((y*numsquads) - numsquads) + i)
+				local sgroup = sg_recon_scoutSupport[num]
+				
+				-- if the supportTimer ran out and the group of Volks is dead, spawn new ones
+				if (t_recon.supportTimer == false or Timer_GetRemaining(t_recon.supportTimer) == 0 ) and SGroup_IsEmpty(sgroup) then
+				
+					if (marker.dest ~= mkr_strong_area1)
+					and (marker.dest ~= mkr_strong_area2) 
+					and (marker.dest ~= mkr_strong_area3)
+					and (marker.dest ~= mkr_strong_area4) then
+					
+						Util_CreateSquads(player2, sgroup, SBP.AXIS.VOLKSGRENADIER, marker.src, marker.src, 1, 4, true, nil, Caen_RandUpg())
+						local offset = {OFFSET_FRONT_LEFT, OFFSET_FRONT, OFFSET_FRONT_RIGHT}
+						Cmd_AttackMove(sgroup, marker.dest)
+						
+						Timer_Start(t_recon.supportTimer, 12)
+						break
+					end
+					
+				else
+					-- if the squad count is too low
+					if SGroup_TotalMembersCount(sgroup) < 4 then
+						-- run away and die
+						Cmd_Move(sgroup, marker.src, NO_QUEUE, marker.src, NIL_FACE, NIL_OFFSET, NIL_DIST, NIL_COVER)
+				
+					elseif SGroup_IsMoving(sgroup, false) == false then
+						-- find cover
+						Cmd_Move(sgroup, sgroup, NO_QUEUE, NIL_DELETE, NIL_FACE, NIL_OFFSET, NIL_DIST, 7)
+					end
+				end
+				
+			end
+		end
+	end
+
+end
+
+
+-- spawn the Flak 38s
+function Recon_SpawnFlak38s()
+	for k, this in pairs(t_recon_flak38) do
+		Util_CreateSquads(player2, this.sgroup, this.sbp, this.marker)
+
+	end
+end
+
+
+-- spawns the squads on the left side of the map
+function Recon_SpawnLeftSide()
+	Player_GetAll(player1)
+
+	if Prox_AreSquadsNearMarker(sg_allsquads, mkr_left_hmg3, ANY, 100) then
+		Rule_RemoveMe()
+		Util_CreateSquads(player2, sg_left_axisHMG[3], SBP.AXIS.HEAVYMG, mkr_left_hmg3, nil, 1, nil, false, mkr_outer_spot5)
+		Cmd_InstantSetupTeamWeapon(sg_left_axisHMG[3])
+		Util_CreateSquads(player2, sg_left_axisHMG[4], SBP.AXIS.HEAVYMG, mkr_left_hmg4, nil, 1, nil, false, mkr_help_ambush4)
+		Cmd_InstantSetupTeamWeapon(sg_left_axisHMG[4])
+		Util_CreateSquads(player2, sg_left_axisSniper[2], SBP.AXIS.SNIPER, mkr_left_sniper2)
+		Util_CreateSquads(player2, sg_trench_infantry, SBP.AXIS.GRENADIER, mkr_left_trench3)
+	end
+
+end
+
+
+-- spawns the squads on the left side of the map
+function Recon_SpawnRightSide()
+	Player_GetAll(player1)
+	
+	if Prox_AreSquadsNearMarker(sg_allsquads, Util_GetPosition(eg_victory_point3), ANY, 100) then
+		
+		Rule_RemoveMe()
+		
+		Util_CreateSquads(player2, sg_right_axisHMG[1], SBP.AXIS.HEAVYMG, mkr_right_hmg1)
+		Cmd_InstantSetupTeamWeapon(sg_right_axisHMG[1])
+		Util_CreateSquads(player2, sg_right_axisHMG[3], SBP.AXIS.HEAVYMG, mkr_right_hmg3)
+		Cmd_InstantSetupTeamWeapon(sg_right_axisHMG[3])
+		Util_CreateSquads(player2, sg_right_axisMort[1], SBP.AXIS.MORTAR, mkr_right_mortar1)
+		Cmd_InstantSetupTeamWeapon(sg_right_axisMort[1])
+		Util_CreateSquads(player2, sg_trench_infantry, SBP.AXIS.GRENADIER, mkr_right_trench5)
+		
+		t_recon.right = {sg_right_axisHMG[3], sg_right_axisMort[1]}
+		Rule_AddInterval(Recon_RightBehavior, 5)
+	end
+
+end
+
+-- a little extra to keep team weapons from being too powerful
+function Recon_RightBehavior()
+	local count = table.getn(t_recon.right)
+	if count == 0 then
+		Rule_RemoveMe()
+	else
+		for i = count, 1, -1 do 
+			if SGroup_IsEmpty(t_recon.right[i]) then
+				table.remove(t_recon.right)
+			elseif SGroup_IsUnderAttack(t_recon.right[i], false, 7) then
+				Cmd_Move(t_recon.right[i], t_recon.right[i], NO_QUEUE, NIL_DELETE, mkr_offmap2, OFFSET_BACK, 20, 5)
+				table.remove(t_recon.right)
+			end
+		end
+	end
+end
+
+------------------------------------------------------------------------
+-- Spawn Trenches function
+------------------------------------------------------------------------
+-- Spawns all of the infantry that stay in their trenches
+function Recon_SpawnTrenches()
+
+	for k, this in pairs(t_trenches) do
+		
+		if this.marker == mkr_right_trench2 then
+			Util_CreateSquads(player2, sg_check_squad1, SBP.AXIS.GRENADIER, this.marker)
+		else
+			Util_CreateSquads(player2, sg_trench_infantry, SBP.AXIS.GRENADIER, this.marker)
+		end
+	end
+	
+	-- tell the trench infantry to hold position
+	Cmd_DoPlan(sg_trench_infantry, "infantry-idle-plan-NO-MOVE")
+end
+
+
+function Recon_SpawnGarrisonedTroops()
+
+	for k, this in pairs(t_buildings) do
+
+		Util_CreateSquads(player2, sg_building_infantry, SBP.AXIS.GRENADIER, this)
+	
+	end
+
+end
+
+
+
+
+
+------------------------------------------------------------------------
+-- Volks Manager	
+------------------------------------------------------------------------
+-- Manages the destination markers of the Volksgrenadiers that spawn. If a bombing run has happened for a strongpoint, 
+-- then the Volksgrenadiers move to hang around the strongpoint instead of moving to the front line.
+
+
+function Recon_VolksManager()
+	
+	-- Check the entire table of markers and change the destination of the Volksgrenadiers to the strongpoint if its respective bombing run has triggered.
+	for k, this in pairs(t_recon.markers) do
+	
+		if (this.dest == mkr_outer_spot1 or this.dest == mkr_outer_spot2) and fg_bombingrun1 == true then
+			this.dest = mkr_strong_area1
+		
+		elseif this.dest == mkr_outer_spot3 and fg_bombingrun2 == true then
+			this.dest = mkr_strong_area2
+		
+		elseif this.dest == mkr_outer_spot4 and fg_bombingrun3 == true then
+			this.dest = mkr_strong_area3
+		
+		elseif (this.dest == mkr_outer_spot5 or this.dest == mkr_outer_spot6) and fg_bombingrun4 == true then
+			this.dest = mkr_strong_area4
+		
+		end
+	end
+
+	-- if all of the bombing runs have triggered, stop checking
+	if fg_bombingrun1 == true and fg_bombingrun2 == true and fg_bombingrun3 == true and fg_bombingrun4 == true then
+		Rule_RemoveMe()
+	end
+end
+
+
+
+
+	
+------------------------------------------------------------------------
+-- Bombing Run Functions
+------------------------------------------------------------------------
+
+-- This checks if the player marked a defensive position and if so, triggers a bombing run
+-- NO LONGER USED
+
+--~ function Bombing_Run(marker)
+
+--~ 	if data_bombingruns == nil then
+--~ 		data_bombingruns = {}
+--~ 	end
+--~ 	
+--~ 	local current_time = World_GetGameTime()
+--~ 	local max_time = 20
+--~ 	
+--~ 	-- first check if this is the same position as last time and if not enough time has passed 
+--~ 	if (current_time - last_bombing_run_time < max_time) and marker == last_marker then
+--~ 		return
+--~ 		
+--~ 	elseif (marker == mkr_strong_area1 and fg_area1_bunkers_dead == false)
+--~ 		or (marker == mkr_strong_area2 and fg_area2_bunkers_dead == false)
+--~ 		or (marker == mkr_strong_area3 and fg_area3_bunkers_dead == false)
+--~ 		or (marker == mkr_strong_area4 and fg_area4_bunkers_dead == false) then
+--~ 		
+--~ 		-- table to contain the strongpoint position that was found and the bombing time
+--~ 		table.insert(data_bombingruns, {marker = marker, triggertime = (World_GetGameTime() + 10) } )
+--~ 		
+--~ 		-- update which was the last marker that was bombed and update the last time a bombing run happened
+--~ 		last_marker = marker
+--~ 		last_bombing_run_time = World_GetGameTime()
+--~ 		
+--~ 		-- start the bombing run timer
+--~ 		if Rule_Exists(Bombing_Run_Manager) == false then
+--~ 			Rule_AddInterval(Bombing_Run_Manager, 1)
+--~ 		end
+--~ 	end
+--~ end
+
+
+-- this function checks if the bombing runs were successful and sets the appropriate flags
+function BunkerCheck()
+	local marker = false
+	
+	if EGroup_IsEmpty(eg_recon_bunkersAll) then
+		Rule_RemoveMe()
+		
+	elseif fg_area4_bunkers_dead == false and EGroup_IsEmpty(eg_recon_bunker1) and EGroup_IsEmpty(eg_recon_bunker5) and EGroup_IsEmpty(eg_recon_bunker6) then
+		fg_area4_bunkers_dead = true
+		-- Add one more to the recon counter and refresh it
+		--recon_counter = recon_counter + 1
+		--Objective_SetCounter( OBJ_Recon, recon_counter, 4 )
+		marker = mkr_strong_area4
+		
+	elseif fg_area3_bunkers_dead == false and EGroup_IsEmpty(eg_recon_bunker2) and EGroup_IsEmpty(eg_recon_bunker7) then
+		fg_area3_bunkers_dead = true
+		-- Add one more to the recon counter and refresh it
+		--recon_counter = recon_counter + 1
+		--Objective_SetCounter( OBJ_Recon, recon_counter, 4 )
+		marker = mkr_strong_area3
+		
+	elseif fg_area2_bunkers_dead == false and EGroup_IsEmpty(eg_recon_bunker8) and EGroup_IsEmpty(eg_recon_bunker3) and EGroup_IsEmpty(eg_recon_bunker9) then
+		fg_area2_bunkers_dead = true
+		-- Add one more to the recon counter and refresh it
+		--recon_counter = recon_counter + 1
+		--Objective_SetCounter( OBJ_Recon, recon_counter, 4 )
+		marker = mkr_strong_area2
+		
+	elseif fg_area1_bunkers_dead == false and EGroup_IsEmpty(eg_recon_bunker4) and EGroup_IsEmpty(eg_recon_bunker10) and EGroup_IsEmpty(eg_recon_bunker11) then
+		fg_area1_bunkers_dead = true
+		-- Add one more to the recon counter and refresh it
+		--recon_counter = recon_counter + 1
+		--Objective_SetCounter( OBJ_Recon, recon_counter, 4 )
+		marker = mkr_strong_area1
+		
+	end
+	
+	for k, this in pairs(t_recon.points) do
+		if marker == false then
+			break
+		elseif this.marker == marker then
+			-- remove the minimap ping for this strongpoint
+			Objective_RemoveUIElements(OBJ_Recon, this.hint)
+		end
+	end
+end
+
+-- handles the individual bombing runs
+function Bombing_Run_Manager()
+
+	for n = table.getn(data_bombingruns), 1, -1 do
+		
+		-- check if it's time to bomb
+		if World_GetGameTime() >= data_bombingruns[n].triggertime then
+			
+			
+			-- Checks which strongpoint was spotted and then starts the bombing runs there
+			if data_bombingruns[n].marker == mkr_strong_area1 then
+				
+--~ 				Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_1a, Marker_GetDirection(mkr_bombingrun_1a), true)
+--~ 				Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_1b, Marker_GetDirection(mkr_bombingrun_1b), true)
+--~ 				Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_1c, Marker_GetDirection(mkr_bombingrun_1c), true)
+
+				Rule_AddOneShot(Bombing_Run1a, World_GetRand(1, 3))
+				Rule_AddOneShot(Bombing_Run1b, World_GetRand(2, 7))
+				Rule_AddOneShot(Bombing_Run1c, World_GetRand(3, 9))
+			
+				FOW_RevealEGroup(eg_recon_bunker4, -1)
+				FOW_RevealEGroup(eg_recon_bunker10, -1)
+				FOW_RevealEGroup(eg_recon_bunker11, -1)
+			
+				fg_bombingrun1 = true
+				
+				-- make the bunkers vulnerable
+				--EGroup_SetInvulnerable(eg_recon_bunker4, false)
+				--EGroup_SetInvulnerable(eg_recon_bunker10, false)
+				--EGroup_SetInvulnerable(eg_recon_bunker11, false)
+				Modify_Vulnerability( eg_recon_bunker4, 10 )
+				Modify_Vulnerability( eg_recon_bunker10, 10 )
+				Modify_Vulnerability( eg_recon_bunker11, 10 )
+				
+				-- make the bunkers invulnerable again after the bombing run
+				--if Rule_Exists(Recon_MakeBunkersInvulnerable) == false then
+				--	Rule_AddOneShot(Recon_MakeBunkersInvulnerable, 20)
+				--end
+				
+				
+			elseif data_bombingruns[n].marker == mkr_strong_area2 then
+		
+--~ 				Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_2a, Marker_GetDirection(mkr_bombingrun_2a), true)
+--~ 				Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_2b, Marker_GetDirection(mkr_bombingrun_2b), true)
+--~ 				Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_2c, Marker_GetDirection(mkr_bombingrun_2c), true)
+
+				Rule_AddOneShot(Bombing_Run2a, World_GetRand(1, 3))
+				Rule_AddOneShot(Bombing_Run2b, World_GetRand(2, 7))
+				Rule_AddOneShot(Bombing_Run2c, World_GetRand(3, 9))
+
+				fg_bombingrun2 = true
+				
+				-- make the bunkers vulnerable
+				--EGroup_SetInvulnerable(eg_recon_bunker8, false)
+				--EGroup_SetInvulnerable(eg_recon_bunker3, false)
+				--EGroup_SetInvulnerable(eg_recon_bunker9, false)
+				Modify_Vulnerability( eg_recon_bunker8, 10 )
+				Modify_Vulnerability( eg_recon_bunker3, 10 )
+				Modify_Vulnerability( eg_recon_bunker9, 10 )
+				
+				FOW_RevealEGroup(eg_recon_bunker8, -1)
+				FOW_RevealEGroup(eg_recon_bunker3, -1)
+				FOW_RevealEGroup(eg_recon_bunker9, -1)
+				               
+				-- make the bunkers invulnerable again after the bombing run
+				--if Rule_Exists(Recon_MakeBunkersInvulnerable) == false then
+				--	Rule_AddOneShot(Recon_MakeBunkersInvulnerable, 20)
+				--end
+				
+				-- note that there are only 2 bombing runs for strongpoint3
+			elseif data_bombingruns[n].marker == mkr_strong_area3 then
+			
+--~ 				Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_3a, Marker_GetDirection(mkr_bombingrun_3a), true)
+--~ 				Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_3b, Marker_GetDirection(mkr_bombingrun_3b), true)
+
+				Rule_AddOneShot(Bombing_Run3a, World_GetRand(1, 3))
+				Rule_AddOneShot(Bombing_Run3b, World_GetRand(2, 7))
+			
+				fg_bombingrun3 = true
+				
+				-- make the bunkers vulnerable
+				--EGroup_SetInvulnerable(eg_recon_bunker2, false)
+				--EGroup_SetInvulnerable(eg_recon_bunker7, false)
+				Modify_Vulnerability( eg_recon_bunker2, 10 )
+				Modify_Vulnerability( eg_recon_bunker7, 10 )
+				
+				FOW_RevealEGroup(eg_recon_bunker2, -1)
+				FOW_RevealEGroup(eg_recon_bunker7, -1)
+				
+				
+				-- make the bunkers invulnerable again after the bombing run
+				--if Rule_Exists(Recon_MakeBunkersInvulnerable) == false then
+				--	Rule_AddOneShot(Recon_MakeBunkersInvulnerable, 20)
+				--end
+				
+			elseif data_bombingruns[n].marker == mkr_strong_area4 then
+				
+--~ 				Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_4a, Marker_GetDirection(mkr_bombingrun_4a), true)
+--~ 				Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_4b, Marker_GetDirection(mkr_bombingrun_4b), true)
+--~ 				Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_4c, Marker_GetDirection(mkr_bombingrun_4c), true)
+
+				Rule_AddOneShot(Bombing_Run4a, World_GetRand(1, 3))
+				Rule_AddOneShot(Bombing_Run4b, World_GetRand(2, 7))
+				Rule_AddOneShot(Bombing_Run4c, World_GetRand(3, 9))
+				
+				fg_bombingrun4 = true
+				
+				-- make the bunkers vulnerable
+				--EGroup_SetInvulnerable(eg_recon_bunker1, false)
+				--EGroup_SetInvulnerable(eg_recon_bunker5, false)
+				--EGroup_SetInvulnerable(eg_recon_bunker6, false)
+				Modify_Vulnerability( eg_recon_bunker1, 10 )
+				Modify_Vulnerability( eg_recon_bunker5, 10 )
+				Modify_Vulnerability( eg_recon_bunker6, 10 )
+				
+				FOW_RevealEGroup(eg_recon_bunker1, -1)
+				FOW_RevealEGroup(eg_recon_bunker5, -1)
+				FOW_RevealEGroup(eg_recon_bunker6, -1)
+				               
+				-- make the bunkers invulnerable again after the bombing run
+				--if Rule_Exists(Recon_MakeBunkersInvulnerable) == false then
+				--	Rule_AddOneShot(Recon_MakeBunkersInvulnerable, 20)
+				--end
+				
+			end
+			
+			table.remove(data_bombingruns, n)
+			
+			if table.getn(data_bombingruns) == 0 then
+				Rule_RemoveMe()
+--~ 				Rule_AddInterval(Strafing_Run_Manager, 6)
+				-- destroy any remaining bunkers
+				Rule_AddOneShot(DestroyBunkers, 18)
+				
+			end
+		end
+	end
+end
+
+
+-- destroy any remaining bunkers
+function DestroyBunkers()
+
+	EGroup_Kill(eg_recon_bunkersAll)
+end
+
+-----------------------------------------------------------------------------------------
+-- Strafing Run Manager
+-----------------------------------------------------------------------------------------
+
+-- handles the individual bombing runs
+function Strafing_Run_Manager()
+	
+	local num = World_GetRand(1, 11)
+	local mkr = false
+	
+	if num == 1 then
+		mkr = mkr_bombingrun_1a
+	elseif num == 2 then
+		mkr = mkr_bombingrun_1b
+	elseif num == 3 then
+		mkr = mkr_bombingrun_1c
+	elseif num == 4 then
+		mkr = mkr_bombingrun_2a
+	elseif num == 5 then
+		mkr = mkr_bombingrun_2b
+	elseif num == 6 then
+		mkr = mkr_bombingrun_2c
+	elseif num == 7 then
+		mkr = mkr_bombingrun_3a
+	elseif num == 8 then
+		mkr = mkr_bombingrun_3b
+	elseif num == 9 then
+		mkr = mkr_bombingrun_4a
+	elseif num == 10 then
+		mkr = mkr_bombingrun_4b
+	elseif num == 11 then
+		mkr = mkr_bombingrun_4c
+	end
+	
+	Cmd_Ability(player1, ABILITY.SP.TYPHOON_STRAFE_CAEN, mkr, Marker_GetDirection(mkr), true)
+	Cmd_Ability(player1, ABILITY.SP.TYPHOON_STRAFE_CAEN, mkr, Marker_GetDirection(mkr), true)
+	Cmd_Ability(player1, ABILITY.SP.TYPHOON_STRAFE_CAEN, mkr, Marker_GetDirection(mkr), true)
+	Cmd_Ability(player1, ABILITY.SP.TYPHOON_STRAFE_CAEN, mkr, Marker_GetDirection(mkr), true)
+	
+	Rule_ChangeInterval(Strafing_Run_Manager, World_GetRand(3, 8))
+	
+end
+
+
+
+
+
+-- used in RuleAddOneShot to stagger the bombers
+function Bombing_Run1a()
+	Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_1a, Marker_GetDirection(mkr_bombingrun_1a), true)
+end
+
+function Bombing_Run1b()
+	Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_1b, Marker_GetDirection(mkr_bombingrun_1b), true)
+end
+
+function Bombing_Run1c()
+	Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_1c, Marker_GetDirection(mkr_bombingrun_1c), true)
+end
+
+function Bombing_Run2a()
+	Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_2a, Marker_GetDirection(mkr_bombingrun_2a), true)
+end
+
+function Bombing_Run2b()
+	Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_2b, Marker_GetDirection(mkr_bombingrun_2b), true)
+end
+
+function Bombing_Run2c()
+	Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_2c, Marker_GetDirection(mkr_bombingrun_2c), true)
+end
+
+function Bombing_Run3a()
+	Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_3a, Marker_GetDirection(mkr_bombingrun_3a), true)
+end
+
+function Bombing_Run3b()
+	Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_3b, Marker_GetDirection(mkr_bombingrun_3b), true)
+end
+
+function Bombing_Run4a()
+	Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_4a, Marker_GetDirection(mkr_bombingrun_4a), true)
+end
+
+function Bombing_Run4b()
+	Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_4b, Marker_GetDirection(mkr_bombingrun_4b), true)
+end
+
+function Bombing_Run4c()
+	Cmd_Ability(player1, ABILITY.SP.CAEN_BOMBING_RUN, mkr_bombingrun_4c, Marker_GetDirection(mkr_bombingrun_4c), true)
+end
+
+
+
+-- this function triggers when the bombing run button is clicked
+function Start_Bombing_Runs()
+	
+	if fg_bombing_runs_started == true then
+		return
+	end
+	
+	-- play speech
+	Util_StartIntel(EVENTS.Start_Bombing_Run)
+	
+	SGroup_Clear(sg_temp)
+
+	if Rule_Exists(Bombing_Run_Manager) == false then
+		
+		fg_bombing_runs_started = true
+		
+		-- remove the previous modifier from the bunkers
+		Modifier_Remove(modid_bunker)
+		
+		
+		-- spawn the final wave to attack all of the VP's while the bombers are incoming
+		for n = 1, table.getn(t_victory_points) do
+			
+			num_infantry = 2
+			
+			if n == 1 then
+				target = eg_victory_point1
+				sgroup = sg_vp_attacker1
+				marker = mkr_offmap7
+			
+			elseif n == 2 then
+				target = eg_victory_point2
+				sgroup = sg_vp_attacker2
+				marker = mkr_offmap7
+			
+			elseif n == 3 then
+				target = eg_victory_point3
+				sgroup = sg_vp_attacker3
+				marker = mkr_offmap9
+			end
+			
+			if EGroup_IsCapturedByPlayer(t_victory_points[n].vp, player2, ALL) == false and SGroup_IsEmpty(sgroup) then
+				Util_CreateSquads(player2, sgroup, SBP.AXIS.GRENADIER, marker, marker, num_infantry, 4, true, nil, Caen_RandUpg())
+				SGroup_AddGroup(sg_vp_attackers, sgroup)
+				Cmd_AttackMove(sgroup, target)
+			end
+		end
+		
+		
+		-- call the bombing runs
+		data_bombingruns = {
+			{marker = mkr_strong_area1, triggertime = (World_GetGameTime() + 10) },
+			{marker = mkr_strong_area2, triggertime = (World_GetGameTime() + 30) },
+			{marker = mkr_strong_area3, triggertime = (World_GetGameTime() + 50) },
+			{marker = mkr_strong_area4, triggertime = (World_GetGameTime() + 70) },
+		}
+		Rule_AddInterval(Bombing_Run_Manager, 1)
+		
+		-- add ambient speech events
+		Rule_AddDelayedInterval(Bombing_Run_Ambient_Speech, 12, 20)
+		
+		-- remove the ability button since the player has completed the mission
+		Player_SetAbilityAvailability(player1, ABILITY.SP.CAEN_START_BOMBING_RUNS, ITEM_REMOVED)
+		
+		-- reveal the FOW over the bunkers
+--~ 		FOW_RevealEGroup(eg_recon_bunkersAll, -1)
+		
+		
+		
+		-- grab all of the squads and get them to retreat to the nearest bunker in order to maximize casualties
+		Player_GetAll(player2)
+		SGroup_Filter(sg_allsquads, {SBP.AXIS.PANZER, SBP.AXIS.NEBELWERFER}, FILTER_REMOVE)
+		SGroup_RemoveGroup(sg_allsquads, sg_vp_attackers)
+		
+--~ 		local _FindClosest = function(gid, idx, sid)
+--~ 		local dist = 9999
+--~ 		local marker = false
+--~ 		
+--~ 			for k, this in pairs(t_strong_points) do
+--~ 			
+--~ 				local thisdist = World_DistancePointToPoint(Squad_GetPosition(sid), Util_GetPosition(this))
+--~ 	
+--~ 				if thisdist < dist then
+--~ 					dist = thisdist
+--~ 					closest_bunker = this
+--~ 					
+--~ 					-- randomly pick a marker near the strong area to retreat to
+--~ 					if k == 1 then
+--~ 						marker = t_retreat_points1[World_GetRand(1, table.getn(t_retreat_points1))]
+--~ 					elseif k == 2 then
+--~ 						marker = t_retreat_points2[World_GetRand(1, table.getn(t_retreat_points2))]
+--~ 					elseif k == 3 then
+--~ 						marker = t_retreat_points3[World_GetRand(1, table.getn(t_retreat_points3))]
+--~ 					else 
+--~ 						marker = t_retreat_points4[World_GetRand(1, table.getn(t_retreat_points4))]
+--~ 					end
+--~ 				end
+--~ 			end
+--~ 			
+--~ 			SGroup_Single(sg_temp, sid)
+--~ 			Cmd_Retreat(sg_temp, Util_GetPosition(marker))
+
+		local _FindClosest = function(gid, idx, sid)
+		
+			local dist = 9999
+			local marker = false
+		
+			for k, this in pairs(t_attack_points) do
+				
+				local thisdist = World_DistancePointToPoint(Squad_GetPosition(sid), Util_GetPosition(this))
+				
+				if thisdist < dist then
+					dist = thisdist
+					closest_vp = this
+					
+					-- randomly pick a marker near the strong area to retreat to
+					if k == 1 then
+					
+						marker = t_attack_points3[World_GetRand(1, table.getn(t_attack_points3))]
+					
+					elseif k == 2 then
+						marker = t_attack_points2[World_GetRand(1, table.getn(t_attack_points2))]
+					
+					elseif k == 3 then
+						marker = t_attack_points1[World_GetRand(1, table.getn(t_attack_points1))]
+				
+					end
+				end
+			end
+			
+			SGroup_Single(sg_temp, sid)
+			Cmd_AttackMove(sg_temp, Util_GetPosition(marker))
+		end
+
+		SGroup_ForEach(sg_allsquads, _FindClosest)
+		
+		-- stop the flak 88's from looking for targets so that they do not shoot down the planes
+		SGroup_SetAutoTargetting(sg_recon_flakAll, "hardpoint_01", false)
+		SGroup_SetAutoTargetting(sg_wall_flaks, "hardpoint_01", false)
+		
+		-- start the strafing runs
+		if Rule_Exists(Strafing_Run_Manager) == false then
+			Rule_AddInterval(Strafing_Run_Manager, 6)
+		end
+	end
+
+end
+
+
+-- this function announces to the player that the AA guns are responsible for shooting down the planes
+function Recon_AnnounceAAGuns()
+	if fg_bombingrun4 == true then
+		Rule_RemoveMe()
+		if fg_area4_bunkers_dead == false then
+			Rule_AddInterval(Event_FlakGuns, 10)
+			Objective_AddUIElements(OBJ_Recon, sg_recon_flakaa, false, LOC("Destroy the Flak 38"), true)
+		end
+	end
+end
+
+-- announces the destruction of the flak 38 guns
+function Recon_CheckAAGuns()
+	if SGroup_IsEmpty(sg_recon_flakaa) then
+		Util_AutoIntel(t_recon.event_AAGunsDestroyed)
+		Rule_RemoveMe()
+	end
+end
+
+-- this function sets the bunkers back to invulnerable after a bombing run
+--~ function Recon_MakeBunkersInvulnerable()
+--~ 	if EGroup_IsEmpty(eg_recon_bunkersAll) == false then
+--~ 		EGroup_SetInvulnerable(eg_recon_bunkersAll, true)
+--~ 		
+--~ 	end
+--~ end
+
+-----------------------------------------------------------------------
+-- Mark Strongpoint related functions
+------------------------------------------------------------------------
+
+
+-- adds the ability check to all of the player's officers
+--~ function Recon_AddCheckOfficers()
+--~ 	
+--~ 	Player_GetAll(player1)
+--~ 	SGroup_Filter(sg_allsquads, {SBP.CW.CAPTAIN, SBP.CW.LIEUTENANT}, FILTER_KEEP)
+--~ 	SGroup_RemoveGroup(sg_allsquads, sg_officers)
+
+--~ 	if SGroup_Count(sg_allsquads) >= 1 then
+--~ 		
+--~ 		Rule_AddSGroupEvent(Recon_CheckMarkerSmoke, sg_allsquads, GE_AbilityExecuted)
+--~ 		SGroup_AddGroup(sg_officers, sg_allsquads)
+--~ 		
+--~ 	end
+--~ end
+
+
+
+
+-- checks if the player marked the strongpoint, and if they did, launches the bombing run
+--~ function Recon_CheckMarkerSmoke(source, abilityid, target)
+
+--~ 	if abilityid == ABILITY.SP.CAEN_MARK_STRONGPOINT then
+--~ 		
+--~ 		-- if the target isn't a position, make it into a position
+--~ 		if scartype(target) ~= ST_SCARPOS then
+--~ 			target = Util_GetPosition(target)
+--~ 		end
+--~ 		
+--~ 		for k, this in pairs(t_recon.points) do
+--~ 		
+--~ 			if World_DistancePointToPoint(target, Marker_GetPosition(this.marker)) <= 45 then
+--~ 	
+--~ 				-- Send a bombing run to that strongpoint area
+--~ 				Bombing_Run(this.marker)
+--~ 				
+--~ 			end
+--~ 		end
+--~ 	end
+--~ end
+
+
+
+-------------------------------------------------------------------------
+-- Reminder text
+-------------------------------------------------------------------------
+-- Periodically reminds the player to keep moving towards the strongpoints
+
+function Recon_Reminder()
+	
+	local reminder_time = 540           -- how much time between each reminder
+	
+	if Objective_IsComplete(OBJ_Recon) or Rule_Exists(Bombing_Run_Manager) then
+		Rule_RemoveMe()
+		
+	else
+		if Timer_Exists(timer_reminder_text) == false then
+			Timer_Start(timer_reminder_text, reminder_time)
+			
+			-- The previous number of strongpoints recon'd since last check (for the text that tells the player to not sit around)
+			prev_count = 0
+			
+		elseif Timer_GetRemaining(1) > 0 then
+			-- get the current number of strongpoints spotted
+			prev_count = recon_counter
+			
+		elseif Timer_GetRemaining(1) == 0 and (prev_count == recon_counter) then
+			
+			-- if the number of recon points spotted hasn't changed within the time limit then tell the player to move forward and find the strongpoints
+			Util_StartIntel(EVENTS.Recon_Reminder)
+			-- nag the player with the objective
+			Objective_UpdateText(OBJ_Recon, t_recon.update.title, t_recon.update.desc)
+			Timer_Add(1, reminder_time)
+			
+		-- if the player has found another strongpoint since the last check, add more time until you remind again
+		elseif Timer_GetRemaining(1) == 0 and (prev_count ~= recon_counter) then
+			Timer_Add(1, reminder_time)
+			
+		end
+	end
+end
+
+
+
+
+	
+	
+-- trigger the mine layer manager
+function Shell_MineManager()
+	
+	
+	for k,v in pairs(t_shell.mine) do 
+		
+		if EGroup_IsEmpty(v.egroup) ~= true then
+	
+			if SGroup_IsEmpty(v.sgroup) then
+				
+				-- Create Mine layer
+				Util_CreateSquads(player2, v.sgroup, SBP.AXIS.PIONEER, v.egroup, v.src, 1, 1)
+				SGroup_AddGroup(sg_shell_mineAll, v.sgroup)
+				t_shell.mine_deaths = t_shell.mine_deaths+1
+				-- if too many pioneers have been created
+				if t_shell.mine_deaths > t_shell.mine_maxdeath then
+					-- can take action if too many mine layers have been killed
+					
+				end
+				break
+				
+			-- are you underattack
+			elseif SGroup_IsUnderAttack(v.sgroup, false, 5) then
+				-- pick a trak and go there
+				Cmd_Stop(v.sgroup)
+				local pos = EGroup_FindNearestEntity(v.sgroup, v.egroup)
+				Cmd_Move(v.sgroup, pos, NO_QUEUE, NIL_DELETE, NIL_FACE, NIL_OFFSET, NIL_DIST, 12)
+				
+			-- are you NOT moving and NOT building a mine?
+			elseif SGroup_IsMoving(v.sgroup, ANY) == false and Squad_GetActiveCommand(SGroup_GetSpawnedSquadAt(v.sgroup, 1)) ~= SQUADSTATEID_Construction then
+			-- i guess you're idle
+				
+				-- pick a new spot to mine
+				-- each mine layer focuses on it's own set of areas
+				-- they do not share areas like the Lyon example
+				-- there is also no cap to how many they can build in an area
+				
+				local rand = World_GetRand(1, table.getn(v.markers))
+				local marker = v.markers[rand]
+				local pos1 = Marker_GetPosition(marker)
+				-- move there
+				Cmd_Move(v.sgroup, pos1, NO_QUEUE, NIL_DELETE, NIL_FACE, NIL_OFFSET, NIL_DIST, 12)
+				
+				-- pick a random spot
+				local pos2 = World_GetRandPos(pos1, 20)
+				
+				-- build a random thing
+				local build = {EBP.AXIS.MINES, EBP.AXIS.TANK_TRAP}
+				local EBP = build[World_GetRand(1, 2)]
+				Command_PlayerSquadConstructBuilding(player2, v.sgroup, EBP, pos2, pos2, true)
+			end
+		end
+	end
+end
+
+
+
+-------------------------------------------------------------------------
+-- Tank Attack functions
+-------------------------------------------------------------------------	
+
+
+-- spawns tanks to attack the player when they've arrived at the leftmost VP
+function TankAttack()
+		
+	
+	Player_GetAll(player1)
+	
+	if Prox_AreSquadsNearMarker(sg_allsquads, mkr_path3_end, ANY) then
+	
+		Rule_RemoveMe()
+		for k, this in pairs(t_tank_attack) do
+		
+			Util_CreateSquads(player2, this.sgroup, SBP.AXIS.PANZER, this.spawn)
+			SGroup_AddGroup(sg_tank_attack, this.sgroup)
+		end
+		
+		Rule_AddInterval(TankAttackManager, 3)
+	end
+end
+
+-- manages the tanks at the leftmost VP
+function TankAttackManager()
+	
+	if SGroup_IsEmpty(sg_tank_attack) then
+		Rule_RemoveMe()
+		
+	else
+		
+		for k, this in pairs(t_tank_attack) do
+		
+			-- if the tank is low on health, tell it to retreat
+			if SGroup_GetAvgHealth(this.sgroup) < .3 then
+				Cmd_Move(this.sgroup, mkr_offmap7, NO_QUEUE, mkr_offmap7, NIL_FACE, NIL_OFFSET, NIL_DIST, NIL_COVER)
+				this.camping = false
+			
+			-- if the tank is under attack, tell the tank to try to flank the attacker
+			elseif SGroup_IsUnderAttack(this.sgroup, ANY, 10) and SGroup_IsMoving(this.sgroup, ALL) == false then
+				SGroup_Clear(sg_temp)
+				SGroup_GetLastAttacker(this.sgroup, sg_temp)
+				if SGroup_IsEmpty(sg_temp) == false then
+					Cmd_Move(this.sgroup, sg_temp, NO_QUEUE, NIL_DEST, NIL_FACE, OFFSET_RIGHT, World_GetRand(15, 20))
+					this.camping = false
+				end
+				
+				
+			-- if nothing's happening, camp the VP
+			elseif this.camping == false then
+				Cmd_Move(this.sgroup, this.dest)
+				this.camping = true
+			end
+		end
+	end
+end
+
+
+-------------------------------------------------------------------------
+-- Victory Point functions
+-------------------------------------------------------------------------	
+
+
+-- This function checks which player has captured a VP and grants the territory to appropriate player
+function Territory_Checker()
+	
+	if Rule_Exists(Bombing_Run_Manager) then
+		
+		for k, v in pairs(t_victory_points) do
+		
+			Objective_RemoveUIElements(OBJ_Recon, hpid_victory_point[k]) 
+		end
+--~ 		Rule_RemoveMe()
+	else
+	
+		for k,v in pairs(t_victory_points) do 
+		
+			local player = Util_GetPlayerOwner(v.vp)
+			if player ~= Util_GetPlayerOwner(v.territory) then
+				if World_OwnsEGroup(v.vp, ANY) then
+					Entity_SetStrategicPointNeutral(EGroup_GetSpawnedEntityAt(v.territory, 1))
+				else
+					EGroup_InstantCaptureStrategicPoint(v.territory, player)
+					
+					-- play the speech
+					if player == player1 then
+						
+						Objective_RemoveUIElements(OBJ_Recon, hpid_victory_point[k])
+						-- change hintpoint to tell the player to defend the VP
+						hpid_victory_point[k] = Objective_AddUIElements(OBJ_Recon, v.vp, true, 1359126, true, 6)
+						
+						local count = 0
+			
+						for k, this in pairs(t_victory_points) do
+							if EGroup_IsCapturedByPlayer(this.vp, player1, ALL) then
+								count = count + 1
+							end
+						end
+						
+						if count == 1 then
+							Util_StartIntel(EVENTS.First_VP_Captured)
+						elseif count == 2 then
+							Util_StartIntel(EVENTS.Second_VP_Captured)
+						end
+					
+					else
+						-- play speech telling the player they lost a VP
+						Util_StartIntel(EVENTS.Lost_VP)
+						
+						Objective_RemoveUIElements(OBJ_Recon, hpid_victory_point[k])
+						-- change hintpoint to tell the player to capture the VP
+						hpid_victory_point[k] = Objective_AddUIElements(OBJ_Recon, v.vp, true, 1359121, true, 6)
+					end
+				end
+			end
+		end	
+	end
+end
+
+
+
+-- This function checks if the player has captured enough Victory Points to start the timer
+function CheckVictoryPoints()
+
+	local count = 0
+	
+	for k, this in pairs(t_victory_points) do
+		if EGroup_IsCapturedByPlayer(this.vp, player1, ALL) then
+			count = count + 1
+			
+			if fg_first_vp_captured == false then
+				fg_first_vp_captured = true
+			end
+			
+		end
+	end   
+	
+	-- if the player has all 3 VP's then tell the player to call in the bombing runs
+	if count == 3 then
+	
+		if fg_all_vps_captured == false then
+			
+			fg_all_vps_captured = true
+			
+			if EGroup_IsEmpty(eg_recon_bunkersAll) == false then
+				-- reveal the bombing run button if there are still bunkers left
+				Player_SetAbilityAvailability(player1, ABILITY.SP.CAEN_START_BOMBING_RUNS, ITEM_UNLOCKED)
+				UI_FlashAbilityButton(ABILITY.SP.CAEN_START_BOMBING_RUNS, true, BT_UI_Strong_AbilityBtn)
+				Rule_AddOneShot(AddHintpoint, 1)
+				Util_StartIntel(EVENTS.All_VPs_Captured)
+				-- update the objective 
+				if t_recon.update.active == false then
+					t_recon.update = {title = 1359123, desc = 1359111, active = true} -- "call in planes"
+					Objective_UpdateText(OBJ_Recon, t_recon.update.title, t_recon.update.desc)
+				end
+			end
+		end
+		
+	else
+		-- update the objective 
+		if t_recon.update.active == true then
+			t_recon.update = {title = 1359101, desc = 1359111, active = false} -- "capture and defend"
+			Objective_UpdateText(OBJ_Recon, t_recon.update.title, t_recon.update.desc)
+		end
+		-- remove the ability button since the player doesn't have enough VPs
+		Player_SetAbilityAvailability(player1, ABILITY.SP.CAEN_START_BOMBING_RUNS, ITEM_REMOVED)
+		fg_all_vps_captured = false
+	end
+	
+	-- update the counter
+	Objective_SetCounter( OBJ_Recon, count, 3 )
+	
+	-- tell the function that handles counterattack infantry how many vp's the player has
+	vp_count = count
+end
+
+-- adds a hintpoint to the bombing run button
+function AddHintpoint()
+	HintPoint_AddToAbilityButton(ABILITY.SP.CAEN_START_BOMBING_RUNS, 1359123, true)
+end
+
+
+
+
+-- This function periodically spawns infantry to try to take back the VPs
+function SpawnAttackers()
+	
+	local num = World_GetRand(1, 3)
+	local random_num = World_GetRand(15, 45)
+	local marker = false
+	local support_marker = false
+	local target = false
+	local sgroup = false
+	local sgroup2 = false
+	local support_sbp = false
+	local support_num = World_GetRand(1, 3)
+	local marker_num = World_GetRand(1, 3)
+	local num_infantry = 0	-- how many infantry to spawn is determined by how many vp's the player controls
+	local delay = 600	-- how much time it takes for the attacks to ramp up in power
+	
+	
+	if Objective_IsComplete(OBJ_Recon) or Rule_Exists(Bombing_Run_Manager) then
+		Rule_RemoveMe()
+	
+--~ 	elseif fg_all_vps_captured == true then
+	
+--~ 		-- spawn the final wave to attack all of the VP's while the bombers are incoming
+--~ 		for n = 1, table.getn(t_victory_points) do
+--~ 			
+--~ 			num_infantry = 2
+--~ 			
+--~ 			if n == 1 then
+--~ 				target = eg_victory_point1
+--~ 				sgroup = sg_vp_attacker1
+--~ 				marker = mkr_offmap7
+--~ 			
+--~ 			elseif n == 2 then
+--~ 				target = eg_victory_point2
+--~ 				sgroup = sg_vp_attacker2
+--~ 				marker = mkr_offmap7
+--~ 			
+--~ 			elseif n == 3 then
+--~ 				target = eg_victory_point3
+--~ 				sgroup = sg_vp_attacker3
+--~ 				marker = mkr_offmap9
+--~ 			end
+--~ 			
+--~ 			if EGroup_IsCapturedByPlayer(t_victory_points[n].vp, player2, ALL) == false and SGroup_IsEmpty(sgroup) then
+--~ 				Util_CreateSquads(player2, sgroup, SBP.AXIS.GRENADIER, marker, marker, num_infantry, 4, true, nil, Caen_RandUpg())
+--~ 				SGroup_AddGroup(sg_vp_attackers, sgroup)
+--~ 				Cmd_AttackMove(sgroup, target)
+--~ 			end
+--~ 		end
+	
+	
+	else
+	
+		-- determine how many infantry to spawn based on how many vp's the player has
+		if vp_count == 1 then
+			num_infantry = 1
+			
+			if Timer_Exists(timer_counterattack_infantry) then
+				if Timer_GetRemaining(timer_counterattack_infantry) <= 0 then
+					Timer_Add(timer_counterattack_infantry, delay)
+				end
+			end
+				
+		elseif vp_count > 1 then
+			
+			if Timer_Exists(timer_counterattack_infantry) == false then
+				Timer_Start(timer_counterattack_infantry, delay)
+				
+			elseif Timer_GetRemaining(timer_counterattack_infantry) <= 0 then
+				num_infantry = 2
+			else
+				num_infantry = 1
+			end
+		end
+		
+		-- randomly pick a vp to check
+		if num == 1 then
+			target = eg_victory_point1
+			sgroup = sg_vp_attacker1
+			sgroup2 = sg_vp_attacker_support1
+			support_marker = mkr_attack1
+			
+			-- assign a spawn point
+			if marker_num == 1 then
+				marker = mkr_offmap7
+			elseif marker_num == 2 then
+				marker = mkr_path4_end
+			else
+				marker = mkr_offmap7
+			end
+			
+		elseif num == 2 then
+			target = eg_victory_point2
+			sgroup = sg_vp_attacker2
+			sgroup2 = sg_vp_attacker_support2
+			support_marker = mkr_attack2
+			
+			-- assign a spawn point
+			if marker_num == 1 then
+				marker = mkr_offmap7
+			elseif marker_num == 2 then
+				marker = mkr_strong2_mine1
+			else
+				marker = mkr_clear_mine10
+			end
+			
+		elseif num == 3 then
+			target = eg_victory_point3
+			sgroup = sg_vp_attacker3
+			sgroup2 = sg_vp_attacker_support3
+			support_marker = mkr_attack3
+			
+			-- assign a spawn point
+			if marker_num == 1 then
+				marker = mkr_offmap9
+			elseif marker_num == 2 then
+				marker = mkr_strong1_mine2
+			else
+				marker = mkr_strong2_mine1
+			end
+			
+		end
+		
+		-- determine what the support unit for the attack will be
+		if support_num == 1 then
+			support_sbp = SBP.AXIS.MORTAR
+			
+		elseif support_num == 2 then
+			support_sbp = SBP.AXIS.HEAVYMG
+			
+		elseif support_num == 3 then
+			support_sbp = SBP.AXIS.SNIPER
+		end
+		
+		if fg_first_vp_captured == false then
+			-- don't start counting until the player has captured a vp for the first time
+			return
+			
+		-- spawn attackers if the player has the vp and enough time has passed, only allow one group per VP
+		elseif EGroup_IsCapturedByPlayer(t_victory_points[num].vp, player2, ALL) == false and (vp_attacker_count >= random_num) and SGroup_IsEmpty(sgroup) then
+			Util_CreateSquads(player2, sgroup, SBP.AXIS.GRENADIER, marker, marker, num_infantry, 4, true, nil, Caen_RandUpg())
+			SGroup_AddGroup(sg_vp_attackers, sgroup)
+			Cmd_AttackMoveThenCapture(sgroup, target)
+			
+			
+			
+			-- spawn a support unit if the player has control of enough vp's
+			if vp_count > 1 then
+				Util_CreateSquads(player2, sgroup2, support_sbp, marker, marker)
+				SGroup_AddGroup(sg_vp_attackers, sgroup2)
+				Cmd_AttackMove(sgroup2, support_marker)
+			end
+			
+			
+			vp_attacker_count = 0
+		else
+			-- no attack triggered during this iteration of the loop
+			vp_attacker_count = vp_attacker_count + 1
+		end
+	end
+end
+
+
+
+-- plays speech when the Axis attack a victory point
+function Event_Counterattack()
+	local min_time = 40	-- how much time has to pass before it will display another warning speech event
+	local current_time = World_GetGameTime()
+	local time_passed = current_time - last_counterattack_reminder 	-- how much time has passed since the last reminder speech
+	local range = 40	-- the distance from the vp the attackers have to be to trigger the reminder speech
+	
+	if Objective_IsComplete(OBJ_Recon) or Rule_Exists(Bombing_Run_Manager) then
+		Rule_RemoveMe()
+	
+	elseif (Prox_AreSquadsNearMarker(sg_vp_attackers, Util_GetPosition(eg_victory_point1), ANY, range) or Prox_AreSquadsNearMarker(sg_vp_attackers, Util_GetPosition(eg_victory_point2), ANY, range) 
+	or Prox_AreSquadsNearMarker(sg_vp_attackers, Util_GetPosition(eg_victory_point3), ANY, range)) 
+	and time_passed >= min_time then
+		last_counterattack_reminder = World_GetGameTime()
+		
+		-- if the Axis are capturing a point back, play the speech event
+		if SGroup_IsCapturing(sg_vp_attacker1, ANY) or SGroup_IsCapturing(sg_vp_attacker2, ANY) or SGroup_IsCapturing(sg_vp_attacker3, ANY) then
+			Util_StartIntel(EVENTS.Losing_VP)
+		else
+			Util_StartIntel(EVENTS.Counterattack)
+		end
+	end
+
+end
+
+
+-------------------------------------------------------------------------
+-- Strongpoint infantry functions
+-------------------------------------------------------------------------
+-- These functions handle the behavior and spawning of the infantry that fortify the strongpoints
+
+-- only spawn the strongpoint infantry after at least one VP has been captured
+function CheckSpawnStrongpointInfantry()
+
+	if fg_first_vp_captured == true then
+		Rule_RemoveMe()
+		
+		--spawn the infantry
+		Recon_SpawnStrongpointInfantry()
+		Rule_AddDelayedInterval(Recon_StrongpointInfantryManager, 10, 3)
+	end
+end
+
+function Recon_SpawnStrongpointInfantry()
+	for k, this in pairs(t_strongpoint_infantry) do
+	
+		local marker1 = false
+		local marker2 = false
+		local marker3 = false
+		
+		if k == 1 then
+			marker1 = mkr_strongpoint_infantry1a
+			marker2 = mkr_strongpoint_infantry1b
+			marker3 = mkr_strongpoint_infantry1c
+			
+		elseif k == 2 then
+			marker1 = mkr_strongpoint_infantry2a
+			marker2 = mkr_strongpoint_infantry2b
+			marker3 = mkr_strongpoint_infantry2c
+			
+		elseif k == 3 then
+			marker1 = mkr_strongpoint_infantry3a
+			marker2 = mkr_strongpoint_infantry3b
+			marker3 = mkr_strongpoint_infantry3c
+			
+		elseif k == 4 then
+			marker1 = mkr_strongpoint_infantry4a
+			marker2 = mkr_strongpoint_infantry4b
+			marker3 = mkr_strongpoint_infantry4c
+		end
+		
+		Util_CreateSquads(player2, this.sgroup, SBP.AXIS.GRENADIER, marker1, nil, nil, nil, nil, nil, UPG.AXIS.GREN_MG42)
+		Util_CreateSquads(player2, this.sgroup, SBP.AXIS.GRENADIER, marker2, nil, nil, nil, nil, nil, UPG.AXIS.GREN_PANZERSCHRECK)
+		Util_CreateSquads(player2, this.sgroup, SBP.AXIS.GRENADIER, marker3)
+		
+		-- tell the trench infantry to hold position
+		Cmd_DoPlan(this.sgroup, "infantry-idle-plan-NO-MOVE")
+	end
+end
+	
+	
+-- This function handles the behavior of the infantry that hang around behind a strongpoint. 
+-- They retreat when their strongpoint is fully bombed or they are too hurt.
+function Recon_StrongpointInfantryManager()
+	
+	local bunker_flag = false
+	
+	for k, this in pairs(t_strongpoint_infantry) do
+	
+		-- check if any of the strongpoints have been fully bombed
+		if this.flag == 1 then
+			bunker_flag = fg_area4_bunkers_dead
+		elseif this.flag == 2 then
+			bunker_flag = fg_area3_bunkers_dead
+		elseif this.flag == 3 then
+			bunker_flag = fg_area2_bunkers_dead
+		elseif this.flag == 4 then
+			bunker_flag = fg_area1_bunkers_dead
+		end
+		
+		if table.getn(t_strongpoint_infantry) == 0 then
+			Rule_RemoveMe()
+		elseif SGroup_IsEmpty(this.sgroup) then
+			table.remove(t_strongpoint_infantry, k)
+		elseif bunker_flag == true then
+			Cmd_Move(this.sgroup, this.mkr, false, this.mkr)
+		elseif SGroup_TotalMembersCount(this.sgroup) < 7 then
+			Cmd_Move(this.sgroup, this.mkr, false, this.mkr)
+		end
+	end
+end
+	
+
+	
+
+	
+-- this function spawns new squads to attack if certain squads are killed	
+function Recon_SpawnSquads()
+	
+	if table.getn(t_spawn_squads) == 0 then
+			Rule_RemoveMe()
+	else
+		for k, this in pairs(t_spawn_squads) do
+			
+			if SGroup_IsEmpty(this.sgroup_check) then
+				Util_CreateSquads(player2, this.sgroup_new, SBP.AXIS.GRENADIER, this.spawn, this.mkr, 1, nil, true)
+				table.remove(t_spawn_squads, k)
+			end
+			
+		end
+	end
+end
+	
+
+-------------------------------------------------------------------------
+-- Idle Attack functions
+-------------------------------------------------------------------------	
+-- if the player is idle for too long, they will come under attack
+
+function Recon_IdleAttack()
+
+	local max_idle_time = 300    -- the maximum amount of time without completing something significant without being attacked
+	
+	if Objective_IsComplete(OBJ_Recon) or Rule_Exists(Bombing_Run_Manager) then
+		Rule_RemoveMe()
+	else
+	
+		if SGroup_IsEmpty(sg_player_buildings) == false then
+		
+			if SGroup_IsEmpty(sg_player_hq) == false then
+				sg_idle_target = sg_player_hq
+				
+			elseif SGroup_IsEmpty(sg_player_soldier_hq) == false then
+				sg_target = sg_player_soldier_hq
+				
+			elseif SGroup_IsEmpty(sg_player_armour_hq) == false then
+				sg_idle_target = sg_player_armour_hq
+			end
+			
+			Player_GetAll(player1)
+			
+			--if idle_attack_count >= 2 then
+			
+			if Objective_IsComplete(OBJ_Recon) or Rule_Exists(Bombing_Run_Manager) then
+				Rule_RemoveMe()
+			
+			-- mark the time if the player is fighting
+			elseif SGroup_IsDoingAttack(sg_allsquads, ANY, 10) then
+				last_time_active = World_GetGameTime()
+			
+			-- if the player has been idle then send units to attack the player
+			elseif ((World_GetGameTime() - last_time_active) >= max_idle_time) and t_bridgehead.tankDead == true then
+				-- spawn units that attack the player
+				IdleAttack_TankCreate()
+				idle_attack_count = idle_attack_count + 1
+				-- mark the time for the idle attack check
+				last_time_active = World_GetGameTime()
+			end
+		end
+	end
+end
+
+-- spawns the idle attack force and triggers the behavior rule
+function IdleAttack_TankCreate()
+	
+	local num_tank = 1
+	local num_infantry = 1
+	
+	-- after a few times, ramp up the number of enemies
+	if idle_attack_count > 1 then
+		num_tank = 2
+		num_infantry = 2
+	end
+	
+	-- send in the tank
+	Util_CreateSquads(player2, sg_chateau_tank, SBP.AXIS.PANZER, mkr_offmap3, sg_idle_target, num_tank, nil, true)
+	Util_CreateSquads(player2, sg_chateau_counter[5], SBP.AXIS.GRENADIER, mkr_offmap3, sg_idle_target, num_infantry, nil, true)
+	SGroup_AddGroup(sg_chateau_axisAll, sg_chateau_counter[5])
+	-- start tank behavior
+	Rule_AddInterval(IdleAttack_TankCheck, 5)
+
+end
+
+function IdleAttack_TankCheck()
+	local sgroup1 = sg_chateau_tank
+	local sgroup2 = sg_chateau_tankAttacker
+	local sgroup3 = sg_chateau_counter[5]
+	
+	
+	if SGroup_IsEmpty(sgroup1) then
+		
+		-- remaining guys run away
+		if SGroup_IsEmpty(sg_chateau_axisAll) == false then
+			Cmd_Move(sg_chateau_axisAll, mkr_offmap3, NO_QUEUE, mkr_offmap3, NIL_FACE, NIL_OFFSET, NIL_DIST, NIL_COVER)
+		end
+		Rule_RemoveMe()
+		
+	elseif SGroup_GetAvgHealth(sgroup1) < .2 then
+		Cmd_Move(sgroup1, mkr_offmap3, NO_QUEUE, mkr_offmap3, NIL_FACE, NIL_OFFSET, NIL_DIST, NIL_COVER)
+		Rule_RemoveMe()
+		
+	elseif SGroup_IsUnderAttack(sgroup1, false, 10) and SGroup_IsMoving(sgroup1, false) == false then
+		SGroup_GetLastAttacker(sgroup1, sgroup2)
+		
+		-- this if check was put in here to hopefully prevent a SCAR error when being attacked by a bombing run
+		if SGroup_IsEmpty(sgroup2) == false then
+			Cmd_Move(sgroup1, sgroup2, NO_QUEUE, NIL_DEST, NIL_FACE, OFFSET_RIGHT, World_GetRand(15, 20))
+		end
+	
+		
+		if SGroup_IsEmpty(sgroup3) and World_GetRand(1,3) < 3 then
+			Util_CreateSquads(player2, sgroup3, SBP.AXIS.GRENADIER, mkr_offmap3, sgroup1, 1, World_GetRand(3, 4), true)
+			SGroup_AddGroup(sg_chateau_axisAll, sgroup3)
+		end
+		
+	else
+		Cmd_AttackMove(sg_chateau_axisAll, sg_idle_target)
+	end
+end
+
+
+
+
+-------------------------------------------------------------------------
+-- Tactical Event Speech Functions
+-------------------------------------------------------------------------
+
+-- This function handles the random speech whenever a player fights a Panzer
+function Event_Panzers()
+	local min_time = 120	-- how much time has to pass before it will display another warning speech event
+	local current_time = World_GetGameTime()
+	local time_passed = current_time - last_panzer_warning 	-- how much time has passed since the last warning speech
+--~ 	Player_GetAll(player1)
+	Player_GetAll(player2)
+	SGroup_Filter(sg_allsquads, SBP.AXIS.PANZER, FILTER_KEEP)
+	
+	if Objective_IsComplete(OBJ_Recon) or Rule_Exists(Bombing_Run_Manager) then
+		Rule_RemoveMe()
+		
+	elseif SGroup_IsDoingAttack(sg_allsquads, ANY, 5) and time_passed >= min_time then
+		last_panzer_warning = World_GetGameTime()
+		Util_StartIntel(EVENTS.Panzer_Warning)
+		
+		
+--~ 	elseif SGroup_IsUnderAttack(sg_allsquads, ANY, 5) and time_passed >= min_time then
+--~ 		SGroup_GetLastAttacker(sg_allsquads, sg_panzer_attacker)
+--~ 		if SGroup_ContainsBlueprints(sg_panzer_attacker, SBP.AXIS.PANZER, ANY) and Event_IsAnyRunning() == false then			
+--~ 			last_panzer_warning = World_GetGameTime()
+--~ 			Util_StartIntel(EVENTS.Panzer_Warning)
+--~ 		end
+	end
+	
+end
+
+
+-- This function handles the random speech whenever a player's officer is near a strongpoint that reminds the player to mark it
+--~ function Event_OfficerNearMarker()
+--~ 	local min_time = 40	-- how much time has to pass before it will display another warning speech event
+--~ 	local current_time = World_GetGameTime()
+--~ 	local time_passed = current_time - last_mark_strongpoint_reminder 	-- how much time has passed since the last reminder speech
+--~ 	local range = 50	-- the distance from the strongpoint the officer has to be to trigger the reminder speech
+--~ 	
+--~ 	if Objective_IsComplete(OBJ_Recon) or Rule_Exists(Bombing_Run_Manager) then
+--~ 		Rule_RemoveMe()
+--~ 	
+--~ 	elseif (Prox_AreSquadsNearMarker(sg_officers, mkr_strong_area1, ANY, range) or Prox_AreSquadsNearMarker(sg_officers, mkr_strong_area2, ANY, range) 
+--~ 	or Prox_AreSquadsNearMarker(sg_officers, mkr_strong_area3, ANY, range) or Prox_AreSquadsNearMarker(sg_officers, mkr_strong_area4, ANY, range))
+--~ 	and time_passed >= min_time then
+--~ 		last_mark_strongpoint_reminder = World_GetGameTime()
+--~ 		Util_StartIntel(EVENTS.Officer_Near_Strongpoint)
+--~ 	end
+--~ end
+
+
+
+
+-- This function handles the random speech to remind the player to capture points
+--~ function Event_CapturePoint()
+--~ 	local min_time = 60	-- how much time has to pass before it will display another warning speech event
+--~ 	local current_time = World_GetGameTime()
+--~ 	local time_passed = current_time - last_capture_point_reminder 	-- how much time has passed since the last reminder speech
+--~ 	local range = 30	-- the distance from the strategic point the player has to be to trigger the reminder speech
+--~ 	local count = 0
+--~ 	
+--~ 	
+--~ 	if Objective_IsComplete(OBJ_Recon) or Rule_Exists(Bombing_Run_Manager) then
+--~ 		Rule_RemoveMe()
+--~ 	
+--~ 	else
+--~ 		for k, this in pairs(t_capture_point) do
+--~ 			if EGroup_IsCapturedByPlayer(this, player1, ANY) == false and Prox_PlayerSquadsInProximityOfEntities(player1, this, range, ANY) 
+--~ 			and time_passed >= min_time and Event_IsAnyRunning() == false then
+--~ 		
+--~ 				last_capture_point_reminder = World_GetGameTime()
+--~ 				
+--~ 				if this == eg_victory_point1 or this == eg_victory_point2 or this == eg_victory_point3 then
+--~ 					Util_StartIntel(EVENTS.Capture_VP)
+--~ 				else
+--~ 					Util_StartIntel(EVENTS.Capture_Point)
+--~ 				end
+--~ 			end
+--~ 		end
+--~ 		
+--~ 	end
+--~ end
+
+function Event_CapturePoint()
+	local min_time = 120	-- how much time has to pass before it will display another warning speech event
+	local current_time = World_GetGameTime()
+	local time_passed = current_time - last_capture_point_reminder 	-- how much time has passed since the last reminder speech
+	local range = 30	-- the distance from the strategic point the player has to be to trigger the reminder speech
+	local count = 0
+	
+	
+	if Objective_IsComplete(OBJ_Recon) or Rule_Exists(Bombing_Run_Manager) then
+		Rule_RemoveMe()
+	
+	else
+		for k, this in pairs(t_capture_point) do
+			if EGroup_IsCapturedByPlayer(this, player1, ANY) == false and Prox_PlayerSquadsInProximityOfEntities(player1, this, range, ANY) 
+			and time_passed >= min_time and Event_IsAnyRunning() == false then
+		
+				last_capture_point_reminder = World_GetGameTime()
+				
+				if this == eg_victory_point1 or this == eg_victory_point2 or this == eg_victory_point3 then
+					Util_StartIntel(EVENTS.Capture_VP)
+				else
+					Util_StartIntel(EVENTS.Capture_Point)
+				end
+				
+			elseif EGroup_IsCapturedByPlayer(this, player1, ANY) then
+				table.remove(t_capture_point, k)
+			
+			else
+				-- add the current to the end
+				table.insert(t_capture_point, t_capture_point[k])
+				-- remove the current
+				table.remove(t_capture_point, k) -- this is so only 1 prox check is done a cycle, but its always a new one
+			end
+			break
+		end
+		
+	end
+end
+
+
+
+-- This function handles the speech when the player is fighting
+function Event_Combat()
+	local min_time = 150	-- how much time has to pass before it will display another warning speech event
+	local current_time = World_GetGameTime()
+	local time_passed = current_time - last_combat_warning 	-- how much time has passed since the last warning speech
+	Player_GetAll(player1)
+	
+	if Objective_IsComplete(OBJ_Recon) or Rule_Exists(Bombing_Run_Manager) then
+		Rule_RemoveMe()
+		
+	elseif SGroup_IsUnderAttack(sg_allsquads, ANY, 10) and time_passed >= min_time then
+		last_combat_warning = World_GetGameTime()
+		local num = World_GetRand(1, 2)
+		
+		-- randomly choose between a tactical event or an ambient event
+		if num == 1 then
+			Util_StartIntel(EVENTS.Combat)
+		else
+			Util_StartAmbient(EVENTS.Ambient_Combat)
+		end
+	end
+end
+
+
+
+-- This function handles the speech when the player is fighting
+--~ function Event_FlakGuns()
+--~ 	local min_time = 60	-- how much time has to pass before it will display another warning speech event
+--~ 	local current_time = World_GetGameTime()
+--~ 	local time_passed = current_time - last_flak_warning 	-- how much time has passed since the last warning speech
+--~ 	Player_GetAll(player1)
+--~ 	
+--~ 	if SGroup_IsEmpty(sg_recon_flakaa) or fg_area4_bunkers_dead == true then
+--~ 		Rule_RemoveMe()
+--~ 		
+--~ 	elseif SGroup_IsUnderAttack(sg_allsquads, ANY, 10) and time_passed >= min_time then
+--~ 		last_flak_warning = World_GetGameTime()
+--~ 		Util_StartIntel(EVENTS.Flak_Guns)
+--~ 	end
+--~ end
+
+
+
+-----------------------------------------------------------------------
+-- Ambient Event speech
+------------------------------------------------------------------------
+
+-- this function plays the ambient speech for each bombing run
+function Bombing_Run_Ambient_Speech()
+	
+	if bombing_run_speech_count > 4 then
+		Rule_RemoveMe()
+	
+	elseif fg_first_bombing_run == true then
+	
+		Util_StartAmbient(EVENTS.Ambient_First_Bombing_Run)
+		fg_first_bombing_run = false
+		bombing_run_speech_count = bombing_run_speech_count + 1
+		
+	else
+	
+		Util_StartAmbient(EVENTS.Ambient_Bombing_Runs)
+		bombing_run_speech_count = bombing_run_speech_count + 1
+	end
+
+end
+
+
+-- plays speech when the Axis attack a victory point
+function Help_Ambient_Speech()
+	local min_time = 70	-- how much time has to pass before it will display another warning speech event
+	local current_time = World_GetGameTime()
+	local time_passed = current_time - last_help_reminder 	-- how much time has passed since the last reminder speech
+	
+	if Objective_IsComplete(OBJ_Help) or Objective_IsFailed(OBJ_Help) or Rule_Exists(Bombing_Run_Manager) then
+		Rule_RemoveMe()
+	
+	elseif time_passed >= min_time then
+	
+		last_help_reminder = World_GetGameTime()
+		
+		-- randomly play either the reminder speech event or the ambient event
+		if World_GetRand(1, 2) == 1 then
+			Util_StartIntel(EVENTS.Help_Reminder)
+		else
+			Util_StartAmbient(EVENTS.Ambient_Help_Ally)
+		end
+	end
+end
+
+
+-------------------------------------------------------------------------
+-- Game Over
+-------------------------------------------------------------------------
+
+function Caen_GameOver_End()
+	if Event_IsAnyRunning() == false then
+		
+		-- retreat all of the axis units
+		Player_GetAll(player2, sg_axis_all)
+--~ 		Cmd_Retreat(sg_axis_all)
+		
+		-- restoring the points
+		for k,v in pairs(t_caen_points) do 
+			EGroup_DestroyAllEntities(eg_caen_NoPoints[k])
+			Util_CreateEntities(player2, v.egroup, v.ebp, v.pos, 1)
+			
+			-- add it to its 2nd egroup if it is supposed to have one
+			if v.t_egroups ~= false then
+				for n, this in pairs(v.t_egroups) do
+					EGroup_AddEGroup(this, v.egroup)
+				end
+			end
+		
+		end
+		
+		Game_EndSP( true, nil, true )
+		
+		Rule_RemoveMe()
+		
+	end
+end
+	
+function Caen_GameOver_Fail()
+	if Event_IsAnyRunning() == false then
+		
+		
+		Game_EndSP(false)
+		
+		
+		Rule_RemoveMe()
+		
+	end
+end	
+	
+
+-------------------------------------------------------------------------
+-- Mission Util Functions
+-------------------------------------------------------------------------
+
+function EGroup_GetPositionIfOK(egroup, player, pos)
+	local EGroupPlayerOwner = function(egID, itmID, entID)
+		if World_OwnsEntity(entID) or Entity_GetPlayerOwner(entID) == player then
+			return true
+		end
+	end
+	
+	if EGroup_IsEmpty(egroup) or EGroup_ForEach(egroup, EGroupPlayerOwner) == false then
+		return pos
+	else
+		return EGroup_GetPosition(egroup)
+	end
+end
+
+
+function Caen_AutoRetreat_Add(sgroup1, num1, marker1)
+	if t_caen_autoRetreat == nil then
+		t_caen_autoRetreat = {}
+	end
+	table.insert(t_caen_autoRetreat, {sgroup = sgroup1, num = num1, marker = marker1})
+	if Rule_Exists(Caen_AutoRetreat) == false then
+		Rule_AddInterval(Caen_AutoRetreat, 1)
+	end
+end
+
+function Caen_AutoRetreat()
+	local retreat = t_caen_autoRetreat
+	if table.getn(retreat) < 1 then
+		Rule_RemoveMe()
+	else
+		for k,v in pairs(retreat) do 
+			if SGroup_IsEmpty(v.sgroup) then
+				table.remove(t_caen_autoRetreat, k)
+				break
+			elseif SGroup_TotalMembersCount(v.sgroup) <= v.num then
+				Cmd_Move(v.sgroup, v.marker, false, v.marker)
+				table.remove(t_caen_autoRetreat, k)
+				break
+			end
+		end
+	end
+end
+
+function Caen_GetRandOffset(pos, dist)
+	local newpos = pos
+	newpos.x = newpos.x+World_GetRand(dist*-1, dist)
+	newpos.z = newpos.z+World_GetRand(dist*-1, dist)
+	return newpos
+end
+
+
+
+-- adds a sgroup to the manager
+function Caen_RocketStrike_Add(sgroup1, marker1, type1)
+	if t_rocket == nil then
+		t_rocket = {}
+	end
+	
+	table.insert(t_rocket, {sgroup = sgroup1, marker = marker1, count = 15, typeRocket = type1})
+
+	if Rule_Exists(Caen_RocketStrike_Control) == false then
+		Rule_AddInterval(Caen_RocketStrike_Control, 5)
+	end
+end
+
+-- tells the stuka's to fire at random targets within their sphere
+-- assumes player 2 controlling
+-- assumes player 1 target
+function Caen_RocketStrike_Control()
+
+	if Objective_IsComplete(OBJ_Recon) or Rule_Exists(Bombing_Run_Manager) then
+		Rule_RemoveMe()
+
+	else
+		for k,v in pairs(t_rocket) do 
+			-- are you empty
+			if SGroup_IsEmpty(v.sgroup) then
+				-- remove it from the table 
+				
+			-- are you moving?
+			elseif SGroup_IsMoving(v.sgroup, false) == false then
+				-- are you under attack?
+				if SGroup_IsUnderAttack(v.sgroup, false, 10) then
+					
+					if v.typeRocket ~= "nebel" and SGroup_GetAvgHealth(v.sgroup) < .4 then
+						-- if your health is low, run for the border
+						Cmd_Move(v.sgroup, Marker_GetPosition(v.marker), false, v.marker)
+						
+					else
+						-- else we may have you relocate
+					end
+					
+				-- if the count is high enough we can fire
+				--elseif v.count >= World_GetRand(25, 45) then       -- this was the old elseif for firing at infantry
+				elseif v.count >= World_GetRand(15, 45) then
+			
+					-- find a target
+					local target = SGroup_CreateIfNotFound("sg_stuka_target")
+					local dist = 100
+					if v.typeRocket == "nebel" then dist = 1000 end  -- this used to be 80 for when it fired at infantry (in case I want to revert)
+					
+					Player_GetAllSquadsNearMarker(player1, target, SGroup_GetPosition(v.sgroup), dist)
+					
+					if vp_count > 1 and World_GetRand(30, 60) <= delay_nebel_count then
+						-- filter for emplacement units
+						SGroup_Filter(target, {SBP.CW.ARTILLERY_25_POUNDER, SBP.CW.PRIEST, SBP.CW.BOFORS_AA, SBP.CW.MORTAR, SBP.CW.VICKERSMG }, FILTER_KEEP)
+						delay_nebel_count = 0
+					
+					else
+						-- filter for artillery units only
+						SGroup_Filter(target, {SBP.CW.ARTILLERY_25_POUNDER, SBP.CW.PRIEST }, FILTER_KEEP)
+					end
+					
+					
+					-- function to filter out any squad that isn't firing (nebels only fire at the player's attacking artillery until they have 2 vp's)
+					local _CheckSquad = function (gid, idx, sid)
+						if Squad_IsAttacking(sid, 10) == false and vp_count < 2 then
+							SGroup_Remove(gid, sid)
+						end
+					end
+					SGroup_ForEach(target, _CheckSquad)
+					
+				
+					local squadID = SGroup_GetRandomSpawnedSquad(target)
+					if scartype(squadID) ~= ST_NUMBER then
+						local targetPos = Squad_GetPosition(squadID)
+						-- and fire
+						if v.typeRocket == "nebel" then
+							Cmd_Ability(v.sgroup, ABILITY.AXIS.NEB_BARRAGE, targetPos, nil, true)
+						elseif v.typeRocket == "stuka" then
+							Cmd_Ability(v.sgroup, ABILITY.AXIS.HALFTRACK_ROCKETS, targetPos, nil, true)
+						end
+						
+						v.count = 0
+					end
+				-- else increment the count
+				else
+					v.count = v.count+1
+				end
+			-- if we're moving set the count to ten to make a fire when it stops more likely
+			elseif v.count < 10 then
+				v.count = 10
+			end
+		end
+		
+		delay_nebel_count = delay_nebel_count + 1
+	end
+end
+
+
+function Caen_RandUpg()
+	local t_upg = {UPG.AXIS.GREN_MG42, UPG.AXIS.GREN_PANZERSCHRECK, false, false}
+	local rand = World_GetRand(1, table.getn(t_upg))
+	local upgrade = t_upg[rand]
+	
+	return upgrade
+end
+
+
+function Sgroup_FindNearestSquad(sgroup1, sgroup2)
+	local posReturn = false
+	local dist = 9999
+	local GetNearest = function(sgID, itID, sqID)
+		local pos = Squad_GetPosition(sqID)
+		if World_DistanceSGroupToPoint(sgroup1, pos, true) < dist then
+			posReturn = pos
+		end
+	end
+	SGroup_ForEach(sgroup2, GetNearest)
+	return posReturn
+end
+
+function EGroup_FindNearestEntity(sgroup1, egroup1)
+	local posReturn = false
+	local dist = 9999
+	local GetNearest = function(egID, itID, enID)
+		local pos = Entity_GetPosition(enID)
+		if World_DistanceSGroupToPoint(sgroup1, pos, true) < dist then
+			posReturn = pos
+		end
+	end
+	EGroup_ForEach(egroup1, GetNearest)
+	return posReturn
+end
+
+
+function World_GetRandPos(pos, range)
+
+	if range == nil then
+		range = 0
+	end
+	
+	local dir = World_GetRand(1, math.floor(2000*math.pi)) / 1000
+	local offset = World_GetRand(1, (range * 1000)) / 1000
+	
+	return World_Pos(pos.x + (math.cos(dir) * offset), pos.y, pos.z + (math.sin(dir) * offset))
+
+end

@@ -1,0 +1,50 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+--
+-- Script File for the COH Performance Test
+--
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+-- World Builder Markers - Colour Key:
+--	Red			Enemy movement positions
+--	Green		Friendly movement positions
+-- 	Yellow		
+--	Magenta		Parachute-in spots
+--	Orange		Hidden people
+--	Grey		Trigger zones
+
+import("ScarUtil.scar")
+g_AIControl_Enable = false
+g_ATC_Enable = false
+
+-------------------------------------------------------------------------
+-- [[ ONINIT ]]
+-------------------------------------------------------------------------
+
+function OnInit()
+	-- start the opening NIS
+	Game_Letterbox(true, 0)
+	Game_FadeToBlack(FADE_OUT, 0)
+	FOW_Enable(false)
+	-- kick off the mission proper
+	Rule_Add(Rule_StartMission)
+end
+
+Scar_AddInit(OnInit)
+
+-------------------------------------------------------------------------
+-- [[ MISSION START ]]
+-------------------------------------------------------------------------
+
+--
+-- This rule is run as soon as SPACE is pressed
+--
+function Rule_StartMission()
+	Scar_DebugConsoleExecute("turn_off_warnings")
+	
+	--[[ this part has been scooped out - deg ]]
+	Util_StartNIS(EVENTS.NIS_NEWOPEN)
+	
+	Rule_RemoveMe()
+end

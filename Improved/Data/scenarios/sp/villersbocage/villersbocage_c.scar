@@ -1,0 +1,515 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+-- Mission Villers_C_
+
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+import("DLC1Import.scar")
+import("VillersBocage_AIScavenger.scar")   -- *** NOTE this file must be imported before objective, to ensure that preset units are not managed by the AI Scavenger
+import("VillersBocage_C_TankBattle.scar")
+import("VillersBocage_C_KillAntiInfantry.scar")
+import("VillersBocage_C_CaptureTown.scar")
+import("VillersBocage_C_InfantryAI.scar")
+import("VillersBocage_C_Medal.scar")
+import("VillersBocage_RPGMechanics.scar")
+import("VillersBocage_RPGTracker.scar")
+import("VillersBocage_Bounty.scar")
+import("VillersBocage_TankHeal.scar")
+
+
+-------------------------------------------------------------------------
+
+-- [[ SETUP ]]
+
+-------------------------------------------------------------------------
+
+function OnGameSetup()
+	-- string numbers should reference dat files
+	-- "allies_commonwealth" "allies" "axis" "axis_panzer_elite"
+	player1 = Setup_Player(1, 6000100, TRACE_AXIS, 1)
+	player2 = Setup_Player(2, 6000110, TRACE_ALLIES_COMMONWEALTH, 2)
+	player3 = Setup_Player(3, 6000100, TRACE_AXIS, TEAM_NEUTRAL)
+	player4 = Setup_Player(4, 6000100, TRACE_AXIS_PANZER_ELITE, 1)
+	
+	-- AI slot (ensure that the AI is on the same team as the other Axis player by setting the second parameter
+--~  	player3 = Setup_Player(3, "$000000", "Axis Infantry Company", 2)
+end
+
+function OnGameRestore()
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+	player3 = World_GetPlayerAt(3)
+	player4 = World_GetPlayerAt(4)
+	
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+end
+
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ ONINIT ]]
+
+-------------------------------------------------------------------------
+
+function OnInit()
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	-- a constant that stores the mission number for use with
+	-- setting the global speech paths, tech tree setup, and 
+	-- the player's starting resources
+	MISSION_NUMBER = 0303
+	
+	--[[ PRESET GAME STATE ]]
+	Setup_MissionPreset(MISSION_NUMBER)
+	
+	--[[ COUNTERATTACK CLEANUP ]]
+	Villers_C_CounterattackCleanup()
+	
+	--[[ PRESET DEBUG CONDITIONS ]]
+	Villers_C_Debug()
+	
+	--[[ MOD INITIAL STATS ]]
+	Villers_C_ModifyStats()
+	
+	--[[ SET RESTRICTIONS ]]
+	Villers_C_Restrictions()
+	
+	--[[ SET AI ]]
+	Villers_C_CpuInit()
+	
+	--[[ SET DIFFICULTY ]]
+	Villers_C_Difficulty()
+	
+	--[[ MISSION PRESETS ]]
+	Villers_C_MissionPreset()
+	
+	--[[ GAME START CHECK ]]
+	Rule_Add(Villers_C_StartAnimatic)
+
+end
+
+Scar_AddInit(OnInit)
+
+
+function Villers_C_Debug()
+	
+	-- looks for the command line option [-debug]
+	if Misc_IsCommandLineOptionSet("debug") then
+		
+		g_debug = true
+		
+		-- reveal FOW
+		FOW_Enable(false)
+		
+		Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('TankBattle_Debug()')]])")
+		Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('KAI_Debug()')]])")
+		Util_MuteAmbientSound(false)
+		
+	else
+		-- set up bindings for NISes
+		Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(NIS_OPENING)')]])")
+		Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('Util_StartNIS(NIS_CLOSING)')]])")
+		
+	end
+	
+	
+
+	
+end
+
+function Villers_C_ModifyStats()
+	
+	--[[ saved as example - deg
+	Player_SetDefaultSquadMoodMode(player1, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player2, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player3, MM_ForceTense)
+	
+	-- shorten vision ranges
+	Modify_PlayerSightRadius(player1, 0.75)
+
+	-- mod resource rates
+	t_player1_res_mods= {}
+	t_player1_res_mods[1] = Modify_PlayerResourceRate(player1, RT_Manpower, 2)
+	t_player1_res_mods[2] = Modify_PlayerResourceRate(player1, RT_Munition, 2)
+	t_player1_res_mods[3] = Modify_PlayerResourceRate(player1, RT_Fuel, 1)
+	
+	]]	
+	
+end
+
+function Villers_C_Restrictions()
+
+	--[[ UN/RESTRICT UPGRADES ]]
+	-- give the player the ability to have the Tiger Ace Skin
+	Cmd_InstantUpgrade(player1, UPG.SP.VILLERS_BOCAGE.TIGER_ACE_SKIN)
+	
+	-- give player 2 firestorm for the end of the mission
+	Cmd_InstantUpgrade( player2, UPG.COMMANDER_TREE.AXIS.PROPAGANDA_01)
+	
+	--[[ RESOURCES 	]]
+	Player_SetResource(player1, RT_Manpower, 0)
+	Player_SetResource(player1, RT_Munition, 1000)
+	Player_SetResource(player1, RT_Fuel, 0)
+
+	
+	--[[ UN/RESTRICT ABILITIES ]]
+	Player_SetUpgradeAvailability(player1, {UPG.COMMANDER_TREE.AXIS.DEFENSE,UPG.COMMANDER_TREE.AXIS.BLITZKRIEG, UPG.COMMANDER_TREE.AXIS.PROPAGANDA,}, ITEM_LOCKED)
+	
+	
+	-- UN/RESTRICT POP CAP
+	Player_SetPopCapOverride(player1, 75)
+
+	--[[ UN/RESTRICT UI 
+	UI_BindingSetEnabled("company_commander", false)
+	UI_BindingSetEnabled("squadcap", false)
+	]]
+	
+	--[[ UN/RESTRICT SBPS 
+	local sbps = {SBP.ALLIES_SHERMAN, SBP.ALLIES_CROCODILE, SBP.ALLIES_GREYHOUN, SBP.ALLIES_PERSHING }
+	for i = 1, table.getn(sbps) do
+		Player_SetSquadProductionAvailability(player1, sbps[i], ITEM_LOCKED)
+	end
+	]]
+end
+
+
+
+function Villers_C_CpuInit()
+
+	--[[ left as an example
+	
+	-- set up Player3 AI  
+	Util_AI_Setup(player3, {Util_DifVar({10, 15, 20, 30}), 5}, player3, Game_GetSPDifficulty(), 7, Util_DifVar({1, 2, 3, 5}), 2, 3)
+	
+	-- Set up AI's resources
+	Player_SetResource(player3, RT_Manpower, 1000)
+	Player_SetResource(player3, RT_Munition, 100)
+	Player_SetResource(player3, RT_Fuel, 100)
+	
+	-- tell AI to go after strongest threat instead of the weakest
+	AI_DoString( player3, "s_personality.attack_prefer_threat = true" )
+	AI_DoString( player3, "s_personality.defend_prefer_threat = true" )
+
+	-- tell AI not to "defend" territories outside of the ring around its base
+	AI_EnableComponent(player3, false, COMPONENT_ForwardDefending)
+	
+	-- disable use of comapny commander menu and abilities
+	AI_DoString( player3, "s_commandtree_enabled = false" )
+	AI_DoString( player3, "s_playerabilities_enabled = false" )
+	
+	AI_EnableComponent(player3, false, COMPONENT_Attacking)
+	
+	]]
+
+end
+
+
+
+function Villers_C_Difficulty()
+
+	--[[ left as an example 	]]
+	
+	-- get the difficulty
+	g_difficulty = Game_GetSPDifficulty()  -- set a global difficulty variable
+	print("********* DIFFICULTY: "..g_difficulty)
+	
+	-- set health bonus for player 1
+	Setup_Difficulty(player1, g_difficulty) -- pass the player and difficulty global variable into the Set Health function
+	Setup_Difficulty(player2, g_difficulty) -- do it for each player that you have defined'
+	
+	t_difficulty = {
+		tigerVulnerability 			= Util_DifVar( {1.1, 1.15, 1.2, 1.25} ),	-- vulnerability of the Tiger,
+		repairRecharge	 			= Util_DifVar( {0.9, 1, 1.25, 1.5} ),			-- vulnerability of the Tiger,
+	}
+	
+	-- modify the recharge time for the player
+	Modify_AbilityRechargeTime( player1, ABILITY.SP.VILLERS_BOCAGE.TIGER_REPAIR, t_difficulty.repairRecharge)
+	
+	if g_difficulty == GD_EXPERT then
+		Player_SetAbilityAvailability( player1, ABILITY.SP.VILLERS_BOCAGE.TIGER_REPAIR, ITEM_REMOVED)
+	end
+	
+end
+
+
+function Villers_C_CounterattackCleanup()
+
+	RPGTracker_UpdateCommandPointLimit()
+	tmkr_VillersC_SpMGNest = Marker_GetTable("mkr_VillersC_SpMGNest%d")
+	tmkr_ATEmplacementSp = Marker_GetTable("mkr_ATEmplacementSp%d")
+
+	SGroup_Clear(sg_temp)
+	Player_GetAll(player1, sg_temp)
+	SGroup_DestroyAllSquads(sg_temp)
+
+	SGroup_Clear(sg_temp)
+	Player_GetAllSquadsNearMarker(player2, sg_temp, mkr_VillersC_Cleanup)
+	for i=1, table.getn(tsg_CPTank) do 
+		SGroup_RemoveGroup(sg_temp, tsg_CPTank[i])
+	end
+	SGroup_DestroyAllSquads(sg_temp)
+
+end
+
+-------------------------------------------------------------------------
+
+-- MISSION Preset 
+
+-------------------------------------------------------------------------
+
+function Villers_C_MissionPreset()
+
+	-- spawn squads
+	tmkr_PlayerStart = Marker_GetTable("mkr_VillersC_PlayerStart%d")
+	tsg_Player = SGroup_CreateTable("sg_Player%d", table.getn(tmkr_PlayerStart))
+	
+	eg_MapEntry = EGroup_CreateIfNotFound("eg_MapEntry")
+	
+	eg_EntryPointClear = EGroup_CreateIfNotFound("eg_EntryPointClear")
+	-- clean up the starting NIS area
+	World_GetNeutralEntitiesNearMarker(eg_EntryPointClear, mkr_FOW_Road1)
+	EGroup_Filter(eg_EntryPointClear, {EBP.WRECKS.SHERMAN} , FILTER_KEEP)
+	EGroup_DestroyAllEntities(eg_EntryPointClear)
+
+	-- clear the barbed wire as well
+	EGroup_Clear(eg_temp)
+	Player_GetAllEntitiesNearMarker( player2, eg_temp, mkr_FOW_Road1)
+	EGroup_DestroyAllEntities( eg_temp)
+	
+	if EGroup_IsEmpty(eg_MapEntry) == false then
+		EGroup_DestroyAllEntities(eg_MapEntry)
+	end
+	
+	-- kill the tank traps
+	EGroup_Hide(LAYER_VillersCObjToShow, false)
+	EGroup_Hide(LAYER_VillersCObjToHide, true)
+	
+	Util_CreateEntities(player1, eg_MapEntry, EBP.STRAT_POINT.ENTRY, mkr_VillersC_MapEntry, 1)
+	
+	local posStart = mkr_VillersC_PlayerStart2
+	Camera_MoveToPosition(posStart)
+	
+	t_Player = {
+		{
+			sbp		= SBP.VILLERS_BOCAGE.AXIS.TIGER,
+		},
+		{
+			sbp		= SBP.VILLERS_BOCAGE.AXIS.REGULAR_TIGER,
+		},
+	}
+	
+	if IsCounterattackMission() == false then
+		Player_AddResource(player1, RT_Command, 10)
+		if g_commandPointLimit ~= nil then
+			g_commandPointLimit = g_commandPointLimit + 10
+		end
+	end
+	
+	for i, this in pairs(t_Player) do
+		
+		this.sgroup		= tsg_Player[i]
+		this.posSpawn	= tmkr_PlayerStart[i]
+		this.bDestroyed = false
+		
+		if g_debug == true then
+			
+			Util_CreateSquads(player1, this.sgroup, this.sbp, this.posSpawn)
+			
+		end
+		
+	end	
+	
+	-- show the bengal skin if the player does not lose a single squad member in the previous mission
+	if g_healAbilityFlashed == 0 then
+		Cmd_InstantUpgrade( player1, UPG.SP.VILLERS_BOCAGE.TIGER_BENGAL_SKIN)
+	end
+	
+	Rule_AddOneShot(Villers_C_DelayCommander, 1)
+	
+	t_Objectives = {
+		OBJ_TankBattle,
+		OBJ_CaptureTown
+	}
+	
+	-- load the NISes
+	NIS01 = "sp/VillersBocage/NIS/N03_01"
+	nis_load(NIS01)
+	
+	A03_01 = "sp/VillersBocage/NIS/N03_01A"
+	nis_load(A03_01)
+	
+	
+end
+
+function Villers_C_DelayCommander()
+	
+	if IsCounterattackMission() == false then
+		Cmd_InstantUpgrade(player1, UPG.SP.VILLERS_BOCAGE.VOSS1)
+		Cmd_InstantUpgrade(player1, UPG.SP.VILLERS_BOCAGE.VOSS2)
+		Cmd_InstantUpgrade(player1, UPG.SP.VILLERS_BOCAGE.VOSS3)
+	end
+	
+	Cmd_Ability(tsg_Player[1], ABILITY.SP.VILLERS_BOCAGE.COMMANDER_UP)
+
+end
+
+
+
+
+-------------------------------------------------------------------------
+
+-- MISSION START 
+
+-------------------------------------------------------------------------
+function Villers_C_StartAnimatic()
+
+	if g_debug ~= true then
+		Util_StartNIS(Villers_C_Animatic)
+	end
+	
+	Rule_Add(Villers_C_PostNIS)
+	Rule_RemoveMe()
+	
+end
+
+function Villers_C_PostNIS()
+	
+	if Event_IsAnyRunning() == false then
+		if g_debug == true then
+			Game_Letterbox(false, 0)
+			Game_FadeToBlack(FADE_IN, 0)
+		end
+		Villers_C_MissionStart()
+		Rule_RemoveMe()
+	end
+	
+end
+
+-- event to play the two opening NISes back to back,
+-- since one was to occur before the loading screen originally.
+Villers_C_Animatic = function()
+
+	Game_FadeToBlack(FADE_IN, 0)
+	Game_Letterbox(true, 0)
+	CTRL.Scar_PlayNIS(A03_01)
+	CTRL.WAIT()
+
+	Game_FadeToBlack(FADE_OUT, 0.75)
+	CTRL.Event_Delay(1)
+	CTRL.WAIT()
+
+	Game_FadeToBlack(FADE_IN, 1)
+	Game_Letterbox(true, 0)
+	CTRL.Scar_PlayNIS(NIS01)
+	CTRL.WAIT()
+
+	-- post-NIS fixups go here
+	Game_Letterbox(false, 1)
+
+end
+
+function Villers_C_MissionStart()
+
+	-- delay first objective
+	if Rule_Exists(Villers_C_DelayStart) == false then
+		Rule_AddOneShot(Villers_C_DelayStart, 5)
+	end
+
+	VB_RPGMechanics_KickOff(t_Player[1].sgroup)
+	VBBounty_SetSGroupKicker(t_Player[1].sgroup)
+	RPGTracker_SetSGroup(t_Player[1].sgroup)
+	Modify_Vulnerability(t_Player[1].sgroup, t_difficulty.tigerVulnerability)
+	
+	for i, this in pairs(t_Player) do		
+		TankHeal_AddSGroup(this.sgroup)
+		Misc_SetSquadControlGroup(SGroup_GetSpawnedSquadAt(this.sgroup, 1), i)
+	end	
+
+	Sound_PlayMusic("Music/DLC/Villers_Bocage/M03/dlc_for_the_king.bsc",3,0)
+	Rule_RemoveMe()
+end
+
+
+function Villers_C_DelayStart()
+
+	for i=1, table.getn(t_Objectives) do 
+		Objective_Start(t_Objectives[1])
+	end
+	
+	Rule_AddInterval(Villers_C_Rule_CheckMissions, 4)	
+
+end
+
+function Villers_C_Rule_CheckMissions()
+
+	local activeObj = t_Objectives[1]
+	local all_done = true
+	for i=1, table.getn(t_Objectives) do 
+		if Objective_IsComplete(t_Objectives[i]) == false then
+			all_done = false
+			activeObj = t_Objectives[i]
+			break
+		end
+	end
+	
+	-- inform the player that the other tank has been destroyed
+	if t_Player[2].bDestroyed == false
+	and SGroup_IsEmpty(t_Player[2].sgroup) == true then
+		local temp = {
+			{ ACTOR.VILLERS_BOCAGE.Voss,	6040770},
+			{ ACTOR.VILLERS_BOCAGE.Voss,	6040790},
+		}
+		Util_AutoIntel(temp)
+		t_Player[2].bDestroyed = true
+	end
+	
+	if Objective_IsStarted(activeObj) == false 
+	and Objective_IsComplete(activeObj) == false then
+		Objective_Start(activeObj)		
+	end
+	
+	if all_done == true then
+		Rule_RemoveAll()
+		Event_Skip()
+		Util_StartNIS(NIS_CLOSING, Villers_C_EndMission1)
+		Rule_RemoveMe()
+		return
+	end
+	
+	if SGroup_IsEmpty(t_Player[1].sgroup) == true
+	or Player_HasLost(player1, CRITICAL_BUILDINGS.AXIS ) == true then
+		Game_EndSP(false)
+		Rule_RemoveMe()
+		return
+	end
+
+end
+
+function Villers_C_EndMission1()
+
+	if Event_IsAnyRunning() == false then
+		if Objective_IsFailed(OBJ_TimeLimit) == false then
+			Objective_Complete(OBJ_TimeLimit)
+		end
+		Rule_RemoveMe()
+		Rule_Add(Villers_C_EndMission2)
+	end
+
+end
+
+function Villers_C_EndMission2()
+
+	if Event_IsAnyRunning() == false then
+		Game_EndSP(true)
+		Rule_RemoveMe()
+	end
+
+end
+

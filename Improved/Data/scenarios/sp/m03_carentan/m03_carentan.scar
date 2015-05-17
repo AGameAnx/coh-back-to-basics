@@ -1,0 +1,2916 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+--
+-- Script File for Mission 03 Carentan
+--
+---noprecache -mipdrop -texturedetail 3.
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+import("ScarUtil.scar")
+import("M03_Carentan.events")
+--import("DesignerLib.scar")
+
+-------------------------------------------------------------------------
+-- GLOBAL VARIABLES
+-------------------------------------------------------------------------
+
+-------------------------------------------------------------------------
+-- STARTUP SCRIPTS
+-------------------------------------------------------------------------
+
+-- Called immediately on startup, this just sets out some parameters for the mission
+function OnGameSetup()
+	-- set up the players
+	player1 = Setup_Player(1, 239040,TRACE_ALLIES,1)
+	player2 = Setup_Player(2, 239041,TRACE_AXIS,2)
+	player3 = Setup_Player(3,"Civilian", TRACE_ALLIES, TEAM_NEUTRAL)
+	--player3 = Setup_Player(3, 239052, TRACE_ALLIES, 1)
+end
+
+-- Called immediately on starting up a saved game
+function OnGameRestore()
+	-- assign player IDs again
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+	player3 = World_GetPlayerAt(3)
+	--player4 = World_GetPlayerAt(4)
+
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+end
+
+function Initialize_OBJECTIVE1()
+	OBJECTIVE1 = {
+		SetupUI = function()
+			--CafeUIID = Objective_AddUIElements(OBJECTIVE1, Marker_CafeNormArrow, true, 239100, true)
+			CafeUIID = Objective_AddUIElements(OBJECTIVE1, Blg_CafeNormandie, true, 239100, true)
+		end,
+		OnStart = function() end,
+		OnComplete = function() end,
+		OnFail = function() end,
+		OnSitRep = function() end,
+		Title = 239020,
+		Description = 239030,
+		Icon= IT_P_Attack,  
+		Type = OT_Primary,
+	}
+	Objective_Register(OBJECTIVE1)
+end
+
+function Initialize_OBJECTIVE2()
+	OBJECTIVE2 = {
+		SetupUI = function()
+			Objective_AddUIElements(OBJECTIVE2, Marker_B10, true, 239021, true)
+		end,
+		OnStart = function() end,
+		OnComplete = function() end,
+		OnFail = function() end,
+		Title = 239021,
+		Description = 239031,
+		Type = OT_Primary,
+		Icon= IT_P_Garrison, 
+		SitRep = {
+			Movie = "SR_03-01",
+			Force = true,
+			SpeechTiming = {
+				{ 1, ACTOR.Thompson, 230300 },
+				{ 4, ACTOR.Thompson, 230310 },
+				{ 8, ACTOR.Thompson, 230320 },
+				{ 12.4, ACTOR.Thompson, 230321 },
+				{ 16.25, ACTOR.Thompson, 230330 },
+				{ 22.5, ACTOR.Thompson, 230340 },
+				{ 28, ACTOR.Thompson, 230350 },
+				{ 31.5, ACTOR.Thompson, 230360 },
+			},
+		},
+	}
+	Objective_Register(OBJECTIVE2)
+end
+
+function Initialize_OBJECTIVE3()
+	OBJECTIVE3 = {
+		SetupUI = function()
+			objhint3 = Objective_AddUIElements(OBJECTIVE3, Blg_Church , true, 239022, true, -7)
+		end,
+		OnStart = function() end,
+		OnComplete = function()
+			Objective_RemoveUIElements(OBJECTIVE3, objhint3)
+		end,
+		OnFail = function() end,
+		OnSitRep = function() end,
+		Title = 239022,
+		Description = 239032,
+		Type = OT_Primary,
+		Icon= IT_P_Upgrade,
+	}
+	Objective_Register(OBJECTIVE3)
+end
+
+function Initialize_OBJECTIVE4()
+	OBJECTIVE4 = {
+		SetupUI = function()
+			objhint4 = Objective_AddUIElements(OBJECTIVE4, Blg_Church, true, 239023, true, -7)
+		end,
+		OnStart = function() end,
+		OnComplete = function()
+			Objective_RemoveUIElements(OBJECTIVE4, objhint4)
+		end,
+		OnFail = function() end,
+		OnSitRep = function() end,
+		Title = 239023,
+		Description = 239033,
+		Icon= IT_P_Defend,  
+		Type = OT_Primary,
+	}
+	Objective_Register(OBJECTIVE4)
+end
+
+function Initialize_OBJECTIVE5()
+	OBJECTIVE5 = {
+		SetupUI = function()
+			Objective_AddUIElements(OBJECTIVE5, Marker_D24, true, 239024, true)
+		end,
+		OnStart = function()
+			--Modify_EntityBuildTime(player1, "ebps/races/allies/soldiers/airborne_infantry", 0.6)
+			Modify_PlayerProductionRate(player1, 1.5)
+		end,
+		OnComplete = function() end,
+		OnFail = function() end,
+		Title = 239024,
+		Description = 239034,
+		Icon= IT_P_Garrison, 
+		Type = OT_Primary,
+		SitRep = {
+			Movie = "SR_03-02",
+			Force = true,
+			SpeechTiming = {
+				{ 1.25, ACTOR.Thompson, 230581 },
+				{ 6.9, ACTOR.Thompson, 230582 },
+				{ 10.5, ACTOR.Thompson, 230583 },
+				{ 19.5, ACTOR.Thompson, 230584 },
+				{ 29.5, ACTOR.Thompson, 230585 },
+			},
+		},
+	}
+	Objective_Register(OBJECTIVE5)
+end
+
+function Initialize_OBJECTIVESECONDARY()
+	OBJECTIVESECONDARY = {
+		SetupUI = function()
+			Objective_AddUIElements(OBJECTIVESECONDARY, ResourcePoint1, true, 239205, true, 2)
+			Objective_AddUIElements(OBJECTIVESECONDARY, ResourcePoint3, true, 239205, true, 2)
+		end,
+		OnStart = function() end,
+		OnComplete = function() end,
+		OnFail = function() end,
+		OnSitRep = function() end,
+		Title = 239025,
+		Description = 239035,
+		Icon= IT_S_Default,   
+		Type = OT_Secondary,
+	}
+	Objective_Register(OBJECTIVESECONDARY)
+end
+
+function Initialize_MEDALOBJECTIVE()
+	MEDALOBJECTIVE = {
+		SetupUI = function() end,
+		OnStart = function() end,
+		OnComplete = function() end,
+		IsComplete = function() return false end,
+		OnFail = function() end,
+		OnSitRep = function() end,
+		Title =  Loc_FormatText(239026, Loc_ConvertNumber(difficulty.medaltarget)),
+		Description = 239036,
+		Icon= IT_M_Default,
+		Type = OT_Medal,
+		MedalID = MEDALS.ARMY_SHARPSHOOTER_BADGE,
+	}
+	Objective_Register(MEDALOBJECTIVE)
+end
+
+-- Called once things have been initialised proper, and is used to trigger off the game script
+function OnInit()
+	Game_Letterbox(true, 0)
+	Game_FadeToBlack(true, 0)
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	--[[ AUDIO ]]
+	g_MissionSpeechPath = "Mission03"
+	Sound_PreCacheSinglePlayerSpeech( g_MissionSpeechPath )	
+	Util_MuteAmbientSound(true)
+	
+	M03_Difficulty()
+	
+	--[[ TECH TREE ]]
+	TechTreeSetup()
+	--UI_BindingSetEnabled("squadcap", false)
+	-- use default veteran squads if necessary
+	if not Player_HasPersistentSquadFile(player1) then
+		Player_LoadPersistentSquadsFromFile(player1, "data:scenarios/sp/m03_carentan/default_veteran_squads.lua")
+	end
+	
+	print ("------------------------------------------------------------------------------------------")
+	print ("------------------------------------- MISSION STARTED ------------------------------------")
+	print ("------------------------------------------------------------------------------------------")
+	Rule_AddOneShot(Rule_CreateWehrmacht, 1)
+	--Camera_FocusOnTargetMarker(Camera_Start, 5)
+	Camera_SetDefault()
+	Camera_SetDefault()
+	
+	Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS01)')]])")
+	Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS02)')]])")
+	Scar_DebugConsoleExecute("bind([[0]], [[Scar_DoString('Change_Camera()')]])")
+	
+	-- some constants for the mission
+	UPGRADE_REINFORCEMENTS_M03  =  BP_GetUpgradeBlueprint("upgrade/allies/sp_reinforcements_m03.lua")
+	ABILITY_REINFORCEMENTS_M03	= BP_GetAbilityBlueprint("abilities/reinforcements_ability_sp_m03.lua")
+	
+	-- init and register all objectives
+	Initialize_OBJECTIVE1()
+	Initialize_OBJECTIVE2()
+	Initialize_OBJECTIVE3()
+	Initialize_OBJECTIVE4()
+	Initialize_OBJECTIVE5()
+	Initialize_OBJECTIVESECONDARY()
+	Initialize_MEDALOBJECTIVE()
+
+	-- start OBJECTIVE1 ???
+	--Objective_Start(OBJECTIVE1)
+	
+	table_RandomUnitB = {SBP.ELITE.FALLSCHIRMJAGER, SBP.ELITE.FALLSCHIRMJAGER, SBP.AXIS.VOLKS_2PANZERF, SBP.ELITE.FALLSCHIRMJAGER, SBP.ELITE.FALLSCHIRMJAGER}
+
+	sg_tempTownHallB = SGroup_CreateIfNotFound("sg_tempTownHallB")
+	sg_tempDestroy = SGroup_CreateIfNotFound("sg_tempDestroy")
+	sg_AxisGame = SGroup_CreateIfNotFound("sg_AxisGame")
+	
+	sg_AbleCompany = SGroup_CreateIfNotFound("sg_AbleCompany")
+	sg_BuildMortar = SGroup_CreateIfNotFound("sg_BuildMortar")
+	sg_tempMortar = SGroup_CreateIfNotFound("sg_tempMortar")
+	sg_tempMortar2 = SGroup_CreateIfNotFound("sg_tempMortar2")
+	sg_SpeechMortar = SGroup_CreateIfNotFound("sg_SpeechMortar")
+	sg_SpeechSniper = SGroup_CreateIfNotFound("sg_SpeechSniper")
+
+	ConstantAxis = SGroup_CreateIfNotFound("ConstantAxis")
+	
+	sg_AllyTownHall = SGroup_CreateIfNotFound("sg_AllyTownHall")
+	sg_AxisTownHall = SGroup_CreateIfNotFound("sg_AxisTownHall")
+	sg_AllyChurch = SGroup_CreateIfNotFound("sg_AllyChurch")
+	sg_AxisChurch = SGroup_CreateIfNotFound("sg_AxisChurch")
+	sg_AxisChurch2 = SGroup_CreateIfNotFound("sg_AxisChurch2")
+	sg_AllyResourcePoint3 = SGroup_CreateIfNotFound("sg_AllyResourcePoint3")
+	sg_AxisResourcePoint3 = SGroup_CreateIfNotFound("sg_AxisResourcePoint3")
+	sg_AllyResourcePoint7 = SGroup_CreateIfNotFound("sg_AllyResourcePoint7")
+	sg_AxisResourcePoint7 = SGroup_CreateIfNotFound("sg_AxisResourcePoint7")
+	sg_AllyResourcePoint1 = SGroup_CreateIfNotFound("sg_AllyResourcePoint1")
+	sg_AxisResourcePoint1 = SGroup_CreateIfNotFound("sg_AxisResourcePoint1")
+	sg_AllyResourcePoint4 = SGroup_CreateIfNotFound("sg_AllyResourcePoint4")
+	sg_AxisResourcePoint4 = SGroup_CreateIfNotFound("sg_AxisResourcePoint4")
+	sg_AllyResourcePoint5 = SGroup_CreateIfNotFound("sg_AllyResourcePoint5")
+	sg_AxisResourcePoint5 = SGroup_CreateIfNotFound("sg_AxisResourcePoint5")
+----------------------------Able Company---------------------------------------------------------------------------------------------------	
+	
+	AbleCompany1 = SGroup_CreateIfNotFound("AbleCompany1")
+	AbleCompany2 = SGroup_CreateIfNotFound("AbleCompany2")
+	AbleCompany3 = SGroup_CreateIfNotFound("AbleCompany3")
+	AbleCompany4 = SGroup_CreateIfNotFound("AbleCompany4")
+	AbleCompany5 = SGroup_CreateIfNotFound("AbleCompany5")
+	AbleCompany6 = SGroup_CreateIfNotFound("AbleCompany6")
+	
+	table_AbleCompany = {}
+	table_AbleCompany[1] = {sgroup = AbleCompany1, start = Marker_AbleCompanySpawn, location1 =  Marker_Start1, count = 6, unit = SBP.ALLIES.PARATROOPER_REINF_SP, posx = nil, dest = nil}
+	table_AbleCompany[2] = {sgroup = AbleCompany2, start = Marker_AbleCompanySpawn, location1 =  Marker_Start2, count = 6, unit = SBP.ALLIES.PARATROOPER_REINF_SP, posx = nil, dest = nil}
+
+-------------------------------------------WehrmachtAlpha---------------------------------------------------------------------------------------------------	
+
+	WehrmachtAlpha1 = SGroup_CreateIfNotFound("WehrmachtAlpha1")
+	WehrmachtAlpha2 = SGroup_CreateIfNotFound("WehrmachtAlpha2")
+	WehrmachtAlpha3 = SGroup_CreateIfNotFound("WehrmachtAlpha3")
+	WehrmachtAlpha4 = SGroup_CreateIfNotFound("WehrmachtAlpha4")
+	WehrmachtAlpha5 = SGroup_CreateIfNotFound("WehrmachtAlpha5")
+	WehrmachtAlpha6 = SGroup_CreateIfNotFound("WehrmachtAlpha6")
+	WehrmachtAlpha7 = SGroup_CreateIfNotFound("WehrmachtAlpha7")
+	WehrmachtAlpha8 = SGroup_CreateIfNotFound("WehrmachtAlpha8")
+	WehrmachtAlpha9 = SGroup_CreateIfNotFound("WehrmachtAlpha9")
+	WehrmachtAlpha10 = SGroup_CreateIfNotFound("WehrmachtAlpha10")
+	
+	table_WehrmachtAlpha = {} -- Location, location , building, Final 
+	table_WehrmachtAlpha[1] =  {sgroup = WehrmachtAlpha1, b1health = 1, start = Marker_A9,  facing1 = north, location1 = Marker_A12, facing2 = north, building1 = Blg_A4,       location2 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3,  g_WehrmachtAlphaArrived0 = true, g_WehrmachtAlphaArrived1 = false, g_WehrmachtAlphaArrived2 = false}
+	table_WehrmachtAlpha[2] =  {sgroup = WehrmachtAlpha2,  b1health = 1, start = Marker_B1,  facing1 = north, location1 = Marker_B3,  facing2 = north, building1 = Blg_Church,   location2 = Marker_Final,  unit = SBP.ELITE.LUFTWAFFE, count = 3,  g_WehrmachtAlphaArrived0 = true, g_WehrmachtAlphaArrived1 = false, g_WehrmachtAlphaArrived2 = false}
+	table_WehrmachtAlpha[3] =  {sgroup = WehrmachtAlpha3, b1health = 1,  start = Marker_B13, facing1 = north, location1 = Marker_B27, facing2 = north, building1 = Blg_D2,       location2 = Marker_Final3, unit = SBP.ELITE.LUFTWAFFE, count = 3,  g_WehrmachtAlphaArrived0 = true, g_WehrmachtAlphaArrived1 = false, g_WehrmachtAlphaArrived2 = false}
+	table_WehrmachtAlpha[4] =  {sgroup = WehrmachtAlpha4,  b1health = 1, start = Marker_B22, facing1 = north, location1 = Marker_B11, facing2 = north, building1 = Blg_D1,       location2 = Marker_Final3, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3,  g_WehrmachtAlphaArrived0 = true, g_WehrmachtAlphaArrived1 = false, g_WehrmachtAlphaArrived2 = false}
+	table_WehrmachtAlpha[5] =  {sgroup = WehrmachtAlpha5,  b1health = 1, start = Marker_C12,  facing1 = west,  location1 = Marker_C13, facing2 = west,  building1 = Blg_D2, 		location2 = Marker_Final3, unit = SBP.ELITE.LUFTWAFFE, count = 3,  g_WehrmachtAlphaArrived0 = true, g_WehrmachtAlphaArrived1 = false, g_WehrmachtAlphaArrived2 = false}
+	--table_WehrmachtAlpha[6] =  {sgroup = WehrmachtAlpha6,  start = Marker_C9,  facing1 = west,  location1 = Marker_C14, facing2 = west, building1 = Blg_D7,  location2 = Marker_Final3, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3,  g_WehrmachtAlphaArrived0 = true, g_WehrmachtAlphaArrived1 = false, g_WehrmachtAlphaArrived2 = false}
+	--table_WehrmachtAlpha[9] =  {sgroup = WehrmachtAlpha9,  start = Marker_D1,  facing1 = north, location1 = Marker_D15, facing2 = south, building1 = Blg_TownHall, location2 = Marker_Final2, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3,  g_WehrmachtAlphaArrived0 = true, g_WehrmachtAlphaArrived1 = false, g_WehrmachtAlphaArrived2 = false}
+	--table_WehrmachtAlpha[10] = {sgroup = WehrmachtAlpha10, start = Marker_C26, facing1 = north, location1 = Marker_D13, facing2 = south, building1 = Blg_TownHall, location2 = Marker_Final2, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3,  g_WehrmachtAlphaArrived0 = true, g_WehrmachtAlphaArrived1 = false, g_WehrmachtAlphaArrived2 = false}
+	--table_WehrmachtAlpha[2] =  {sgroup = WehrmachtAlpha2,  start = Marker_B6,  facing1 = north, location1 = Marker_B3, facing2 = north, building1 = Blg_B1,       location2 = Marker_Final3, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3,  g_WehrmachtAlphaArrived0 = true, g_WehrmachtAlphaArrived1 = false, g_WehrmachtAlphaArrived2 = false}
+	--table_WehrmachtAlpha[3] =  {sgroup = WehrmachtAlpha3,  start = Marker_B8,  facing1 = north, location1 = Marker_B9,  facing2 = north, building1 = Blg_Church,   location2 = Marker_Final3, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3,  g_WehrmachtAlphaArrived0 = true, g_WehrmachtAlphaArrived1 = false, g_WehrmachtAlphaArrived2 = false}
+	
+-------------------------------------------WehrmachtBeta---------------------------------------------------------------------------------------------------	
+	
+	WehrmachtBeta1 = SGroup_CreateIfNotFound("WehrmachtBeta1")
+	WehrmachtBeta2 = SGroup_CreateIfNotFound("WehrmachtBeta2")
+	WehrmachtBeta3 = SGroup_CreateIfNotFound("WehrmachtBeta3")
+	WehrmachtBeta4 = SGroup_CreateIfNotFound("WehrmachtBeta4")
+	WehrmachtBeta5 = SGroup_CreateIfNotFound("WehrmachtBeta5")
+	WehrmachtBeta6 = SGroup_CreateIfNotFound("WehrmachtBeta6")
+	WehrmachtBeta7 = SGroup_CreateIfNotFound("WehrmachtBeta7")
+	WehrmachtBeta8 = SGroup_CreateIfNotFound("WehrmachtBeta8")
+	WehrmachtBeta9 = SGroup_CreateIfNotFound("WehrmachtBeta9")
+	WehrmachtBeta10 = SGroup_CreateIfNotFound("WehrmachtBeta10")
+	
+	table_WehrmachtBeta = {} -- Location, Building, location, final
+	table_WehrmachtBeta[1] = {sgroup = WehrmachtBeta1, b1health = 1, start= Marker_A6,  facing1 = north, building1 = Blg_A3,     location1 = Marker_B15, facing2 = north, location2 = Marker_Final,  unit = SBP.ELITE.LUFTWAFFE, count = 3,  g_WehrmachtBetaArrived0 = true, g_WehrmachtBetaArrived1 = false, g_WehrmachtBetaArrived2 = false}
+	table_WehrmachtBeta[2] = {sgroup = WehrmachtBeta2, b1health = 1, start= Marker_A7,  facing1 = north, building1 = Blg_A5,     location1 = Marker_A4,  facing2 = north, location2 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3,  g_WehrmachtBetaArrived0 = true, g_WehrmachtBetaArrived1 = false, g_WehrmachtBetaArrived2 = false}
+	table_WehrmachtBeta[3] = {sgroup = WehrmachtBeta3, b1health = 1, start= Marker_B9,  facing1 = north, building1 = Blg_Church, location1 = Marker_B27, facing2 = north, location2 = Marker_Final,  unit = SBP.ELITE.LUFTWAFFE, count = 3,  g_WehrmachtBetaArrived0 = true, g_WehrmachtBetaArrived1 = false, g_WehrmachtBetaArrived2 = false}
+	table_WehrmachtBeta[4] = {sgroup = WehrmachtBeta4, b1health = 1, start= Marker_C11, facing1 = north, building1 = Blg_C3,     location1 = Marker_B32, facing2 = north, location2 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3,  g_WehrmachtBetaArrived0 = true, g_WehrmachtBetaArrived1 = false, g_WehrmachtBetaArrived2 = false}
+	table_WehrmachtBeta[5] = {sgroup = WehrmachtBeta5, b1health = 1, start= Marker_B11, facing1 = north,  building1 = Blg_D2,    location1 = Marker_C32, facing2 = north, location2 = Marker_Final,  unit = SBP.ELITE.LUFTWAFFE, count = 3,  g_WehrmachtBetaArrived0 = true, g_WehrmachtBetaArrived1 = false, g_WehrmachtBetaArrived2 = false}
+	table_WehrmachtBeta[6] = {sgroup = WehrmachtBeta6, b1health = 1, start= Marker_D10, facing1 = west,  building1 = Blg_TownHall, location1 = Marker_D36,  facing2 = west,  location2 = Marker_Final,  unit = SBP.ELITE.LUFTWAFFE, count = 3,  g_WehrmachtBetaArrived0 = true, g_WehrmachtBetaArrived1 = false, g_WehrmachtBetaArrived2 = false}
+
+	-------------------------------------------WehrmachtGamma---------------------------------------------------------------------------------------------------	
+	
+	WehrmachtGamma1 = SGroup_CreateIfNotFound("WehrmachtGamma1")
+	WehrmachtGamma2 = SGroup_CreateIfNotFound("WehrmachtGamma2")
+	WehrmachtGamma3 = SGroup_CreateIfNotFound("WehrmachtGamma3")
+	WehrmachtGamma4 = SGroup_CreateIfNotFound("WehrmachtGamma4")
+	WehrmachtGamma5 = SGroup_CreateIfNotFound("WehrmachtGamma5")
+	
+	table_WehrmachtGamma = {} -- locatoin, building, buidling2, final
+	table_WehrmachtGamma[1] = {sgroup = WehrmachtGamma1, b1health = 1, b2health = 1, start = Marker_A7,  facing1 = north, building1 = Blg_A7,       door1 = Marker_Blg_A7,		 building2 = Blg_A4,     	    location2 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtGammaArrived0 = true, g_WehrmachtGammaArrived1 = false, g_WehrmachtGammaArrived2 = false, g_WehrmachtGammaArrived3 = false}
+	table_WehrmachtGamma[2] = {sgroup = WehrmachtGamma2, b1health = 1, b2health = 1, start = Marker_B11, facing1 = north, building1 = Blg_B1,       door1 = Marker_Blg_B1, 		 building2 = Blg_Church,      		location2 = Marker_Final3, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtGammaArrived0 = true, g_WehrmachtGammaArrived1 = false, g_WehrmachtGammaArrived2 = false, g_WehrmachtGammaArrived3 = false}
+	table_WehrmachtGamma[3] = {sgroup = WehrmachtGamma3, b1health = 1, b2health = 1, start = Marker_C11,  facing1 = west,  building1 = Blg_C3,       door1 = Marker_Blg_C3,		 building2 = Blg_D2,      location2 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtGammaArrived0 = true, g_WehrmachtGammaArrived1 = false, g_WehrmachtGammaArrived2 = false, g_WehrmachtGammaArrived3 = false}
+	table_WehrmachtGamma[4] = {sgroup = WehrmachtGamma4, b1health = 1, b2health = 1, start = Marker_D26, facing1 = west,  building1 = Blg_TownHall, door1 = Marker_Blg_TownHall, building2 = Blg_TownHall, location2 = Marker_Final2, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtGammaArrived0 = true, g_WehrmachtGammaArrived1 = false, g_WehrmachtGammaArrived2 = false, g_WehrmachtGammaArrived3 = false}
+	--table_WehrmachtGamma[5] = {sgroup = WehrmachtGamma5, start = Marker_C24, facing1 = west,  building1 = Blg_TownHall, door1 = Marker_Blg_TownHall, building2 = Blg_TownHallB, location2 = Marker_Final2, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtGammaArrived0 = true, g_WehrmachtGammaArrived1 = false, g_WehrmachtGammaArrived2 = false, g_WehrmachtGammaArrived3 = false}
+-------------------------------------------WehrmachtDelta---------------------------------------------------------------------------------------------------	
+	
+	WehrmachtDelta1 = SGroup_CreateIfNotFound("WehrmachtDelta1")
+	WehrmachtDelta2 = SGroup_CreateIfNotFound("WehrmachtDelta2")
+	WehrmachtDelta3 = SGroup_CreateIfNotFound("WehrmachtDelta3")
+	WehrmachtDelta4 = SGroup_CreateIfNotFound("WehrmachtDelta4")
+	WehrmachtDelta5 = SGroup_CreateIfNotFound("WehrmachtDelta5")
+	WehrmachtDelta6 = SGroup_CreateIfNotFound("WehrmachtDelta6")
+	WehrmachtDelta7 = SGroup_CreateIfNotFound("WehrmachtDelta7")
+	WehrmachtDelta8 = SGroup_CreateIfNotFound("WehrmachtDelta8")
+	WehrmachtDelta9 = SGroup_CreateIfNotFound("WehrmachtDelta9")
+	WehrmachtDelta10 = SGroup_CreateIfNotFound("WehrmachtDelta10")
+	WehrmachtDelta11 = SGroup_CreateIfNotFound("WehrmachtDelta11")
+	WehrmachtDelta12 = SGroup_CreateIfNotFound("WehrmachtDelta12")
+	WehrmachtDelta13 = SGroup_CreateIfNotFound("WehrmachtDelta13")
+	WehrmachtDelta14 = SGroup_CreateIfNotFound("WehrmachtDelta14")
+	WehrmachtDelta15 = SGroup_CreateIfNotFound("WehrmachtDelta15")
+	
+	sg_WehrmachtDelta1 = SGroup_CreateIfNotFound("sg_WehrmachtDelta1")
+	
+	table_WehrmachtDelta = {} -- location, location, final(for C & D)
+	table_WehrmachtDelta[1] = {agroup = sg_WehrmachtDelta1, sgroup = WehrmachtDelta1, start = Marker_Blg_D2,  facing1 = west,  trigger1 = TriggerPath20, location1 = Marker_C24,  facing2 = west, location2 = Marker_Final3, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtDeltaArrived0 = true, g_WehrmachtDeltaArrived1 = false, g_WehrmachtDeltaArrived2 = false}
+	--table_WehrmachtDelta[2] = {agroup = sg_WehrmachtDelta2,sgroup = WehrmachtDelta2, start = Marker_D6,              facing1 = west,  trigger1 = TriggerPath6,  location1 = Marker_C20, facing2 = west, location2 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtDeltaArrived0 = true, g_WehrmachtDeltaArrived1 = false, g_WehrmachtDeltaArrived2 = false}
+	--table_WehrmachtDelta[3] = {sgroup = WehrmachtDelta3, start = Marker_Blg_TownHallSide1, facing1 = west,  trigger1 = TriggerPath17, location1 = Marker_D3,  facing2 = west, location2 = Marker_Final2, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtDeltaArrived0 = true, g_WehrmachtDeltaArrived1 = false, g_WehrmachtDeltaArrived2 = false}
+	--table_WehrmachtDelta[4] = {sgroup = WehrmachtDelta4, start = Marker_Blg_TownHallSide2, facing1 = north, trigger1 = TriggerPath20, location1 = Marker_D4,  facing2 = west, location2 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtDeltaArrived0 = true, g_WehrmachtDeltaArrived1 = false, g_WehrmachtDeltaArrived2 = false}
+	--table_WehrmachtDelta[5] = {sgroup = WehrmachtDelta5, start = Marker_Blg_TownHallSide3, facing1 = north, trigger1 = TriggerPath20, location1 = Marker_D1,  facing2 = west, location2 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtDeltaArrived0 = true, g_WehrmachtDeltaArrived1 = false, g_WehrmachtDeltaArrived2 = false}
+	--table_WehrmachtDelta[6] = {sgroup = WehrmachtDelta6, start = Marker_Blg_TownHallSide4, facing1 = north, trigger1 = TriggerPath21, location1 = Marker_C25, facing2 = west, location2 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtDeltaArrived0 = true, g_WehrmachtDeltaArrived1 = false, g_WehrmachtDeltaArrived2 = false}
+	--table_WehrmachtDelta[7] = {sgroup = WehrmachtDelta7, start = Marker_Blg_TownHallSide5, location1 = Marker_C27, facing1 = north, trigger1 = TriggerPath23, location2 = Marker_D2, facing2 = west, facing3 = west, location3 = Marker_Final, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtDeltaArrived0 = true, g_WehrmachtDeltaArrived1 = false, g_WehrmachtDeltaArrived2 = false}
+	--table_WehrmachtDelta[8] = {sgroup = WehrmachtDelta8, start = Marker_Blg_TownHallSide6, location1 = Marker_D7, facing1 = north, trigger1 = TriggerPath23, location2 = Marker_D13, facing2 = west, facing3 = west, location3 = Marker_Final2, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtDeltaArrived0 = true, g_WehrmachtDeltaArrived1 = false, g_WehrmachtDeltaArrived2 = false}
+	--table_WehrmachtDelta[9] = {sgroup = WehrmachtDelta9, start = Marker_Blg_TownHall, location1 = Marker_D8,  facing1 = west, trigger1 = TriggerPath24, location2 = Marker_D16, facing2 = west, facing3 = west, location3 = Marker_Final2, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtDeltaArrived0 = true, g_WehrmachtDeltaArrived1 = false, g_WehrmachtDeltaArrived2 = false}
+	--table_WehrmachtDelta[10] = {sgroup = WehrmachtDelta10, start = Marker_Blg_TownHallSide6, location1 = Marker_D7, facing1 = north, trigger1 = TriggerPath21, location2 = Marker_D13, facing2 = west, facing3 = west, location3 = Marker_Final2, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtDeltaArrived0 = true, g_WehrmachtDeltaArrived1 = false, g_WehrmachtDeltaArrived2 = false}
+	--table_WehrmachtDelta[11] = {sgroup = WehrmachtDelta11, start = Marker_Blg_TownHallSide5, location1 = Marker_D8,  facing1 = north, trigger1 = TriggerPath21, location2 = Marker_D4, facing2 = west, facing3 = west, location3 = Marker_Final, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtDeltaArrived0 = true, g_WehrmachtDeltaArrived1 = false, g_WehrmachtDeltaArrived2 = false}
+	--table_WehrmachtDelta[12] = {sgroup = WehrmachtDelta12, start = Marker_Blg_TownHallSide4, location1 = Marker_D2, facing1 = north, trigger1 = TriggerPath20, location2 = Marker_D2, facing2 = west, facing3 = west, location3 = Marker_Final, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtDeltaArrived0 = true, g_WehrmachtDeltaArrived1 = false, g_WehrmachtDeltaArrived2 = false}
+	--table_WehrmachtDelta[13] = {sgroup = WehrmachtDelta13, start = Marker_Blg_TownHallSide4, location1 = Marker_D10, facing1 = north, trigger1 = TriggerPath20, location2 = Marker_D16, facing2 = west, facing3 = west, location3 = Marker_Final2, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtDeltaArrived0 = true, g_WehrmachtDeltaArrived1 = false, g_WehrmachtDeltaArrived2 = false}
+	--table_WehrmachtDelta[14] = {sgroup = WehrmachtDelta14, start = Marker_Blg_TownHallSide3, location1 = Marker_D8,  facing1 = north, trigger1 = TriggerPath20, location2 = Marker_D14, facing2 = west, facing3 = west, location3 = Marker_Final2, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtDeltaArrived0 = true, g_WehrmachtDeltaArrived1 = false, g_WehrmachtDeltaArrived2 = false}
+	
+-------------------------------------------WehrmachtEpsilon---------------------------------------------------------------------------------------------------	
+	
+	WehrmachtEpsilon1 = SGroup_CreateIfNotFound("WehrmachtEpsilon1")
+	WehrmachtEpsilon2 = SGroup_CreateIfNotFound("WehrmachtEpsilon2")
+	WehrmachtEpsilon3 = SGroup_CreateIfNotFound("WehrmachtEpsilon3")
+	WehrmachtEpsilon4 = SGroup_CreateIfNotFound("WehrmachtEpsilon4")
+	WehrmachtEpsilon5 = SGroup_CreateIfNotFound("WehrmachtEpsilon5")
+	WehrmachtEpsilon6 = SGroup_CreateIfNotFound("WehrmachtEpsilon6")
+	WehrmachtEpsilon7 = SGroup_CreateIfNotFound("WehrmachtEpsilon7")
+	WehrmachtEpsilon8 = SGroup_CreateIfNotFound("WehrmachtEpsilon8")
+	WehrmachtEpsilon9 = SGroup_CreateIfNotFound("WehrmachtEpsilon9")
+
+	
+	table_WehrmachtEpsilon = {}--Trigger from location, trigger to location, trigger to location(constantly runs away)
+	table_WehrmachtEpsilon[1] = {sgroup = WehrmachtEpsilon1,  start = Marker_Blg_D4,	     building1 = Blg_D4, 		  facing1 = west, trigger1 =  TriggerPath22, location1 = Marker_D7, facing2 = west, location2 = Marker_D28, facing3 = west, location3 = Marker_Final3, unit = SBP.ELITE.LUFTWAFFE, count = 3,  g_WehrmachtEpsilonArrived0 = true, g_WehrmachtEpsilonArrived1 = true, g_WehrmachtEpsilonArrived2 = true}
+	table_WehrmachtEpsilon[2] = {sgroup = WehrmachtEpsilon2,  start = Marker_Blg_D5, 	     building1 = Blg_D5,		  facing1 = west, trigger1 =  TriggerPath20, location1 = Marker_C28, facing2 = west, location2 = Marker_D4, facing3 = west, location3 = Marker_Final3, unit = SBP.ELITE.LUFTWAFFE, count = 3,  g_WehrmachtEpsilonArrived0 = true, g_WehrmachtEpsilonArrived1 = true, g_WehrmachtEpsilonArrived2 = true}
+	table_WehrmachtEpsilon[3] = {sgroup = WehrmachtEpsilon3,  start = Marker_Blg_TownSide1, building1 = Blg_TownSide1,   facing1 = west, trigger1 =  TriggerPath28, location1 = Marker_D19, facing2 = west,  location2 = Marker_D34, facing3 = west, location3 = Marker_Final, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3,  g_WehrmachtEpsilonArrived0 = true, g_WehrmachtEpsilonArrived1 = true, g_WehrmachtEpsilonArrived2 = true}
+	table_WehrmachtEpsilon[4] = {sgroup = WehrmachtEpsilon4,  start = Marker_Blg_TownSide2, building1 = Blg_TownSide2,   facing1 = west, trigger1 =  TriggerPath28, location1 = Marker_D32, facing2 = west, location2 = Marker_D43, facing3 = west, location3 = Marker_Final3, unit = SBP.ELITE.LUFTWAFFE, count = 3,  g_WehrmachtEpsilonArrived0 = true, g_WehrmachtEpsilonArrived1 = true, g_WehrmachtEpsilonArrived2 = true}
+	table_WehrmachtEpsilon[5] = {sgroup = WehrmachtEpsilon5,  start = Marker_Blg_TownHall,  building1 = Blg_TownHall,	  facing1 = west, trigger1 =  TriggerPath27, location1 = Marker_D18,  facing2 = west, location2 = Marker_D18, facing3 = west, location3 = Marker_Final3, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3,  g_WehrmachtEpsilonArrived0 = true, g_WehrmachtEpsilonArrived1 = true, g_WehrmachtEpsilonArrived2 = true}
+	
+	
+	
+	
+-------------------------------------------WehrmachtZeta---------------------------------------------------------------------------------------------------	
+	
+	WehrmachtZeta1 = SGroup_CreateIfNotFound("WehrmachtZeta1")
+	WehrmachtZeta2 = SGroup_CreateIfNotFound("WehrmachtZeta2")
+	WehrmachtZeta3 = SGroup_CreateIfNotFound("WehrmachtZeta3")
+	WehrmachtZeta4 = SGroup_CreateIfNotFound("WehrmachtZeta4")
+	WehrmachtZeta5 = SGroup_CreateIfNotFound("WehrmachtZeta5")
+	WehrmachtZeta6 = SGroup_CreateIfNotFound("WehrmachtZeta6")
+	WehrmachtZeta7 = SGroup_CreateIfNotFound("WehrmachtZeta7")
+
+	
+	table_WehrmachtZeta = {} -- building, location, building, death
+	table_WehrmachtZeta[1] = {sgroup = WehrmachtZeta1, b1health = 1, start = Marker_Blg_A4,       building1 = Blg_A4,       location1 = Marker_A12,  facing1 = north, building2 = Blg_A4,       unit = SBP.ELITE.LUFTWAFFE, count = 3, g_WehrmachtZetaArrived0 = true, g_WehrmachtZetaArrived1 = false}
+	table_WehrmachtZeta[2] = {sgroup = WehrmachtZeta2, b1health = 1, start = Marker_Blg_B1,		building1 = Blg_B1, 	  location1 = Marker_B21,  facing1 = north, building2 = Blg_D1,       unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtZetaArrived0 = true, g_WehrmachtZetaArrived1 = false}
+	table_WehrmachtZeta[3] = {sgroup = WehrmachtZeta3, b1health = 1, start = Marker_Blg_A7,       building1 = Blg_A7,       location1 = Marker_A8,  facing1 = north, building2 = Blg_A7,       unit = SBP.ELITE.LUFTWAFFE, count = 3, g_WehrmachtZetaArrived0 = true, g_WehrmachtZetaArrived1 = false}
+	table_WehrmachtZeta[4] = {sgroup = WehrmachtZeta4, b1health = 1,  start = Marker_Blg_C3,       building1 = Blg_C3,       location1 = Marker_C13,  facing1 = west, building2 = Blg_D1,       unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtZetaArrived0 = true, g_WehrmachtZetaArrived1 = false}
+	--table_WehrmachtZeta[5] = {sgroup = WehrmachtZeta5, start = Marker_Blg_C2,       building1 = Blg_C2,       location1 = Marker_C9, facing1 = north, building2 = Blg_D1,       unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtZetaArrived0 = true, g_WehrmachtZetaArrived1 = false}
+	--table_WehrmachtZeta[7] = {sgroup = WehrmachtZeta7, start = Marker_Blg_D2,     building1 = Blg_D2,          location1 = Marker_D16,  facing1 = west, building2 = Blg_D5, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtZetaArrived0 = true, g_WehrmachtZetaArrived1 = false}
+-------------------------------------------WehrmachtEta---------------------------------------------------------------------------------------------------	
+	
+	WehrmachtEta1 = SGroup_CreateIfNotFound("WehrmachtEta1")
+	WehrmachtEta2 = SGroup_CreateIfNotFound("WehrmachtEta2")
+	WehrmachtEta3 = SGroup_CreateIfNotFound("WehrmachtEta3")
+	WehrmachtEta4 = SGroup_CreateIfNotFound("WehrmachtEta4")
+	WehrmachtEta5 = SGroup_CreateIfNotFound("WehrmachtEta5")
+	WehrmachtEta6 = SGroup_CreateIfNotFound("WehrmachtEta6")
+	WehrmachtEta7 = SGroup_CreateIfNotFound("WehrmachtEta7")
+	
+	table_WehrmachtEta = {} -- Church on location, location & capture, final
+	table_WehrmachtEta[1] = {sgroup = WehrmachtEta1, start = Marker_Eta1,   facing1 = west, location1 = Marker_B19, building1 = Blg_B2,     capture = Blg_Church, location2 = Marker_Final, unit = SBP.ELITE.LUFTWAFFE, count = 3, g_WehrmachtEtaArrived0 = true, g_WehrmachtEtaArrived1 = false}
+	table_WehrmachtEta[2] = {sgroup = WehrmachtEta2, start = Marker_Eta2,   facing1 = west, location1 = Marker_B28, building1 = Blg_B1,     capture = Blg_Church, location2 = Marker_Final, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtEtaArrived0 = true, g_WehrmachtEtaArrived1 = false}
+	table_WehrmachtEta[3] = {sgroup = WehrmachtEta3, start = Marker_Eta3,   facing1 = west, location1 = Marker_B15, building1 = Blg_Church, capture = ResourcePoint1, location2 = Marker_Final, unit = SBP.ELITE.LUFTWAFFE, count = 4, g_WehrmachtEtaArrived0 = true, g_WehrmachtEtaArrived1 = false}
+	table_WehrmachtEta[4] = {sgroup = WehrmachtEta4, start = Marker_Eta4,   facing1 = west, location1 = Marker_B11, building1 = Blg_Church,		 capture = ResourcePoint1, location2 = Marker_Final, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtEtaArrived0 = true, g_WehrmachtEtaArrived1 = false}
+	--table_WehrmachtEta[5] = {sgroup = WehrmachtEta5, start = Marker_Eta5,    facing1 = west, facing1 = west, location1 = Marker_B21, building1 = Blg_A5,     capture = ResourcePoint1, location2 = Marker_Final, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtEtaArrived0 = true, g_WehrmachtEtaArrived1 = false} 
+	--table_WehrmachtEta[6] = {sgroup = WehrmachtEta6, start = Marker_D18,   facing1 = west, location1 = Marker_B19, building1 = Blg_Church, capture = ResourcePoint1, location2 = Marker_Final, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 2, g_WehrmachtEtaArrived0 = true, g_WehrmachtEtaArrived1 = false}
+	--table_WehrmachtEta[7] = {sgroup = WehrmachtEta7, start = Marker_D15,   facing1 = west, location1 = Marker_B6,  building1 = Blg_Church, capture = ResourcePoint1, location2 = Marker_Final, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 2, g_WehrmachtEtaArrived0 = true, g_WehrmachtEtaArrived1 = false}
+	
+-------------------------------------------WehrmachtZeta---------------------------------------------------------------------------------------------------	
+	
+	
+	WehrmachtTheta1 = SGroup_CreateIfNotFound("WehrmachtTheta1")
+	WehrmachtTheta2 = SGroup_CreateIfNotFound("WehrmachtTheta2")
+	WehrmachtTheta3 = SGroup_CreateIfNotFound("WehrmachtTheta3")
+	WehrmachtTheta4 = SGroup_CreateIfNotFound("WehrmachtTheta4")
+	WehrmachtTheta5 = SGroup_CreateIfNotFound("WehrmachtTheta5")
+	WehrmachtTheta6 = SGroup_CreateIfNotFound("WehrmachtTheta6")
+	WehrmachtTheta7 = SGroup_CreateIfNotFound("WehrmachtTheta7")
+	WehrmachtTheta8 = SGroup_CreateIfNotFound("WehrmachtTheta8")
+	WehrmachtTheta9 = SGroup_CreateIfNotFound("WehrmachtTheta9")
+	WehrmachtTheta10 = SGroup_CreateIfNotFound("WehrmachtTheta10")
+	WehrmachtTheta11 = SGroup_CreateIfNotFound("WehrmachtTheta11")
+	
+	sg_WehrmachtTheta1 = SGroup_CreateIfNotFound("sg_WehrmachtTheta1")
+	sg_WehrmachtTheta2 = SGroup_CreateIfNotFound("sg_WehrmachtTheta2")
+	sg_WehrmachtTheta3 = SGroup_CreateIfNotFound("sg_WehrmachtTheta3")
+	sg_WehrmachtTheta4 = SGroup_CreateIfNotFound("sg_WehrmachtTheta4")
+	sg_WehrmachtTheta5 = SGroup_CreateIfNotFound("sg_WehrmachtTheta5")
+	sg_WehrmachtTheta6 = SGroup_CreateIfNotFound("sg_WehrmachtTheta6")
+	
+	
+	table_WehrmachtTheta = {} -- Trigger from Building, Location, Location (go to location ~ Zeta, getting into position)
+	table_WehrmachtTheta[1] =  {agroup = sg_WehrmachtTheta1, sgroup = WehrmachtTheta1,  start = Marker_Blg_A4,        building1 = Blg_A4, 	        trigger1 = TriggerPath2,  location1 = Marker_A12, facing1 = north, location2 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtThetaArrived0 = true, g_WehrmachtThetaArrived1 = false, g_WehrmachtThetaArrived2 = false}
+	table_WehrmachtTheta[2] =  {agroup = sg_WehrmachtTheta2, sgroup = WehrmachtTheta2,  start = Marker_Blg_A5,        building1 = Blg_A5,            trigger1 = TriggerPath2,  location1 = Marker_A12, facing1 = north, location2 = Marker_Final3, unit = SBP.ELITE.LUFTWAFFE, count = 3, g_WehrmachtThetaArrived0 = true, g_WehrmachtThetaArrived1 = false, g_WehrmachtThetaArrived2 = false}
+	table_WehrmachtTheta[3] =  {agroup = sg_WehrmachtTheta3, sgroup = WehrmachtTheta3,  start = Marker_Blg_Church,    building1 = Blg_Church,        trigger1 = TriggerPath7,  location1 = Marker_B9,  facing1 = north, location2 = Marker_Final,  unit = SBP.ELITE.LUFTWAFFE, count = 3, g_WehrmachtThetaArrived0 = true, g_WehrmachtThetaArrived1 = false, g_WehrmachtThetaArrived2 = false}
+	--table_WehrmachtTheta[4] =  {agroup = sg_WehrmachtTheta4, sgroup = WehrmachtTheta4,  start = Marker_Blg_C2,        building1 = Blg_C2, 	        trigger1 = TriggerPath11, location1 = Marker_B27, facing1 = north, location2 = Marker_Final3, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtThetaArrived0 = true, g_WehrmachtThetaArrived1 = false, g_WehrmachtThetaArrived2 = false}
+	--table_WehrmachtTheta[5] =  {sgroup = WehrmachtTheta5,  start = Marker_Blg_Church,    building1 = Blg_Church,        trigger1 = TriggerPath7,  location1 = Marker_B2,  facing1 = north, location2 = Marker_Final3, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtThetaArrived0 = true, g_WehrmachtThetaArrived1 = false, g_WehrmachtThetaArrived2 = false}
+	--table_WehrmachtTheta[6] =  {sgroup = WehrmachtTheta6,   start = Marker_Blg_B1,	     building1 = Blg_B1,            trigger1 = TriggerPath7,  location1 = Marker_B15, facing1 = north, location2 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtThetaArrived0 = true, g_WehrmachtThetaArrived1 = false, g_WehrmachtThetaArrived2 = false}
+	
+	table_WehrmachtTheta[5] = {agroup = sg_WehrmachtTheta5, sgroup = WehrmachtTheta5, start = Marker_Blg_D6, building1 = Blg_D6, trigger1 = TriggerPath23, location1 = Marker_D30, facing1 = west,  location2 = Marker_Final3,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtThetaArrived0 = true, g_WehrmachtThetaArrived1 = false, g_WehrmachtThetaArrived2 = false}
+	table_WehrmachtTheta[6] = {agroup = sg_WehrmachtTheta6, sgroup = WehrmachtTheta6, start = Marker_Blg_D5, building1 = Blg_D5, trigger1 = TriggerPath24, location1 = Marker_D15, facing1 = west,  location2 = Marker_Final3,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtThetaArrived0 = true, g_WehrmachtThetaArrived1 = false, g_WehrmachtThetaArrived2 = false} 
+-------------------------------------------Wehrmacth Iota---------------------------------------------------------------------------------------------------			
+	
+	WehrmachtIota1 = SGroup_CreateIfNotFound("WehrmachtIota1")
+	WehrmachtIota2 = SGroup_CreateIfNotFound("WehrmachtIota2")
+	WehrmachtIota3 = SGroup_CreateIfNotFound("WehrmachtIota3")
+	WehrmachtIota4 = SGroup_CreateIfNotFound("WehrmachtIota4")
+	WehrmachtIota5 = SGroup_CreateIfNotFound("WehrmachtIota5")
+	WehrmachtIota6 = SGroup_CreateIfNotFound("WehrmachtIota6")
+	WehrmachtIota7 = SGroup_CreateIfNotFound("WehrmachtIota7")
+	WehrmachtIota8 = SGroup_CreateIfNotFound("WehrmachtIota8")
+	WehrmachtIota9 = SGroup_CreateIfNotFound("WehrmachtIota9")
+	WehrmachtIota10 = SGroup_CreateIfNotFound("WehrmachtIota10")
+	WehrmachtIota11 = SGroup_CreateIfNotFound("WehrmachtIota11")
+	WehrmachtIota12 = SGroup_CreateIfNotFound("WehrmachtIota12")
+	
+	table_WehrmachtIota = {} -- Resource Point Stragglers
+	table_WehrmachtIota[1] = {sgroup = WehrmachtIota1, b1health = 1, start= Marker_Z4, facing1 = west,  building1 = Blg_Z3,   marker1 = Marker_Z2, location1 = Marker_Z3, facing2 = west,  location2 = Marker_Final2, unit = SBP.ELITE.LUFTWAFFE, count = 3,  g_WehrmachtIotaArrived0 = true, g_WehrmachtIotaArrived1 = false, g_WehrmachtIotaArrived2 = false}
+	table_WehrmachtIota[2] = {sgroup = WehrmachtIota2, b1health = 1, start= Marker_Z6, facing1 = west,  building1 = Blg_Z4,    marker1 = Marker_D37,  location1 = Marker_D46, facing2 = west,  location2 = Marker_Final2, unit = SBP.ELITE.LUFTWAFFE, count = 3,  g_WehrmachtIotaArrived0 = true, g_WehrmachtIotaArrived1 = false, g_WehrmachtIotaArrived2 = false}
+	table_WehrmachtIota[3] = {sgroup = WehrmachtIota3, b1health = 1, start= Marker_E1, facing1 = west,  building1 = Blg_C3,    marker1 = Marker_C29, location1 = Marker_C20, facing2 = west,  location2 = Marker_Final2, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3,  g_WehrmachtIotaArrived0 = true, g_WehrmachtIotaArrived1 = false, g_WehrmachtIotaArrived2 = false}
+	--table_WehrmachtIota[4] ={sgroup = WehrmachtIota4,b1health = 1,  start= Marker_E1, facing1 = west,  building1 = Blg_C3,     location1 = Marker_C20, facing2 = west,  location2 = Marker_Final2, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3,  g_WehrmachtIotaArrived0 = true, g_WehrmachtIotaArrived1 = false, g_WehrmachtIotaArrived2 = false}
+	
+-------------------------------------------Wehrmacth Kappa---------------------------------------------------------------------------------------------------			
+	
+	WehrmachtKappa1 = SGroup_CreateIfNotFound("WehrmachtKappa1")
+	WehrmachtKappa2 = SGroup_CreateIfNotFound("WehrmachtKappa2")
+	WehrmachtKappa3 = SGroup_CreateIfNotFound("WehrmachtKappa3")
+	WehrmachtKappa4 = SGroup_CreateIfNotFound("WehrmachtKappa4")
+	WehrmachtKappa5 = SGroup_CreateIfNotFound("WehrmachtKappa5")
+	WehrmachtKappa6 = SGroup_CreateIfNotFound("WehrmachtKappa6")
+	WehrmachtKappa7 = SGroup_CreateIfNotFound("WehrmachtKappa7")
+	WehrmachtKappa8 = SGroup_CreateIfNotFound("WehrmachtKappa8")
+	
+	table_WehrmachtKappa = {} -- Reinforce an Area
+	table_WehrmachtKappa[1] = {sgroup = WehrmachtKappa1, start = Marker_C15,  facing1 = west, trigger1 = TriggerPath22, posture1 = 1, location1 = Marker_D30,  facing2 = west, location2 = Marker_Final,  unit = SBP.ELITE.LUFTWAFFE, count = 3, g_WehrmachtKappaArrived0 = true, g_WehrmachtKappaArrived1 = false, g_WehrmachtKappaArrived2 = false}
+	table_WehrmachtKappa[2] = {sgroup = WehrmachtKappa2, start = Marker_D5,   facing1 = west, trigger1 = TriggerPath21, posture1 = 1, location1 = Marker_D26, facing2 = west, location2 = Marker_Final3, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 5, g_WehrmachtKappaArrived0 = true, g_WehrmachtKappaArrived1 = false, g_WehrmachtKappaArrived2 = false}
+	table_WehrmachtKappa[3] = {sgroup = WehrmachtKappa3, start = Marker_C31, facing1 = west,  trigger1 = TriggerPath21, posture1 = 1, location1 = Marker_D10, facing2 = west, location2 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtKappaArrived0 = true, g_WehrmachtKappaArrived1 = false, g_WehrmachtKappaArrived2 = false}
+	table_WehrmachtKappa[4] = {sgroup = WehrmachtKappa4, start = Marker_D13, facing1 = west,  trigger1 = TriggerPath23, posture1 = 1, location1 = Marker_D28, facing2 = west, location2 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 5, g_WehrmachtKappaArrived0 = true, g_WehrmachtKappaArrived1 = false, g_WehrmachtKappaArrived2 = false}
+	table_WehrmachtKappa[5] = {sgroup = WehrmachtKappa5, start = Marker_D7,  facing1 = west,  trigger1 = TriggerPath23, posture1 = 1, location1 = Marker_D36, facing2 = west, location2 = Marker_Final,  unit = SBP.ELITE.LUFTWAFFE, count = 5, g_WehrmachtKappaArrived0 = true, g_WehrmachtKappaArrived1 = false, g_WehrmachtKappaArrived2 = false}
+	table_WehrmachtKappa[6] = {sgroup = WehrmachtKappa6, start = Marker_C26,  facing1 = west, trigger1 = TriggerPath19, posture1 = 1, location1 = Marker_D3, facing2 = west, location2 = Marker_Final3,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 3, g_WehrmachtKappaArrived0 = true, g_WehrmachtKappaArrived1 = false, g_WehrmachtKappaArrived2 = false}
+	table_WehrmachtKappa[7] = {sgroup = WehrmachtKappa7, start = Marker_D4,  facing1 = west,  trigger1 = TriggerPath20, posture1 = 1, location1 = Marker_D19, facing2 = west, location2 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 5, g_WehrmachtKappaArrived0 = true, g_WehrmachtKappaArrived1 = false, g_WehrmachtKappaArrived2 = false}
+	table_WehrmachtKappa[8] = {sgroup = WehrmachtKappa8, start = Marker_C31,  facing1 = west,  trigger1 = TriggerPath20, posture1 = 1, location1 = Marker_D18, facing2 = west, location2 = Marker_Final,  unit = SBP.ELITE.LUFTWAFFE, count = 3, g_WehrmachtKappaArrived0 = true, g_WehrmachtKappaArrived1 = false, g_WehrmachtKappaArrived2 = false}
+	
+-------------------------------------------Wehrmacth Lamda---------------------------------------------------------------------------------------------------			
+	
+	WehrmachtLamda1 = SGroup_CreateIfNotFound("WehrmachtLamda1")
+	WehrmachtLamda2 = SGroup_CreateIfNotFound("WehrmachtLamda2")
+	WehrmachtLamda3 = SGroup_CreateIfNotFound("WehrmachtLamda3")
+	WehrmachtLamda4 = SGroup_CreateIfNotFound("WehrmachtLamda4")
+	
+	table_WehrmachtLamda = {} -- Drop Munition 
+	table_WehrmachtLamda[1] = {sgroup = WehrmachtLamda1, start = Marker_B9,  facing1 = north,  trigger1 = TriggerPath3, location1 = Marker_A9, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 1, g_WehrmachtLamdaArrived0 = true, g_WehrmachtLamdaArrived1 = false }
+	--table_WehrmachtLamda[2] = {sgroup = WehrmachtLamda2, start = Marker_B12, facing1 = north,  trigger1 = TriggerPath6a, location1 = Marker_B1, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 1, g_WehrmachtLamdaArrived0 = true, g_WehrmachtLamdaArrived1 = false}
+	--table_WehrmachtLamda[3] = {sgroup = WehrmachtLamda3, start = Marker_C31, facing1 = west,  trigger1 = TriggerPath7, location1 = Marker_B20, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 1, g_WehrmachtLamdaArrived0 = true, g_WehrmachtLamdaArrived1 = false}
+	
+-------------------------------------------MG42Alpha---------------------------------------------------------------------------------------------------		
+	
+	MG42Alpha1 = SGroup_CreateIfNotFound("MG42Alpha1")
+	MG42Alpha2 = SGroup_CreateIfNotFound("MG42Alpha2")
+	MG42Alpha3 = SGroup_CreateIfNotFound("MG42Alpha3")
+	MG42Alpha4 = SGroup_CreateIfNotFound("MG42Alpha4")
+	MG42Alpha5 = SGroup_CreateIfNotFound("MG42Alpha5")
+	MG42Alpha6 = SGroup_CreateIfNotFound("MG42Alpha6")
+	
+	table_MG42Alpha = {} -- Location, Location, Location
+	
+	table_MG42Alpha[1] = {sgroup = MG42Alpha1, start = Spawn_MG42Alpha3, location1 = Marker_Final, facing1 = north, facing2 = west, unit = SBP.AXIS.HEAVYMG, count = 1 }
+	table_MG42Alpha[2] = {sgroup = MG42Alpha2, start = Marker_B8,        location1 = Marker_Final, facing1 = west, facing2 = west, unit = SBP.AXIS.HEAVYMG, count = 1 }
+	table_MG42Alpha[3] = {sgroup = MG42Alpha3, start = Marker_Z1,        location1 = Marker_Final, facing1 = south, facing2 = west, unit = SBP.AXIS.HEAVYMG, count = 1 }
+	table_MG42Alpha[4] = {sgroup = MG42Alpha4, start = Marker_Z2, 		 location1 = Marker_Final, facing1 = north, facing2 = west, unit = SBP.AXIS.HEAVYMG, count = 1 }
+	table_MG42Alpha[5] = {sgroup = MG42Alpha5, start = Marker_Z3, 		 location1 = Marker_Final, facing1 = west, facing2 = west, unit = SBP.AXIS.HEAVYMG, count = 1 }
+	table_MG42Alpha[6] = {sgroup = MG42Alpha6, start = Marker_E2, 		 location1 = Marker_Final, facing1 = west, facing2 = west, unit = SBP.AXIS.HEAVYMG, count = 1 }
+	
+	------------------------------------------------MG42Beta-------------------------------------------------------------------------------------------------	
+	
+	MG42Beta1 = SGroup_CreateIfNotFound("MG42Beta1")
+	MG42Beta2 = SGroup_CreateIfNotFound("MG42Beta2")
+	MG42Beta3 = SGroup_CreateIfNotFound("MG42Beta3")
+	MG42Beta4 = SGroup_CreateIfNotFound("MG42Beta4")
+	MG42Beta5 = SGroup_CreateIfNotFound("MG42Beta5")
+	MG42Beta6 = SGroup_CreateIfNotFound("MG42Beta6")
+	
+	table_MG42Beta = {} -- Location, Location, Location
+
+	table_MG42Beta[1] = {sgroup = MG42Beta1, start = Marker_Blg_B1, building1 = Blg_B1,     unit = SBP.AXIS.HEAVYMG, count = 1}
+	--table_MG42Beta[2] = {sgroup = MG42Beta2, start = Marker_Blg_C3, building1 = Blg_C3,     unit = SBP.AXIS.HEAVYMG, count = 1}
+	table_MG42Beta[2] = {sgroup = MG42Beta2, start = Marker_Blg_D2, building1 = Blg_D2,     unit = SBP.AXIS.HEAVYMG, count = 1}
+	table_MG42Beta[3] = {sgroup = MG42Beta3, start = Marker_Blg_TownHall, building1 = Blg_TownHall, unit = SBP.AXIS.HEAVYMG, count = 1}
+	--table_MG42Beta[5] = {sgroup = MG42Beta5, start = Marker_Blg_A5, building1 = Blg_A5,     unit = SBP.AXIS.HEAVYMG, count = 1}
+-------------------------------------------PanzerfaustAlpha--------------------------------------------------------------------------------------------------		
+	
+	PanzerfaustAlpha1 = SGroup_CreateIfNotFound("PanzerfaustAlpha1")
+	PanzerfaustAlpha2 = SGroup_CreateIfNotFound("PanzerfaustAlpha2")	
+	PanzerfaustAlpha3 = SGroup_CreateIfNotFound("PanzerfaustAlpha3")
+	PanzerfaustAlpha4 = SGroup_CreateIfNotFound("PanzerfaustAlpha4")
+	
+	table_PanzerfaustAlpha = {}
+	--table_PanzerfaustAlpha[1] = {sgroup = PanzerfaustAlpha1, start = Marker_C14, facing0 = west, location1 =  Marker_D1, facing1 = west, facing2 = west, location2 = Marker_Final, facing3 = west, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 2, g_PanzerfaustAlphaArrived0 = true}
+	--table_PanzerfaustAlpha[2] = {sgroup = PanzerfaustAlpha2, start = Marker_D8, facing0 = west, location1 =  Marker_D10, facing1 = west, facing2 = west, location2 = Marker_Final, facing3 = west, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 2, g_PanzerfaustAlphaArrived0 = true}
+	--table_PanzerfaustAlpha[4] = {sgroup = PanzerfaustAlpha4, start = Marker_D9, facing0 = west, location1 =  Marker_D11, facing1 = west, facing2 = west, location2 = Marker_Final, facing3 = west, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 2, g_PanzerfaustAlphaArrived0 = true}
+	
+-------------------------------------------Panzerfaust Beta--------------------------------------------------------------------------------------------------		
+	
+	PanzerfaustBeta1 = SGroup_CreateIfNotFound("PanzerfaustBeta1")
+	PanzerfaustBeta2 = SGroup_CreateIfNotFound("PanzerfaustBeta2")
+	PanzerfaustBeta3 = SGroup_CreateIfNotFound("PanzerfaustBeta3")		
+	PanzerfaustBeta4 = SGroup_CreateIfNotFound("PanzerfaustBeta4")	
+	
+	table_PanzerfaustBeta = {}
+	table_PanzerfaustBeta[1] = {sgroup = PanzerfaustBeta1, b1health = 1, start = Marker_Blg_D2, facing1 = west, building1 = Blg_D2, location1 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 2, g_PanzerfaustBetaArrived0 = true, g_PanzerfaustBetaArrived1 = false}
+	table_PanzerfaustBeta[2] = {sgroup = PanzerfaustBeta2, b1health = 1, start = Marker_C26, facing1 = west, building1 = Blg_B1, location1 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 2, g_PanzerfaustBetaArrived0 = true, g_PanzerfaustBetaArrived1 = false}
+	table_PanzerfaustBeta[3] = {sgroup = PanzerfaustBeta3, b1health = 1, start = Marker_Blg_D5, facing1 = west, building1 = Blg_D5, location1 = Marker_Final,  unit = SBP.ELITE.FALLSCHIRMJAGER, count = 2, g_PanzerfaustBetaArrived0 = true, g_PanzerfaustBetaArrived1 = false}
+	--table_PanzerfaustBeta[4] = {sgroup = PanzerfaustBeta4, b1health = 1, start = Marker_D43, facing1 = west, building1 = Blg_D4, location1 = Marker_Final2, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 1, g_PanzerfaustBetaArrived0 = true, g_PanzerfaustBetaArrived1 = false}
+	
+-------------------------------------------50MM Flak---------------------------------------------------------------------------------------------------		
+	
+	FiftyMMAlpha1 = SGroup_CreateIfNotFound("FiftyMMAlpha1")
+	FiftyMMAlpha2 = SGroup_CreateIfNotFound("FiftyMMAlpha2")
+	FiftyMMAlpha3 = SGroup_CreateIfNotFound("FiftyMMAlpha3")
+	
+	sg_FiftyMMAlpha1 = SGroup_CreateIfNotFound("sg_FiftyMMAlpha1")
+	sg_FiftyMMAlpha2 = SGroup_CreateIfNotFound("sg_FiftyMMAlpha2")
+	
+	table_FiftyMMAlpha = {} -- Trigger from Building, Location, Location
+	
+	table_FiftyMMAlpha[1] = {sgroup = FiftyMMAlpha1, start = Marker_50MMAlpha1, location1 = Marker_B31, location2 = Marker_Final3, unit = SBP.AXIS.PAK_38, count = 4, facing1 = west, phase = 0,  target = Blg_Statue, agroup = sg_AllyChurch}	
+	table_FiftyMMAlpha[2] = {sgroup = FiftyMMAlpha2, start = Marker_50MMAlpha2, location1 = Marker_D31, location2 = Marker_Final, unit = SBP.AXIS.PAK_38, count = 4, facing1 = north, phase = 0,  target = Entity_Box1, agroup = sg_AllyTownHall}
+	--table_FiftyMMAlpha[3] = {sgroup = FiftyMMAlpha3, start = Marker_50MMAlpha3, location1 = Marker_D14, location2 = Marker_Final2, trigger = TriggerPath20, unit = SBP.AXIS.PAK_38, count = 4, facing1 = west, g_FiftyMMAttacked0 = true, g_FiftyMMAttacked1 = false, g_FiftyMMAttacked2 = false, target = Blg_Church}	
+	
+-------------------------------------------Sniper Alpha---------------------------------------------------------------------------------------------------			
+	
+	SniperAlpha1 = SGroup_CreateIfNotFound("SniperAlpha1")
+	SniperAlpha2 = SGroup_CreateIfNotFound("SniperAlpha2")
+	SniperAlpha3 = SGroup_CreateIfNotFound("SniperAlpha3")
+	
+	table_SniperAlpha = {}
+	table_SniperAlpha[1] = {sgroup = SniperAlpha1, b1health = 1, start = Marker_Blg_F1, building1 = Blg_F1, unit = SBP.ELITE.FALLSNIPER, count = 1}	
+	table_SniperAlpha[2] = {sgroup = SniperAlpha2, b1health = 1, start = Marker_Blg_Z1, building1 = Blg_Z1, unit = SBP.ELITE.FALLSNIPER, count = 1}	
+	table_SniperAlpha[3] = {sgroup = SniperAlpha3, b1health = 1, start = Marker_Blg_Z2, building1 = Blg_Z2, unit = SBP.ELITE.FALLSNIPER, count = 1}
+	
+-------------------------------------------BMW Beta---------------------------------------------------------------------------------------------------			
+	
+	BMWBeta1 = SGroup_CreateIfNotFound("BMWBeta1")
+	BMWBeta2 = SGroup_CreateIfNotFound("BMWBeta2")
+	BMWBeta3 = SGroup_CreateIfNotFound("BMWBeta3")
+	table_BMWBeta = {}
+	table_BMWBeta[1] = {sgroup = BMWBeta1, start = Marker_BMWBeta1,  facing1 = west,  trigger = TriggerPath21, location1 = Marker_BMWBeta1,  unit = SBP.ELITE.SCHWIMMWAGEN, count = 1}
+	table_BMWBeta[2] = {sgroup = BMWBeta2, start = Marker_BMWBeta2,  facing1 = west,  trigger = TriggerPath27, location1 = Marker_BMWBeta2,  unit = SBP.ELITE.SCHWIMMWAGEN, count = 1}
+	table_BMWBeta[3] = {sgroup = BMWBeta3, start = Marker_BMWBeta3,  facing1 = west,  trigger = TriggerPath25, location1 = Marker_BMWBeta3,  unit = SBP.ELITE.SCHWIMMWAGEN, count = 1}
+	
+-------------------------------------------TownHall Runaways--------------------------------------------------------------------------------------------------			
+	
+	TownHallRunaway1 = SGroup_CreateIfNotFound("TownHallRunaway1")
+	TownHallRunaway2 = SGroup_CreateIfNotFound("TownHallRunaway2")
+	TownHallRunaway3 = SGroup_CreateIfNotFound("TownHallRunaway3")
+	TownHallRunaway4 = SGroup_CreateIfNotFound("TownHallRunaway4")
+	TownHallRunaway5 = SGroup_CreateIfNotFound("TownHallRunaway5")
+	TownHallRunaway6 = SGroup_CreateIfNotFound("TownHallRunaway6")
+	
+	table_TownHallRunaway = {}
+	table_TownHallRunaway[1] = {sgroup = TownHallRunaway1, start = Marker_Blg_TownHallSide1, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 1, location1 = Marker_Final}
+	table_TownHallRunaway[2] = {sgroup = TownHallRunaway2, start = Marker_Blg_TownHallSide2, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 1, location1 = Marker_Final3}
+	table_TownHallRunaway[3] = {sgroup = TownHallRunaway3, start = Marker_Blg_TownHallSide3, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 1, location1 = Marker_Final}
+	table_TownHallRunaway[4] = {sgroup = TownHallRunaway4, start = Marker_Blg_TownHallSide4, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 1, location1 = Marker_Final3}
+	table_TownHallRunaway[5] = {sgroup = TownHallRunaway5, start = Marker_Blg_TownHallSide5, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 1, location1 = Marker_Final}
+
+	TownHallRunawayB1 = SGroup_CreateIfNotFound("TownHallRunawayB1")
+	TownHallRunawayB2 = SGroup_CreateIfNotFound("TownHallRunawayB2")
+	TownHallRunawayB3 = SGroup_CreateIfNotFound("TownHallRunawayB3")
+	TownHallRunawayB4 = SGroup_CreateIfNotFound("TownHallRunawayB4")
+	TownHallRunawayB5 = SGroup_CreateIfNotFound("TownHallRunawayB5")
+	TownHallRunawayB6 = SGroup_CreateIfNotFound("TownHallRunawayB6")
+	
+	table_TownHallRunawayB = {}
+	table_TownHallRunawayB[1] = {sgroup = TownHallRunawayB1, start = Spawn_LastAttack2, location1 = Marker_D19, facing1 = west, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 2, location2 = Marker_Final}
+	--table_TownHallRunawayB[3] = {sgroup = TownHallRunawayB3, start = Spawn_LastAttack2, location1 = Marker_D26, facing1 = west, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 2, location2 = Marker_Final}
+	table_TownHallRunawayB[2] = {sgroup = TownHallRunawayB2, start = Spawn_LastAttack1, location1 = Marker_D25, facing1 = west, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 2, location2 = Marker_Final3}
+	--table_TownHallRunawayB[4] = {sgroup = TownHallRunawayB4, start = Spawn_LastAttack1, location1 = Marker_D32, facing1 = west, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 2, location2 = Marker_Final3}
+	--table_TownHallRunawayB[5] = {sgroup = TownHallRunawayB5, start = Spawn_LastAttack2, location1 = Marker_D25, facing1 = west, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 2, location2 = Marker_Final2}
+	--table_TownHallRunawayB[6] = {sgroup = TownHallRunawayB6, start = Spawn_LastAttack2, location1 = Marker_D43, facing1 = west, unit = SBP.ELITE.FALLSCHIRMJAGER, count = 2, location2 = Marker_Final2}
+	
+-------------------------------------------Checkpoint Markers----------------------------------------------------------------------------------			
+	
+-------------------------------------------Rules------------------------------------------------------------------------------------------------		
+	
+	table_Mortar = {}
+	table_Mortar[1] = {position = Marker_GetPosition(Marker_B31)}
+	table_Mortar[2] = {position = Marker_GetPosition(Marker_B16)}
+	table_Mortar[3] = {position = Marker_GetPosition(Marker_B28)}
+	table_Mortar[4] = {position = Marker_GetPosition(Marker_B22)}
+	table_Mortar[5] = {position = SGroup_GetPosition_EVEN_IF_EMPTY(sg_tempMortar)}
+	
+	table_AxisSGroup = {}
+	
+-------------------------------------------Variables------------------------------------------------------------------------------------------------		
+	
+	g_CafeNormandieCaptured = false
+	g_ChurchCaptured = false	
+	g_ResourcePoint1Captured = false
+	g_TownHallCaptured = false
+	g_ResourcePoint2Captured = false
+	
+	g_TownHallStarted = false
+	
+	g_UpgradeBarracks = false
+	g_SetWires1 = false
+	g_SetWires1a = false
+	g_SetWires2 = false
+	lastcount = 0
+	g_Reinforcement = false
+	g_fireup = 0 
+	g_Ambient1 = false
+	g_resourcespeech = 0
+	g_Ambient3 = false
+	g_Ambient4 = false
+	g_Ambient5 = false
+	g_AbleCompany = 0
+	g_EmpCounter = 0
+	g_FowRevealTownHall = false
+	g_OntheRun = false
+	g_EmplacementComplete = false
+	g_StartEmplacement = false
+	g_UpgradeComplete = false
+	g_OwnResource3 = false
+	g_mortarcreated = false
+	g_RunawayCounter = 0
+	g_Runawaystart = false
+	g_ConnectResource = false	
+	g_OwnResourceAll = false	
+	
+	g_SitRep1 = false
+	g_SitRep2 = false
+	g_SitRep3 = false
+	
+	MortarTimer = 5
+	
+	--EGroup_SetInvulnerable(blg_NIS, true)
+
+	
+	EGroup_SetInvulnerable(Blg_Bridge, true)
+	
+	sg_AllyTownHall2 = SGroup_CreateIfNotFound("sg_AllyTownHall2")
+	
+	resourcemanID = Modify_PlayerResourceRate( player1, RT_Manpower, 0)
+	--Modify_PlayerResourceRate( player1, RT_Munition, 3)
+
+	AxisHalftrackAlpha1 = SGroup_CreateIfNotFound("AxisHalftrackAlpha1")
+	AxisSquad1 = SGroup_CreateIfNotFound("AxisSquad1")
+	AxisSquad2 = SGroup_CreateIfNotFound("AxisSquad2")
+	AxisSquad3 = SGroup_CreateIfNotFound("AxisSquad3")
+	
+	Entity_Wire1 = EGroup_CreateIfNotFound("Entity_Wire1")
+	Entity_WireX1 = EGroup_CreateIfNotFound("Entity_WireX1")
+	Axis_WireLayer1 = SGroup_CreateIfNotFound("Axis_WireLayer1")
+	Util_CreateSquadsAtMarker(player2, Axis_WireLayer1, SBP.AXIS.PIONEER, Spawn_Axis_WireLayer1, 1)
+	--Modify_WeaponRange(Axis_WireLayer1, "hardpoint_01", 0.5)
+
+	Entity_Wire1a = EGroup_CreateIfNotFound("Entity_Wire1a")
+	Entity_WireX1a = EGroup_CreateIfNotFound("Entity_WireX1a")
+	Axis_WireLayer1a = SGroup_CreateIfNotFound("Axis_WireLayer1a")
+	Util_CreateSquadsAtMarker(player2, Axis_WireLayer1a, SBP.AXIS.PIONEER, Spawn_Axis_WireLayer1a, 1)
+	--Modify_WeaponRange(Axis_WireLayer1a, "hardpoint_01", 0.5)
+	
+	Entity_Wire2 = EGroup_CreateIfNotFound("Entity_Wire2")
+	Axis_WireLayer2 = SGroup_CreateIfNotFound("Axis_WireLayer2")
+	Util_CreateSquadsAtMarker(player2, Axis_WireLayer2, SBP.AXIS.PIONEER, Spawn_Axis_WireLayer2, 1)
+	--Modify_WeaponRange(Axis_WireLayer2, "hardpoint_01", 0.5)
+	
+	Axis_Mortar = SGroup_CreateIfNotFound("Axis_Mortar")
+	Util_CreateSquadsAtMarker(player2, Axis_Mortar, SBP.AXIS.MORTAR, Marker_D6, 1)
+	Cmd_InstantSetupTeamWeapon(Axis_Mortar)
+	--Modify_WeaponRange(Axis_Mortar, "hardpoint_01", 2)
+	
+	--EGroup_DeSpawn(Entity_Wire1)
+	--EGroup_DeSpawn(Entity_Wire2)
+
+	sectorID1 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(ChurchPoint))		-- church
+	sectorID2 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(Territory3))		-- TownHall
+	sectorID5 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(ResourcePoint3))		
+	sectorID4 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(ResourcePoint4))		
+	sectorID3 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(ResourcePoint5))		
+	sectorID6 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(ResourcePoint1))		
+	sectorID7 = World_GetTerritorySectorID(EGroup_GetPosition_EVEN_IF_EMPTY(ResourcePoint7))		
+	
+	
+	sg_AllyPinned = SGroup_CreateIfNotFound("sg_AllyPinned")
+	
+--	Player_SetResource(player1, RT_Munition, 700)										-- moved to after NIS, now using Util function
+	
+	Player_SetUpgradeAvailability(player1, UPG.ALLIES.CONVERT_AMBIENT_BUILDING, ITEM_REMOVED)
+	
+	Cmd_InstantUpgrade(player1, UPGRADE_REINFORCEMENTS_M03)
+	Player_SetAbilityAvailability(player1, ABILITY_REINFORCEMENTS_M03, ITEM_REMOVED)
+
+	--UI_BindingSetEnabled("resources", false)
+	
+	Rule_Add(Rule_StartMission)
+
+	playerMunitions = 0
+	
+	Player_SetPopCapOverride(player1, popcap)
+	
+	v_reinforcementcount = 0
+	
+	Camera_ClampToMarker(mkr_Clamp)
+end
+
+Scar_AddInit(OnInit)	
+
+function M03_Difficulty()
+	-- get the difficulty
+
+	g_dif = Game_GetSPDifficulty()
+
+	-- set health bonus and AI difficulty (if applicable) for player 1
+
+	Setup_Difficulty(player1, g_dif) -- pass the player and difficulty global variable 
+
+	-- set health handicap and AI difficulty (if applicable) for player 2
+
+	Setup_Difficulty(player2, g_dif) -- do it for each player that you have defined
+	difficulty = {}
+	if g_dif == GD_EASY then --easy
+		difficulty.medaltarget = 20
+		popcap = 45
+		maxreinforcement = 4
+	elseif g_dif == GD_NORMAL then --normal
+		difficulty.medaltarget = 30
+		popcap = 45
+		maxreinforcement = 3
+	elseif g_dif == GD_HARD then --hard
+		difficulty.medaltarget = 40
+		popcap = 42
+		maxreinforcement = 2
+	elseif g_dif == GD_EXPERT then --expert
+		difficulty.medaltarget = 50
+		popcap = 40
+		maxreinforcement = 1
+	end
+end
+
+----------------------------------------------Mission Start------------------------------------------------------------------------------------
+function Rule_StartMission()
+	Util_StartNIS(EVENTS.NIS01)
+	Rule_Add(Rule_CreateAble)
+	Rule_RemoveMe()
+	Rule_AddInterval(Check_ResourceZero, 1)
+	Rule_AddInterval(Check_ChurchHealth, 1)
+	
+	EGroup_Hide(LAYER_NIS_Church, true)
+	--EGroup_Hide(LAYER_Designer, true)
+	Timer_Start("Timer_PlayerResources", 15)
+end
+
+-----------------------------------------------------Cafe Normandie------------------------------------------------------	
+
+function Change_Camera()
+	--Camera_SetOrbit( 6.005 )
+	Camera_FollowSelection()
+	Camera_SetZoomDist(15)
+	Camera_SetDeclination(0.15)
+end
+
+function Rule_CafeNormandieFire()
+	if Timer_GetRemaining("Timer_CafeNorm") == 4 then
+		Objective_Start(OBJECTIVE1)
+		Util_StartIntel(EVENTS.CafeNormandieStart)
+		
+		print("events should start")
+	end
+	if Timer_GetRemaining("Timer_CafeNorm") == 0 then
+		-- Modifier_RemoveAllFromSGroup(MG42CafeNormandie1)
+		Modify_WeaponDamage(MG42CafeNormandie1, "hardpoint_01", 3.0)
+		Modify_WeaponAccuracy(MG42CafeNormandie1, "hardpoint_01", 2.0)
+		table.insert(table_AbleCompany, 3, {sgroup = AbleCompany3, start = Marker_AbleCompanySpawn2, location1 =  Marker_Start3, count = 6, unit = SBP.ALLIES.PARATROOPER, posx = nil, dest = nil})
+		Util_CreateSquadsAtMarker(player1, table_AbleCompany[3].sgroup, table_AbleCompany[3].unit, Marker_AbleCompanySpawn, 1, table_AbleCompany[3].count) 
+		table.insert(table_AbleCompany, 4, {sgroup = AbleCompany4, start = Marker_AbleCompanySpawn2, location1 =  Marker_Start3, count = 6, unit = SBP.ALLIES.MEDIC, posx = nil, dest = nil})
+		Util_CreateSquadsAtMarker(player1, table_AbleCompany[4].sgroup, table_AbleCompany[4].unit, Marker_AbleCompanySpawn, 1, table_AbleCompany[4].count) 
+		--Cmd_InstantUpgrade(AbleCompany3, UPG.ALLIES.BAZOOKA)
+		Cmd_Move(table_AbleCompany[3].sgroup, Marker_Start2)		
+		print("Creating Able Company")
+		Rule_RemoveMe()
+		Rule_AddInterval(Rule_AmbientSpeech, 1)
+	end
+end
+
+function Check_ResourceZero()
+ 	playerMunitions = Player_GetResource(player1, RT_Munition)
+	
+ 	-- start a timer for when to add more munitions
+ 	if g_CheckMunition == nil then
+  		g_CheckMunition = 1
+ 		Timer_Start("Timer_PlayerResources", 15)
+ 	end
+ 	
+  	-- if player has no munitions and hasn't received any free in the last x seconds, give them another 100
+  	if Player_GetResource(player1, RT_Munition) < 200 and Timer_GetRemaining("Timer_PlayerResources") == 0 then
+ 		Timer_Start("Timer_PlayerResources", 15)
+ 		playerMunitions = playerMunitions + 100
+  		Player_SetResource(player1, RT_Munition, playerMunitions)
+ 	end
+end
+
+
+
+function Objective_CafeNormandie()	
+	if ((EGroup_GetAvgHealth(Blg_CafeNormandie) <= 0.90) or SGroup_TotalMembersCount(MG42CafeNormandie1) == 0) and g_CafeNormandieCaptured == false then		
+		Util_PlayMusic("Sound/Music/sp/M03/m03_ob2_takechurch", 0, 0)
+		
+	--Timer--
+		Timer_Start("Timer_Cafe", 30)
+		
+	--Variable Complete--		
+		g_CafeNormandieCaptured = true 
+		
+		EGroup_SetPlayerOwner(RetreatPoint3, player1)
+	--Allies--							
+		EGroup_InstantCaptureStrategicPoint(Territory1, player1)
+		for i = 1, 2 do
+			SGroup_SetSuppression(table_AbleCompany[i].sgroup, 0)
+			SGroup_SuggestPosture(table_AbleCompany[i].sgroup, 0, 10)
+		end
+		
+	--Event--
+		Util_StartIntel(EVENTS.CafeComplete)
+		Objective_Complete(OBJECTIVE1)
+		
+	--Axis--	
+		EGroup_Kill(Blg_CafeNormandie)
+		SGroup_DestroyAllSquads(MG42CafeNormandie1)
+		CafeNormandieCrew1 = SGroup_CreateIfNotFound("CafeNormandieCrew1")
+		Util_CreateSquadsAtMarker(player2, CafeNormandieCrew1, SBP.ELITE.FALLSCHIRMJAGER, Marker_Blg_CafeNormandie, 1, 1)
+		SGroup_AddSlotItemToDropOnDeath(CafeNormandieCrew1, SLOT_ITEM.LMG_42, 1.0, true)
+		Cmd_Move(CafeNormandieCrew1, Marker_Start2)
+		--SGroup_SetMoveType(CafeNormandieCrew1, MOVETYPE.FAST)
+		
+	--Hint Points--
+		HintPoint_Remove(HintPoint_CafeNormandieID)
+		--Rule_AddOneShot(HintPoint_Bazooka, 1)
+		Rule_AddOneShot(Check_Burn, 1)
+		Rule_AddOneShot(String_Church, 10)
+		
+	--Rules--
+		Rule_RemoveMe()
+	end	
+end	
+function Check_Burn()
+	--local sid = SGroup_GetSpawnedSquadAt(CafeNormandieCrew1, 1)
+	Cmd_CriticalHit(player2, CafeNormandieCrew1, CRIT.BURN_DEATH_OOC, CRIT.DAMAGE_GREEN)	
+end	
+function String_Church()
+	if g_check1 ~= 1 then	
+		Rule_Remove(Objective_Church2)
+	end
+--Next Objective--
+	if g_ChurchCaptured == true then 
+		print("Next Objective Completed")
+	elseif g_check1 == nil then
+		Rule_AddInterval(Objective_ClearChurch, 1)
+		Objective_Start(OBJECTIVE2)
+		--Rule_AddOneShot(HintPoint_Church1b, 1)
+		
+		Rule_RemoveMe()
+	end
+end
+
+function Objective_Church2()
+	if Player_AreSquadsNearMarker(player1, TriggerPath3) and g_CafeNormandieCaptured == false and g_check1 ~= 1 then 
+		Objective_Start(OBJECTIVE2)
+		
+		Rule_AddInterval(Objective_ClearChurch, 1)
+		--Rule_AddOneShot(HintPoint_Church1b, 1)
+		g_check1 = 1
+		Rule_RemoveMe()
+		print("objective church 2")
+	end
+end	
+
+function Check_EnterTownHall()
+	print(SGroup_CountSpawned(sg_AllyTownHall))
+	if SGroup_CountSpawned(sg_AllyTownHall) > 0  and g_TownHallStarted == false and g_ChurchCaptured == false then 
+		Objective_Start(OBJECTIVE5)
+		g_TownHallStarted = true
+		g_Ambient2 = true
+		Rule_AddOneShot(HintPoint_TownHall1a, 5)
+		Rule_RemoveMe()
+	end
+--~ 	if SGroup_CountSpawned(sg_AxisTownHall) == 0 then 
+--~ 		Objective_Complete(OBJECTIVE5)
+--~ 		HintPoint_Remove(HintPoint_TownHall1aID)
+--~ 		Rule_RemoveMe()
+--~ 	end
+end
+
+--------------------------------------------------------Church----------------------------------------------------------
+function Check_ChurchHealth()
+	if (EGroup_GetAvgHealth(Blg_TownHall) <= 0.20) then
+		EGroup_SetAvgHealth(Blg_TownHall, 0.20)
+		EGroup_SetInvulnerable(Blg_TownHall, true)
+	end
+	if (EGroup_GetAvgHealth(Blg_Church) <= 0.20) then
+		EGroup_SetAvgHealth(Blg_Church, 0.20)
+		EGroup_SetInvulnerable(Blg_Church, true)
+	end
+end
+ 
+function Objective_ClearChurch()
+	--Player_GetAllSquadsNearMarker(player2, sg_AxisChurch2, sectorID1)
+	SGroup_Filter(sg_AxisChurch, SBP.AXIS.PAK_38 , FILTER_REMOVE)
+	if SGroup_CountSpawned(sg_AxisChurch) < 7 and g_perimeterspeech == nil then 
+		Util_StartIntel(EVENTS.ChurchStarta)	
+		g_perimeterspeech = 1
+	end
+	if SGroup_CountSpawned(sg_AxisChurch) < 3 and g_speechretreat == nil then 
+		Cmd_Retreat(sg_AxisChurch, Marker_GetPosition(Marker_Final3))
+		Util_StartIntel(EVENTS.ChurchStart)
+		g_speechretreat = 1
+	end
+	if SGroup_CountSpawned(sg_AxisChurch) < 4 and Player_OwnsEGroup(player2, Blg_CafeNormandie) then
+		Obj_SetVisible(OBJECTIVE1.ID, false)
+		g_CafeNormandieCaptured = true
+		Objective_RemoveUIElements(OBJECTIVE1, CafeUIID)
+		Rule_Remove(Objective_CafeNormandie)
+		EGroup_InstantCaptureStrategicPoint(Territory1, player1)
+		if SGroup_CountSpawned(MG42CafeNormandie1) > 0 then
+			Cmd_Ungarrison(Blg_CafeNormandie, Marker_GetPosition(Marker_Final3))
+		end
+	end
+	if SGroup_CountSpawned(sg_AxisChurch) == 0 and (SGroup_CountSpawned(table_FiftyMMAlpha[1].sgroup) == 0 or SGroup_TotalMembersCount(table_FiftyMMAlpha[1].sgroup) < 2) then
+		Objective_Complete(OBJECTIVE2)
+		HintPoint_Remove(HintPoint_CafeNormandieID)
+		Rule_Remove(Rule_WehrmachtEta)
+		--HintPoint_Remove(HintPoint_Church1bID)
+		--Rule_AddOneShot(HintPoint_Church1, 1)
+		Rule_AddInterval(Objective_Church, 1)
+		Timer_Start("TimerObjective2", 9)
+		g_clearchurch = true
+		Rule_RemoveMe()
+	end
+end
+
+function Objective_Church()
+	if g_objective3start == nil and Timer_GetRemaining("TimerObjective2")== 0 then 
+		Util_StartIntel(EVENTS.Ambient5)
+		Objective_Start(OBJECTIVE3)
+		g_objective3start = 1
+		Timer_Start("TimerObjective3", 10)
+	end 
+	
+	if Player_OwnsEGroup(player1, Blg_Church) and g_ChurchCaptured == false and g_clearchurch == true and Timer_GetRemaining("TimerObjective3") ==  0 and g_objective3start == 1 then
+		Util_StartIntel(EVENTS.ChurchComplete)
+		sg_ChurchDeath = SGroup_CreateIfNotFound("sg_ChurchDeath")
+		Objective_Complete(OBJECTIVE3)
+		g_objective3start = 2
+		g_ChurchCaptured = true	
+		Rule_AddInterval(Objective_UpgradeBarracks, 1)
+		Util_StartIntel(EVENTS.UpgradeStart)
+		Modify_UpgradeBuildTime(player1, UPG.SP.CONVERT_AMBIENT_BUILDING_CHURCH, 0.8)
+		Player_SetUpgradeAvailability( player1, UPG.SP.CONVERT_AMBIENT_BUILDING_CHURCH, ITEM_UNLOCKED )
+		Rule_AddInterval(Check_Church2, 1)
+		
+		Timer_Start("TimerObjective4", 11)
+	--Hint Points--
+		--HintPoint_Remove(HintPoint_Church1ID)
+		--Rule_AddOneShot(HintPoint_Church1a, 1)
+		flashid_infantry_ambientupgrade = UI_FlashProductionButton(PITEM_Upgrade, UPG.SP.CONVERT_AMBIENT_BUILDING_CHURCH, true, BT_UI_Weak_UpgradeBtn )
+		HintPoint_AddToProductionButton(PITEM_Upgrade, UPG.SP.CONVERT_AMBIENT_BUILDING_CHURCH, 239115, true)
+		Rule_RemoveMe()	
+	end
+end
+
+
+function Check_Church()
+	if Player_OwnsEGroup(player2, Blg_Church) or (Player_OwnsEGroup(player1, Blg_Church) == false and SGroup_TotalMembersCount(sg_AxisChurch ) > SGroup_TotalMembersCount(sg_AllyChurch))then
+		EGroup_InstantCaptureStrategicPoint(ChurchPoint, player2)
+		EGroup_SetPlayerOwner(RetreatPoint1, player2)
+	end
+	if Player_OwnsEGroup(player1, Blg_Church) or (Player_OwnsEGroup(player2, Blg_Church) == false and SGroup_TotalMembersCount(sg_AllyChurch) > SGroup_TotalMembersCount(sg_AxisChurch)) then 
+		--EGroup_SetPlayerOwner(ChurchPoint, player1)
+		EGroup_InstantCaptureStrategicPoint(ChurchPoint, player1)
+		EGroup_SetPlayerOwner(RetreatPoint1, player1)
+	end
+end
+
+function Check_Church2()
+	SGroup_SetInvulnerable(sg_AllyChurch, false)
+	if Player_OwnsEGroup(player1, Blg_Church) then 
+		Player_GetAllSquadsNearMarker(player1, sg_ChurchDeath, Marker_ChurchMiddle)
+		SGroup_SetInvulnerable(sg_ChurchDeath, true) 
+	else
+		SGroup_SetInvulnerable(sg_AllyChurch, false)
+	end
+end
+
+function Rule_SpeechCA()
+	Rule_Remove(Rule_AxisBarbWire1)
+	Rule_Remove(Rule_AxisBarbWire2)
+	Player_GetAllEntitiesNearMarker(player2, Entity_Wire1, Marker_BarbWireTotal1)
+	EGroup_Filter(Entity_Wire1, EBP.AXIS.BARBED_WIRE, FILTER_KEEP)
+	EGroup_Kill(Entity_Wire1)
+	Player_GetAllEntitiesNearMarker(player2, Entity_Wire1a, Marker_BarbWireTotal1a)
+	EGroup_Filter(Entity_Wire1a, EBP.AXIS.BARBED_WIRE, FILTER_KEEP)
+	EGroup_Kill(Entity_Wire1a)
+	Player_GetAllEntitiesNearMarker(player2, Entity_Wire2, Marker_BarbWireTotal2)
+	EGroup_Filter(Entity_Wire2, EBP.AXIS.BARBED_WIRE, FILTER_KEEP)
+	EGroup_Kill(Entity_Wire2)
+	Rule_AddInterval(Rule_WehrmachtEta, 1)
+	Rule_AddInterval(Rule_PanzerfaustBeta, 1)
+	
+	Timer_Start("Timer_CounterAttack", 20)
+end
+
+function Objective_UpgradeBarracks()
+	if g_objective4start == nil  and Timer_GetRemaining("TimerObjective4")== 0 then 
+		Objective_Start(OBJECTIVE4)
+		g_objective4start = 1
+		Timer_Start("TimerObjective9", 15)
+	end 
+	if EGroup_HasUpgrade(Blg_Church, UPG.SP.CONVERT_AMBIENT_BUILDING_CHURCH, ANY) and g_UpgradeComplete == false and Timer_GetRemaining("TimerObjective9")== 0  and g_objective4start == 1 then 
+		Player_SetSquadProductionAvailability(player1, SBP.ALLIES.AT_57MM, ITEM_REMOVED)
+		Player_SetSquadProductionAvailability(player1, SBP.ALLIES.ENGINEER	, ITEM_REMOVED)
+		Player_SetSquadProductionAvailability(player1, SBP.ALLIES.HEAVYMG, ITEM_UNLOCKED)
+		Player_SetSquadProductionAvailability(player1, SBP.ALLIES.SNIPER, ITEM_UNLOCKED)
+		Player_SetSquadProductionAvailability(player1, SBP.ALLIES.MORTAR, ITEM_UNLOCKED)
+		EGroup_SetPlayerOwner(RetreatPoint3, player2)
+		EGroup_SetPlayerOwner(RetreatPoint4, player2)
+		Timer_Start("TimerObjective5", 15)
+		Rule_AddInterval(Objective_Part1, 1)
+		Rule_AddInterval(Objective_TownHall, 1)
+		Rule_AddInterval(Check_MortarSquad, 5)
+		--HintPoint_Remove(HintPoint_Church1aID)
+		Rule_AddOneShot(HintPoint_Church2, 5)
+		Rule_Remove(Rule_AbleReinforcements)
+		Objective_Complete(OBJECTIVE4)
+		Rule_Remove(Check_AllyFireUp)
+		Util_StartIntel(EVENTS.UpgradeComplete)	
+		Modifier_Remove(resourcemanID)
+		Player_AddResource(player1, RT_Manpower, 500)
+		modifymanpower = Modify_PlayerResourceRate( player1, RT_Manpower, 2.0)
+		
+		Util_StartIntel(EVENTS.SecureStart)			
+		g_UpgradeComplete = true
+
+		Rule_AddInterval(Check_Church, 1)
+		Rule_Remove(Check_ResourceZero)
+		
+		Rule_RemoveMe()
+		
+		Player_SetUpgradeAvailability( player1, UPG.ALLIES.SUPPRESSION_KIT, ITEM_UNLOCKED )
+		Player_SetUpgradeAvailability( player1, UPG.ALLIES.PARATROOPER_AT, ITEM_DEFAULT)
+		
+		Player_SetCommandAvailability(player1, SCMD_PlaceCharge, ITEM_UNLOCKED)
+		Player_SetEntityProductionAvailability(player1, EBP.ALLIES.TANK_TRAP, ITEM_REMOVED)
+		Player_SetAbilityAvailability(player1, ABILITY.ALLIES.CUT_WIRES, ITEM_UNLOCKED)
+		Player_SetAbilityAvailability(player1, ABILITY.COMMANDER_TREE.ALLIES.HOWITZER_SHOOT, ITEM_REMOVED)
+		
+		Rule_AddInterval(Speech_FlashUI1, 1)					
+		Command_EntityPos(player1, Blg_Church, CMD_RallyPoint, Marker_GetPosition(Marker_RallyPoint))
+		Rule_AddInterval(Rule_Check_Barracks, 1)	
+		Rule_AddInterval(Rule_CheckProducing, 1) 
+		churchflash = UI_FlashProductionButton(PITEM_Spawn, SBP.ALLIES.PARATROOPER, true, BT_UI_Weak_UpgradeBtn )
+		hintchurchflash = HintPoint_AddToProductionButton(PITEM_Spawn, SBP.ALLIES.PARATROOPER, 239114, true)
+		g_UpgradeBarracks = true
+		
+		Scar_Autosave(239052) 
+		
+		--Rule_Remove(Check_Church)
+	end
+end
+function Speech_FlashUI1()
+	if  EGroup_IsProducingSquads(Blg_Church, ANY) then
+		if churchflash ~= nil then
+			UI_StopFlashing(churchflash)
+		end
+		
+		HintPoint_Remove(hintchurchflash)
+		Rule_RemoveMe()
+	end
+end
+function Objective_Secondary()
+	g_secondarystarted = 1
+	Util_StartIntel(EVENTS.ResourcePoint1Start)
+	Rule_AddInterval(Rule_CheckResourcePoint, 10) 
+end
+function Rule_CheckProducing()
+	if SGroup_TotalMembersCount(sg_allsquads) > 15  then 
+		Rule_AddOneShot(Rule_CreateCounterAttack, 20)
+		Rule_RemoveMe()
+	end
+end
+function Rule_CheckResourcePoint()
+	if g_resourcespeech == 0 and g_secondarystarted == 1 then 
+		Timer_Start("ResourceTimer", 300)
+		g_resourcespeech = 1
+	end
+	if g_resourcespeech == 1 and Timer_GetRemaining("ResourceTimer") == 0 then
+		Util_StartIntel(EVENTS.ResourcePoint1Remind)
+		g_resourcespeech = 0
+	end
+	
+	if (Player_OwnsEGroup(player1, ResourcePoint1) or Player_OwnsEGroup(player1, ResourcePoint3)) and g_checkpoint1 == nil and g_checkpoint2 == nil then 
+		g_resourcespeech = 2
+		if Player_OwnsEGroup(player1, ResourcePoint1) then 
+			Rule_AddOneShot(HintPoint_SecurePoint, 1) 
+			Objective_Complete(OBJECTIVESECONDARY)
+			g_secondarystarted = 2
+			Rule_AddInterval(Rule_BuildOP, 1)
+			g_checkpoint1 = 1 
+		elseif Player_OwnsEGroup(player1, ResourcePoint3) then 
+			Rule_AddOneShot(HintPoint_SecurePoint3, 1) 
+			g_secondarystarted = 2
+			Objective_Complete(OBJECTIVESECONDARY)
+			Rule_AddInterval(Rule_BuildOP, 1)
+			g_checkpoint2 = 1 
+		end
+	end
+	
+	if Player_OwnsEGroup(player1, ResourcePoint3) and g_checkpoint1 == 1 and Player_HasBuilding(player1, EBP.ALLIES.OBSERVATION_POST) == false then 
+		Rule_AddOneShot(HintPoint_SecurePoint3, 1) 
+		Rule_RemoveMe()
+	end
+	if Player_OwnsEGroup(player1, ResourcePoint1) and g_checkpoint2 == 1 and Player_HasBuilding(player1, EBP.ALLIES.OBSERVATION_POST) == false then 
+		Rule_AddOneShot(HintPoint_SecurePoint, 1) 
+		Rule_RemoveMe()
+	end
+end
+function Rule_BuildOP()
+	if Player_HasBuilding(player1, EBP.ALLIES.OBSERVATION_POST) then
+		Rule_RemoveMe()
+		HintPoint_Remove(HintPoint_SecurePoint3ID)
+		HintPoint_Remove(HintPoint_SecurePointID)
+		Rule_Remove(Rule_CheckResourcePoint)
+	end
+end
+
+function Rule_Check_Barracks()
+	if Player_OwnsEGroup(player1, Blg_Church) == false and g_emptybarrcks == nil then 
+--		Util_StartIntel(EVENTS.Ambient6)				-- Daly: this event has no associated speech file ("Church empty.  We must have someone in the church at all times to recruit squads.")
+		g_emptybarrcks = 1
+	end 
+	if Player_OwnsEGroup(player1, Blg_Church) and g_UpgradeBarracks == false  then
+		HintPoint_Remove(HintPoint_Church3ID)
+		if Rule_Exists(HintPoint_Church2) == false then
+			Rule_AddOneShot(HintPoint_Church2, 1)
+		end
+		Cmd_InstantUpgrade( Blg_Church, UPG.SP.CONVERT_AMBIENT_BUILDING_CHURCH )
+		Command_EntityPos(player1, Blg_Church, CMD_RallyPoint, Marker_GetPosition(Marker_RallyPoint))
+		g_UpgradeBarracks = true
+	elseif g_UpgradeBarracks == true and Player_OwnsEGroup(player1, Blg_Church) == false then
+		HintPoint_Remove(HintPoint_Church2ID)
+		
+		if Rule_Exists(HintPoint_Church3) == false then
+			Rule_AddOneShot(HintPoint_Church3, 1)
+		end
+		g_UpgradeBarracks = false
+		print("empty barracks unable to upgrade")
+	end
+end
+
+function Rule_CreateCounterAttack()
+	--Camera_FocusOnTargetEGroup(Blg_Church)
+	--Objective_Start(OBJECTIVE4)
+	--Util_CreateSquadsAndGarrison(player2, MG42Beta6, SBP.AXIS.HEAVYMG, Blg_B4, 1, true, 1)
+	Rule_AddOneShot(Rule_SpeechCA, 1)
+	Rule_AddInterval(Objective_ClearArea, 1) 
+
+end
+
+function Objective_ClearArea()
+	if Timer_GetRemaining("Timer_CounterAttack") == 10 then
+		Util_StartIntel(EVENTS.ChurchAttack)
+		EventCue_Create(CUE.NORMAL, 42807, 42807, WehrmachtEta3)
+	end
+	if Timer_GetRemaining("Timer_CounterAttack") == 0 then 
+		if SGroup_CountSpawned(Axis_WireLayer1) >  0 then 
+			Command_PlayerSquadConstructFence(player2, Axis_WireLayer1, EBP.AXIS.BARBED_WIRE, Marker_GetPosition(Marker_NewBarbWireStart1), Marker_GetPosition(Marker_NewBarbWireEnd1), false)   
+			SGroup_SetAutoTargetting(Axis_WireLayer1, "hardpoint_01", true)
+		end
+		if SGroup_CountSpawned(Axis_WireLayer1a) >  0 then 
+			Command_PlayerSquadConstructFence(player2, Axis_WireLayer1a, EBP.AXIS.BARBED_WIRE, Marker_GetPosition(Marker_NewBarbWireStart1a), Marker_GetPosition(Marker_NewBarbWireEnd1a), false)  
+			SGroup_SetAutoTargetting(Axis_WireLayer1a, "hardpoint_01", true)
+		end
+		if SGroup_CountSpawned(Axis_WireLayer2) >  0 then 
+			Command_PlayerSquadConstructFence(player2, Axis_WireLayer2, EBP.AXIS.BARBED_WIRE, Marker_GetPosition(Marker_NewBarbWireStart2), Marker_GetPosition(Marker_NewBarbWireEnd2), false)   		
+			SGroup_SetAutoTargetting(Axis_WireLayer2, "hardpoint_01", true)
+		end
+		if Timer_GetRemaining("Timer_CounterAttack") == 0 and SGroup_CountSpawned(sg_AxisChurch) == 0 and SGroup_CountSpawned(sg_AxisResourcePoint1) == 0 then
+			Util_StartIntel(EVENTS.SecureComplete)
+			Rule_RemoveMe()
+			Rule_Remove(Rule_WehrmachtEta)
+			SGroup_SetAutoTargetting(MG42Beta1, "hardpoint_01", true)
+			--Event--
+			Rule_AddInterval(Check_PioneerMoveBack, 10)
+			
+			--Objective_Complete(OBJECTIVE4)
+		end
+		
+		--Obj_AlertSitRep(player1, OBJECTIVE5.ID)
+	end
+end	
+function Check_PioneerMoveBack()
+	Player_GetAllEntitiesNearMarker(player2, Entity_WireX1a, Marker_BarbWireTotalX1a)
+	EGroup_Filter(Entity_WireX1a, EBP.AXIS.BARBED_WIRE, FILTER_KEEP)
+	Player_GetAllEntitiesNearMarker(player2, Entity_WireX1, Marker_BarbWireTotalX1)
+	EGroup_Filter(Entity_WireX1, EBP.AXIS.BARBED_WIRE, FILTER_KEEP)
+	if SGroup_IsConstructingBuilding(Axis_WireLayer1a, ANY) == false and EGroup_Count(Entity_WireX1a) > 0 then 
+		if Prox_AreSquadMembersNearMarker(Axis_WireLayer1a, Spawn_Axis_WireLayer1a, ANY) == false then 
+			Cmd_Move(Axis_WireLayer1a, Spawn_Axis_WireLayer1a)
+			AddToTable(Axis_WireLayer1a, Spawn_Axis_WireLayer1a,  west)
+			SGroup_SetAutoTargetting(Axis_WireLayer1a, "hardpoint_01", true)
+			g_Wirelayer1a = 1
+		end
+	end
+	if SGroup_IsConstructingBuilding(Axis_WireLayer1, ANY) == false and EGroup_Count(Entity_WireX1) > 0  then 
+		if Prox_AreSquadMembersNearMarker(Axis_WireLayer1, Spawn_Axis_WireLayer1, ANY) == false then 
+			Cmd_Move(Axis_WireLayer1, Spawn_Axis_WireLayer1)
+			AddToTable(Axis_WireLayer1, Spawn_Axis_WireLayer1,  west)
+			SGroup_SetAutoTargetting(Axis_WireLayer1, "hardpoint_01", true)
+			g_Wirelayer1 = 1
+		end
+	end
+	if g_Wirelayer1a == 1 and g_Wirelayer1 == 1 then 
+		Rule_RemoveMe()
+	end
+end
+function Check_SetFacing()
+	sg_gauntlet = SGroup_CreateIfNotFound("sg_gauntlet")
+	Player_GetAllSquadsNearMarker(player2, sg_gauntlet, Marker_PioneerFace)
+	SGroup_FaceMarker(sg_gauntlet, west)
+end
+
+----------------------------------------------------------Build Squad-----------------------------------------------------
+function Check_MortarSquad()
+	Player_GetAllSquadsNearMarker(player1, sg_tempMortar, Marker_AllCarentan) 
+	SGroup_Filter(sg_tempMortar2, {SBP.ALLIES.MORTAR, SBP.ALLIES.SNIPER}, FILTER_KEEP) 
+	if SGroup_CountSpawned(sg_tempMortar2) > 0 and g_mortarcreated == false and Timer_GetRemaining("Timer_Mortar") == 0 then
+		i = World_GetRand(1, 5)
+		Cmd_Ability(Axis_Mortar, ABILITY.AXIS.MORTAR_BARRAGE, table_Mortar[i].position)
+		MortarTimer = MortarTimer + 2
+		Timer_Start("Timer_Mortar", MortarTimer)	
+		--g_mortarcreated = true
+	end
+
+	--if g_mortarcreated == true then 
+		if SGroup_CountSpawned(Axis_Mortar) == 0 then
+			Rule_RemoveMe()
+		end
+	--end
+end
+
+function Production_Mortar()
+	local spawnID = EGroup_GetSpawnedEntityAt(Blg_Church, 1)
+	if EGroup_IsProducingSquads(Blg_Church, ANY) then
+		local blueprintID = Entity_GetProductionQueueItem(spawnID, 0)
+		if blueprintID == SBP.ALLIES.MORTAR then
+			g_MortarBuilding = true
+		end
+	end
+	if g_MortarBuilding == true then
+		Player_GetAllSquadsNearMarker(player1, sg_SpeechMortar, TriggerPath9) 
+		SGroup_Filter(sg_SpeechMortar, SBP.ALLIES.MORTAR, FILTER_KEEP) 
+		if SGroup_CountSpawned(sg_SpeechMortar) > 0 then 
+			Util_StartIntel(EVENTS.MortarBuilt)
+			Rule_RemoveMe()
+			Timer_Start("Timer_Mortar", 45)	
+		end
+	end
+end
+function Production_Sniper()
+	local spawnID = EGroup_GetSpawnedEntityAt(Blg_Church, 1)
+	if EGroup_IsProducingSquads(Blg_Church, ANY) then
+		local blueprintID = Entity_GetProductionQueueItem(spawnID, 0)
+		if blueprintID == SBP.ALLIES.SNIPER then
+			g_SniperBuilding = true
+		end
+	end
+	if g_SniperBuilding == true then
+		Player_GetAllSquadsNearMarker(player1, sg_SpeechSniper, TriggerPath9) 
+		SGroup_Filter(sg_SpeechSniper, SBP.ALLIES.SNIPER, FILTER_KEEP) 
+		if SGroup_CountSpawned(sg_SpeechSniper) > 0 then 
+			Util_StartIntel(EVENTS.SniperBuilt)
+			Objective_Start(MEDALOBJECTIVE)
+			g_medalstart = 1
+			Objective_SetCounter(MEDALOBJECTIVE, 0, difficulty.medaltarget)
+			numKills = 0 
+			Rule_AddInterval(Check_SniperKills, 1)
+			Rule_RemoveMe()
+			Timer_Start("Timer_Mortar", 45)
+		end
+	end
+end
+
+function Check_SniperKills()
+	local numKills = Stats_UnitTotalKills(player1, SBP.ALLIES.SNIPER )
+	Objective_SetCounter(MEDALOBJECTIVE, numKills, difficulty.medaltarget)
+	if numKills >= difficulty.medaltarget then 
+ 		Objective_Complete(MEDALOBJECTIVE)
+		
+		g_medalstart = 2
+ 		Rule_RemoveMe()
+	elseif numKills > lastcount then
+		Objective_SetCounter( MEDALOBJECTIVE, numKills, difficulty.medaltarget )
+		lastcount = numKills
+	end
+end
+
+----------------------------------------------------------Resource Point-----------------------------------------------------
+
+function Objective_ResourcePoint1()	
+	if Player_OwnsEGroup(player1, ResourcePoint1) or Player_OwnsEGroup(player1, ResourcePoint3) and g_ResourcePoint1Captured == false  then
+		
+	--Variable Complete--		
+		g_ResourcePoint1Captured = true	
+		Player_AddResource(player1, RT_Munition, 200)
+		
+	--Territory & Resources	
+		--Modify_PlayerResourceRate( player1, RT_Manpower, 3.0)
+		--Modify_PlayerResourceRate( player1, RT_Munition, 4.0)
+		--ChurchPoint = Entity_Create("ebps/gameplay/territory_marker_50.lua", player1, Marker_GetPosition(Marker_Blg_Church))
+		--Entity_Spawn(ChurchPoint)
+		
+	--Event--
+		--Rule_AddInterval(Rule_Check_Manpower, 1)
+		--Rule_AddInterval(Objective_BuildCheckPoint, 1)	
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+
+function Objective_Part1()
+	if g_Objective5 == nil and Timer_GetRemaining("TimerObjective5") == 0 then
+		Objective_Start(OBJECTIVE5)
+		g_Objective5 = 1
+		Rule_AddOneShot(Objective_Secondary, 12)
+	end 
+	if g_UpgradeComplete == true and g_CafeNormandieCaptured == true and g_ChurchCaptured == true and g_Objective5 == 1 then
+		Rule_AddInterval(Production_Mortar, 1)
+		Rule_AddInterval(Production_Sniper, 1)
+		g_Ambient2 = false
+		Rule_AddOneShot(HintPoint_TownHall1a, 5)
+		Rule_AddInterval(Rule_ConstantAxis, 1)
+		--Rule_AddOneShot(HintPoint_BarbWire1, 1)
+		--Rule_AddOneShot(HintPoint_BarbWire2, 1)
+		Rule_AddInterval(Rule_WehrmachtKappa, 2.5)
+		Rule_AddInterval(Rule_WehrmachtEpsilon, 2.2)
+		
+		Rule_RemoveMe()
+	end
+end
+
+-------------------------------------------------------------Town Hall-----------------------------------------------------
+function Objective_TownHall()	
+	if Player_AreSquadsNearMarker(player1, TriggerPath27) and g_musicstart == nil then 
+		Util_PlayMusic("Sound/Music/sp/M03/m03_ob3_takehq", 5, 0)
+		g_musicstart = 1
+	end
+	if Player_AreSquadsNearMarker(player1, TriggerPath25) and g_Runawaystart == false then 
+		Rule_AddInterval(Rule_TownHallRunawayAttack, 1)
+		--FOW_TagEGroup(player1, Blg_TownHall)
+		g_Runawaystart = true
+	else 
+		--FOW_UnTagEGroup(player1, Blg_TownHall)
+	end
+
+	if  Player_OwnsEGroup(player2, Blg_TownHall) == false then 
+		--Util_StartIntel(EVENTS.TownHallOver)
+		
+		Cmd_Ungarrison(Blg_D4, Marker_GetPosition(Marker_D40))
+		Cmd_Ungarrison(Blg_D5, Marker_GetPosition(Marker_D42))
+		Cmd_Ungarrison(Blg_D2, Marker_GetPosition(Marker_Blg_D2))
+		Cmd_Ungarrison(Blg_Z1, Marker_GetPosition(Marker_Blg_Z1))
+		Cmd_Ungarrison(Blg_Z2, Marker_GetPosition(Marker_Blg_Z2))
+		Cmd_Ungarrison(Blg_Z3, Marker_GetPosition(Marker_Blg_Z3))
+		Cmd_Ungarrison(Blg_Z4, Marker_GetPosition(Marker_Blg_Z4))
+		
+		Rule_AddInterval(Rule_AxisHalftrackAlpha, 1)
+		
+		poshalftrack = World_GetHiddenPositionOnPath(player1, Marker_AxisStart7, Marker_BMWBeta2, CHECK_IN_FOW)	
+		if poshalftrack == nil then 
+			Util_CreateSquadsAtMarker(player2, AxisHalftrackAlpha1, SBP.AXIS.PUMA, Marker_AxisStart7, 1)
+			SGroup_SetMoveType(AxisHalftrackAlpha1, MOVETYPE.FAST)
+			Cmd_Move(AxisHalftrackAlpha1, Marker_D17)	
+		else
+			Util_CreateSquadsAtMarker(player2, AxisHalftrackAlpha1, SBP.AXIS.PUMA, poshalftrack, 1)
+			SGroup_SetMoveType(AxisHalftrackAlpha1, MOVETYPE.FAST)
+			Cmd_Move(AxisHalftrackAlpha1, Marker_D17)
+		end
+		
+		possquad1 = World_GetHiddenPositionOnPath(player1, Marker_AxisStart5, Marker_D25, CHECK_IN_FOW)	
+		if possquad1 == nil then 
+			Util_CreateSquadsAtMarker(player2, AxisSquad1, SBP.ELITE.FALLSCHIRMJAGER, Marker_AxisStart5, 1, 3) 
+			Cmd_Move(AxisSquad1, Marker_D31)
+		else
+			Util_CreateSquadsAtMarker(player2, AxisSquad1, SBP.ELITE.FALLSCHIRMJAGER, possquad1, 1, 3) 
+			Cmd_Move(AxisSquad1, Marker_D31)
+			--Cmd_Attack(AxisSquad1, sg_AllyChurch)
+		end
+		
+		possquad2 = World_GetHiddenPositionOnPath(player1, Marker_AxisStart5, Marker_D25, CHECK_IN_FOW)	
+		if possquad2 == nil then 
+			Util_CreateSquadsAtMarker(player2, AxisSquad2, SBP.ELITE.FALLSCHIRMJAGER, Marker_AxisStart5, 1, 3) 
+			Cmd_Move(AxisSquad2, Marker_D20)
+			--Cmd_Attack(AxisSquad2, sg_AllyChurch)
+		else
+			Util_CreateSquadsAtMarker(player2, AxisSquad2, SBP.ELITE.FALLSCHIRMJAGER, possquad2, 1, 3) 
+			Cmd_Move(AxisSquad2, Marker_D20)
+		end
+		
+		possquad3 = World_GetHiddenPositionOnPath(player1, Marker_AxisStart5, Marker_D25, CHECK_IN_FOW)	
+		if possquad3 == nil then 
+			Util_CreateSquadsAtMarker(player2, AxisSquad3, SBP.ELITE.FALLSCHIRMJAGER, Marker_AxisStart5, 1, 3) 
+			Cmd_Move(AxisSquad3, Marker_D26)	
+			--Cmd_Attack(AxisSquad3, sg_AllyChurch)
+		else
+			Util_CreateSquadsAtMarker(player2, AxisSquad3, SBP.ELITE.FALLSCHIRMJAGER, possquad3, 1, 3) 
+			Cmd_Move(AxisSquad3, Marker_D26)	
+			--Cmd_Attack(AxisSquad3, sg_AllyChurch)
+		end
+		--Cmd_Attack(AxisHalftrackAlpha1, sg_AllyTownHall)
+		
+		Cmd_AttackMove(sg_AxisResourcePoint7, SGroup_GetPosition_EVEN_IF_EMPTY(sg_AllyTownHall), nil, nil, 30)
+		Cmd_AttackMove(sg_AxisResourcePoint3, SGroup_GetPosition_EVEN_IF_EMPTY(sg_AllyTownHall), nil, nil, 30)
+		--Axis--
+		
+		--Cmd_Move(sg_AxisTownHall, Marker_Final3)
+		
+		for i = 1, table.getn(table_SniperAlpha) do
+			Cmd_Move(table_SniperAlpha[i].sgroup, Marker_Final)
+		end
+		for i = 1, table.getn(table_WehrmachtIota) do
+			Cmd_AttackMove(table_WehrmachtIota[i].sgroup, Marker_GetPosition(table_WehrmachtIota[i].marker1), nil, nil, 30)
+		end
+		
+		Rule_AddInterval(Check_TownHall, 1)
+		--Rules--
+		--Rule_AddInterval(Objective_ResourcePoint2, 1)
+		Rule_RemoveMe()
+	end
+end
+
+
+function Rule_AxisHalftrackAlpha()
+	if SGroup_IsOnScreen(player1, AxisHalftrackAlpha1, ANY) and g_arrive == nil then 
+		Util_StartIntel(EVENTS.Ambient4)
+		g_arrive = 1 
+	end
+	
+--~ if SGroup_GetAvgHealth(AxisHalftrackAlpha1) < 0.5 then 
+--~ 	Cmd_Move(AxisHalftrackAlpha1, Marker_Final3)
+--~ end
+--~ if SGroup_GetAvgHealth(AxisHalftrackAlpha1) < 0.3 then 
+--~ 	Cmd_CriticalHit(player2, AxisHalftrackAlpha1, OCCCriticalID, Green_Damage2ID)	
+--~ end
+	
+	if SGroup_CountSpawned(AxisHalftrackAlpha1) > 0  then 
+		if SGroup_CountSpawned(sg_AllyTownHall) > 0 then 
+			--Cmd_Move(AxisHalftrackAlpha1, sg_AllyTownHall, 4, 6)
+			SGroup_SetMoveType(AxisHalftrackAlpha1, MOVETYPE.FAST)
+			g_puma = nil
+			Cmd_AttackMove(AxisSquad1, SGroup_GetPosition_EVEN_IF_EMPTY(sg_AllyTownHall), nil, nil, 30)
+			Cmd_AttackMove(AxisSquad2, SGroup_GetPosition_EVEN_IF_EMPTY(sg_AllyTownHall), nil, nil, 20)
+			Cmd_AttackMove(AxisSquad3, SGroup_GetPosition_EVEN_IF_EMPTY(sg_AllyTownHall), nil, nil, 15)
+		elseif SGroup_CountSpawned(sg_AllyTownHall) == 0 and g_puma == nil then 
+			Cmd_AttackMove(AxisSquad1, SGroup_GetPosition_EVEN_IF_EMPTY(sg_AllyTownHall), nil, nil, 30)
+			Cmd_AttackMove(AxisSquad2, SGroup_GetPosition_EVEN_IF_EMPTY(sg_AllyTownHall), nil, nil, 20)
+			Cmd_AttackMove(AxisSquad3, SGroup_GetPosition_EVEN_IF_EMPTY(sg_AllyTownHall), nil, nil, 15)
+			--SGroup_FaceMarker(AxisHalftrackAlpha1, Marker_C18)
+			g_puma = 1
+		end
+		
+		if SGroup_CountSpawned(AxisSquad1) == 0 and g_AxisSquad1 == nil then
+			Util_CreateSquadsAtMarker(player2, AxisSquad1, SBP.ELITE.FALLSCHIRMJAGER, Marker_AxisStart5, 1) 
+			g_AxisSquad1 = 1
+		end
+		if SGroup_CountSpawned(AxisSquad2) == 0 and g_AxisSquad2 == nil then
+			Util_CreateSquadsAtMarker(player2, AxisSquad2, SBP.ELITE.FALLSCHIRMJAGER, Marker_AxisStart5, 1) 
+			g_AxisSquad2 = 1
+		end
+		if SGroup_CountSpawned(AxisSquad3) == 0 and g_AxisSquad3 == nil then
+			Util_CreateSquadsAtMarker(player2, AxisSquad3, SBP.ELITE.FALLSCHIRMJAGER, Marker_AxisStart6, 1) 
+			g_AxisSquad3 = 1
+		end
+		if SGroup_CountSpawned(AxisSquad1) == 0 and g_AxisSquad1 == 1 and SGroup_CountSpawned(sg_AxisTownHall) < 4 then
+			Util_CreateSquadsAtMarker(player2, AxisSquad1, SBP.ELITE.FALLSCHIRMJAGER, Marker_AxisStart5, 1) 
+		end
+		if SGroup_CountSpawned(AxisSquad2) == 0 and g_AxisSquad2 == 1 and SGroup_CountSpawned(sg_AxisTownHall) < 3 then
+			Util_CreateSquadsAtMarker(player2, AxisSquad2, SBP.ELITE.FALLSCHIRMJAGER, Marker_AxisStart5, 1) 
+		end
+		if SGroup_CountSpawned(AxisSquad3) == 0 and g_AxisSquad3 == 1 and SGroup_CountSpawned(sg_AxisTownHall) < 2 then
+			Util_CreateSquadsAtMarker(player2, AxisSquad3, SBP.ELITE.FALLSCHIRMJAGER, Marker_AxisStart6, 1) 
+		end
+		if SGroup_CountSpawned(sg_AllyTownHall2) > 0 then 
+			Cmd_AttackMove(AxisHalftrackAlpha1, SGroup_GetPosition_EVEN_IF_EMPTY(sg_AllyTownHall2)) 
+		end
+--~ 	if SGroup_CountSpawned(sg_AllyTownHall) == 0 and Prox_AreSquadsNearMarker(AxisHalftrackAlpha1, Marker_D17, ANY) == false then 
+--~ 		SGroup_FaceMarker(AxisHalftrackAlpha1, Marker_C18)
+--~ 	end
+		
+		--Cmd_Move(AxisSquad1, AxisHalftrackAlpha1, 2, 14)
+		--Cmd_Move(AxisSquad2, AxisHalftrackAlpha1, 0, 23)
+		--Cmd_Move(AxisSquad3, AxisHalftrackAlpha1, 6, 20)
+	elseif SGroup_CountSpawned(AxisHalftrackAlpha1) == 0 then
+		HintPoint_Remove(HintPoint_TownHall1aID)
+		sg_axissquads = SGroup_CreateIfNotFound("sg_axissquads")
+		Player_GetAll(player2, sg_axissquads)
+		Cmd_Move(sg_axissquads, Marker_Final)
+		Util_StartIntel(EVENTS.PumaDestroyed)
+		Objective_Complete(OBJECTIVE5)
+		Util_StartIntel(EVENTS.NIS02)
+		Rule_RemoveMe()
+		Rule_RemoveAll()
+		Rule_AddInterval(Check_GameOver, 1)
+	end
+end
+
+function Check_TownHall()
+	if Player_OwnsEGroup(player2, Blg_TownHall) or (Player_OwnsEGroup(player1, Blg_TownHall) == false and SGroup_TotalMembersCount(sg_AxisTownHall) > SGroup_TotalMembersCount(sg_AllyTownHall))then
+		EGroup_InstantCaptureStrategicPoint(Territory3, player2)
+		EGroup_SetPlayerOwner(RetreatPoint2, player2)
+	end
+	if Player_OwnsEGroup(player1, Blg_TownHall) or (Player_OwnsEGroup(player2, Blg_TownHall) == false and SGroup_TotalMembersCount(sg_AllyTownHall) > SGroup_TotalMembersCount(sg_AxisTownHall)) then 
+		EGroup_InstantCaptureStrategicPoint(Territory3, player1)
+		EGroup_SetPlayerOwner(RetreatPoint2, player1)
+	end
+end
+
+function Check_GameOver()
+	if (Event_IsAnyRunning() == false) then
+		Player_SetAbilityAvailability(player1, ABILITY_REINFORCEMENTS_M03, ITEM_REMOVED)
+		SGroup_Hide(sg_AllyTownHall, false)
+		Game_EndSP(true, nil, true)
+		Rule_RemoveMe()
+	end
+end
+function Rule_TownHallRunawayAttack()
+	if SGroup_TotalMembersCount(sg_AxisTownHall) < 22 then
+		Rule_AddInterval(Rule_CreateTownHallRunaway, 5)
+		Rule_AddInterval(Rule_CreateTownHallRunawayB, 3)
+		Rule_RemoveMe()
+	end
+end
+
+function Rule_PutUnitsInGroups()
+	Player_GetAllSquadsNearMarker(player1, sg_AllyChurch, sectorID1)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisChurch, sectorID1)
+	
+	Player_GetAllSquadsNearMarker(player1, sg_AllyTownHall, sectorID2)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisTownHall, sectorID2)
+	
+	Player_GetAllSquadsNearMarker(player1, sg_AllyResourcePoint7, sectorID7)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisResourcePoint7, sectorID7)
+	
+	Player_GetAllSquadsNearMarker(player1, sg_AllyResourcePoint5, sectorID3)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisResourcePoint5, sectorID3)
+	
+	Player_GetAllSquadsNearMarker(player1, sg_AllyResourcePoint4, sectorID4)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisResourcePoint4, sectorID4)
+	
+	Player_GetAllSquadsNearMarker(player1, sg_AllyResourcePoint3, sectorID5)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisResourcePoint3, sectorID5)
+	
+	Player_GetAllSquadsNearMarker(player1, sg_AllyResourcePoint1, sectorID6)
+	Player_GetAllSquadsNearMarker(player2, sg_AxisResourcePoint1, sectorID6)
+end	
+
+function Rule_CreateTownHallRunaway()
+	if g_RunawayCounter < 70 and Player_AreSquadsNearMarker(player1, TriggerPath25) then
+		i = World_GetRand(1, 5)
+		Util_CreateSquadsAtMarker(player2, table_TownHallRunaway[i].sgroup, table_TownHallRunaway[i].unit, table_TownHallRunaway[i].start, 1, table_TownHallRunaway[i].count)
+		FOW_RevealSGroupOnly(table_TownHallRunaway[i].sgroup, 3)
+		Modify_ReceivedDamage(table_TownHallRunaway[i].sgroup, 15)
+		Cmd_Move(table_TownHallRunaway[i].sgroup, table_TownHallRunaway[i].location1, true)
+		SGroup_SetMoveType(table_TownHallRunaway[i].sgroup, MOVETYPE.FAST)
+		g_RunawayCounter = g_RunawayCounter + 1
+		k = World_GetRand(1, 3)
+		if k == 1 then
+			j = World_GetRand(1, 5)
+			Util_CreateSquadsAtMarker(player2, table_TownHallRunaway[j].sgroup, table_TownHallRunaway[j].unit, table_TownHallRunaway[j].start, 1, 2)
+			Modify_ReceivedDamage(table_TownHallRunaway[j].sgroup, 3)
+			Cmd_Attack(table_TownHallRunaway[j].sgroup, sg_AllyTownHall)
+			SGroup_SetMoveType(table_TownHallRunaway[j].sgroup, MOVETYPE.FAST)
+			g_RunawayCounter = g_RunawayCounter + 1	
+		end
+	end
+	for j = 1, table.getn(table_TownHallRunaway) do
+		if SGroup_TotalMembersCount(table_TownHallRunaway[j].sgroup) < 2 then
+			Cmd_Retreat(table_TownHallRunaway[j].sgroup,  Marker_GetPosition(table_TownHallRunaway[j].location1))
+			--Cmd_Move(table_TownHallRunaway[j].sgroup, table_TownHallRunaway[j].location1) 
+		end
+	end
+end
+
+function Rule_MoveTownHallAxis()
+	Cmd_Move(sg_AxisTownHall, Marker_Final3)
+end
+
+function Rule_CreateTownHallRunawayB()
+	sg_tempTownHallB = SGroup_CreateIfNotFound("sg_tempTownHallB")
+	Player_GetAllSquadsNearMarker(player2, sg_tempTownHallB, TriggerPath27) 
+	if SGroup_CountSpawned(sg_tempTownHallB) < 12 then
+		for i = 1, table.getn(table_TownHallRunawayB) do
+			Util_CreateSquadsAtMarker(player2, table_TownHallRunawayB[i].sgroup, table_TownHallRunawayB[i].unit, table_TownHallRunawayB[i].start, 1, 2) 
+			print("creating Whrmacht Gamma")
+			Modify_ReceivedDamage(table_TownHallRunawayB[i].sgroup, 3)
+			Modify_WeaponAccuracy(table_TownHallRunawayB[i].sgroup, "hardpoint_01", 0.5)
+			Cmd_Move(table_TownHallRunawayB[i].sgroup, table_TownHallRunawayB[i].location1)
+			AddToTable(table_TownHallRunawayB[i].sgroup, table_TownHallRunawayB[i].start,  table_TownHallRunawayB[i].facing1)	
+		end
+		
+--~ 	WehrmachtTownHall = SGroup_CreateIfNotFound("WehrmachtTownHall")
+--~ 	Util_CreateSquadsAtMarker(player2, WehrmachtTownHall, SBP.ELITE.FALLSCHIRMJAGER, Spawn_LastAttack1, 1, 4)
+--~ 	Cmd_Garrison(WehrmachtTownHall, Blg_TownHall)
+		
+		Rule_AddInterval(Rule_TownHallRunawayB, 3)
+		Rule_RemoveMe()
+	end
+end
+function Rule_TownHallRunawayB()
+	for i = 1, table.getn(table_TownHallRunawayB) do
+		if SGroup_TotalMembersCount(table_TownHallRunawayB[i].sgroup) < 2 then
+			Cmd_Retreat(table_TownHallRunawayB[i].sgroup,  Marker_GetPosition(table_TownHallRunawayB[i].location2))
+			--Cmd_Move(table_TownHallRunawayB[i].sgroup, table_TownHallRunawayB[i].location2)
+			print("Moving TownHallRunawayB to final")
+		end	
+	end
+	if Player_OwnsEGroup(player2, Blg_TownHall) == false then 
+		Rule_Remove(Rule_CreateTownHallRunaway)
+	end
+	if (Player_OwnsEGroup(player1, Blg_TownHall))  then	
+		EGroup_InstantCaptureStrategicPoint(Territory3, player1)
+		--Rule_AddInterval(Rule_MoveTownHallAxis, 1)
+		Rule_Remove(Rule_ConstantAxis)
+		
+		Rule_RemoveMe()	
+		--Rule_RemoveAll()
+	end
+end
+
+function Rule_CreateAble()
+	if (Event_IsAnyRunning() == false) then
+		Util_SetStartingResources(3)					-- set starting resources
+		
+		-- restore sound to the mission
+		Util_MuteAmbientSound(false)
+		
+		FOW_Enable(true)       
+		Rule_RemoveMe()
+		Timer_Start("Timer_CafeNorm", 10)
+		Objective_Start(OBJECTIVE1)
+	---------Mission Start----------
+		--Rule_AddOneShot(HintPoint_CafeNormandie, 1)
+		Rule_AddOneShot(Rule_CreateAbleCompany, 0.2)
+		Rule_AddInterval(Rule_AbleReinforcements, 2)
+		Rule_AddInterval(Rule_CafeNormandieFire, 1)
+		
+		Rule_AddInterval(Check_EnterTownHall, 1)
+		
+	---------Axis Create and Actions------		
+		
+		Rule_AddInterval(Rule_WehrmachtAlpha, 1.2)
+		Rule_AddInterval(Rule_WehrmachtBeta, 1.4)
+		Rule_AddInterval(Rule_WehrmachtGamma, 1.6)
+		Rule_AddInterval(Rule_WehrmachtDelta, 1.8)
+		Rule_AddInterval(Rule_WehrmachtZeta, 2)
+		--Rule_AddInterval(Rule_WehrmachtEpsilon, 2.2)
+		--Rule_AddInterval(Rule_WehrmachtEta, 1)
+		Rule_AddInterval(Rule_WehrmachtTheta, 2.4)
+		Rule_AddInterval(Rule_WehrmachtIota, 2.6)
+		
+		Rule_AddInterval(Rule_WehrmachtLamda, 3)
+		
+		Rule_AddInterval(Rule_MG42Alpha, 1)
+		Rule_AddInterval(Rule_PanzerfaustAlpha, 1)
+		
+		Rule_AddInterval(Rule_FiftyMMAlpha, 1)
+		Rule_AddInterval(Rule_SniperAlpha, 1)
+		Rule_AddInterval(Rule_BMWBeta, 1)
+		
+		Rule_AddInterval(Rule_FacingPosition, 1)
+		
+		Rule_AddInterval(Rule_PutUnitsInGroups, 1)
+		Rule_AddInterval(Rule_DestroyAllSquads, 5)
+		Rule_AddInterval(Check_AllyFireUp, 1)
+		
+		Rule_AddInterval(Rule_AxisBarbWire1, 1)
+		Rule_AddInterval(Rule_AxisBarbWire2, 1)
+	------------Game Rules------------------------	
+	
+		Rule_AddInterval(Objective_CafeNormandie, 1)
+		Rule_AddInterval(Objective_Church2, 1)
+		
+		Rule_AddInterval(Objective_ResourcePoint1, 1)
+	end	
+end
+
+-----------------------------------------------------------------------------------------
+
+function Check_AllyFireUp()
+	Player_GetAll(player1)
+	if SGroup_IsPinned(sg_allsquads, ANY) and g_fireup == 0 then
+		local _CheckSquad = function(gid, idx, sid)
+			if Squad_IsPinned(sid) then
+				SGroup_Single(sg_AllyPinned, sid)
+				return true
+			else
+				return false
+			end
+		end
+		SGroup_ForEach(sg_allsquads, _CheckSquad)
+		flashID = UI_FlashAbilityButton(ABILITY.ALLIES.FIREUP, true, BT_UI_Weak_CommandBtn)
+		Rule_AddInterval(Check_PinClick, 1)
+		Rule_AddOneShot(HintPoint_FireUp, 1)
+		g_fireup = 1
+		Timer_Start("Timer_FireUp", 20) 
+	end 
+	if SGroup_IsPinned(sg_AllyPinned, ANY) == false and g_fireup == 1 then 
+		--Rule_Remove(Check_PinClick)
+		HintPoint_Remove(HintPoint_FireUpID)
+		UI_StopFlashing(flashID)
+		Rule_RemoveMe()
+	end
+end
+function Check_PinClick()
+	if Timer_GetRemaining("Timer_FireUp") == 0 then 
+		HintPoint_Remove(HintPoint_FireUpID)
+		Rule_RemoveMe()
+	end
+end
+function AddToTable(group, destination, face)
+	for i = table.getn(table_AxisSGroup), 1, -1 do 
+		if (table_AxisSGroup[i].sgroup == group) then
+			table.remove(table_AxisSGroup, i)	
+		end
+	end
+	table.insert(table_AxisSGroup, {sgroup = group, dest = destination, facing = face})
+end
+
+function Rule_FacingPosition()
+	for i = table.getn(table_AxisSGroup), 1, -1 do		
+		if Prox_AreSquadMembersNearMarker(table_AxisSGroup[i].sgroup, table_AxisSGroup[i].dest, ANY) == true then
+			SGroup_FaceMarker(table_AxisSGroup[i].sgroup, table_AxisSGroup[i].facing)
+			table.remove(table_AxisSGroup, i)			
+		end		
+	end
+end
+
+function Rule_DestroyAllSquads()
+	Player_GetAll(player1)
+	Player_GetAllSquadsNearMarker(player2, sg_tempDestroy, Marker_Final) 
+	if SGroup_CountSpawned(sg_tempDestroy) > 0 then
+		SGroup_DestroyAllSquads(sg_tempDestroy)
+	end
+	Player_GetAllSquadsNearMarker(player2, sg_tempDestroy, Marker_Final2)
+	if SGroup_CountSpawned(sg_tempDestroy) > 0 then
+		SGroup_DestroyAllSquads(sg_tempDestroy)
+	end
+	Player_GetAllSquadsNearMarker(player2, sg_tempDestroy, Marker_Final3) 		
+	if SGroup_CountSpawned(sg_tempDestroy) > 0 then
+		SGroup_DestroyAllSquads(sg_tempDestroy)
+	end
+end
+
+function Rule_AxisBarbWire1()
+	Player_GetAllEntitiesNearMarker(player2, Entity_Wire1, Marker_BarbWireTotal1)
+	EGroup_Filter(Entity_Wire1, EBP.AXIS.BARBED_WIRE, FILTER_KEEP)
+	if SGroup_CountSpawned(Axis_WireLayer1) > 0 then 
+		if Player_AreSquadsNearMarker(player1, Trigger_BarbWire1) and g_SetWires1 == false then
+			SGroup_SetAutoTargetting(Axis_WireLayer1, "hardpoint_01", false)
+			Command_PlayerSquadConstructFence(player2, Axis_WireLayer1, EBP.AXIS.BARBED_WIRE, Marker_GetPosition(Marker_BarbWireEnd1), Marker_GetPosition(Marker_BarbWireStart1), false)   
+			g_SetWires1 = true
+		end
+		if EGroup_Count(Entity_Wire1) > 0 and g_SetWires1 == true then 
+			if SGroup_IsConstructingBuilding(Axis_WireLayer1, ANY) == false and g_SetWires1 == true then 
+				if Prox_AreSquadMembersNearMarker(Axis_WireLayer1, Spawn_Axis_WireLayer1, ANY) == false then 
+					Cmd_Move(Axis_WireLayer1, Spawn_Axis_WireLayer1)
+					AddToTable(Axis_WireLayer1, Spawn_Axis_WireLayer1, west)
+					SGroup_SetAutoTargetting(Axis_WireLayer1, "hardpoint_01", true)
+				end
+			end
+		end
+	end
+	Player_GetAllEntitiesNearMarker(player2, Entity_Wire1a, Marker_BarbWireTotal1a)
+	EGroup_Filter(Entity_Wire1a, EBP.AXIS.BARBED_WIRE, FILTER_KEEP)
+	if SGroup_CountSpawned(Axis_WireLayer1a) > 0 then
+		if  Player_AreSquadsNearMarker(player1, Trigger_BarbWire1) and g_SetWires1a == false then
+			SGroup_SetAutoTargetting(Axis_WireLayer1a, "hardpoint_01", false)
+			Command_PlayerSquadConstructFence(player2, Axis_WireLayer1a, EBP.AXIS.BARBED_WIRE, Marker_GetPosition(Marker_BarbWireEnd1a), Marker_GetPosition(Marker_BarbWireStart1a), false)   	
+			g_SetWires1a = true
+		end
+		if EGroup_Count(Entity_Wire1a) > 0 and g_SetWires1a == true then 
+			if SGroup_IsConstructingBuilding(Axis_WireLayer1a, ANY) == false then 
+				if Prox_AreSquadMembersNearMarker(Axis_WireLayer1a, Spawn_Axis_WireLayer1a, ANY) == false then 
+					Cmd_Move(Axis_WireLayer1a, Spawn_Axis_WireLayer1a)
+					SGroup_SetAutoTargetting(Axis_WireLayer1a, "hardpoint_01", true)
+					AddToTable(Axis_WireLayer1a, Spawn_Axis_WireLayer1a,  west)
+				end
+			end
+		end
+	end
+end
+
+function Rule_AxisBarbWire2()
+	Player_GetAllEntitiesNearMarker(player2, Entity_Wire2, Marker_BarbWireTotal2)
+	EGroup_Filter(Entity_Wire2, EBP.AXIS.BARBED_WIRE, FILTER_KEEP)
+	if SGroup_CountSpawned(Axis_WireLayer2) > 0 then 
+		if Player_AreSquadsNearMarker(player1, Trigger_BarbWire2) and g_SetWires2 == false  then		
+			SGroup_SetAutoTargetting(Axis_WireLayer2, "hardpoint_01", false)
+			Command_PlayerSquadConstructFence(player2, Axis_WireLayer2, EBP.AXIS.BARBED_WIRE, Marker_GetPosition(Marker_BarbWireEnd2), Marker_GetPosition(Marker_BarbWireStart2), false)   
+			g_SetWires2 = true
+		end
+		if EGroup_Count(Entity_Wire2) > 0 and g_SetWires2 == true then 
+			if SGroup_IsConstructingBuilding(Axis_WireLayer2, ANY) == false then 
+				if Prox_AreSquadMembersNearMarker(Axis_WireLayer2, Marker_B35, ANY) == false then 
+					Cmd_Move(Axis_WireLayer2, Marker_B35)
+					AddToTable(Axis_WireLayer2, Spawn_Axis_WireLayer2,  north)
+					SGroup_SetAutoTargetting(Axis_WireLayer2, "hardpoint_01", true)
+				end
+			end
+		end
+	end
+end
+
+---------------------------------------------------Create Able Company---------------------------------------------------
+
+function Rule_CreateAbleCompany()
+	FOW_RevealMarker(Marker_Fow1, -1)
+--~	for i = 1, 2 do
+--~ 	Modify_ReceivedDamage(table_AbleCompany[i].sgroup, 0.5)
+--~ 	Modify_WeaponDamage(table_AbleCompany[i].sgroup, "hardpoint_01", 2)
+--~	end
+end
+
+-----------------------------------------------------Create Wehrmacht------------------------------------------------------------------------
+
+function Rule_CreateWehrmacht()
+	for i = 1, table.getn(table_WehrmachtAlpha) do
+		Util_CreateSquadsAtMarkerFacing(player2, table_WehrmachtAlpha[i].sgroup, table_WehrmachtAlpha[i].unit, table_WehrmachtAlpha[i].start, table_WehrmachtAlpha[i].facing1, 1, table_WehrmachtAlpha[i].count) 
+		print("creating Whrmacht Alpha")
+		Modify_ReceivedDamage(table_WehrmachtAlpha[i].sgroup, 2.5)
+		Modify_WeaponAccuracy(table_WehrmachtAlpha[i].sgroup, "hardpoint_01", 0.5)
+		SGroup_SuggestPosture(table_WehrmachtAlpha[i].sgroup, 1, -1)
+		SGroup_SetMoodMode(table_WehrmachtAlpha[i].sgroup, MM_ForceTense)
+	end
+	
+	for i = 1, table.getn(table_WehrmachtBeta) do
+		Util_CreateSquadsAtMarkerFacing(player2, table_WehrmachtBeta[i].sgroup, table_WehrmachtBeta[i].unit, table_WehrmachtBeta[i].start, table_WehrmachtBeta[i].facing1, 1, table_WehrmachtBeta[i].count) 
+		print("creating Whrmacht Beta")
+		SGroup_SuggestPosture(table_WehrmachtBeta[i].sgroup, 1, -1)
+		Modify_ReceivedDamage(table_WehrmachtBeta[i].sgroup, 2.5)
+		Modify_WeaponAccuracy(table_WehrmachtBeta[i].sgroup, "hardpoint_01", 0.5)
+		SGroup_SetMoodMode(table_WehrmachtBeta[i].sgroup, MM_ForceTense)
+	end
+	
+	for i = 1, table.getn(table_WehrmachtGamma) do
+		Util_CreateSquadsAtMarkerFacing(player2, table_WehrmachtGamma[i].sgroup, table_WehrmachtGamma[i].unit, table_WehrmachtGamma[i].start, table_WehrmachtGamma[i].facing1, 1, table_WehrmachtGamma[i].count) 
+		print("creating Whrmacht Gamma")
+		Modify_ReceivedDamage(table_WehrmachtGamma[i].sgroup, 2.5)
+		Modify_WeaponAccuracy(table_WehrmachtGamma[i].sgroup, "hardpoint_01", 0.5)
+		SGroup_SetMoodMode(table_WehrmachtGamma[i].sgroup, MM_ForceTense)
+	end
+	
+	for i = 1, table.getn(table_WehrmachtDelta) do
+		Util_CreateSquadsAtMarkerFacing(player2, table_WehrmachtDelta[i].sgroup, table_WehrmachtDelta[i].unit, table_WehrmachtDelta[i].start, table_WehrmachtDelta[i].facing1, 1, table_WehrmachtDelta[i].count)
+		print("creating Wehrmacht Delta")
+		Modify_ReceivedDamage(table_WehrmachtDelta[i].sgroup, 2.5)
+		Modify_WeaponAccuracy(table_WehrmachtDelta[i].sgroup, "hardpoint_01", 0.5)
+		SGroup_SetMoodMode(table_WehrmachtDelta[i].sgroup, MM_ForceTense)
+	end
+	
+	for i = 1, table.getn(table_WehrmachtEpsilon) do
+		Util_CreateSquadsAtMarkerFacing(player2, table_WehrmachtEpsilon[i].sgroup, table_WehrmachtEpsilon[i].unit, table_WehrmachtEpsilon[i].start, table_WehrmachtEpsilon[i].facing1, 1, table_WehrmachtEpsilon[i].count)
+		Cmd_Garrison(table_WehrmachtEpsilon[i].sgroup, table_WehrmachtEpsilon[i].building1, true, true)
+		
+		--Modify_ReceivedDamage(table_WehrmachtEpsilon[i].sgroup, 2)
+		Modify_WeaponAccuracy(table_WehrmachtEpsilon[i].sgroup, "hardpoint_01", 0.5)
+		SGroup_SetMoodMode(table_WehrmachtEpsilon[i].sgroup, MM_ForceTense)
+		print("creating Wehrmacht Epsilon")
+	end
+	
+	for i = 1, table.getn(table_WehrmachtZeta) do
+		Util_CreateSquadsAtMarkerFacing(player2, table_WehrmachtZeta[i].sgroup, table_WehrmachtZeta[i].unit, table_WehrmachtZeta[i].start, table_WehrmachtZeta[i].facing1, 1, table_WehrmachtZeta[i].count)
+		Cmd_Garrison(table_WehrmachtZeta[i].sgroup, table_WehrmachtZeta[i].building1, true, true)
+		table_WehrmachtZeta[i].b1health = EGroup_GetAvgHealth(table_WehrmachtZeta[i].building1)
+		Modify_ReceivedDamage(table_WehrmachtZeta[i].sgroup, 2.5)
+		Modify_WeaponAccuracy(table_WehrmachtZeta[i].sgroup, "hardpoint_01", 0.5)
+		SGroup_SetMoodMode(table_WehrmachtZeta[i].sgroup, MM_ForceTense)
+		print("creating Whrmacht Zeta")
+	end
+	
+	for i = 1, table.getn(table_WehrmachtEta) do
+		Util_CreateSquadsAtMarkerFacing(player2, table_WehrmachtEta[i].sgroup, table_WehrmachtEta[i].unit, table_WehrmachtEta[i].start, table_WehrmachtEta[i].facing1, 1, table_WehrmachtEta[i].count)
+		print("creating Wehrmacht Eta")
+		--Modify_ReceivedDamage(table_WehrmachtEta[i].sgroup, 5)
+		Modify_WeaponAccuracy(table_WehrmachtEta[i].sgroup, "hardpoint_01", 0.5)
+		SGroup_SetMoodMode(table_WehrmachtEta[i].sgroup, MM_ForceTense)
+	end	
+	
+	for i = 1, table.getn(table_WehrmachtTheta) do
+		Util_CreateSquadsAtMarker(player2, table_WehrmachtTheta[i].sgroup, table_WehrmachtTheta[i].unit, table_WehrmachtTheta[i].start,  1, table_WehrmachtTheta[i].count)
+		print("creating Whrmacht Theta")
+		--Modify_ReceivedDamage(table_WehrmachtTheta[i].sgroup, 2.5)
+		Modify_WeaponAccuracy(table_WehrmachtTheta[i].sgroup, "hardpoint_01", 0.5)
+		Cmd_Garrison(table_WehrmachtTheta[i].sgroup, table_WehrmachtTheta[i].building1)
+		SGroup_SetMoodMode(table_WehrmachtTheta[i].sgroup, MM_ForceTense)
+		
+		--SGroup_SetAutoTargetting(table_WehrmachtTheta[i].sgroup, "hardpoint_01", false)
+	end
+	
+	for i = 1, table.getn(table_WehrmachtIota) do
+		Util_CreateSquadsAtMarker(player2, table_WehrmachtIota[i].sgroup, table_WehrmachtIota[i].unit, table_WehrmachtIota[i].start, 1, table_WehrmachtIota[i].count)
+		print("creating Whrmacht Iota")
+		--Modify_ReceivedDamage(table_WehrmachtIota[i].sgroup, 2.5)
+		--Modify_WeaponAccuracy(table_WehrmachtIota[i].sgroup, "hardpoint_01", 3)
+		SGroup_SetMoodMode(table_WehrmachtIota[i].sgroup, MM_ForceTense)
+		
+	end
+	
+	for i = 1, table.getn(table_WehrmachtKappa) do
+		Util_CreateSquadsAtMarkerFacing(player2, table_WehrmachtKappa[i].sgroup, table_WehrmachtKappa[i].unit, table_WehrmachtKappa[i].start, table_WehrmachtKappa[i].facing1, 1, table_WehrmachtKappa[i].count)
+		print("creating Wehrmacht Kappa")
+		Modify_ReceivedDamage(table_WehrmachtKappa[i].sgroup, 4)
+		Modify_WeaponAccuracy(table_WehrmachtKappa[i].sgroup, "hardpoint_01", 0.5)
+		SGroup_SetMoodMode(table_WehrmachtKappa[i].sgroup, MM_ForceTense)
+	end
+	for i = 1, table.getn(table_WehrmachtLamda) do
+		Util_CreateSquadsAtMarkerFacing(player2, table_WehrmachtLamda[i].sgroup, table_WehrmachtLamda[i].unit, table_WehrmachtLamda[i].start, table_WehrmachtLamda[i].facing1, 1, table_WehrmachtLamda[i].count)
+		print("creating Wehrmacht Lamda")
+		SGroup_AddSlotItemToDropOnDeath(table_WehrmachtLamda[i].sgroup, SLOT_ITEM.PANZERSCHRECK, 1.0, true)
+		Modify_ReceivedDamage(table_WehrmachtLamda[i].sgroup, 3)
+		SGroup_SetMoodMode(table_WehrmachtLamda[i].sgroup, MM_ForceTense)
+	end
+	for i = 1, table.getn(table_MG42Alpha) do
+ 		Util_CreateSquadsAtMarker(player2, table_MG42Alpha[i].sgroup, table_MG42Alpha[i].unit, table_MG42Alpha[i].start, 1)
+--~ 		print("creating MG42 Alpha")
+			Cmd_InstantSetupTeamWeapon(table_MG42Alpha[i].sgroup)
+--~ 		--Modify_WeaponBurst(table_MG42Alpha[i].sgroup, "hardpoint_01", 0.2)
+--~ 		--Modify_WeaponCooldown(table_MG42Alpha[i].sgroup, "hardpoint_01", 10)
+			--Modify_WeaponRange(table_MG42Alpha[i].sgroup, "hardpoint_01", 0.1)
+			Modify_WeaponAccuracy(table_MG42Alpha[i].sgroup, "hardpoint_01", 1.0)
+			Modify_WeaponDamage(table_MG42Alpha[i].sgroup, "hardpoint_01", 1)
+--~ 		Modify_ReceivedDamage(table_MG42Alpha[i].sgroup, 5)
+			SGroup_SetMoodMode(table_MG42Alpha[i].sgroup, MM_ForceTense)
+		
+	end
+	
+	for i = 1, table.getn(table_MG42Beta) do
+		Util_CreateSquadsAtMarker(player2, table_MG42Beta[i].sgroup, table_MG42Beta[i].unit, table_MG42Beta[i].start, 1)
+		print("creating MG42 Beta")
+		Cmd_Garrison(table_MG42Beta[i].sgroup, table_MG42Beta[i].building1)
+		--Modify_WeaponBurst(table_MG42Beta[i].sgroup, "hardpoint_01", 0.2)
+		--Modify_WeaponCooldown(table_MG42Beta[i].sgroup, "hardpoint_01", 10)
+		--Modify_WeaponRange(table_MG42Beta[i].sgroup, "hardpoint_01", 0.1)
+		Modify_WeaponAccuracy(table_MG42Beta[i].sgroup, "hardpoint_01", 0.5)
+		Modify_WeaponDamage(table_MG42Beta[i].sgroup, "hardpoint_01", 0.5)
+		Modify_ReceivedDamage(table_MG42Beta[i].sgroup, 1)
+		SGroup_SetMoodMode(table_MG42Beta[i].sgroup, MM_ForceTense)
+	end
+	
+	for i = 1, table.getn(table_PanzerfaustAlpha) do
+		Util_CreateSquadsAtMarkerFacing(player2, table_PanzerfaustAlpha[i].sgroup, table_PanzerfaustAlpha[i].unit, table_PanzerfaustAlpha[i].start, table_PanzerfaustAlpha[i].facing1,  1, table_PanzerfaustAlpha[i].count)
+		Cmd_InstantUpgrade(table_PanzerfaustAlpha[i].sgroup, UPG.AXIS.PANZERSCHRECK)
+		print("creating Panzerfaust Alpha")
+		SGroup_SetMoodMode(table_PanzerfaustAlpha[i].sgroup, MM_ForceTense)
+	end
+	
+	for i = 1, table.getn(table_PanzerfaustBeta) do
+		Util_CreateSquadsAtMarker(player2, table_PanzerfaustBeta[i].sgroup, table_PanzerfaustBeta[i].unit, table_PanzerfaustBeta[i].start, 1, table_PanzerfaustBeta[i].count)
+		Cmd_InstantUpgrade(table_PanzerfaustBeta[i].sgroup, UPG.AXIS.PANZERSCHRECK)
+		print("creating Panzerfaust Beta")
+		AddToTable(table_PanzerfaustBeta[i].sgroup, table_PanzerfaustBeta[i].start,  table_PanzerfaustBeta[i].facing1)
+		Modify_ReceivedDamage(table_PanzerfaustBeta[i].sgroup, 0.7)
+		--Modify_WeaponDamage(table_PanzerfaustBeta[i].sgroup, "hardpoint_01", 0.1)
+	end
+	
+	
+	for i = 1, table.getn(table_FiftyMMAlpha) do
+		Util_CreateSquadsAtMarker(player2, table_FiftyMMAlpha[i].sgroup, table_FiftyMMAlpha[i].unit, table_FiftyMMAlpha[i].start, 1)
+		print("creating FiftyMM Alpha")	
+		Modify_WeaponAccuracy(table_FiftyMMAlpha[i].sgroup, "hardpoint_01", 1)
+		Modify_WeaponDamage(table_FiftyMMAlpha[i].sgroup, "hardpoint_01", 1)
+		Modify_WeaponRange(table_FiftyMMAlpha[i].sgroup, "hardpoint_01", 0.8)
+		AddToTable(table_FiftyMMAlpha[i].sgroup, table_FiftyMMAlpha[i].start,  table_FiftyMMAlpha[i].facing1)
+	end
+	
+	for i = 1, table.getn(table_SniperAlpha) do
+		Util_CreateSquadsAtMarker(player2, table_SniperAlpha[i].sgroup, table_SniperAlpha[i].unit, table_SniperAlpha[i].start, 1, table_SniperAlpha[i].count)
+		print("creating Sniper Alpha")
+		Cmd_Garrison(table_SniperAlpha[i].sgroup, table_SniperAlpha[i].building1)
+		--Modify_WeaponAccuracy(table_SniperAlpha[i].sgroup, "hardpoint_01", 0.3)
+		--Modify_WeaponDamage(table_SniperAlpha[i].sgroup, "hardpoint_01", 0.3)
+		--Modify_ReceivedDamage(table_SniperAlpha[i].sgroup, 2)
+	end
+	for i = 1, table.getn(table_BMWBeta) do
+		Util_CreateSquadsAtMarker(player2, table_BMWBeta[i].sgroup, table_BMWBeta[i].unit, table_BMWBeta[i].start, 1, table_BMWBeta[i].count)
+		print("creating BMW Beta")
+		Modify_ReceivedDamage(table_BMWBeta[i].sgroup, 3)
+	end
+end
+
+-- Location, Location, building, final
+function Rule_WehrmachtAlpha()
+	for i = 1, table.getn(table_WehrmachtAlpha) do	
+		if table_WehrmachtAlpha[i].g_WehrmachtAlphaArrived0 == true then 		
+			if Player_CanSeeSGroup(player1, table_WehrmachtAlpha[i].sgroup, ANY) then 
+				SGroup_SuggestPosture(table_WehrmachtAlpha[i].sgroup, 0, -1)
+				Cmd_Retreat(table_WehrmachtAlpha[i].sgroup,  Marker_GetPosition(table_WehrmachtAlpha[i].location1))
+				SGroup_SetMoveType(table_WehrmachtAlpha[i].sgroup, MOVETYPE.FAST)
+				AddToTable(table_WehrmachtAlpha[i].sgroup, table_WehrmachtAlpha[i].location1,  table_WehrmachtAlpha[i].facing2)
+				print("Move Alpha to location1")
+				table_WehrmachtAlpha[i].g_WehrmachtAlphaArrived0 = false
+				print("setting 1 g_WehrmachtAlphaArrived0 to FALSE")
+				table_WehrmachtAlpha[i].g_WehrmachtAlphaArrived1 = true
+				print("setting 1 g_WehrmachtAlphaArrived1 to TRUE")	
+				table_WehrmachtAlpha[i].g_WehrmachtAlphaArrived2 = false
+				print("setting 2 g_WehrmachtAlphaArrived2 to TRUE")	
+			end
+		end			
+		if table_WehrmachtAlpha[i].g_WehrmachtAlphaArrived1 == true then
+			if SGroup_TotalMembersCount(table_WehrmachtAlpha[i].sgroup) < 3 then
+				if EGroup_IsEmpty(table_WehrmachtAlpha[i].building1) == false then
+					Cmd_Garrison(table_WehrmachtAlpha[i].sgroup, table_WehrmachtAlpha[i].building1, true, true)
+					table_WehrmachtAlpha[i].b1health = EGroup_GetAvgHealth(table_WehrmachtAlpha[i].building1)
+				end
+				print("Garrison Alpha to building1")
+				table_WehrmachtAlpha[i].g_WehrmachtAlphaArrived0 = false
+				print("setting 2 g_WehrmachtAlphaArrived0 to FALSE")
+				table_WehrmachtAlpha[i].g_WehrmachtAlphaArrived1 = false
+				print("setting 2 g_WehrmachtAlphaArrived1 to FALSE")
+				table_WehrmachtAlpha[i].g_WehrmachtAlphaArrived2 = true
+				print("setting 2 g_WehrmachtAlphaArrived2 to TRUE")
+			end
+		end		
+		if table_WehrmachtAlpha[i].g_WehrmachtAlphaArrived2 == true then		
+			if (EGroup_GetAvgHealth(table_WehrmachtAlpha[i].building1) < table_WehrmachtAlpha[i].b1health) then 
+				Cmd_UngarrisonSquad(table_WehrmachtAlpha[i].sgroup, Marker_GetPosition(table_WehrmachtAlpha[i].location2), true)	
+				Cmd_Retreat(table_WehrmachtAlpha[i].sgroup,  Marker_GetPosition(table_WehrmachtAlpha[i].location2))
+				SGroup_SetMoveType(table_WehrmachtAlpha[i].sgroup, MOVETYPE.FAST)
+				print("Ungarrison Alpha to Final")
+				Cmd_Move(table_WehrmachtAlpha[i].sgroup, table_WehrmachtAlpha[i].location2, true)
+				print("Move Alpha to Final")			
+				table_WehrmachtAlpha[i].g_WehrmachtAlphaArrived0 = false
+				print("setting 3 g_WehrmachtAlphaArrived0 to FALSE")
+				table_WehrmachtAlpha[i].g_WehrmachtAlphaArrived1 = false
+				print("setting 3 g_WehrmachtAlphaArrived0 to FALSE")
+				table_WehrmachtAlpha[i].g_WehrmachtAlphaArrived2 = false
+				print("setting 3 g_WehrmachtAlphaArrived2 to FALSE")
+			end
+		end
+	end
+end
+
+--Location, building, location, final
+function Rule_WehrmachtBeta()
+	for i = 1, table.getn(table_WehrmachtBeta) do	
+		if table_WehrmachtBeta[i].g_WehrmachtBetaArrived0 == true then 		
+			if Player_CanSeeSGroup(player1, table_WehrmachtBeta[i].sgroup, ANY) then
+				Cmd_Garrison(table_WehrmachtBeta[i].sgroup, table_WehrmachtBeta[i].building1, true, true)
+				table_WehrmachtBeta[i].b1health = EGroup_GetAvgHealth(table_WehrmachtBeta[i].building1)
+				print("Move 1 to location 1")
+				table_WehrmachtBeta[i].g_WehrmachtBetaArrived0 = false
+				print("setting 1 g_WehrmachtBetaArrived0 to FALSE")
+				table_WehrmachtBeta[i].g_WehrmachtBetaArrived1 = true
+				print("setting 1 g_WehrmachtBetaArrived1 to TRUE")
+				table_WehrmachtBeta[i].g_WehrmachtBetaArrived2 = false
+				print("setting 1 g_WehrmachtBetaArrived2 to FALSE")					
+			end
+		end			
+		if table_WehrmachtBeta[i].g_WehrmachtBetaArrived1 == true then			
+			if (EGroup_GetAvgHealth(table_WehrmachtBeta[i].building1) < table_WehrmachtBeta[i].b1health) then
+				Cmd_UngarrisonSquad(table_WehrmachtBeta[i].sgroup, Marker_GetPosition(table_WehrmachtBeta[i].location1), true)	
+				print("Unloading Beta")
+				Cmd_Retreat(table_WehrmachtBeta[i].sgroup,  Marker_GetPosition(table_WehrmachtBeta[i].location1))
+				--Cmd_Move(table_WehrmachtBeta[i].sgroup, table_WehrmachtBeta[i].location1)
+				SGroup_SetMoveType(table_WehrmachtBeta[i].sgroup, MOVETYPE.FAST)
+				AddToTable(table_WehrmachtBeta[i].sgroup, table_WehrmachtBeta[i].location1,  table_WehrmachtBeta[i].facing2)
+				print("Move Beta to location1")			
+				table_WehrmachtBeta[i].g_WehrmachtBetaArrived0 = false
+				print("setting 3 g_WehrmachtBetaArrived0 to FALSE")
+				table_WehrmachtBeta[i].g_WehrmachtBetaArrived1 = false
+				print("setting 3 g_WehrmachtBetaArrived1 to FALSE")
+				table_WehrmachtBeta[i].g_WehrmachtBetaArrived2 = true
+				print("setting 3 g_WehrmachtBetaArrived2 to TRUE")
+			end
+		end		
+		if table_WehrmachtBeta[i].g_WehrmachtBetaArrived2 == true then
+			if SGroup_TotalMembersCount(table_WehrmachtBeta[i].sgroup) < 3 then
+				Cmd_Retreat(table_WehrmachtBeta[i].sgroup,  Marker_GetPosition(table_WehrmachtBeta[i].location2))
+				--Cmd_Move(table_WehrmachtBeta[i].sgroup, table_WehrmachtBeta[i].location2)
+				print("Garrison 2 to building 2")
+				table_WehrmachtBeta[i].g_WehrmachtBetaArrived0 = false
+				print("setting 2 g_WehrmachtBetaArrived0 to FALSE")
+				table_WehrmachtBeta[i].g_WehrmachtBetaArrived1 = false
+				print("setting 2 g_WehrmachtBetaArrived1 to FALSE")
+				table_WehrmachtBeta[i].g_WehrmachtBetaArrived2 = false
+				print("setting 2 g_WehrmachtBetaArrived2 to FALSE")
+			end
+		end
+	end
+end
+
+--Location, building, building, final
+function Rule_WehrmachtGamma()
+	for i = 1, table.getn(table_WehrmachtGamma) do	
+		if table_WehrmachtGamma[i].g_WehrmachtGammaArrived0 == true then		
+			if SGroup_TotalMembersCount(table_WehrmachtGamma[i].sgroup) < 3 then
+				Cmd_Garrison(table_WehrmachtGamma[i].sgroup, table_WehrmachtGamma[i].building1, true, true)		
+				table_WehrmachtGamma[i].b1health = EGroup_GetAvgHealth(table_WehrmachtGamma[i].building1)
+				SGroup_SetMoveType(table_WehrmachtGamma[i].sgroup, MOVETYPE.FAST)
+				print("Garrison gamma to building1")
+				table_WehrmachtGamma[i].g_WehrmachtGammaArrived0 = false
+				print("setting 1 g_WehrmachtGammaArrived0 to FALSE")
+				table_WehrmachtGamma[i].g_WehrmachtGammaArrived1 = true
+				print("setting 1 g_WehrmachtGammaArrived1 to TRUE")	
+				table_WehrmachtGamma[i].g_WehrmachtGammaArrived2 = false
+				print("setting 1 g_WehrmachtGammaArrived2 to FALSE")	
+			end
+		end	
+		if  table_WehrmachtGamma[i].g_WehrmachtGammaArrived1 == true then	
+			if (EGroup_GetAvgHealth(table_WehrmachtGamma[i].building1) < table_WehrmachtGamma[i].b1health) then
+				Cmd_UngarrisonSquad(table_WehrmachtGamma[i].sgroup, Marker_GetPosition(table_WehrmachtGamma[i].door1), true)
+				Cmd_Garrison(table_WehrmachtGamma[i].sgroup, table_WehrmachtGamma[i].building2, true, true)
+				table_WehrmachtGamma[i].b2health = EGroup_GetAvgHealth(table_WehrmachtGamma[i].building2)
+				SGroup_SetMoveType(table_WehrmachtGamma[i].sgroup, MOVETYPE.FAST)
+				print("Garrison Gamma to building2")
+				table_WehrmachtGamma[i].g_WehrmachtGammaArrived0 = false
+				print("setting 2 g_WehrmachtGammaArrived0 to FALSE")
+				table_WehrmachtGamma[i].g_WehrmachtGammaArrived1 = false
+				print("setting 2 g_WehrmachtGammaArrived1 to FALSE")
+				table_WehrmachtGamma[i].g_WehrmachtGammaArrived2 = true
+				print("setting 2 g_WehrmachtGammaArrived2 to TRUE")
+			end
+		end
+		if  table_WehrmachtGamma[i].g_WehrmachtGammaArrived2 == true then		
+			if (EGroup_GetAvgHealth(table_WehrmachtGamma[i].building2) < table_WehrmachtGamma[i].b2health) then
+				Cmd_UngarrisonSquad(table_WehrmachtGamma[i].sgroup, Marker_GetPosition(table_WehrmachtGamma[i].location2), true)
+				Cmd_Retreat(table_WehrmachtGamma[i].sgroup,  Marker_GetPosition(table_WehrmachtGamma[i].location2))
+				--Cmd_Move(table_WehrmachtGamma[i].sgroup, table_WehrmachtGamma[i].location2)
+				SGroup_SetMoveType(table_WehrmachtGamma[i].sgroup, MOVETYPE.FAST)
+				print("Move Gamma to Final")			
+				table_WehrmachtGamma[i].g_WehrmachtGammaArrived0 = false
+				print("setting 3 g_WehrmachtGammaArrived0 to FALSE")
+				table_WehrmachtGamma[i].g_WehrmachtGammaArrived1 = false
+				print("setting 3 g_WehrmachtGammaArrived to FALSE")
+				table_WehrmachtGamma[i].g_WehrmachtGammaArrived2 = false
+				print("setting 3 g_WehrmachtGammaArrived2 to FALSE")
+			end	
+		end
+	end
+end
+
+
+-- Location, trigger, location, final
+function Rule_WehrmachtDelta()
+	for i = 1, table.getn(table_WehrmachtDelta) do
+		if table_WehrmachtDelta[i].g_WehrmachtDeltaArrived0 == true then
+			if Player_AreSquadsNearMarker(player1, table_WehrmachtDelta[i].trigger1, ANY) then		
+				Player_GetAllSquadsNearMarker(player1, table_WehrmachtDelta[i].agroup, table_WehrmachtDelta[i].trigger1) 
+				Cmd_Attack(table_WehrmachtDelta[i].sgroup, table_WehrmachtDelta[i].agroup, true)
+				SGroup_SetMoveType(table_WehrmachtDelta[i].sgroup, MOVETYPE.FAST)
+				print("Move Delta to Attack")
+				table_WehrmachtDelta[i].g_WehrmachtDeltaArrived0 = false
+				print("setting 1 g_WehrmachtDeltaArrived0 to FALSE")
+				table_WehrmachtDelta[i].g_WehrmachtDeltaArrived1 = true
+				print("setting 1 g_WehrmachtDeltaArrived1 to TRUE")	
+				table_WehrmachtDelta[i].g_WehrmachtDeltaArrived2 = false
+				print("setting 1 g_WehrmachtDeltaArrived2 to FALSE")			
+			end
+		end	
+		if table_WehrmachtDelta[i].g_WehrmachtDeltaArrived1 == true then	
+			if SGroup_TotalMembersCount(table_WehrmachtDelta[i].sgroup) < 3 then
+				Cmd_Retreat(table_WehrmachtDelta[i].sgroup,  Marker_GetPosition(table_WehrmachtDelta[i].location1))
+				--Cmd_Move(table_WehrmachtDelta[i].sgroup, table_WehrmachtDelta[i].location1)
+				SGroup_SetMoveType(table_WehrmachtDelta[i].sgroup, MOVETYPE.FAST)
+				AddToTable(table_WehrmachtDelta[i].sgroup, table_WehrmachtDelta[i].location1,  table_WehrmachtDelta[i].facing2)
+				print("Delta moving to location1")
+				table_WehrmachtDelta[i].g_WehrmachtDeltaArrived0 = false
+				print("setting 2 g_WehrmachtDeltaArrived0 to FALSE")
+				table_WehrmachtDelta[i].g_WehrmachtDeltaArrived1 = false
+				print("setting 2 g_WehrmachtDeltaArrived1 to FALSE")
+				table_WehrmachtDelta[i].g_WehrmachtDeltaArrived2 = true
+				print("setting 2 g_WehrmachtDeltaArrived2 to TRUE")
+			elseif Player_AreSquadsNearMarker(player1, table_WehrmachtDelta[i].trigger1, ANY) == false then	
+				--Cmd_Move(table_WehrmachtDelta[i].sgroup, table_WehrmachtDelta[i].start)
+				Cmd_Retreat(table_WehrmachtAlpha[i].sgroup,  Marker_GetPosition(table_WehrmachtDelta[i].start))
+				SGroup_SetMoveType(table_WehrmachtDelta[i].sgroup, MOVETYPE.FAST)
+				AddToTable(table_WehrmachtDelta[i].sgroup, table_WehrmachtDelta[i].start,  table_WehrmachtDelta[i].facing1)
+				print("Move Delta back to start")
+				table_WehrmachtDelta[i].g_WehrmachtDeltaArrived0 = true
+				print("setting 1 g_WehrmachtDeltaArrived0 to TRUE")
+				table_WehrmachtDelta[i].g_WehrmachtDeltaArrived1 = false
+				print("setting 1 g_WehrmachtDeltaArrived1 to FALSE")	
+				table_WehrmachtDelta[i].g_WehrmachtDeltaArrived2 = false
+				print("setting 1 g_WehrmachtDeltaArrived2 to FALSE")
+			end
+		end
+		if table_WehrmachtDelta[i].g_WehrmachtDeltaArrived2 == true then
+			if SGroup_TotalMembersCount(table_WehrmachtDelta[i].sgroup) < 2 then	
+				Cmd_Retreat(table_WehrmachtDelta[i].sgroup,  Marker_GetPosition(table_WehrmachtDelta[i].location2))
+				--Cmd_Move(table_WehrmachtDelta[i].sgroup, table_WehrmachtDelta[i].location2)
+				print("Move Delta to location2")			
+				table_WehrmachtDelta[i].g_WehrmachtDeltaArrived0 = false
+				print("setting 3 g_WehrmachtDeltaArrived0 to FALSE")
+				table_WehrmachtDelta[i].g_WehrmachtDeltaArrived1 = false
+				print("setting 3 g_WehrmachtDeltaArrived1 to FALSE")
+				table_WehrmachtDelta[i].g_WehrmachtDeltaArrived2 = false
+				print("setting 3 g_WehrmachtDeltaArrived2 to FALSE")
+			end
+		end	
+	end
+end
+
+--Trigger from location, trigger to location, trigger to location(constantly runs away)
+function Rule_WehrmachtEpsilon()
+	for i = 1, table.getn(table_WehrmachtEpsilon) do
+		--local isonscreen = SGroup_IsOnScreen(player2, table_WehrmachtEpsilon[i].sgroup, ALL)
+		--local seenbyplayer = Player_CanSeeSGroup(player1, table_WehrmachtEpsilon[i].sgroup, ALL)
+		--local isonscreen = false
+		--local seenbyplayer = false
+		
+		if Player_AreSquadsNearMarker(player1, table_WehrmachtEpsilon[i].trigger1, ANY) and SGroup_TotalMembersCount(table_WehrmachtEpsilon[i].sgroup) == 3 then
+			Cmd_UngarrisonSquad(table_WehrmachtEpsilon[i].sgroup, Marker_GetPosition(table_WehrmachtEpsilon[i].location1), true)
+			--Cmd_Retreat(table_WehrmachtEpsilon[i].sgroup,  Marker_GetPosition(table_WehrmachtEpsilon[i].location1))
+			--Cmd_Move(table_WehrmachtEpsilon[i].sgroup, table_WehrmachtEpsilon[i].location1)
+			print("Moving Epsilon unloading buidling and moving to position")
+			SGroup_SetMoveType(table_WehrmachtEpsilon[i].sgroup, MOVETYPE.FAST)
+			AddToTable(table_WehrmachtEpsilon[i].sgroup, table_WehrmachtEpsilon[i].location1,  table_WehrmachtEpsilon[i].facing1)
+			table_WehrmachtEpsilon[i].g_WehrmachtEpsilonArrived0 = false
+			table_WehrmachtEpsilon[i].g_WehrmachtEpsilonArrived1 = true
+			table_WehrmachtEpsilon[i].g_WehrmachtEpsilonArrived2 = false
+		end 
+		if SGroup_TotalMembersCount(table_WehrmachtEpsilon[i].sgroup) < 3 then 
+			--Cmd_Move(table_WehrmachtEpsilon[i].sgroup, table_WehrmachtEpsilon[i].location2)
+			Cmd_Retreat(table_WehrmachtEpsilon[i].sgroup,  Marker_GetPosition(table_WehrmachtEpsilon[i].location2))
+			SGroup_SetMoveType(table_WehrmachtEpsilon[i].sgroup, MOVETYPE.FAST)
+			AddToTable(table_WehrmachtEpsilon[i].sgroup, table_WehrmachtEpsilon[i].location2,  table_WehrmachtEpsilon[i].facing2)
+			table_WehrmachtEpsilon[i].g_WehrmachtEpsilonArrived0 = false
+			table_WehrmachtEpsilon[i].g_WehrmachtEpsilonArrived1 = false
+			table_WehrmachtEpsilon[i].g_WehrmachtEpsilonArrived2 = true
+		end 
+		if SGroup_TotalMembersCount(table_WehrmachtEpsilon[i].sgroup) < 2 then 
+			Cmd_Move(table_WehrmachtEpsilon[i].sgroup, table_WehrmachtEpsilon[i].location3, true)
+			SGroup_SetMoveType(table_WehrmachtEpsilon[i].sgroup, MOVETYPE.FAST)
+			AddToTable(table_WehrmachtEpsilon[i].sgroup, table_WehrmachtEpsilon[i].location3,  table_WehrmachtEpsilon[i].facing3)
+			table_WehrmachtEpsilon[i].g_WehrmachtEpsilonArrived0 = false
+			table_WehrmachtEpsilon[i].g_WehrmachtEpsilonArrived1 = false
+			table_WehrmachtEpsilon[i].g_WehrmachtEpsilonArrived2 = false
+		end 
+	end
+end
+
+--Building, Location, building
+function Rule_WehrmachtZeta()
+	for i = 1, table.getn(table_WehrmachtZeta) do
+		if table_WehrmachtZeta[i].g_WehrmachtZetaArrived0 == true then
+			if (EGroup_GetAvgHealth(table_WehrmachtZeta[i].building1) < table_WehrmachtZeta[i].b1health) then	
+				print("Moving Zeta to attack")
+				Cmd_UngarrisonSquad(table_WehrmachtZeta[i].sgroup, Marker_GetPosition(table_WehrmachtZeta[i].location1), true)
+				--Cmd_Move(table_WehrmachtZeta[i].sgroup, table_WehrmachtZeta[i].location1)
+				Cmd_Retreat(table_WehrmachtZeta[i].sgroup,  Marker_GetPosition(table_WehrmachtZeta[i].location1))
+				AddToTable(table_WehrmachtZeta[i].sgroup, table_WehrmachtZeta[i].location1,  table_WehrmachtZeta[i].facing1)
+				SGroup_SetMoveType(table_WehrmachtZeta[i].sgroup, MOVETYPE.FAST)
+				table_WehrmachtZeta[i].g_WehrmachtZetaArrived0 = false
+				table_WehrmachtZeta[i].g_WehrmachtZetaArrived1 = true
+			end 
+		end			
+		if table_WehrmachtZeta[i].g_WehrmachtZetaArrived1 == true then 
+			if SGroup_TotalMembersCount(table_WehrmachtZeta[i].sgroup) < 2 then
+				Cmd_Garrison(table_WehrmachtZeta[i].sgroup, table_WehrmachtZeta[i].building1, true, true)
+				SGroup_SetMoveType(table_WehrmachtZeta[i].sgroup, MOVETYPE.FAST)
+				table_WehrmachtZeta[i].g_WehrmachtZetaArrived0 = false
+				table_WehrmachtZeta[i].g_WehrmachtZetaArrived1 = false
+			end 
+		end
+	end
+end
+
+--location, Location(capture), final
+function Rule_WehrmachtEta()
+	for i = 1, table.getn(table_WehrmachtEta) do
+		if table_WehrmachtEta[i].g_WehrmachtEtaArrived0 == true then
+			if g_ChurchCaptured == true then
+				Cmd_Move(table_WehrmachtEta[i].sgroup, table_WehrmachtEta[i].location1)
+				print("Moving Eta to attack")
+				SGroup_SetMoveType(table_WehrmachtEta[i].sgroup, MOVETYPE.FAST)
+				AddToTable(table_WehrmachtEta[i].sgroup, table_WehrmachtEta[i].location1,  table_WehrmachtEta[i].facing1)
+				table_WehrmachtEta[i].g_WehrmachtEtaArrived0 = false
+				table_WehrmachtEta[i].g_WehrmachtEtaArrived1 = true
+			end
+		end 
+		if table_WehrmachtEta[i].g_WehrmachtEtaArrived1 == true then 
+			if Player_OwnsEGroup(player1, table_WehrmachtEta[i].building1) == false then
+				Cmd_Garrison(table_WehrmachtEta[i].sgroup, table_WehrmachtEta[i].building1, true, true)
+				table_WehrmachtEta[i].g_WehrmachtEtaArrived0 = false
+				table_WehrmachtEta[i].g_WehrmachtEtaArrived1 = true
+			else 
+				Cmd_AttackMoveThenCapture(table_WehrmachtEta[i].sgroup, table_WehrmachtEta[i].capture, true)
+				table_WehrmachtEta[i].g_WehrmachtEtaArrived0 = false
+				table_WehrmachtEta[i].g_WehrmachtEtaArrived1 = true
+			end
+		end 
+	end
+end
+
+--building, location, final
+function Rule_WehrmachtTheta()
+	for i = 1, table.getn(table_WehrmachtTheta) do
+		if table_WehrmachtTheta[i].g_WehrmachtThetaArrived0 == true then
+			if Player_AreSquadsNearMarker(player1, table_WehrmachtTheta[i].trigger1, ANY) then
+				Cmd_UngarrisonSquad(table_WehrmachtTheta[i].sgroup, Marker_GetPosition(table_WehrmachtTheta[i].trigger1), true)		
+				--SGroup_SetAutoTargetting(table_WehrmachtTheta[i].sgroup, "hardpoint_01", true)
+				print("Moving Theta to attack")
+				Player_GetAllSquadsNearMarker(player1, table_WehrmachtTheta[i].agroup, table_WehrmachtTheta[i].trigger1) 
+				Cmd_Attack(table_WehrmachtTheta[i].sgroup, table_WehrmachtTheta[i].agroup, true)
+				SGroup_SetMoveType(table_WehrmachtTheta[i].sgroup, MOVETYPE.FAST)
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived0 = false
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived1 = true
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived2 = false
+			elseif (EGroup_GetAvgHealth(table_WehrmachtTheta[i].building1) <= 0.91) and table_WehrmachtTheta[i].g_WehrmachtThetaArrived0 == true then	
+				Cmd_UngarrisonSquad(table_WehrmachtTheta[i].sgroup, Marker_GetPosition(table_WehrmachtTheta[i].trigger1), true)			
+				Player_GetAllSquadsNearMarker(player1, table_WehrmachtTheta[i].agroup, table_WehrmachtTheta[i].trigger1) 
+				Cmd_Attack(table_WehrmachtTheta[i].sgroup, table_WehrmachtTheta[i].agroup, true)
+				SGroup_SetMoveType(table_WehrmachtTheta[i].sgroup, MOVETYPE.FAST)
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived0 = false
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived1 = true
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived2 = false
+			end
+		end
+		if table_WehrmachtTheta[i].g_WehrmachtThetaArrived1 == true then 
+			if SGroup_TotalMembersCount(table_WehrmachtTheta[i].sgroup) < 3 then
+				--Cmd_Move(table_WehrmachtTheta[i].sgroup, table_WehrmachtTheta[i].location1)
+				Cmd_Retreat(table_WehrmachtTheta[i].sgroup,  Marker_GetPosition(table_WehrmachtTheta[i].location1))
+				SGroup_SetMoveType(table_WehrmachtTheta[i].sgroup, MOVETYPE.FAST)
+				AddToTable(table_WehrmachtTheta[i].sgroup, table_WehrmachtTheta[i].location1, table_WehrmachtTheta[i].facing1)
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived0 = false
+				print("setting 2 g_WehrmachtThetaArrived0 to FALSE")
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived1 = false
+				print("setting 2 g_WehrmachtThetaArrived1 to FALSE")
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived2 = true
+				print("setting 2 g_WehrmachtThetaArrived2 to TRUE")
+			elseif Player_AreSquadsNearMarker(player1, table_WehrmachtTheta[i].trigger1, ANY) == false then	
+				Cmd_Garrison(table_WehrmachtTheta[i].sgroup, table_WehrmachtTheta[i].building1)
+				SGroup_SetMoveType(table_WehrmachtTheta[i].sgroup, MOVETYPE.FAST)
+				print("Move Theta back to start")
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived0 = true
+				print("setting 1 g_WehrmachtThetaArrived0 to TRUE")
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived1 = false
+				print("setting 1 g_WehrmachtThetaArrived1 to FALSE")	
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived2 = false
+				print("setting 1 g_WehrmachtThetaArrived2 to FALSE")
+			end
+		end 		
+		if table_WehrmachtTheta[i].g_WehrmachtThetaArrived2 == true then 
+			if SGroup_TotalMembersCount(table_WehrmachtTheta[i].sgroup) < 2 then
+				SGroup_SetMoveType(table_WehrmachtTheta[i].sgroup, MOVETYPE.FAST)
+				--Cmd_Move(table_WehrmachtTheta[i].sgroup, table_WehrmachtTheta[i].location2)
+				Cmd_Retreat(table_WehrmachtTheta[i].sgroup,  Marker_GetPosition(table_WehrmachtTheta[i].location2))
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived0 = false
+				print("setting 3 g_WehrmachtThetaArrived0 to FALSE")
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived1 = false
+				print("setting 3 g_WehrmachtThetaArrived1 to FALSE")
+				table_WehrmachtTheta[i].g_WehrmachtThetaArrived2 = false
+				print("setting 3 g_WehrmachtThetaArrived2 to FALSE")
+			end
+		end 
+	end
+end
+
+function Rule_WehrmachtIota()
+	for i = 1, table.getn(table_WehrmachtIota) do	
+		if table_WehrmachtIota[i].g_WehrmachtIotaArrived0 == true then 		
+			if SGroup_TotalMembersCount(table_WehrmachtIota[i].sgroup) < 3 then
+				Cmd_Garrison(table_WehrmachtIota[i].sgroup, table_WehrmachtIota[i].building1, true, true)
+				table_WehrmachtIota[i].b1health = EGroup_GetAvgHealth(table_WehrmachtIota[i].building1)
+				print("Move 1 to location 1")
+				table_WehrmachtIota[i].g_WehrmachtIotaArrived0 = false
+				print("setting 1 g_WehrmachtIotaArrived0 to FALSE")
+				table_WehrmachtIota[i].g_WehrmachtIotaArrived1 = true
+				print("setting 1 g_WehrmachtIotaArrived1 to TRUE")
+				table_WehrmachtIota[i].g_WehrmachtIotaArrived2 = false
+				print("setting 1 g_WehrmachtIotaArrived2 to FALSE")					
+			end
+		end			
+		if table_WehrmachtIota[i].g_WehrmachtIotaArrived1 == true then			
+			if (EGroup_GetAvgHealth(table_WehrmachtIota[i].building1) < table_WehrmachtIota[i].b1health) then
+				Cmd_UngarrisonSquad(table_WehrmachtIota[i].sgroup, Marker_GetPosition(table_WehrmachtIota[i].location1), true)	
+				print("Unloading Iota")
+				--Cmd_Move(table_WehrmachtIota[i].sgroup, table_WehrmachtIota[i].location1)
+				Cmd_Retreat(table_WehrmachtIota[i].sgroup,  Marker_GetPosition(table_WehrmachtIota[i].location1))
+				SGroup_SetMoveType(table_WehrmachtIota[i].sgroup, MOVETYPE.FAST)
+				AddToTable(table_WehrmachtIota[i].sgroup, table_WehrmachtIota[i].location1,  table_WehrmachtIota[i].facing2)
+				print("Move Iota to location1")			
+				table_WehrmachtIota[i].g_WehrmachtIotaArrived0 = false
+				print("setting 3 g_WehrmachtIotaArrived0 to FALSE")
+				table_WehrmachtIota[i].g_WehrmachtIotaArrived1 = false
+				print("setting 3 g_WehrmachtIotaArrived1 to FALSE")
+				table_WehrmachtIota[i].g_WehrmachtIotaArrived2 = true
+				print("setting 3 g_WehrmachtIotaArrived2 to TRUE")
+			end
+		end		
+		if table_WehrmachtIota[i].g_WehrmachtIotaArrived2 == true then
+			if SGroup_TotalMembersCount(table_WehrmachtIota[i].sgroup) < 2 then
+				--Cmd_Move(table_WehrmachtIota[i].sgroup, table_WehrmachtIota[i].location2)
+				Cmd_Retreat(table_WehrmachtIota[i].sgroup,  Marker_GetPosition(table_WehrmachtIota[i].location2))
+				print("Garrison 2 to building 2")
+				table_WehrmachtIota[i].g_WehrmachtIotaArrived0 = false
+				print("setting 2 g_WehrmachtIotaArrived0 to FALSE")
+				table_WehrmachtIota[i].g_WehrmachtIotaArrived1 = false
+				print("setting 2 g_WehrmachtIotaArrived1 to FALSE")
+				table_WehrmachtIota[i].g_WehrmachtIotaArrived2 = false
+				print("setting 2 g_WehrmachtIotaArrived2 to FALSE")
+			end
+		end
+	end
+end
+
+--reinforcers
+function Rule_WehrmachtKappa()
+	for i = 1, table.getn(table_WehrmachtKappa) do
+		if table_WehrmachtKappa[i].g_WehrmachtKappaArrived0 == true then
+			if SGroup_IsUnderAttack(table_WehrmachtKappa[i].sgroup, ANY, 1) then
+				SGroup_SuggestPosture(table_WehrmachtKappa[i].sgroup, table_WehrmachtKappa[i].posture1, -1)
+				print("Moving Kappa to attack")
+				table_WehrmachtKappa[i].g_WehrmachtKappaArrived0 = false
+				table_WehrmachtKappa[i].g_WehrmachtKappaArrived1 = true
+				table_WehrmachtKappa[i].g_WehrmachtKappaArrived2 = false
+			end
+		end
+		if table_WehrmachtKappa[i].g_WehrmachtKappaArrived1 == true then
+			if SGroup_TotalMembersCount(table_WehrmachtKappa[i].sgroup) < 3 then
+				--Cmd_Move(table_WehrmachtKappa[i].sgroup, table_WehrmachtKappa[i].location1)
+				Cmd_Retreat(table_WehrmachtKappa[i].sgroup,  Marker_GetPosition(table_WehrmachtKappa[i].location1))
+				AddToTable(table_WehrmachtKappa[i].sgroup, table_WehrmachtKappa[i].location1,  table_WehrmachtKappa[i].facing2)
+				print("Moving Kappa to location1")
+				table_WehrmachtKappa[i].g_WehrmachtKappaArrived0 = false
+				table_WehrmachtKappa[i].g_WehrmachtKappaArrived1 = false
+				table_WehrmachtKappa[i].g_WehrmachtKappaArrived2 = true
+			end	
+		end
+		if table_WehrmachtKappa[i].g_WehrmachtKappaArrived2 == true then
+			if SGroup_TotalMembersCount(table_WehrmachtKappa[i].sgroup) < 2 then
+				--Cmd_Move(table_WehrmachtKappa[i].sgroup, table_WehrmachtKappa[i].location2)
+				Cmd_Retreat(table_WehrmachtKappa[i].sgroup,  Marker_GetPosition(table_WehrmachtKappa[i].location2))
+				print("Moving Kappa to final")
+				table_WehrmachtKappa[i].g_WehrmachtKappaArrived0 = false
+				table_WehrmachtKappa[i].g_WehrmachtKappaArrived1 = false
+				table_WehrmachtKappa[i].g_WehrmachtKappaArrived2 = false
+			end	
+		end 
+	end
+end
+
+--Item droppers
+function Rule_WehrmachtLamda()
+	for i = 1, table.getn(table_WehrmachtLamda) do
+		if table_WehrmachtLamda[i].g_WehrmachtLamdaArrived0 == true then
+			if Player_AreSquadsNearMarker(player1, table_WehrmachtLamda[i].trigger1, ANY) then
+				--Cmd_Move(table_WehrmachtLamda[i].sgroup, table_WehrmachtLamda[i].location1)
+				Cmd_Retreat(table_WehrmachtLamda[i].sgroup,  Marker_GetPosition(table_WehrmachtLamda[i].location1))
+				print("Moving Lamda to attack")
+				table_WehrmachtLamda[i].g_WehrmachtLamdaArrived0 = false
+				table_WehrmachtLamda[i].g_WehrmachtLamdaArrived1 = true
+			end
+		end
+		if table_WehrmachtLamda[i].g_WehrmachtLamdaArrived1 == true then
+			if SGroup_TotalMembersCount(table_WehrmachtLamda[i].sgroup) == 0 then
+				print("Lamda dropping item")
+				table_WehrmachtLamda[i].g_WehrmachtLamdaArrived0 = false
+				table_WehrmachtLamda[i].g_WehrmachtLamdaArrived1 = false
+			end
+		end
+	end
+end
+function Rule_MG42Alpha()	
+	for i = 1, table.getn(table_MG42Alpha) do
+		if SGroup_TotalMembersCount(table_MG42Alpha[i].sgroup) == 1 then
+			Cmd_Move(table_MG42Alpha[i].sgroup, table_MG42Alpha[i].location1)
+			AddToTable(table_MG42Alpha[i].sgroup, table_MG42Alpha[i].location1, table_MG42Alpha[i].facing2)
+		end
+		if SGroup_IsDoingAttack(table_MG42Alpha[2].sgroup, ANY, 1) and g_Ambient7 == nil then 
+			Util_StartIntel(EVENTS.Ambient7)
+			g_Ambient7 = 1
+		end
+		if SGroup_TotalMembersCount(table_MG42Alpha[i].sgroup) <= 2 and SGroup_CountSpawned(table_MG42Alpha[i].sgroup) > 0 then
+			Cmd_AbandonTeamWeapon(table_MG42Alpha[i].sgroup, false)
+
+			Cmd_Move(table_MG42Alpha[i].sgroup, Marker_Final, true)
+			--print("moving 50mm to final destination")
+			SGroup_SetMoveType(table_MG42Alpha[i].sgroup, MOVETYPE.FAST)
+		end
+	
+	end
+end
+	
+function Rule_PanzerfaustAlpha()
+	for i = 1, table.getn(table_PanzerfaustAlpha) do	
+		if table_PanzerfaustAlpha[i].g_PanzerfaustAlphaArrived0 == true then
+			if SGroup_TotalMembersCount(table_PanzerfaustAlpha[i].sgroup) < 2 then
+				Cmd_Move(table_PanzerfaustAlpha[i].sgroup, table_PanzerfaustAlpha[i].location1)
+				AddToTable(table_PanzerfaustAlpha[i].sgroup, table_PanzerfaustAlpha[i].location1,  table_PanzerfaustAlpha[i].facing2)
+				table_PanzerfaustAlpha[i].g_PanzerfaustAlphaArrived0 = false
+			end
+		end
+	end
+end
+
+function Rule_PanzerfaustBeta()
+	for i = 1, table.getn(table_PanzerfaustBeta) do	
+		if table_PanzerfaustBeta[i].g_PanzerfaustBetaArrived0 == true then
+			if g_ChurchCaptured == true then
+				Cmd_Garrison(table_PanzerfaustBeta[i].sgroup, table_PanzerfaustBeta[i].building1)
+				table_PanzerfaustBeta[i].b1health = EGroup_GetAvgHealth(table_PanzerfaustBeta[i].building1)
+				table_PanzerfaustBeta[i].g_PanzerfaustBetaArrived0 = false
+				print("g_PanzerfaustBetaArrived0 set to false")
+				table_PanzerfaustBeta[i].g_PanzerfaustBetaArrived1 = true
+				print("g_PanzerfaustBetaArrived1 set to true initial")
+			end
+			if table_PanzerfaustBeta[i].g_PanzerfaustBetaArrived1 == true then
+				print("g_PanzerfaustBetaArrived1 set to true")
+				if (EGroup_GetAvgHealth(table_PanzerfaustBeta[i].building1) < table_PanzerfaustBeta[i].b1health) then
+					print("getting ready to unload Beta")
+					Cmd_UngarrisonSquad(table_PanzerfaustBeta[i].sgroup, Marker_GetPosition(table_PanzerfaustBeta[i].location1), true)
+					print("unloading Panzerfaust Beta")
+					Cmd_Move(table_PanzerfaustBeta[i].sgroup, table_PanzerfaustBeta[i].location1, true)	
+					table_PanzerfaustBeta[i].g_PanzerfaustBetaArrived0 = false
+					table_PanzerfaustBeta[i].g_PanzerfaustBetaArrived1 = false
+				end
+			end	
+		end
+	end
+end
+
+function Rule_FiftyMMAlpha()	
+	for i = 1, table.getn(table_FiftyMMAlpha) do
+		--Player_GetAllSquadsNearMarker(player1, table_FiftyMMAlpha[i].agroup, table_FiftyMMAlpha[i].trigger) 
+		if EGroup_GetAvgHealth(table_FiftyMMAlpha[i].target) < 0.99 then
+			EGroup_Kill(table_FiftyMMAlpha[i].target)
+		end
+		if SGroup_IsDoingAttack(table_FiftyMMAlpha[i].sgroup, ANY, 1) and g_Ambient1 == false then 
+			EventCue_Create(CUE.NORMAL, 42806, 42806, table_FiftyMMAlpha[i].sgroup)
+			Util_StartIntel(EVENTS.Ambient1)
+			local pos = SGroup_GetPosition_EVEN_IF_EMPTY(table_FiftyMMAlpha[i].sgroup)
+			FOW_RevealArea(pos, 4, 8)
+			--FOW_RevealSGroupOnly(table_FiftyMMAlpha[i].sgroup, 5)
+			g_Ambient1 = true 
+		end
+		if SGroup_IsDoingAttack(table_FiftyMMAlpha[i].sgroup, ANY, 1) then 
+			--FOW_RevealSGroupOnly(table_FiftyMMAlpha[i].sgroup, 5)
+			local pos = SGroup_GetPosition_EVEN_IF_EMPTY(table_FiftyMMAlpha[i].sgroup)
+			FOW_RevealArea(pos, 4, 8)
+		end
+		if table_FiftyMMAlpha[i].phase == 0  then			
+			SGroup_SetAutoTargetting(table_FiftyMMAlpha[i].sgroup, "hardpoint_01", false)
+			if Player_CanSeeSGroup(player1, table_FiftyMMAlpha[i].sgroup, ANY) and EGroup_GetAvgHealth(table_FiftyMMAlpha[i].target) == 1 and SGroup_CountSpawned(table_FiftyMMAlpha[i].sgroup) > 0 then 
+				Cmd_Attack(table_FiftyMMAlpha[i].sgroup, EGroup_GetPosition_EVEN_IF_EMPTY(table_FiftyMMAlpha[i].target), nil, true)
+			end
+			if EGroup_GetAvgHealth(table_FiftyMMAlpha[i].target) < 0.99 then
+				Cmd_Stop(table_FiftyMMAlpha[i].sgroup)
+				SGroup_SetAutoTargetting(table_FiftyMMAlpha[i].sgroup, "hardpoint_01", true)
+				table_FiftyMMAlpha[i].phase = 1
+			end
+		end
+		--print("Cycle: "..i)
+		if table_FiftyMMAlpha[i].phase == 1  then
+			
+			if SGroup_CountSpawned(table_FiftyMMAlpha[i].agroup) > 0 then 
+				--print("Count OK")
+				--Cmd_Attack(table_FiftyMMAlpha[i].sgroup, table_FiftyMMAlpha[i].agroup, nil, true)
+				table_FiftyMMAlpha[i].phase = 2
+			else
+				table_FiftyMMAlpha[i].phase = 2
+			end
+		end
+		if SGroup_TotalMembersCount(table_FiftyMMAlpha[i].sgroup) <= 2 and SGroup_CountSpawned(table_FiftyMMAlpha[i].sgroup) > 0 then
+			Cmd_AbandonTeamWeapon(table_FiftyMMAlpha[i].sgroup)
+			Cmd_Move(table_FiftyMMAlpha[i].sgroup, table_FiftyMMAlpha[i].location2, true)
+			--print("moving 50mm to final destination")
+			SGroup_SetMoveType(table_FiftyMMAlpha[i].sgroup, MOVETYPE.FAST)
+		end
+	end
+end
+
+function Rule_SniperAlpha()
+	for i = 1, table.getn(table_SniperAlpha) do	
+		if table_SniperAlpha[i].g_SniperAlphaArrived0 == true then
+			if g_ChurchCaptured == true then
+				Cmd_Garrison(table_SniperAlpha[i].sgroup, table_SniperAlpha[i].building1)
+				table_SniperAlpha[i].b1health = EGroup_GetAvgHealth(table_SniperAlpha[i].building1)
+				table_SniperAlpha[i].g_SniperAlphaArrived0 = false
+				print("g_SniperAlphaArrived0 set to false")
+				table_SniperAlpha[i].g_SniperAlphaArrived1 = true
+				print("g_SniperAlphaArrived1 set to true initial")
+			end
+			if table_SniperAlpha[i].g_SniperAlphaArrived1 == true then
+				print("g_SniperAlphaArrived1 set to true")
+				if (EGroup_GetAvgHealth(table_SniperAlpha[i].building1) < table_SniperAlpha[i].b1health) then
+					print("getting ready to unload Beta")
+					Cmd_UngarrisonSquad(table_SniperAlpha[i].sgroup, Marker_GetPosition(table_SniperAlpha[i].location1), true)
+					print("unloading Panzerfaust Beta")
+					Cmd_Move(table_SniperAlpha[i].sgroup, table_SniperAlpha[i].location2, true)
+					table_SniperAlpha[i].g_SniperAlphaArrived0 = false
+					table_SniperAlpha[i].g_SniperAlphaArrived1 = false
+				end
+			end	
+		end
+	end
+end
+
+function Rule_BMWBeta()
+	for i = 1, table.getn(table_BMWBeta) do	
+		if Prox_ArePlayersNearMarker(player1, table_BMWBeta[i].trigger, ANY) then 
+			Cmd_Move(table_BMWBeta[i].sgroup, sg_AllyTownHall)
+		elseif  Prox_AreSquadMembersNearMarker(table_BMWBeta[i].sgroup, table_BMWBeta[i].location1, ANY) == false then
+			Cmd_Move(table_BMWBeta[i].sgroup, table_BMWBeta[i].location1)
+		end
+		if SGroup_GetAvgHealth(table_BMWBeta[i].sgroup) < 0.80 then 
+
+			Cmd_CriticalHit(player2, table_BMWBeta[i].sgroup, CRIT.VEH.CONTROL_FAST, CRIT.DAMAGE_GREEN)
+		end
+	end
+end
+
+function Rule_ConstantAxis()
+	Player_GetAllSquadsNearMarker(player1, sg_AbleCompany, Marker_Carentan) 
+	SGroup_Filter(sg_AbleCompany, {SBP.ALLIES.MORTAR, SBP.ALLIES.SNIPER}, FILTER_KEEP) 
+	if SGroup_CountSpawned(sg_AbleCompany) > 0  then
+		if SGroup_TotalMembersCount(ConstantAxis) == 0 and g_AttackMortar == nil then 
+			Timer_Start("Timer_AttackMortar", 50)
+			g_AttackMortar = 1
+		end 
+		if SGroup_TotalMembersCount(ConstantAxis) == 0 and Timer_GetRemaining("Timer_AttackMortar") == 0 and g_AttackMortar == 1 then
+			Util_CreateSquadsAtMarker(player2, ConstantAxis, SBP.ELITE.FALLSCHIRMJAGER, Marker_AxisConstantSpawn, 1, 3) 
+			g_AttackMortar = 1
+		end
+		if SGroup_CountSpawned(ConstantAxis) == 0 and g_AttackMortar == 1 then
+			g_AttackMortar = nil
+		end
+		
+		if SGroup_TotalMembersCount(ConstantAxis) > 1 and g_AttackMortar == 1 then
+			if SGroup_CountSpawned(sg_AbleCompany) > 0 then
+				Cmd_Attack(ConstantAxis, sg_AbleCompany, false)
+			elseif Player_OwnsEGroup(player2, ResourcePoint3) == false then
+				Cmd_AttackMoveThenCapture(ConstantAxis, ResourcePoint3)
+			elseif Player_OwnsEGroup(player2, ResourcePoint1) == false then 
+				Cmd_AttackMoveThenCapture(ConstantAxis, ResourcePoint1)
+			elseif Player_OwnsEGroup(player1, Blg_Church) == false then 
+				Cmd_Garrison(ConstantAxis, Blg_Church) 
+			end
+		elseif 	SGroup_TotalMembersCount(ConstantAxis) == 1 then 
+			Cmd_Move(ConstantAxis, Marker_Final)
+		end
+	end
+end
+
+-----------------------------------------------------Ambient Speech------------------------------------------------------------------------
+
+function Rule_AmbientSpeech()
+--~ if EGroup_Count(Blg_Statue) == 0 and g_Ambient1 == false then
+--~ 	Util_StartIntel(EVENTS.Ambient1)
+--~ 	g_Ambient1 = true 
+--~ end
+	if SGroup_CountSpawned(sg_AllyTownHall) > 0 and g_EnterTownHall == nil then 
+		g_EnterTownHall = 1
+	end
+	if (Player_AreSquadsNearMarker(player1, TriggerPath14) or Player_AreSquadsNearMarker(player1, Trigger_BarbWire2)) and g_Ambient2 == false and g_EnterTownHall == nil then
+		Util_StartIntel(EVENTS.Ambient2)
+		g_Ambient2 = true 
+	end
+	if Player_AreSquadsNearMarker(player1, Trigger_Ambient3) and g_Ambient3 == false then
+		--Util_StartIntel(EVENTS.Ambient3)
+		g_Ambient3 = true 
+	end
+end
+
+-----------------------------------------------------Player Reinforcement------------------------------------------------------------------------
+function Rule_Game()
+	if SGroup_CountSpawned(sg_AxisGame) == 0 then 
+		local value2 = World_GetRand(1, table.getn(table_RandomUnitB))
+		local unittype2 = table_RandomUnitB[value2]
+		Util_CreateSquadsAtMarkerFacing(player2, sg_AxisGame, unittype2, Marker_AxisConstantSpawn, north, 1) 
+	end
+	if SGroup_CountSpawned(sg_AxisGame) > 2 then 
+		if SGroup_CountSpawned(sg_AllyTownHall) > 0 then 
+			Cmd_AttackMove(sg_AxisGame, sg_AllyTownHall) 
+		end
+	else
+		Cmd_Move(sg_AxisGame, Marker_Final)
+	end
+end
+	
+function Rule_AbleReinforcements()
+	--print(SGroup_CountSpawned(sg_AllyTownHall))
+--~ if SGroup_CountSpawned(sg_AllyTownHall) > 0 then 
+--~ 	Util_StartIntel(EVENTS.NoReinforcement)
+--~ 	Rule_AddInterval(Rule_Game, 1)
+--~ 	Rule_RemoveMe()
+--~ end
+	if Player_GetUnitCount(player1) < 7 and g_Reinforcement ==  false and v_reinforcementcount < maxreinforcement then
+		Player_SetAbilityAvailability(player1, ABILITY_REINFORCEMENTS_M03, ITEM_DEFAULT)
+		v_reinforcementcount = v_reinforcementcount + 1
+		--Cmd_InstantUpgrade(player1, UPGRADE_REINFORCEMENTS_M03)
+		UI_FlashAbilityButton(ABILITY_REINFORCEMENTS_M03, true, BT_UI_Weak_AbilityBtn )
+		Util_StartIntel(EVENTS.Reinforcement)
+		g_Reinforcement = true
+	end
+	if Player_GetUnitCount(player1) > 6 and g_Reinforcement == true then
+		Player_SetAbilityAvailability(player1, ABILITY_REINFORCEMENTS_M03, ITEM_REMOVED)
+		--Cmd_InstantUpgrade(player1, UPGRADE_REINFORCEMENTS_M03)
+		g_Reinforcement = false
+	end
+	Player_GetAll(player1)
+	
+	if SGroup_CountSpawned(sg_allsquads) == 0 and v_reinforcementcount == maxreinforcement then 
+--~ 	if g_medalstart == 1 then 
+--~ 		Objective_Fail(MEDALOBJECTIVE)
+--~ 	end
+--~ 	if g_secondarystarted == 1 then 
+--~ 		Objective_Fail(OBJECTIVESECONDARY)
+--~ 	end
+--~ 	if g_objective3start == 1 then
+--~ 		Objective_Fail(OBJECTIVE3)
+--~ 	end
+		Game_EndSP(false, nil, true)
+	end
+end	
+	
+-----------------------------------------Hint Points--------------------------------------------------------------------------------------
+function HintPoint_CafeNormandie()
+	HintPoint_CafeNormandieID = HintPoint_Add(Blg_CafeNormandie, true, 239100)
+end
+function HintPoint_UpgradeBarracks()
+	--HintPoint_CafeNormandieID = HintPoint_AddToProductionButton(Blg_CafeNormandie, true, 239100)
+end
+function HintPoint_FireUp()
+	HintPoint_FireUpID = HintPoint_Add(sg_AllyPinned, true, 239111)
+end
+function HintPoint_Bazooka()
+	HintPoint_BazookaID = HintPoint_Add(Bazooka1, true, 239101)
+end
+
+function HintPoint_SecurePoint()
+	HintPoint_SecurePointID = HintPoint_Add(ResourcePoint1, true, 239118)
+end
+function HintPoint_SecurePoint3()
+	HintPoint_SecurePoint3ID = HintPoint_Add(ResourcePoint3, true, 239118)
+end
+
+function HintPoint_Church1a()
+	HintPoint_Church1aID = HintPoint_Add(mkr_Hintpoint_Church, true, 239112)
+end
+
+function HintPoint_Church1()
+	HintPoint_Church1ID = HintPoint_Add(mkr_Hintpoint_Church, true, 239103)
+end
+function HintPoint_Church1b()
+	HintPoint_Church1bID = HintPoint_Add(Marker_B10, true, 239113)-- cahgne to middle of area
+end
+function HintPoint_Church3()
+	HintPoint_Church3ID = HintPoint_Add(mkr_Hintpoint_Church, true, 239117)
+end
+function HintPoint_BarbWire1()
+	HintPoint_BarbWire1ID = HintPoint_Add(Entity_Wire1,  false, 239105)
+end
+function HintPoint_BarbWire2()
+	HintPoint_BarbWire2ID = HintPoint_Add(Entity_Wire2, false, 239106)
+end
+function HintPoint_BarbWire1a()
+	HintPoint_BarbWire1aID = HintPoint_Add(Entity_Wire1, false, 239107)
+end
+function HintPoint_BarbWire2a()
+	HintPoint_BarbWire2aID = HintPoint_Add(Entity_Wire2, false, 239108)
+end
+function HintPoint_Church2()
+	HintPoint_Church2ID = HintPoint_Add(mkr_Hintpoint_Church, true, 239104)
+end
+function HintPoint_TownHall1()
+	HintPoint_TownHall1ID = HintPoint_Add(Blg_TownHall,  true, 239109)
+end
+function HintPoint_TownHall1a()
+	HintPoint_TownHall1aID = HintPoint_Add(Blg_TownHall,  true, 239109)
+end
+function HintPoint_RemoveCafeNormandie(hpid)
+	HintPoint_Remove(HintPoint_CafeNormandieID)
+end
+
+function HintPoint_RemoveChurch1(hpid)
+	HintPoint_Remove(HintPoint_Church1ID)
+end
+
+function HintPoint_RemoveBarbWire1(hpid)
+	HintPoint_Remove(HintPoint_BarbWire1ID)
+end
+
+function HintPoint_RemoveBarbWire2(hpid)
+	HintPoint_Remove(HintPoint_BarbWire2ID)
+end
+
+function HintPoint_RemoveBazooka(hpid)
+	HintPoint_Remove(HintPoint_BazookaID)
+end
+
+function HintPoint_RemoveResourcePoint1(hpid)
+	HintPoint_Remove(HintPoint_ResourcePoint1ID)
+end
+
+function DoNothing()
+end
+
+-----------------------------------------Territory Markers--------------------------------------------------------------------------------------
+
+-----------------------------------------Mission Complete--------------------------------------------------------------------------------------
+
+function Rule_MissionComplete()
+end
+
+---------------------------------------Event Cues--------------------------------------------------------------------------------------------
+
+function EventCue_Reinforcements()
+	Camera_FocusOnTargetPos(g_AblePosition)
+end
+
+-- TEMPORARY
+function EGroup_Kill(group)
+	local _KillEntity = function (gid, idx, eid)
+		Entity_Kill(eid)
+	end
+	EGroup_ForEach(group, _KillEntity)
+end
+
+function SGroup_IsAttacking(group, all)
+	local _CheckSquad = function(gid, idx, sid)
+		if (Squad_GetActiveCommand(sid) == SQUADSTATEID_Combat) then
+			return true
+		else
+			return false
+		end
+	end
+	return SGroup_ForEachAllOrAny(group, all, _CheckSquad)
+end

@@ -1,0 +1,6583 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+-- Mission Name
+
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+import("ScarUtil.scar")
+
+
+-------------------------------------------------------------------------
+
+-- [[ SETUP ]]
+
+-------------------------------------------------------------------------
+
+function OnGameSetup()
+	player1 = Setup_Player(1, 1309030, "allies_commonwealth", 1)
+	player2 = Setup_Player(2, 1309031, "axis", 2)
+	player3 = Setup_Player(3, 1309032, "allies_commonwealth", 1)
+end
+
+function OnGameRestore()
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+	player3 = World_GetPlayerAt(3)
+	
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+end
+
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ ONINIT ]]
+
+-------------------------------------------------------------------------
+
+function OnInit()
+	g_MissionSpeechPath="Caen\\sp2\\Mission1"
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	-- a constant that stores the mission number for use with
+	-- setting the global speech paths, tech tree setup, and 
+	-- the player's starting resources
+	MISSION_NUMBER = 0101
+	
+	Setup_MissionPreset(MISSION_NUMBER)
+	
+	--[[ PRESET GAME STATE ]]
+	AutoCinematic(true, 0)
+
+	--[[ PRESET DEBUG CONDITIONS ]]
+	Authie_Debug()
+	
+	--[[ REGISTER OBJECTIVES ]]
+	Authie_ObjectiveRegister()
+	
+	--[[ MOD INITIAL STATS ]]
+	Authie_ModifyStats()
+	
+	--[[ SET RESTRICTIONS ]]
+	Authie_Restrictions()
+	
+	--[[ SET AI ]]
+	Authie_CpuInit()
+	
+	--[[ SET DIFFICULTY ]]
+	Authie_Difficulty()
+	
+	--[[ MISSION PRESETS ]]
+	Authie_MissionPreset()
+	
+	--[[ GAME START CHECK ]]
+	Rule_Add(Authie_NISStart)
+end
+
+Scar_AddInit(OnInit)
+
+function Authie_Debug()
+	-- looks for the command line option [-debug]
+	if Misc_IsCommandLineOptionSet("debug") then
+		g_debug = true
+	end
+	
+	-- set up bindings for NISes
+	Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(NIS_OPENING)')]])")
+end
+
+function Authie_ObjectiveRegister()
+	Initialize_OBJ_KillPanther()
+	Initialize_OBJ_SetUpBase()
+	Initialize_OBJ_LeftFlank()
+	Initialize_OBJ_RightFlank()
+	Initialize_OBJ_CaptureAuthie()
+	Initialize_OBJ_CaptureWholeMap()
+	
+	-- ally builds emplacements for the player
+	ATGunAlpha_Init()
+	Ally_Init()
+	LightArmour_Init()
+end
+
+function Authie_ModifyStats()
+	Modify_PlayerProductionRate(player1, 3)
+	Modify_PlayerProductionRate(player3, 3)
+	
+	Modify_EntityBuildTime(player1, EBP.CW.HOWITZER_NEST, .35)	
+	Modify_EntityBuildTime(player3, EBP.CW.HOWITZER_NEST, .35)	
+	Modify_EntityBuildTime(player1, EBP.CW.ANTITANK_NEST, .35)	
+	Modify_EntityBuildTime(player3, EBP.CW.ANTITANK_NEST, .35)
+	Modify_EntityBuildTime(player1, EBP.CW.BOFORS_NEST, 0.35)	
+
+	Modify_AbilityRechargeTime(player1, ABILITY.CW.PDR_25_BARRAGE, .35)
+	Modify_AbilityMaxCastRange(player1, ABILITY.CW.PDR_25_BARRAGE, 3)
+end
+
+function Authie_Restrictions()
+	--[[ UN/RESTRICT UPGRADES ]]
+	Player_SetUpgradeAvailability(player1, UPG.CW.CONVERT_AMBIENT_BUILDING, ITEM_REMOVED)
+	Player_SetUpgradeAvailability(player1, UPG.CW.RECON_TEAM, ITEM_DEFAULT)
+	Player_SetUpgradeAvailability(player1, UPG.CW.RIFLE_GRENADE, ITEM_REMOVED)
+	Player_SetUpgradeAvailability(player1, UPG.CW.PIAT, ITEM_REMOVED)
+	Player_SetUpgradeAvailability(player1, UPG.CW.BREN, ITEM_REMOVED)
+	Player_SetUpgradeAvailability(player1, UPG.CW.EXPERT_ENGINEER, ITEM_REMOVED)
+	Player_SetUpgradeAvailability(player1, UPG.CW.DEMOLITIONS, ITEM_REMOVED)
+	Player_SetUpgradeAvailability(player1, UPG.CW.HQ_SPEED, ITEM_REMOVED)
+	Player_SetUpgradeAvailability(player1, UPG.CW.HQ_ECONOMY_BONUS, ITEM_REMOVED)
+	
+	--[[ RESOURCES 
+	Player_SetResource(player1, RT_Manpower, 600)
+	Player_SetResource(player1, RT_Munition, 600)
+	Player_SetResource(player1, RT_Fuel, 200)
+	]]
+	
+	Player_SetResource(player1, RT_Munition, 600)
+	
+	--[[ UN/RESTRICT ABILITIES 	]]
+
+	Player_SetUpgradeAvailability(player1, UPG.CW.ENABLE_MOBILE_HQ, ITEM_REMOVED)
+	UI_BindingSetEnabled("entity_veterancy_menu_button", false)
+	UI_BindingSetEnabled("squad_veterancy_menu_button", false)
+	Player_SetAbilityAvailability(player1, ABILITY.CW.HQ_REINFORCE, ITEM_REMOVED)
+	
+	Player_SetConstructionMenuAvailability(player1, TYPE.CONSTRUCT.CW.TOMMIES, ITEM_REMOVED)
+	
+	-- UN/RESTRICT POP CAP
+	-- UN/RESTRICT POP CAP
+	Player_SetPopCapOverride(player1, 60)
+	Player_SetPopCapOverride(player3, 100)
+	
+	-- COMMANDER TREE
+	UI_ForceCommanderTreeChoice(player1, UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY)
+	
+	--[[ UN/RESTRICT EBPS ]]
+	Player_SetEntityProductionAvailability(player1, EBP.CW.SLITTRENCH_NEST, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.CW.MORTAR_NEST, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.CW.MG_NEST, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.CW.BARBED_WIRE, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.CW.SANDBAG, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.CW.RADIO_BEACON, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.CW.MINES, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.CW.BOFORS_NEST, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.CW.HOWITZER_NEST, ITEM_LOCKED)
+	Player_SetEntityProductionAvailability(player1, EBP.CW.ANTITANK_NEST, ITEM_LOCKED)
+	
+	--[[ UN/RESTRICT SBPS ]]
+	Player_SetSquadProductionAvailability(player1, SBP.CW.FIREFLY, ITEM_REMOVED)
+	Player_SetSquadProductionAvailability(player1, SBP.CW.COMMAND_CROMWELL, ITEM_REMOVED)
+	Player_SetSquadProductionAvailability(player1, SBP.CW.BREN_CARRIER, ITEM_REMOVED)
+	Player_SetSquadProductionAvailability(player1, SBP.CW.STUART, ITEM_REMOVED)
+	Player_SetSquadProductionAvailability(player1, SBP.CW.CAPTAIN, ITEM_REMOVED)
+	
+	-- set up the construction menu callbacks so we can check the status with a variable check
+	UI_SetConstructionMenuCallback(_ConstructionMenuCallback)
+	
+	--[[ UI RESTRICT BINDINGS ]]
+	-- prevent the veterancy menu button from appearing during this mission.
+	UI_BindingSetEnabled("squad_veterancy_menu_button", false)
+end
+
+function Authie_CpuInit()
+	-- no AI in this mission
+end
+
+function Authie_Difficulty()
+	-- get the difficulty
+	g_difficulty = Game_GetSPDifficulty()  -- set a global difficulty variable
+
+	Setup_Difficulty(player1, g_difficulty) -- pass the player and difficulty global variable into the Set Health function
+	Setup_Difficulty(player2, g_difficulty) -- do it for each player that you have defined
+	Setup_Difficulty(player3, g_difficulty) -- do it for each player that you have defined
+end
+
+
+-------------------------------------------------------------------------
+-- MISSION Preset 
+-------------------------------------------------------------------------
+
+function Authie_MissionPreset()
+	--preventing the player from scuttling his emplacements.
+	UI_BindingSetEnabled("command_retire", false)
+	UI_BindingSetEnabled("command_retire_squad", false)
+	
+	sg_AllyLeftA = SGroup_CreateIfNotFound("sg_AllyLeftA")
+	sg_AxisLeftA = SGroup_CreateIfNotFound("sg_AxisLeftA")
+	sg_AllyLeftB = SGroup_CreateIfNotFound("sg_AllyLeftB")
+	sg_AxisLeftB = SGroup_CreateIfNotFound("sg_AxisLeftB")
+	sg_AllyBuron = SGroup_CreateIfNotFound("sg_AllyBuron")
+	sg_AxisBuron = SGroup_CreateIfNotFound("sg_AxisBuron")
+	sg_AllyAuthie = SGroup_CreateIfNotFound("sg_AllyAuthie")
+	sg_AxisAuthie = SGroup_CreateIfNotFound("sg_AxisAuthie")	
+
+	sg_authie_hmgs = SGroup_CreateTable("sg_authie_hmgs%d", 5)	
+	sg_authie_hmgsAuthie = SGroup_CreateIfNotFound("sg_authie_hmgsAuthie")	
+	
+	eg_CromwellWrecks = EGroup_CreateIfNotFound("eg_CromwellWrecks")
+	
+	-- create misc. temporary groups
+	sg_temp = SGroup_CreateIfNotFound("sg_temp")
+	sg_blah = SGroup_CreateIfNotFound("sg_blah")
+	sg_single = SGroup_CreateIfNotFound("sg_single")
+	eg_temp = EGroup_CreateIfNotFound("eg_temp")
+	eg_blah = EGroup_CreateIfNotFound("eg_blah")
+	eg_single = EGroup_CreateIfNotFound("eg_single")
+	
+	--initialized variables	
+	t_authie = {
+		attacked = 0,
+		HQattacked = 0,
+		GatherLeft1 = 0,
+		GatherLeft2 = 0,
+		GatherMiddle1 = 0,
+		GatherMiddle2 = 0,
+		GatherRight1 = 0,
+		GatherRight2 = 0,
+		hmgHouses = {eg_authie_hmgHouse1, eg_authie_hmgHouse2, eg_authie_hmgHouse3, eg_authie_hmgHouse4, eg_authie_hmgHouse5},
+		tanks = {
+			{sgroup = sg_Cromwell1, marker = mkr_Move1, hint = false},
+			{sgroup = sg_Cromwell2, marker = mkr_Move2, hint = false},
+			{sgroup = sg_Cromwell3, marker = mkr_Move3, hint = false},
+			{sgroup = sg_Cromwell4, marker = mkr_Move4, hint = false},
+		},
+	}
+	
+	-- timer indexes
+	timer_abbeycharge = "AbbeyCharge"
+	timer_fow_plane = "FOWPlane"
+	
+	-- build costs for units
+	cost = {}
+	cost.howitzer	= {mp = 450, mn = 0, fu = 100}
+	cost.atgun		= {mp = 280, mn = 0, fu = 25}
+	
+	-- TEMP fix for bren wreck
+	EGroup_Kill(eg_bren_wreck)
+	
+	-- add fake supply to the starting sector (as we have no real HQ)
+	World_SetDesignerSupply(EGroup_GetPosition(eg_flag_start), true)
+	World_SetDesignerSupply(EGroup_GetPosition(eg_flag_authie), true)
+	
+	
+	--Making some of the building semi invulnerable so that they remain there until the AI spawns units in it.
+	EGroup_SetInvulnerable(eg_ambush_house1, true, 0.3)
+	EGroup_SetInvulnerable(eg_ambush_house2, true, 0.3)
+	EGroup_SetInvulnerable(eg_ambush_house3, true, 0.3)
+	
+	g_middle_flag = false
+	infantryhq_productionqueue = 0
+
+	UI_SetOptionOverride(OPTION_SQUAD_CONTROL, 1)
+	
+	t_LeftFlank_HowitzerFiring = {
+		{{ACTOR.CXP1.Wallis, 1311050}},
+		{{ACTOR.CXP1.Wallis, 1311060}},
+		{{ACTOR.CXP1.Wallis, 1311070}},
+	}
+end
+
+
+-------------------------------------------------------------------------
+-- MISSION START
+-------------------------------------------------------------------------
+
+function Authie_NISStart()
+	Rule_RemoveMe()
+
+	-- UN/RESTRICT UI (has to run a split second after the OnInit)
+	UI_BindingSetEnabled("company_commander", false)
+	UI_EnableResourceTypeKicker(RT_Action, false)
+	
+	-- flatten and hide direction arrows
+	EGroup_SetAnimatorState(eg_helperarrow_howitzer, "arrow_state", "flat")
+	EGroup_SetAnimatorState(eg_helperarrow_atgun, "arrow_state", "flat")	
+	EGroup_SetAnimatorState(eg_helperarrow_bofors, "arrow_state", "flat")
+
+	
+	EGroup_DeSpawn(eg_helperarrow_bofors)
+	EGroup_DeSpawn(eg_helperarrow_howitzer)
+	EGroup_DeSpawn(eg_helperarrow_atgun)
+
+	-- despawn place holders
+	for k,the in pairs(t_authie.tanks) do SGroup_DeSpawn(the.sgroup) end
+	
+	-- out of cinematic
+	AutoCinematic(false, 0.5)
+	
+	-- start the opening NIS
+	Util_StartNIS(EVENTS.NIS01)
+
+	Rule_Add(Authie_PostNIS)
+end
+
+function Authie_PostNIS()
+	if Event_IsAnyRunning() == false then
+		Rule_RemoveMe()
+		
+		-- set game to fullscreen (for when we come out of the NIS)
+		Game_SetMode(UI_Fullscreen)
+		
+		-- respawn the tanks
+		for k,the in pairs(t_authie.tanks) do 
+			SGroup_AddGroup(sg_CromwellAll, the.sgroup)
+			SGroup_ReSpawn(the.sgroup) 
+			Cmd_Move(the.sgroup, the.marker)
+		end
+		
+		-- split the axis infantry into two groups
+		if SGroup_Count(sg_AxisInfantry) >= 1 then
+			SGroup_Add(sg_pantherinfantry1, SGroup_GetSpawnedSquadAt(sg_AxisInfantry, 1))
+		end
+		if SGroup_Count(sg_AxisInfantry) >= 2 then
+			SGroup_Add(sg_pantherinfantry2, SGroup_GetSpawnedSquadAt(sg_AxisInfantry, 2))
+		end
+		
+		-- temporary unit to spawn in building so convert ambient upgrade can be called
+		for k,house in pairs(t_authie.hmgHouses) do 
+			Util_CreateSquads(player2, sg_authie_hmgs[k], SBP.AXIS.HEAVYMG, house) 
+		end
+		SGroup_AddGroup(sg_authie_rallyB_defenders, sg_authie_hmgs[4])
+		
+		Cmd_InstantUpgrade(Blg_StrongHold1, UPG.AXIS.CONVERT_AMBIENT_BUILDING)
+		
+		for i = 1, 4 do 
+			SGroup_AddGroup(sg_authie_hmgsAuthie, sg_authie_hmgs[i])
+		end
+		
+		-- place holder Ally Units
+		CaptureAuthie_Preset()
+		
+		Modify_UnitSpeed(sg_Panther, .8)
+		
+		-- fire off the first objective
+		Objective_Start(OBJ_KillPanther)
+	end
+end
+
+
+-------------------------------------------------------------------------
+-- OBJECTIVE Destroy Panther
+-------------------------------------------------------------------------
+--The player must destroy the Panther to get the next objective.  
+--The Panther will back away if its health hits below a certain threashold
+-------------------------------------------------------------------------
+
+function Initialize_OBJ_KillPanther()
+	OBJ_KillPanther = {
+		SetupUI = function() 
+		end,
+		OnStart = function()
+			Sound_PlayMusic("Music/SP/Caen/Motivation/coh_m01_cue_01.bsc",0,0)
+			Sound_PlayStreamed("Ambiences/Ambiences_Streamed/CXP2/SP/Artillery_Bombardment")
+			Util_StartIntel(EVENTS.KillPanther_Ambush)
+			
+			-- tag as always show
+			Objective_SetAlwaysShowDetails(OBJ_KillPanther, true, false, true)
+			
+			-- reveal FOW on panther
+			FOW_RevealMarker(mkr_fow_killpanther, -1)
+			
+			-- action
+			KillPanther_KickOff()
+			Rule_AddInterval(KillPanther_StartAction, 1)
+		end,
+		OnComplete = function()
+			Sound_PlayMusic("Music/SP/Caen/Preparation/coh_m01_cue_02.bsc",3,0)
+			-- tell the player they did good
+			Util_StartIntel(EVENTS.KillPanther_PantherKilled)
+		end,
+		IsComplete = function()
+		end,
+		OnFail = function()
+			-- tell the player they lost
+		end,
+		Title = 1319200,
+		Description = 1319220,
+		Type = OT_Primary,
+		TitleEnd = 1319240,
+	}
+	-- Register Objective and Initialize Data
+	Objective_Register(OBJ_KillPanther)
+	KillPanther_Init()
+end
+
+-------------------------------------------------------------------------
+-- Kill Panther - Functions 
+-------------------------------------------------------------------------
+
+function KillPanther_Init()
+	sg_CromwellAll = SGroup_CreateIfNotFound("sg_CromwellAll")
+	sg_CromwellPinged = SGroup_CreateIfNotFound("sg_CromwellPinged")
+	
+	sg_pantherinfantry1 = SGroup_CreateIfNotFound("sg_pantherinfantry1")
+	sg_pantherinfantry2 = SGroup_CreateIfNotFound("sg_pantherinfantry2")
+	sg_pantherinfantry3 = SGroup_CreateIfNotFound("sg_pantherinfantry3")
+	sg_pantherinfantry4 = SGroup_CreateIfNotFound("sg_pantherinfantry4")
+	sg_pantherinfantry5 = SGroup_CreateIfNotFound("sg_pantherinfantry5")
+	
+	t_panther_infantry = {
+	
+		{
+			sgroup = sg_pantherinfantry1,
+			sbp = SBP.AXIS.STORMTROOPER,
+			marker = mkr_pantherinfantry_backpup_spawn,
+			dest = mkr_killpanther_axisinfantry1dest,
+		
+		},
+		
+		
+		{
+			sgroup = sg_pantherinfantry2,
+			sbp = SBP.AXIS.STORMTROOPER,
+			marker = mkr_pantherinfantry_backpup_spawn,
+			dest = mkr_killpanther_axisinfantry2dest,
+		
+		},
+		
+		
+		{
+			sgroup = sg_pantherinfantry3,
+			sbp = SBP.AXIS.STORMTROOPER,
+			marker = mkr_pantherinfantry_backpup_spawn,
+			dest = mkr_killpather_axisinfantry3dest,
+		
+		},
+		
+		{
+			sgroup = sg_pantherinfantry4,
+			sbp = SBP.AXIS.STORMTROOPER,
+			marker = mkr_pantherinfantry_backpup_spawn,
+			dest = mkr_killpather_axisinfantry4dest,
+		
+		},
+		
+		{
+			sgroup = sg_pantherinfantry5,
+			sbp = SBP.AXIS.STORMTROOPER,
+			marker = mkr_pantherinfantry_backpup_spawn,
+			dest = mkr_killpather_axisinfantry5dest,
+		
+		},
+	
+	}
+	sg_panther_infantry_group = SGroup_CreateIfNotFound("sg_panther_infantry_group")
+	
+	t_killPanther_ReplaceTankMarkers = {mkr_Move1, mkr_Move2, mkr_Move3, mkr_Move4}
+	
+	-- add a threat arrow for the tank
+	threat_panther = ThreatArrow_CreateGroup(sg_Panther)
+	sg_temp_replacement_cromwell_1 = SGroup_CreateIfNotFound("sg_temp_replacement_cromwell_1")
+	sg_temp_replacement_cromwell_2 = SGroup_CreateIfNotFound("sg_temp_replacement_cromwell_2")
+	sg_temp_replacement_cromwell_3 = SGroup_CreateIfNotFound("sg_temp_replacement_cromwell_3")
+end
+
+
+
+function KillPanther_KickOff()
+
+	-- monitor the player's cromwells
+	Rule_AddInterval(KillPanther_TankReplace, 1)
+	SGroup_SetAutoTargetting(sg_CromwellAll, "hardpoint_01", false)
+	
+	-- get the enemy attacking
+	SGroup_SetSelectable(sg_Cromwell2, false)
+	Cmd_Attack(sg_Panther, sg_Cromwell2)
+	Cmd_Move(sg_pantherinfantry1, mkr_killpanther_axisinfantry1dest)
+	Cmd_Move(sg_pantherinfantry2, mkr_killpanther_axisinfantry2dest)
+	Cmd_Attack(sg_pantherinfantry1, sg_Cromwell3, true)
+	Cmd_Attack(sg_pantherinfantry2, sg_Cromwell1, true)
+	
+	SGroup_AddGroup(sg_panther_infantry_group,sg_pantherinfantry1)
+	SGroup_AddGroup(sg_panther_infantry_group,sg_pantherinfantry2)
+	
+	-- manage the infantry flanking the panther
+	Rule_AddInterval(KillPanther_AxisInfantryRetreat, 3)
+	Modify_Vulnerability(sg_AxisInfantry, 1.3)
+	
+	Rule_AddInterval(Rule_Panther_Infantry_Backup, 5)
+	Rule_AddInterval(Rule_Panther_Leash, 5)
+	Misc_RestrictCommandsToMarker(mkr_camera_phase1a)
+	
+end
+
+function Rule_Panther_Leash()
+
+
+	if SGroup_IsEmpty(sg_Panther) == false and Prox_SGroupSGroup(sg_Panther, sg_CromwellAll, PROX_SHORTEST) > 15 then
+
+		Cmd_Attack(sg_Panther, sg_CromwellAll)
+		
+		
+	elseif SGroup_IsEmpty(sg_Panther) then
+	--	Misc_RemoveCommandRestriction()
+		Rule_RemoveMe()
+	end
+end
+
+function Rule_Panther_Infantry_Backup()
+	print(SGroup_Count(sg_panther_infantry_group))
+	if SGroup_IsEmpty(sg_Panther) == false then
+		if SGroup_Count(sg_panther_infantry_group) < table.getn(t_panther_infantry) then
+	
+			for k, this in pairs(t_panther_infantry) do
+				if SGroup_IsEmpty(this.sgroup) then
+			
+					Util_CreateSquads(player2, this.sgroup, this.sbp, this.marker, this.dest)
+				--	Cmd_Move(this.sgroup, this.dest)
+					SGroup_AddGroup(sg_panther_infantry_group, this.sgroup)
+					break
+				end
+			
+			end
+		
+		end
+	else
+	
+		Rule_RemoveMe()
+	
+	
+	end
+end
+
+-- start the monitoring rules
+function KillPanther_StartAction()
+
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		Camera_ClampToMarker(mkr_camera_phase1a)
+		Misc_RestrictCommandsToMarker(mkr_camera_phase1a)
+		
+		Util_StartIntel(EVENTS.KillPanther_SelectCromwell)
+		
+		-- manage the instructional hints
+		Rule_AddOneShot(KillPanther_BringInTaskbar, 3)
+		Rule_AddOneShot(KillPanther_SelectCromwell, 4)
+		Rule_Add(KillPanther_PantherDead)
+		Rule_Add(KillPanther_DestroyFirstCromwell)
+		
+	end
+	
+end
+
+
+
+-- set game back to normal with taskbar
+function KillPanther_BringInTaskbar()
+	Game_SetMode(UI_Normal)
+end
+
+
+
+--some scar tricks for the designer made NIS at the beginning.
+function KillPanther_DestroyFirstCromwell()
+	if SGroup_IsEmpty(sg_Panther) then
+		Rule_RemoveMe()
+	else
+		for k,the in pairs(t_authie.tanks) do 
+			if SGroup_GetAvgHealth(the.sgroup) < 0.99 then 
+				
+				SGroup_Kill(the.sgroup)
+				Rule_RemoveMe()
+				break
+				
+			end
+		end
+	end
+end
+
+
+
+-- find the closest cromwell and tell the player to select it
+function KillPanther_SelectCromwell()
+
+	if SGroup_IsEmpty(sg_Panther) == false then
+		
+		local dist = 9999
+		local camerapos = Camera_GetTargetPos()
+		local closest = nil
+		
+		local _FindClosest = function(gid, idx, sid)
+			local thisdist = World_DistancePointToPoint(camerapos, Squad_GetPosition(sid))
+			if thisdist < dist then
+				dist = thisdist
+				closest = sid
+			end
+		end
+		SGroup_ForEach(sg_CromwellAll, _FindClosest)
+		
+		if closest ~= nil then
+			
+			SGroup_Single(sg_CromwellPinged, closest)
+			
+			-- slide the camera over to the squad if it's offscreen
+			if Misc_IsSquadOnScreen(closest, 0.7) == false then
+				Camera_MoveToPosition(Squad_GetPosition(closest), true, SLOW_CAMERA_PANNING)
+			end
+			
+			-- change the objective arrow to point at the squad, telling you to select it
+			Objective_RemoveUIElements(OBJ_KillPanther, OBJ_KillPanther.PingID)
+			OBJ_KillPanther.PingID = Objective_AddUIElements(OBJ_KillPanther, closest, true, 1319700, true)
+			
+			Rule_AddInterval(KillPanther_CromwellSelected, 1)
+			
+		end
+		
+	end
+	
+end
+
+function Misc_IsSGroupOnScreen(group, pct, all)
+	
+	local _CheckSquad = function(gid, idx, sid)
+		return Misc_IsSquadOnScreen(sid, pct)
+	end
+	return SGroup_ForEachAllOrAny(group, all, _CheckSquad)
+	
+end
+
+
+-- wait until one of the cromwells is selected (don't care which one)
+function KillPanther_CromwellSelected()
+
+	if SGroup_IsEmpty(sg_Panther) then
+		Rule_RemoveMe()
+	elseif Misc_IsSGroupSelected(sg_CromwellAll, ANY) then
+		
+		Rule_RemoveMe()
+		
+		if SGroup_GetAvgHealth(sg_Panther) > 0.9 then
+			
+			Objective_RemoveUIElements(OBJ_KillPanther, OBJ_KillPanther.PingID)
+			
+			if flag_killpanther_haveattacked ~= true then
+				
+				Util_StartIntel(EVENTS.KillPanther_AttackPanther)
+				
+				-- change the objective arrow to point at the Panther
+				OBJ_KillPanther.PingID = Objective_AddUIElements(OBJ_KillPanther, sg_Panther, true, 1319701, true)
+				
+				-- slide the camera over to the squad if it's offscreen
+				if Misc_IsSGroupOnScreen(sg_Panther, 0.7, ANY) == false then
+					Camera_MoveToSGroup(sg_Panther, true, SLOW_CAMERA_PANNING)
+				end
+				
+				flag_killpanther_haveattacked = true
+				killpanther_attacktime = World_GetGameTime()
+				
+			end
+			
+			Rule_AddInterval(KillPanther_AttackingPanther, 1)
+			
+		else
+			
+			panther_rear_pos = Util_GetOffsetPosition(sg_Panther, OFFSET_BACK, 15)
+			panther_rear_pos.y = panther_rear_pos.y + 2
+			
+			-- change the text on the objective arrow
+			Objective_RemoveUIElements(OBJ_KillPanther, OBJ_KillPanther.PingID)
+			OBJ_KillPanther.PingID = Objective_AddUIElements(OBJ_KillPanther, panther_rear_pos, true, 1319702, true)
+			
+			-- slide the camera over to the squad if it's offscreen
+			if Misc_IsSGroupOnScreen(sg_Panther, 0.7, ANY) == false then
+				Camera_MoveToSGroup(sg_Panther, true, SLOW_CAMERA_PANNING)
+			end
+			
+			if panther_rear_described ~= true then
+				
+				-- tell the player to concentrate on the rear armour
+				Util_StartIntel(EVENTS.KillPanther_AttackPantherFromRear)
+				
+				-- switch the rear armour arrow on
+				local eid = Squad_EntityAt(SGroup_GetSpawnedSquadAt(sg_Panther, 1), 0)
+				Entity_SetAnimatorState(eid, "ui_arrow_state", "on")
+				
+				panther_rear_described = true
+				
+			end
+			
+			Rule_AddInterval(KillPanther_EnsurePlayerKeepsCromwellSelected, 1)
+			Rule_AddInterval(KillPanther_PlayerFlankedPanther, 1)
+			
+		end
+		
+	elseif SGroup_IsEmpty(sg_CromwellPinged) then
+		
+		-- pinged tank is dead, go back to step 1
+		Rule_RemoveMe()
+		Rule_AddOneShot(KillPanther_SelectCromwell, 1)
+		
+	end
+
+end
+
+
+-- make the arrow disappear once the player attacks the panther
+function KillPanther_AttackingPanther()
+
+	local _CheckSquad = function(gid, idx, sid)
+		if Squad_HasActiveCommand(sid) then
+			if Squad_GetActiveCommand(sid) == SQUADSTATEID_Combat then
+				return true
+			end
+		end
+	end
+	
+	if SGroup_ForEachAllOrAny(sg_CromwellAll, ANY, _CheckSquad) or (World_GetGameTime() - killpanther_attacktime) >= 6 then
+		
+		Rule_RemoveMe()
+		
+		Objective_RemoveUIElements(OBJ_KillPanther, OBJ_KillPanther.PingID)
+		SGroup_SetAutoTargetting(sg_CromwellAll, "hardpoint_01", true)
+		
+		Rule_AddInterval(KillPanther_HighlightRearArmour, 1)
+		
+	end
+	
+end
+
+
+-- once you've damaged the panther, highlight the rear armour
+function KillPanther_HighlightRearArmour()
+
+	if SGroup_IsEmpty(sg_Panther) then
+		Rule_RemoveMe()
+	else
+		
+		if Misc_IsSGroupSelected(sg_CromwellAll, ANY) then
+			
+			if SGroup_GetAvgHealth(sg_Panther) <= 0.9 then
+				
+				Rule_RemoveMe()
+				
+				panther_rear_pos = Util_GetOffsetPosition(sg_Panther, OFFSET_BACK, 15)
+				panther_rear_pos.y = panther_rear_pos.y + 2
+				
+				-- change the text on the objective arrow
+				Objective_RemoveUIElements(OBJ_KillPanther, OBJ_KillPanther.PingID)
+				OBJ_KillPanther.PingID = Objective_AddUIElements(OBJ_KillPanther, panther_rear_pos, true, 1319702, true)
+				
+				if panther_rear_described ~= true then
+					
+					-- tell the player to concentrate on the rear armour
+					Util_StartIntel(EVENTS.KillPanther_AttackPantherFromRear)
+					
+					-- switch the rear armour arrow on
+					local eid = Squad_EntityAt(SGroup_GetSpawnedSquadAt(sg_Panther, 1), 0)
+					Entity_SetAnimatorState(eid, "ui_arrow_state", "on")
+					
+					if Misc_IsSGroupOnScreen(sg_Panther, 0.7, ANY) == false then
+						Camera_MoveToSGroup(sg_Panther, true, SLOW_CAMERA_PANNING)
+					end
+					
+					panther_rear_described = true
+					
+				end
+				
+				Rule_AddInterval(KillPanther_EnsurePlayerKeepsCromwellSelected, 1)
+				Rule_AddInterval(KillPanther_PlayerFlankedPanther, 1)
+				
+			end
+			
+		else
+			
+			-- lost selection, go back to step 1
+			Rule_RemoveMe()
+			Rule_AddOneShot(KillPanther_SelectCromwell, 1)
+			
+		end
+		
+	end
+	
+end
+
+
+-- remove the flanking arrow if the player moves nearby
+function KillPanther_PlayerFlankedPanther()
+	
+	if SGroup_IsEmpty(sg_Panther) then
+		Rule_RemoveMe()
+	else
+		
+		if Prox_AreSquadsNearMarker(sg_CromwellAll, panther_rear_pos, ANY, 8) then
+			
+			Rule_RemoveMe()
+			
+			Objective_RemoveUIElements(OBJ_KillPanther, OBJ_KillPanther.PingID)
+			
+		end
+		
+	end
+	
+end
+
+
+-- if the player loses selection, pan back to a tank for them to select
+function KillPanther_EnsurePlayerKeepsCromwellSelected()
+
+	if SGroup_IsEmpty(sg_Panther) then
+		Rule_RemoveMe()
+	else
+		
+		if Misc_IsSGroupSelected(sg_CromwellAll, ANY) == false then
+			
+			-- lost selection, go back to step 1
+			Rule_RemoveMe()
+			Rule_RemoveIfExist(KillPanther_PlayerFlankedPanther)
+			Rule_AddOneShot(KillPanther_SelectCromwell, 1)
+			
+		end
+		
+	end
+	
+end
+
+
+
+-- watch the Panther
+function KillPanther_PantherManager()
+
+	if SGroup_IsEmpty(sg_Panther) then
+		Rule_RemoveMe()
+	else
+		if SGroup_IsUnderAttack(sg_Panther, ANY, 5) then
+			if Prox_AreSquadsNearMarker(sg_Panther, mkr_panther_retreat, ANY, 5) == false then
+				Cmd_Move(sg_Panther, mkr_panther_retreat)
+			end
+		elseif SGroup_IsMoving(sg_Panther, ANY) then
+			Cmd_Stop(sg_Panther)
+		else
+			Cmd_AttackMove(sg_Panther, mkr_Move2)
+		end
+	end
+end
+
+
+
+function KillPanther_TankReplace()
+	
+	if SGroup_IsEmpty(sg_Panther) then 
+		Rule_RemoveMe() 
+	else
+		
+		if SGroup_Count(sg_CromwellAll) <= 2 then
+			
+			local marker = t_killPanther_ReplaceTankMarkers[1]
+			
+			if SGroup_IsEmpty(sg_temp_replacement_cromwell_1) then
+			
+				Util_CreateSquads(player1, sg_temp_replacement_cromwell_1, SBP.CW.CROMWELL, mkr_offmap1, marker)				
+				SGroup_AddGroup(sg_CromwellAll, sg_temp_replacement_cromwell_1)
+				Util_ReinforceEvent(sg_temp_replacement_cromwell_1)
+			
+			elseif SGroup_IsEmpty(sg_temp_replacement_cromwell_2) then
+			
+				Util_CreateSquads(player1, sg_temp_replacement_cromwell_2, SBP.CW.CROMWELL, mkr_offmap1, marker)				
+				SGroup_AddGroup(sg_CromwellAll, sg_temp_replacement_cromwell_2)
+				Util_ReinforceEvent(sg_temp_replacement_cromwell_2)
+			
+			elseif SGroup_IsEmpty(sg_temp_replacement_cromwell_3) then
+			
+				Util_CreateSquads(player1, sg_temp_replacement_cromwell_3, SBP.CW.CROMWELL, mkr_offmap1, marker)				
+				SGroup_AddGroup(sg_CromwellAll, sg_temp_replacement_cromwell_3)
+				Util_ReinforceEvent(sg_temp_replacement_cromwell_3)
+			
+			end
+						
+			
+			-- shuffle item to the end of the list
+			table.remove(t_killPanther_ReplaceTankMarkers, 1)
+			table.insert(t_killPanther_ReplaceTankMarkers, marker)
+			
+		end
+		
+	end
+end
+
+
+
+-- retreat the infantry when the Panther dies
+function KillPanther_AxisInfantryRetreat()
+	
+	if SGroup_IsEmpty(sg_panther_infantry_group) then
+		Rule_RemoveMe()
+	elseif SGroup_IsEmpty(sg_Panther) then 
+		
+		Rule_RemoveMe()
+		
+		Modify_Vulnerability(sg_panther_infantry_group, 2)
+		Modify_ReceivedAccuracy(sg_panther_infantry_group, 2)
+		
+		Rule_Add(Rule_Prevent_Retreat_Follow)
+		
+		
+		Rule_AddOneShot(KillPanther_AxisInfantryRetreatA, 1)
+		Rule_AddOneShot(KillPanther_AxisInfantryRetreatB, 3)
+		Rule_AddOneShot(KillPanther_AxisInfantryRetreatC, 5)
+		Rule_AddOneShot(KillPanther_AxisInfantryRetreatD, 7)
+		
+		
+	end
+
+end
+function KillPanther_AxisInfantryRetreatA()
+	
+	Cmd_Retreat(sg_pantherinfantry2, mkr_offmap5, mkr_offmap5, false)		
+end
+function KillPanther_AxisInfantryRetreatB()
+	
+	Cmd_Retreat(sg_pantherinfantry1, mkr_offmap5, mkr_offmap5, false)		
+	Cmd_Retreat(sg_pantherinfantry4, mkr_offmap5, mkr_offmap5, false)	
+end
+
+function KillPanther_AxisInfantryRetreatC()
+	
+	Cmd_Retreat(sg_pantherinfantry3, mkr_offmap5, mkr_offmap5, false)
+	
+end
+
+function KillPanther_AxisInfantryRetreatD()
+	
+	Cmd_Retreat(sg_pantherinfantry5, mkr_offmap5, mkr_offmap5, false)
+end
+
+
+function Rule_Prevent_Retreat_Follow()
+	
+	if SGroup_CountSpawned(sg_CromwellAll) == 0 then
+		Rule_RemoveMe()
+		return
+	end
+	
+	local _CheckSquad = function(gid, idx, sid)
+		
+		SGroup_Clear(sg_single)
+		SGroup_Single(sg_single, sid)
+		if Prox_AreSquadsNearMarker(sg_single, mkr_camera_phase1b, ALL) == false then
+			Cmd_Move(sg_single, mkr_retreating_tank_return)
+		end
+		
+	end
+	SGroup_ForEach(sg_CromwellAll, _CheckSquad)
+	
+
+end
+
+
+-- win condition - once the player kills the Panther 
+function KillPanther_PantherDead()
+	
+	if SGroup_GetAvgHealth(sg_Panther) < 0.3 then 	-- mercy killing
+		SGroup_Kill(sg_Panther)
+	end
+	
+	if SGroup_IsEmpty(sg_Panther) then 
+		
+		Rule_RemoveMe()
+		
+		Rule_AddOneShot(KillPanther_PantherDeadB, 2)
+		
+	end
+	
+end
+function KillPanther_PantherDeadB()
+
+	Objective_Complete(OBJ_KillPanther)
+	
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- OBJECTIVE Retreat and Set Up Base
+-------------------------------------------------------------------------
+--
+-------------------------------------------------------------------------
+
+function Initialize_OBJ_SetUpBase()
+
+	OBJ_SetUpBase = {
+		
+		SetupUI = function() 
+		end,
+		
+		OnStart = function()
+			
+			Util_StartIntel(EVENTS.SetUpBase_CromwellRetreatInstructions)
+			
+			-- tag as always show
+			Objective_SetAlwaysShowDetails(OBJ_SetUpBase, true, true, true)
+			
+			Camera_ClampToMarker(mkr_camera_phase1b)
+			Misc_RestrictCommandsToMarker(mkr_camera_phase1b)
+			
+			-- start the action
+			Rule_Add(SetUpBase_Kickoff)
+			
+		end,
+		
+		OnComplete = function()
+			
+		end,
+		
+		IsComplete = function()
+			
+		end,
+		
+		OnFail = function()
+			
+		end,
+		
+		Title = 1319201,
+		Description = 1319221,
+		TitleEnd = 1319241,
+		Type = OT_Primary,
+		
+		-- the sitrep shouldn't play until the second part of this objective, so we kind of add the details in later on!
+		-- SitRep = {},
+		
+	}
+	
+	-- Register Objective and Initialise Data
+	Objective_Register(OBJ_SetUpBase)
+	SetUpBase_Init()
+	
+end
+
+
+function SetUpBase_Init()
+
+	Rule_AddInterval(SetUpBase_Start, 1)
+	
+	eg_playerhowitzer1 = EGroup_CreateIfNotFound("eg_playerhowitzer1")
+	eg_playerhowitzer2 = EGroup_CreateIfNotFound("eg_playerhowitzer2")
+	eg_playeratgun1 = EGroup_CreateIfNotFound("eg_playeratgun1")
+	sg_playersapper = SGroup_CreateIfNotFound("sg_playersapper")
+	eg_allyslittrench1 = EGroup_CreateIfNotFound("eg_allyslittrench1")
+	eg_allyslittrench2 = EGroup_CreateIfNotFound("eg_allyslittrench2")
+	
+	sg_allytommy1 = SGroup_CreateIfNotFound("sg_allytommy1")
+	sg_allytommy2 = SGroup_CreateIfNotFound("sg_allytommy2")
+	sg_allysapper1 = SGroup_CreateIfNotFound("sg_allysapper1")
+	sg_allysapper2 = SGroup_CreateIfNotFound("sg_allysapper2")
+	sg_cromwellsremaining = SGroup_CreateIfNotFound("sg_cromwellsremaining")
+	sg_othercromwells = SGroup_CreateIfNotFound("sg_othercromwells")
+	g_howitzer_built = false
+	g_objective_deploy_updated = false
+	t_ctrl_table = {}
+	t_ctrl_table[1] = true
+	t_ctrl_table[2] = true
+	t_ctrl_table[3] = true
+	t_ctrl_table[4] = true
+	t_ctrl_table[5] = true
+	t_ctrl_table[6] = true
+	t_ctrl_table[7] = true
+	t_ctrl_table[8] = true
+	t_ctrl_table[9] = true
+	t_ctrl_table[10] = true
+	g_temp_ctrl_group = -1
+	g_first_howitzer_ctrl_group = 0
+	g_second_howitzer_ctrl_group = 0
+	g_at_ctrl_group = 0
+	g_bofors_ctrl_group = 0
+	sg_player_control_groups = SGroup_CreateIfNotFound("sg_player_control_groups")
+	eg_player_control_groups = EGroup_CreateIfNotFound("eg_player_control_groups")
+end
+
+
+function SetUpBase_Start()
+
+	if Event_IsAnyRunning() == false and Objective_IsComplete(OBJ_KillPanther) then
+		
+		Rule_RemoveMe()
+		
+		Objective_Start(OBJ_SetUpBase)
+
+		
+	end
+	
+end
+
+
+
+
+function SetUpBase_Kickoff()
+
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		-- create a temp list of all cromwells
+		SGroup_Duplicate(sg_CromwellAll, sg_cromwellsremaining)
+		
+		if Misc_IsSGroupSelected(sg_CromwellAll, ANY) == true then
+			SetUpBase_RetreatCromwells()
+		else
+			SetUpBase_RetreatSelectCromwells()
+		end
+		
+		
+		
+	end
+	
+end
+
+	
+-- highlight a cromwell and tell the player to select it
+function SetUpBase_RetreatSelectCromwells()
+
+	local dist = 9999
+	local camerapos = Camera_GetTargetPos()
+	local closest = nil
+	
+	local _FindClosest = function(gid, idx, sid)
+		local thisdist = World_DistancePointToPoint(camerapos, Squad_GetPosition(sid))
+		if thisdist < dist then
+			dist = thisdist
+			closest = sid
+		end
+	end
+	SGroup_ForEach(sg_cromwellsremaining, _FindClosest)
+	
+	if closest ~= nil then
+		
+		SGroup_Single(sg_CromwellPinged, closest)
+		
+		-- slide the camera over to the squad if it's offscreen
+		if Misc_IsSquadOnScreen(closest, 0.7) == false then
+			Camera_MoveToPosition(Squad_GetPosition(closest), true, SLOW_CAMERA_PANNING)
+		end
+		
+		-- change the objective arrow to point at the squad, telling you to select it
+		Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingID)
+		OBJ_SetUpBase.PingID = Objective_AddUIElements(OBJ_SetUpBase, closest, true, 1319700, true)
+		
+		Rule_AddInterval(SetUpBase_RetreatCromwells, 1)
+		
+	end
+
+end
+
+
+-- higlight the area we want the player to retreat to
+function SetUpBase_RetreatCromwells()
+
+	if Misc_IsSGroupSelected(sg_CromwellAll, ANY) then
+		
+		Rule_RemoveMe()
+		
+		-- change the text on the objective arrow
+		Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingID)
+		OBJ_SetUpBase.PingID = Objective_AddUIElements(OBJ_SetUpBase, mkr_cromwell_retreatindicator, true, 1319713, true)
+		
+		Camera_MoveToPosition(mkr_cromwell_retreatindicator, true, SLOW_CAMERA_PANNING)
+		
+		flag_startbuildingabbeyhowitzers = true 		-- have the guys run past the camera to build the howitzers for later on (see RightFlank_AutoBuildHowitzers)
+		
+		Rule_AddInterval(SetUpBase_CheckCromwellRetreating, 1)
+		
+	end
+	
+end
+
+
+-- check to see if the player has given the order to the area
+function SetUpBase_CheckCromwellRetreating()
+
+	local pos = nil
+	
+	-- find all retreating cromwells
+	local _CheckSquad = function(gid, idx, sid)
+		if Squad_HasDestination(sid) then
+			if Marker_InProximity(mkr_cromwell_retreatarea, Squad_GetDestination(sid)) then
+				SGroup_Add(sg_temp, sid)
+			end
+		end
+	end
+	SGroup_Clear(sg_temp)
+	SGroup_ForEach(sg_cromwellsremaining, _CheckSquad)
+	
+	if SGroup_Count(sg_temp) >= 1 then
+		
+		Rule_RemoveMe()
+		
+		-- remove these from the cromwell list
+		SGroup_RemoveGroup(sg_cromwellsremaining, sg_temp)
+		SGroup_SetSelectable(sg_temp, false)
+		
+		-- pick one of the tanks to watch in a sec
+		local sid = SGroup_GetSpawnedSquadAt(sg_temp, 1)
+		camerapos_retreatingcromwells = Squad_GetPosition(sid)
+		camerasquad_retreatingcromwells = Squad_GetGameID(sid)
+		
+		-- give these tanks a move offmap
+		Modify_UnitSpeed(sg_temp, 1.3)
+		Cmd_Move(sg_temp, mkr_offmap1, false, mkr_offmap1)
+		
+		Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingID)
+		
+		Util_StartIntel(EVENTS.SetUpBase_CromwellsRetreating)
+		
+		Rule_AddOneShot(SetUpBase_CheckCromwellRetreatingB, 3)
+		Rule_AddInterval(SetUpBase_TheRestOfTheCromwellsSelect, 1)
+		
+	elseif Misc_IsSGroupSelected(sg_CromwellAll, ANY) == false then
+		
+		Rule_RemoveMe()
+		
+		SetUpBase_RetreatSelectCromwells()
+		
+	end
+	
+end
+function SetUpBase_CheckCromwellRetreatingB()
+	if Squad_IsValid(camerasquad_retreatingcromwells) then
+		Camera_FollowSquad(Squad_FromWorldID(camerasquad_retreatingcromwells))
+		--Camera_MoveToPosition(camerapos_retreatingcromwells, true, SLOW_CAMERA_PANNING)
+	end
+end
+	
+	
+--------------------------------------------------------------------------------
+-- TODO: Add in "fetch the rest here"	
+--------------------------------------------------------------------------------	
+	
+function SetUpBase_TheRestOfTheCromwellsSelect()
+	
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		if SGroup_Count(sg_cromwellsremaining) == 0 then
+			
+			Rule_AddInterval(SetUpBase_CromwellRetreating, 1)
+			
+		else
+			
+			local dist = 9999
+			local camerapos = Camera_GetTargetPos()
+			local closest = nil
+			
+			local _FindClosest = function(gid, idx, sid)
+				local thisdist = World_DistancePointToPoint(camerapos, Squad_GetPosition(sid))
+				if thisdist < dist then
+					dist = thisdist
+					closest = sid
+				end
+			end
+			SGroup_ForEach(sg_cromwellsremaining, _FindClosest)
+			
+			if closest ~= nil then
+				
+				SGroup_Single(sg_CromwellPinged, closest)
+				SGroup_Duplicate(sg_cromwellsremaining, sg_othercromwells)
+				SGroup_Remove(sg_othercromwells, closest)
+				
+				-- bring other tank closer to the first if it's far away
+				if SGroup_Count(sg_othercromwells) >= 1 and World_DistancePointToPoint(SGroup_GetPosition(sg_CromwellPinged), SGroup_GetPosition(sg_othercromwells)) > 20 then
+					local pos = Util_GetPositionFromAtoB(SGroup_GetPosition(sg_CromwellPinged), SGroup_GetPosition(sg_othercromwells), 18)
+					Cmd_Move(sg_othercromwells, pos)
+				end
+				
+				-- slide the camera over to the squad if it's offscreen
+				if Misc_IsSquadOnScreen(closest, 0.7) == false and Misc_IsSGroupSelected(sg_CromwellPinged, ALL) == false then
+					Camera_MoveToPosition(Squad_GetPosition(closest), true, SLOW_CAMERA_PANNING)
+				end
+				
+				if SGroup_Count(sg_cromwellsremaining) == 2 then
+					-- change the objective arrow to point at the squad, telling you to select it
+					Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingID)
+					OBJ_SetUpBase.PingIDa = Objective_AddUIElements(OBJ_SetUpBase, closest, true, 1319723, true)
+					OBJ_SetUpBase.PingIDb = Objective_AddUIElements(OBJ_SetUpBase, sg_othercromwells, true, false, true)
+					
+				else
+					Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingID)
+					OBJ_SetUpBase.PingIDa = Objective_AddUIElements(OBJ_SetUpBase, closest, true, 1319700, true)
+					OBJ_SetUpBase.PingIDb = Objective_AddUIElements(OBJ_SetUpBase, sg_othercromwells, true, false, true)
+					
+				end
+				Util_StartIntel(EVENTS.SetUpBase_SelectTheRestOfTheCromwells)
+				
+				Rule_AddInterval(SetUpBase_TheRestOfTheCromwellsSelected, 1)
+				
+			end
+			
+		end
+		
+	end
+	
+end
+
+function SetUpBase_TheRestOfTheCromwellsSelected()
+
+	if Misc_IsSGroupSelected(sg_cromwellsremaining, ALL) then
+		
+		Rule_RemoveMe()
+		
+			-- change the text on the objective arrow
+			Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingIDa)
+			Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingIDb)
+			OBJ_SetUpBase.PingID = Objective_AddUIElements(OBJ_SetUpBase, mkr_cromwell_retreatindicator, true, 1319713, true)
+
+		
+		Camera_MoveToPosition(mkr_cromwell_retreatindicator, true, SLOW_CAMERA_PANNING)
+		
+		Rule_AddInterval(SetUpBase_TheRestOfTheCromwellsRetreating, 0.5)
+		
+	end
+	
+end
+
+
+function SetUpBase_TheRestOfTheCromwellsRetreating()
+	
+	local pos = nil
+	
+	-- find all retreating cromwells
+	local _CheckSquad = function(gid, idx, sid)
+		if Squad_HasDestination(sid) then
+			if Marker_InProximity(mkr_cromwell_retreatarea, Squad_GetDestination(sid)) then
+				SGroup_Add(sg_temp, sid)
+			end
+		end
+	end
+	SGroup_Clear(sg_temp)
+	SGroup_ForEach(sg_cromwellsremaining, _CheckSquad)
+	
+	if SGroup_CountSpawned(sg_temp) == SGroup_CountSpawned(sg_cromwellsremaining) then
+		
+		Rule_RemoveMe()
+		
+		-- remove these from the cromwell list
+		SGroup_RemoveGroup(sg_cromwellsremaining, sg_temp)
+		SGroup_SetSelectable(sg_temp, false)
+		
+		-- pick one of the tanks to watch in a sec
+		local sid = SGroup_GetSpawnedSquadAt(sg_temp, 1)
+		camerapos_retreatingcromwells = Squad_GetPosition(sid)
+		camerasquad_retreatingcromwells = Squad_GetGameID(sid)
+		
+		
+		
+		-- give these tanks a move offmap
+		Modify_UnitSpeed(sg_temp, 1.3)
+		Cmd_Move(sg_temp, mkr_offmap1, false, mkr_offmap1)
+		
+		Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingID)
+		
+		Util_StartIntel(EVENTS.SetUpBase_TheRestOfTheCromwellsRetreating)
+		
+		Rule_AddOneShot(SetUpBase_TheRestOfTheCromwellsRetreatingB, 3)
+		Rule_AddInterval(SetUpBase_CromwellRetreating, 1)
+		
+	elseif Misc_IsSGroupSelected(sg_cromwellsremaining, ALL) == false then
+		
+		Rule_RemoveMe()
+		
+		SetUpBase_TheRestOfTheCromwellsSelect()		
+		
+	end
+	
+end
+function SetUpBase_TheRestOfTheCromwellsRetreatingB()
+	if Squad_IsValid(camerasquad_retreatingcromwells) then
+		Camera_FollowSquad(Squad_FromWorldID(camerasquad_retreatingcromwells))
+		--Camera_MoveToPosition(camerapos_retreatingcromwells, true, SLOW_CAMERA_PANNING)
+	end
+end
+	
+-- complete objective
+function SetUpBase_CromwellRetreating()
+
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		Util_StartIntel(EVENTS.SetUpBase_PreSitRep)
+		
+		Rule_AddInterval(SetUpBase_TriggerSitRep, 1)
+		
+		
+	end
+	
+end
+
+
+-- play the Sit Rep
+function SetUpBase_TriggerSitRep()
+
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		-- surreptitiously add in the sitrep and pretend it was always there
+		OBJ_SetUpBase.OnStart = function() end
+		OBJ_SetUpBase.SitRep = {
+			Movie = "CXP1_SR_01-01",
+			Force = true,
+			SpeechTiming =
+			{
+				{ 1,	ACTOR.CXP1.Cutting, 1310740 },
+				{ 4.5,	ACTOR.CXP1.Cutting, 1310770 },
+				{ 10.5,	ACTOR.CXP1.Blackmore, 1310790 },
+				{ 13.8,	ACTOR.CXP1.Blackmore, 1310780 },
+				{ 17,	ACTOR.CXP1.Blackmore, 1310800 },
+				{ 21,	ACTOR.CXP1.Blackmore, 1310810 },
+				{ 26.9,	ACTOR.CXP1.Blackmore, 1310791 },
+				{ 31.3,	ACTOR.CXP1.Blackmore, 1310820 },
+			},
+			
+			PrologueEvent = function()
+				
+				
+				Util_CreateSquads(player1, sg_ally_Inf_HQ, SBP.CW.INFANTRY_HQ, mkr_infantryhqspawn)
+				Objective_UpdateText(OBJ_SetUpBase, 1319203, 1319224, false)
+				
+				Camera_MoveToPosition(mkr_camera_hq_initial)
+				
+				-- action that starts when this encounter is triggered
+				Player_GetAll(player1, sg_handOver_p1, eg_handOver_p1)
+	
+				SGroup_AddGroup(sg_handOver_cromwells, sg_handOver_p1)
+				SGroup_Filter(sg_handOver_cromwells, SBP.CW.CROMWELL, FILTER_KEEP)
+				
+				SGroup_AddGroup(sg_handOver_infantry, sg_handOver_p1)
+				SGroup_Filter(sg_handOver_infantry, SBP.CW.CROMWELL, FILTER_REMOVE)
+				SGroup_Filter(sg_handOver_p1, SBP.CW.INFANTRY_HQ, FILTER_REMOVE)
+				-- make them go away
+				SGroup_DestroyAllSquads(sg_handOver_p1)
+				
+				-- unreveal FOW on panther
+				FOW_UnRevealMarker(mkr_fow_killpanther)
+				
+				Camera_ResetToDefault()
+			
+			end,
+			
+			EpilogueEvent = function()
+				
+				
+				
+				-- spawn in the Inf HQ
+				Cmd_Move(sg_ally_Inf_HQ, mkr_infantryhqdest)
+				Cmd_Ability(sg_ally_Inf_HQ, ABILITY.CW.HQ_SETUP, mkr_infantryhqdest, nil, true, true)
+				SGroup_SetSelectable(sg_ally_Inf_HQ, false)
+				
+				FOW_RevealMarker(mkr_fow_setupbase1, -1)
+				
+				-- camera move
+				Camera_ClampToMarker(mkr_camera_phase2a)
+				Misc_RestrictCommandsToMarker(mkr_camera_phase2a)
+				Camera_MoveToSGroup(sg_ally_Inf_HQ)
+				Camera_FollowSGroup(sg_ally_Inf_HQ)
+			
+				CTRL.Event_Delay(3)			
+				CTRL.WAIT()
+			
+			
+				Actor_PlaySpeech(ACTOR.CXP1.Cutting, 1310851)
+			
+				CTRL.Event_Delay(14)			
+				CTRL.WAIT()
+				
+				
+			
+			end,
+			
+		}
+		
+		-- and force the sitrep to play
+		Obj_SetObjectiveFunction(OBJ_SetUpBase.ID, FN_OnActivate, __ObjectiveOnActivateCallback)
+		Objective_ForceSitRep(OBJ_SetUpBase)
+		
+		Rule_Add(SetUpBase_PostSitRep)
+		
+	end
+	
+end
+
+
+
+-- after the SitRep, 
+function SetUpBase_PostSitRep()
+	
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		
+		Game_FadeToBlack(FADE_IN, 2)
+			
+
+		
+		-- get the ally building the slit trenches and stuff
+		SetUpBase_BuildAlliedDefences()
+		
+		-- finish transition
+		Rule_AddInterval(SetUpBase_HQSetUp, 4)
+		
+		
+	end
+end
+
+
+
+-- spawn allied players to build the slittrenches and mg nest in the area in front
+function SetUpBase_BuildAlliedDefences()
+	
+	Util_CreateSquads(player3, sg_allytommy1, SBP.CW.TOMMIES, mkr_alliedtommy1spawn)
+	Cmd_Construct(sg_allytommy1, EBP.CW.SLITTRENCH_NEST, mkr_slittrench1pos, Util_CreateFacingPosFromMarker(mkr_slittrench1pos))
+	
+	Util_CreateSquads(player3, sg_allytommy2, SBP.CW.TOMMIES, mkr_alliedtommy2spawn)
+	Cmd_Construct(sg_allytommy2, EBP.CW.MG_NEST, mkr_mgnest1pos, Util_CreateFacingPosFromMarker(mkr_mgnest1pos))
+	Cmd_Construct(sg_allytommy2, EBP.CW.SLITTRENCH_NEST, mkr_slittrench2pos, Util_CreateFacingPosFromMarker(mkr_slittrench2pos), true)
+	
+	Rule_AddInterval(SetUpBase_BuildAlliedDefencesSlittrench1, 3)
+	Rule_AddInterval(SetUpBase_BuildAlliedDefencesSlittrench2, 3)
+	
+end
+function SetUpBase_BuildAlliedDefencesSlittrench1()
+	EGroup_Clear(eg_temp)
+	World_GetNeutralEntitiesNearPoint(eg_temp, Marker_GetPosition(mkr_slittrench1pos), 10)
+	EGroup_Filter(eg_temp, EBP.CW.SLITTRENCH_NEST, FILTER_KEEP)
+	EGroup_FilterUnderConstruction(eg_temp, FILTER_REMOVE)
+	if EGroup_Count(eg_temp) >= 1 then
+		Rule_RemoveMe()
+		EGroup_AddEGroup(eg_allyslittrench1, eg_temp)
+		Cmd_Garrison(sg_allytommy1, eg_allyslittrench1)
+	end
+end
+function SetUpBase_BuildAlliedDefencesSlittrench2()
+	EGroup_Clear(eg_temp)
+	World_GetNeutralEntitiesNearPoint(eg_temp, Marker_GetPosition(mkr_slittrench2pos), 10)
+	EGroup_Filter(eg_temp, EBP.CW.SLITTRENCH_NEST, FILTER_KEEP)
+	EGroup_FilterUnderConstruction(eg_temp, FILTER_REMOVE)
+	if EGroup_Count(eg_temp) >= 1 then
+		Rule_RemoveMe()
+		EGroup_AddEGroup(eg_allyslittrench2, eg_temp)
+		Cmd_Garrison(sg_allytommy2, eg_allyslittrench2)
+	end
+end
+
+
+
+
+-- HQ is ready
+function SetUpBase_HQSetUp()
+
+	if Util_GetCommonwealthHQMobility(sg_ally_Inf_HQ) == false then
+		if Event_IsAnyRunning() == false then
+			Rule_RemoveMe()
+			
+			SGroup_SetSelectable(sg_ally_Inf_HQ, true)
+			
+			Rule_Add(SetUpBase_SelectHQ, 1)
+		end
+	elseif SGroup_IsDoingAbility(sg_ally_Inf_HQ, ABILITY.CW.HQ_SETUP, false) == false then
+		Cmd_Move(sg_ally_Inf_HQ, mkr_infantryhqdest)
+		Cmd_Ability(sg_ally_Inf_HQ, ABILITY.CW.HQ_SETUP, mkr_infantryhqdest, nil, true, true)
+	end
+	
+end
+
+
+
+-------------------------------------------------------------------------
+-- Select HQ and order Sappers
+-------------------------------------------------------------------------
+
+-- tell the player to select the HQ
+function SetUpBase_SelectHQ()
+
+	if Event_IsAnyRunning() == false then
+		
+		
+		if g_objective_deploy_updated == false then
+						
+			Util_StartIntel(EVENTS.SetUpBase_BuildSappers)			
+			g_objective_deploy_updated = true
+		end
+		
+		OBJ_SetUpBase.PingID = Objective_AddUIElements(OBJ_SetUpBase, sg_ally_Inf_HQ, true, 1319703, true, 1)
+		
+		Camera_MoveToSGroup(sg_ally_Inf_HQ, true, SLOW_CAMERA_PANNING)
+		if Rule_Exists(SetUpBase_HQSelected) == false then
+			Rule_AddInterval(SetUpBase_HQSelected, 0.5)
+		end
+		
+		Rule_RemoveMe()
+	
+	end
+end
+
+
+-- HQ selected, now flash the Sapper button
+function SetUpBase_HQSelected()
+	
+	if Misc_IsSGroupSelected(sg_ally_Inf_HQ, ANY) then
+		
+		Command_SquadPos(player1,sg_ally_Inf_HQ,SCMD_RallyPoint,Marker_GetPosition(mkr_hq_spawn_point), false)
+		
+		Rule_RemoveMe()
+		
+		Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingID)
+		
+		flashid_sapper = UI_FlashProductionButton(PITEM_Spawn, SBP.CW.SAPPER, true, BT_UI_Strong_CommandBtn)
+		hpid_sapper = HintPoint_AddToProductionButton(PITEM_Spawn, SBP.CW.SAPPER, 1319704, true)
+		if Rule_Exists(Rule_Player_No_Units) == false then
+			Rule_AddInterval(Rule_Player_No_Units, 1)
+		end
+		Rule_Add(SetUpBase_SappersOrdered)
+		Rule_RemoveMe()
+			
+	end
+	
+end
+
+
+-- sappers ordered, wait for them to be built
+function SetUpBase_SappersOrdered()
+	
+
+	local sid = SGroup_GetSpawnedSquadAt(sg_ally_Inf_HQ, 1)
+	
+	if Squad_HasProductionQueue(sid) and Squad_GetProductionQueueSize(sid) >= 1 then
+		
+		Rule_RemoveMe()
+		
+		--flashid_sapper = UI_FlashProductionQueueIcon(0, false, BT_UI_Weak_CommandBtn)
+		hpid_sapper = HintPoint_AddToProductionQueueItem(0, 1319705, false)		
+		
+		Player_SetSquadProductionAvailability(player1, SBP.CW.SAPPER, ITEM_LOCKED)
+		
+		local queue_size = Squad_GetProductionQueueSize(sid)
+		
+		if queue_size >= 2 then
+			for i = 2, queue_size do
+				infantryhq_productionqueue = infantryhq_productionqueue + 1
+				Command_SquadExt(player1, sg_ally_Inf_HQ, SCMD_CancelProduction, infantryhq_productionqueue, false)
+			end
+		end
+		
+		Rule_AddInterval(SetUpBase_SappersDeployed, 0.5)
+		
+	elseif Misc_IsSGroupSelected(sg_ally_Inf_HQ, ANY) == false then			-- if player deselects HQ, go back to the select HQ step
+		
+		Rule_RemoveMe()
+		
+		UI_StopFlashing(flashid_sapper)
+		HintPoint_Remove(hpid_sapper)
+		
+		if Rule_Exists(SetUpBase_SelectHQ) == false then
+			Rule_Add(SetUpBase_SelectHQ)
+		end
+	end
+	
+end
+
+
+-- sappers are on the field and ready to go, tell the player to select them
+function SetUpBase_SappersDeployed()
+
+	local sid = SGroup_GetSpawnedSquadAt(sg_ally_Inf_HQ, 1)
+	
+	Player_GetAll(player1)
+	SGroup_Filter(sg_allsquads, SBP.CW.SAPPER, FILTER_KEEP)
+	
+	if SGroup_Count(sg_allsquads) >= 1 then
+		
+		Rule_RemoveMe()
+		
+		infantryhq_productionqueue = infantryhq_productionqueue + 1
+		
+		SGroup_AddGroup(sg_playersapper, sg_allsquads)
+		
+		--UI_StopFlashing(flashid_sapper)
+		HintPoint_Remove(hpid_sapper)
+		
+		FOW_RevealMarker(mkr_fow_setupbase2, -1)
+		
+		Objective_UpdateText(OBJ_SetUpBase, 1319204, 1319225)
+		Rule_AddOneShot(Rule_Delayed_Sapper_Speech, 3)
+		
+		if Rule_Exists(SetUpBase_SelectSappers) == false then
+			Rule_AddOneShot(SetUpBase_SelectSappers, 1)
+		end
+		Rule_AddInterval(Rule_Sapper_Reserve, 0.5)
+	elseif Squad_HasProductionQueue(sid) and Squad_GetProductionQueueSize(sid) == 0 then
+		
+		-- player must have cancelled the order
+		
+		infantryhq_productionqueue = infantryhq_productionqueue + 1
+		
+		Player_SetSquadProductionAvailability(player1, SBP.CW.SAPPER, ITEM_DEFAULT)
+		
+		if Misc_IsSGroupSelected(sg_ally_Inf_HQ, ANY) then
+			
+			Rule_RemoveMe()
+			
+			flashid_sapper = UI_FlashProductionButton(PITEM_Spawn, SBP.CW.SAPPER, true, BT_UI_Strong_CommandBtn)
+			hpid_sapper = HintPoint_AddToProductionButton(PITEM_Spawn, SBP.CW.SAPPER, 1319704, true)
+			
+			Rule_AddInterval(SetUpBase_SappersOrdered, 0.5)
+			
+		else
+			
+			OBJ_SetUpBase.PingID = Objective_AddUIElements(OBJ_SetUpBase, sg_ally_Inf_HQ, true, 1319703, true, 1)
+			
+			Camera_MoveToSGroup(sg_ally_Inf_HQ, true, SLOW_CAMERA_PANNING)
+			if Rule_Exists(SetUpBase_HQSelected) == false then
+				Rule_AddInterval(SetUpBase_HQSelected, 0.5)
+			end
+			
+			
+		end
+		
+	end
+	
+end
+
+
+function Rule_Delayed_Sapper_Speech()
+	
+	--this is delayed so that it doesn't play over the multiplayer speech intro
+	Util_StartIntel(EVENTS.SetUpBase_BuildHowitzer)
+ 
+
+end
+
+
+function Rule_Sapper_Reserve()
+
+	if g_howitzer_built == true then
+		
+		Rule_RemoveMe()
+	
+	else
+		Player_GetAll(player1)
+		SGroup_Filter(sg_allsquads, SBP.CW.SAPPER, FILTER_KEEP)
+		
+		if SGroup_Count(sg_allsquads) >= 1 then
+
+			Player_SetSquadProductionAvailability(player1, SBP.CW.SAPPER, ITEM_LOCKED)
+			
+		
+		else
+		
+			Player_SetSquadProductionAvailability(player1, SBP.CW.SAPPER, ITEM_DEFAULT)
+			
+			if Rule_Exists(SetUpBase_SelectHQ) == false then
+				Rule_Add(SetUpBase_SelectHQ)
+				Rule_Remove(SetUpBase_SappersDeployed)
+			end
+			Rule_RemoveMe()
+		end	
+		
+	end	
+end
+
+-------------------------------------------------------------------------
+-- Select Sappers and build Howitzer
+-------------------------------------------------------------------------
+
+-- tell the player to select the sappers
+function SetUpBase_SelectSappers()
+
+	Camera_MoveToSGroup(sg_playersapper, true, SLOW_CAMERA_PANNING)
+	
+	OBJ_SetUpBase.PingID = Objective_AddUIElements(OBJ_SetUpBase, sg_playersapper, true, 1319706, true)
+	Player_SetEntityProductionAvailability(player1, EBP.CW.HOWITZER_NEST, ITEM_DEFAULT)
+	
+	if Rule_Exists(SetUpBase_SappersSelected) == false then
+		Rule_Add(SetUpBase_SappersSelected)
+	end
+end
+
+
+-- sappers selected, now flash the build menu button
+function SetUpBase_SappersSelected()
+	Player_GetAll(player1, sg_playersapper)
+	SGroup_Filter(sg_playersapper, SBP.CW.SAPPER, FILTER_KEEP)
+	if Misc_IsSGroupSelected(sg_playersapper, ANY) then
+		
+		Rule_RemoveMe()
+		
+		Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingID)
+		
+		flashid_buildmenu = UI_FlashConstructionMenu("tp_construction_commonwealth_sapper", false, BT_UI_Strong_CommandBtn)
+		hpid_buildmenu = HintPoint_AddToConstructionMenu("tp_construction_commonwealth_sapper", 1319707, false)
+		
+		Tutorial_SafetySetResources(player1, cost.howitzer)
+		UI_RestrictBuildingPlacement(mkr_howitzer1spawn)
+		
+		Rule_Add(SetUpBase_SappersBuildMenuSelected)
+		
+	end
+	
+end
+
+
+-- build menu selected, now flash the howitzer button
+function SetUpBase_SappersBuildMenuSelected()
+	Player_GetAll(player1, sg_playersapper)
+	SGroup_Filter(sg_playersapper, SBP.CW.SAPPER, FILTER_KEEP)
+
+	if _ConstructionMenuStatus == "tp_construction_commonwealth_sapper" then
+		
+		Rule_RemoveMe()
+		
+		UI_StopFlashing(flashid_buildmenu)
+		HintPoint_Remove(hpid_buildmenu)
+		
+		flashid_howitzer = UI_FlashConstructionButton(EBP.CW.HOWITZER_NEST, true, BT_UI_Strong_CommandBtn)
+		hpid_howitzer = HintPoint_AddToConstructionButton(EBP.CW.HOWITZER_NEST, 1319708, true)
+		
+		UI_SetBuildingPlacementCallback(SetUpBase_SappersPlacingHowitzer)
+		
+		Rule_AddInterval(SetUpBase_SappersHowitzerSappersDeselected, 0.5)
+		
+	elseif Misc_IsSGroupSelected(sg_playersapper, ANY) == false then
+		
+		Rule_RemoveMe()
+		
+		UI_StopFlashing(flashid_buildmenu)
+		HintPoint_Remove(hpid_buildmenu)
+		
+		SetUpBase_SelectSappers()
+		
+	end
+
+end
+
+
+-- callback function deals with stages for building the howitzer
+function SetUpBase_SappersPlacingHowitzer(ebp, phase)
+	
+	if ebp == EBP.CW.HOWITZER_NEST then
+		
+		-- placing
+		if phase == CP_Selected then
+			
+			UI_StopFlashing(flashid_howitzer)
+			HintPoint_Remove(hpid_howitzer)
+			
+			Camera_MoveToPosition(mkr_howitzer1spawn, true, SLOW_CAMERA_PANNING)
+		
+
+			OBJ_SetUpBase.PingID_HOW_Place = Objective_AddUIElements(OBJ_SetUpBase, mkr_howitzer1spawn, false, 1319709, true)
+			
+		-- rotating
+		elseif phase == CP_StartedPlacing then
+			
+			Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingID_HOW_Place)
+			OBJ_SetUpBase.PingID_HOW_Rotate = Objective_AddUIElements(OBJ_SetUpBase, mkr_howitzer1spawn_facing, false, 1319719, false)
+			
+			EGroup_ReSpawn(eg_helperarrow_howitzer)			-- show rotation arrow
+			
+		-- placed
+		elseif phase == CP_FinishedPlacing then
+			
+			UI_ClearBuildingPlacementCallback()
+			
+			
+			Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingID_HOW_Rotate)
+			EGroup_DeSpawn(eg_helperarrow_howitzer)			-- hide rotation arrow
+			
+			Util_StartAmbient(EVENTS.SetUpBase_HowitzerBuilding)
+		--	Util_StartIntel(EVENTS.SetUpBase_HowitzerBuilding)
+			
+			Rule_AddInterval(SetUpBase_SappersHowitzerBuilt, 1)
+			Rule_RemoveIfExist(SetUpBase_SappersHowitzerSappersDeselected)
+			g_howitzer_built = true
+			
+		end
+		
+	end		
+	
+end
+
+
+-- the howitzer is building
+function SetUpBase_SappersHowitzerSappersDeselected()
+	
+	Player_GetAll(player1, sg_playersapper)
+	SGroup_Filter(sg_playersapper, SBP.CW.SAPPER, FILTER_KEEP)
+
+	if Misc_IsSGroupSelected(sg_playersapper, ANY) == false then
+		
+		Rule_RemoveMe()
+		
+		Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingID_HOW_Place)
+		Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingID_HOW_Rotate)
+		EGroup_DeSpawn(eg_helperarrow_howitzer)			-- hide rotation arrow
+		
+		UI_ClearBuildingPlacementCallback()
+		EGroup_DeSpawn(eg_helperarrow_howitzer)			-- hide rotation arrow
+		
+		SetUpBase_SelectSappers()
+		
+	end
+
+
+end
+
+
+-- the howitzer is built
+function SetUpBase_SappersHowitzerBuilt()
+
+	Player_GetAll(player1)
+	EGroup_Filter(eg_allentities, EBP.CW.HOWITZER_NEST, FILTER_KEEP)
+	EGroup_FilterUnderConstruction(eg_allentities, FILTER_REMOVE)
+	
+	if EGroup_Count(eg_allentities) >= 1 then
+		
+		UI_UnrestrictBuildingPlacement()
+		
+		Rule_RemoveMe()
+		
+		EGroup_AddEGroup(eg_playerhowitzer1, eg_allentities)
+		EGroup_SetInvulnerable(eg_playerhowitzer1, 0.5)
+		Player_SetEntityProductionAvailability(player1, EBP.CW.HOWITZER_NEST, ITEM_LOCKED)
+		
+		Player_GetAll(player1, sg_player_control_groups, eg_player_control_groups)
+		
+		if SGroup_IsEmpty(sg_player_control_groups) == false then
+			for i = 1, SGroup_Count(sg_player_control_groups) do
+
+				g_temp_ctrl_group = Misc_GetSquadControlGroup( SGroup_GetSpawnedSquadAt(sg_player_control_groups, i))
+			
+				if g_temp_ctrl_group ~= -1 then
+				
+					if g_temp_ctrl_group == 0 then 
+						g_temp_ctrl_group = 10
+					end
+					t_ctrl_table[g_temp_ctrl_group] = false
+				
+				
+				end
+			
+			end
+			
+		end
+
+
+		if EGroup_IsEmpty(eg_player_control_groups) == false then
+			
+			for i = 1, EGroup_Count(eg_player_control_groups) do
+	
+				g_temp_ctrl_group = Misc_GetEntityControlGroup( EGroup_GetSpawnedEntityAt(eg_player_control_groups, i))
+
+				if g_temp_ctrl_group ~= -1 then
+				
+					if g_temp_ctrl_group == 0 then 
+						g_temp_ctrl_group = 10
+					end
+					t_ctrl_table[g_temp_ctrl_group] = false
+				
+				
+				end
+			
+			end
+
+		end
+		
+		for k, this in pairs(t_ctrl_table) do
+
+			if this == true then
+		
+				if k == 10 then
+					k = 0
+
+				end
+				
+				g_first_howitzer_ctrl_group = k
+				Misc_SetEntityControlGroup(EGroup_GetSpawnedEntityAt(eg_playerhowitzer1, 1), g_first_howitzer_ctrl_group)
+				break	
+
+			end
+		end
+		
+		
+		
+		-- highlight the shortcut button
+		flashid_firsthowitzer = UI_FlashSquadControlGroupIcon(g_first_howitzer_ctrl_group, false, BT_UI_Weak_SquadControl)
+		hpid_firsthowitzer = HintPoint_AddToSquadControlGroup(g_first_howitzer_ctrl_group, 1319950, false)
+		Rule_AddOneShot(SetUpBase_RemoveSquadGroupUIHighlight, 10)
+		
+		Util_StartAmbient(EVENTS.SetUpBase_HowitzerBuilt)
+		
+		Objective_Complete(OBJ_SetUpBase)
+		
+		LeftFlank_StartAttack()
+		Rule_AddInterval(LeftFlank_FocusOnAttack, 1)
+		
+		UI_SetModalAbilityPhaseCallback(LeftFlank_HowitzerArtilleryButtonPressed)
+		
+		--stop the howitzer in case of queued orders
+		if EGroup_Exists("eg_playerhowitzer1")and EGroup_IsEmpty(eg_playerhowitzer1) == false then
+			Cmd_Stop(eg_playerhowitzer1)
+		end	
+	
+		
+		
+	end
+	
+end
+
+function SetUpBase_RemoveSquadGroupUIHighlight()
+	UI_StopFlashing(flashid_firsthowitzer)
+	HintPoint_Remove(hpid_firsthowitzer)
+end
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- OBJECTIVE Defend Left Flank
+-------------------------------------------------------------------------
+-- This is the attack on the left flank that occurs after the player has 
+-- built his first set of defences
+-------------------------------------------------------------------------
+function Initialize_OBJ_LeftFlank()
+
+	OBJ_LeftFlank = {
+		
+		SetupUI = function() 
+			
+		end,
+		
+		OnStart = function()
+		Sound_PlayMusic("Music/SP/Caen/Motivation/coh_m01_cue_03.bsc",2,0)
+			
+			-- tag as always show
+			Objective_SetAlwaysShowDetails(OBJ_LeftFlank, true, true, true)
+			
+			--stop the howitzer in case of queued orders
+			if EGroup_Exists("eg_playerhowitzer1") and EGroup_IsEmpty(eg_playerhowitzer1) == false then
+				Cmd_Stop(eg_playerhowitzer1)
+			end
+		end,
+		
+		OnComplete = function()
+			
+			-- tell the player they did good
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			-- tell the player they lost
+		end,
+		
+		Title = 1319206,
+		Description = 1319222,
+		TitleEnd = 1319242,
+		Type = OT_Primary,
+		
+	}
+	
+	-- Register Objective and initialise data
+	Objective_Register(OBJ_LeftFlank)
+	LeftFlank_Init()
+	
+end
+
+
+
+-------------------------------------------------------------------------
+-- Left Flank functions
+-------------------------------------------------------------------------
+
+function LeftFlank_Init()
+
+	sg_ally_EmpAttacker = SGroup_CreateTable("sg_ally_EmpAttacker%d", 8)
+
+	sg_defAll_empAxis = SGroup_CreateTable("sg_defAll_empAxis%d", 11)
+	sg_defAll_empAxisInf = SGroup_CreateIfNotFound("sg_defAll_empAxisInf")
+	
+	sg_player3sappers = SGroup_CreateIfNotFound("sg_player3sappers")
+	
+	sg_leftflank_firstattackers = SGroup_CreateIfNotFound("sg_leftflank_firstattackers")
+	sg_leftflank_hmg = SGroup_CreateIfNotFound("sg_leftflank_hmg")
+	
+	sg_leftflank_atgunattackers = SGroup_CreateIfNotFound("sg_leftflank_atgunattackers")
+	
+	sg_leftflank_finaltanks = SGroup_CreateIfNotFound("sg_leftflank_finaltanks")
+	sg_leftflank_finalinfantry = SGroup_CreateIfNotFound("sg_leftflank_finalinfantry")
+	
+	-- the units that come in on the first attack
+	t_leftflank_first_attackers = {}
+	t_leftflank_first_attackers[1] = {sgroup = sg_ally_EmpAttacker[1], bp = SBP.AXIS.GRENADIER, dest = mkr_firstattackers_rally1}
+	t_leftflank_first_attackers[2] = {sgroup = sg_ally_EmpAttacker[2], bp = SBP.AXIS.VOLKSGRENADIER, dest = mkr_firstattackers_rally2}
+	t_leftflank_first_attackers[3] = {sgroup = sg_ally_EmpAttacker[3], bp = SBP.AXIS.VOLKSGRENADIER, dest = mkr_firstattackers_rally3}
+	t_leftflank_first_attackers[4] = {sgroup = sg_ally_EmpAttacker[4], bp = SBP.AXIS.GRENADIER, dest = mkr_firstattackers_rally1}
+	
+	-- the units that come in and attack the AT gun
+	t_leftflank_atgun_attackers = {}
+	t_leftflank_atgun_attackers[1] = {delay = 1, bp = SBP.ELITE.ARMOURCAR_221, accuracymod = 4.5, spawnpos = mkr_atgunattacker_spawn, route = "path_atgunattack1", initial = true,}
+	t_leftflank_atgun_attackers[2] = {delay = 11, bp = SBP.AXIS.PUMA, accuracymod = 4.5, spawnpos = mkr_atgunattacker_spawn, route = "path_atgunattack2", initial = false,}
+	t_leftflank_atgun_attackers[3] = {delay = 26, bp = SBP.ELITE.ARMOURCAR_221, accuracymod = 4.5, spawnpos = mkr_atgunattacker_spawn, route = "path_atgunattack3", initial = false,}
+	t_leftflank_atgun_attackers[4] = {delay = 39, bp = SBP.AXIS.PUMA, accuracymod = 4.5, spawnpos = mkr_atgunattacker_spawn, route = "path_atgunattack4", initial = false,}
+	t_leftflank_atgun_attackers[5] = {delay = 49, bp = SBP.ELITE.ARMOURCAR_221, accuracymod = 4.5, spawnpos = mkr_atgunattacker_spawn, route = "path_atgunattack1", initial = false,}
+	t_leftflank_atgun_attackers[6] = {delay = 58, bp = SBP.AXIS.STUG, accuracymod = 4.5, spawnpos = mkr_atgunattacker_spawn, route = "path_atgunattack2", initial = false,}
+
+	-- the units that come in the third and final attack
+	t_leftflank_final_attackers = {}
+	t_leftflank_final_attackers[1] = {sgroup = sg_defAll_empAxis[1], bp = SBP.ELITE.ARMOURCAR_221, kind = "Tank", accuracymod = 4.5}
+	t_leftflank_final_attackers[2] = {sgroup = sg_defAll_empAxis[2], bp = SBP.ELITE.HALFTRACK_MORTAR, kind = "Tank", accuracymod = 4.5}
+	t_leftflank_final_attackers[3] = {sgroup = sg_defAll_empAxis[3], bp = SBP.ELITE.ARMOURCAR_221, kind = "Tank", accuracymod = 4.5}
+	t_leftflank_final_attackers[4] = {sgroup = sg_defAll_empAxis[4], bp = SBP.ELITE.ARMOURCAR_221, kind = "Tank", accuracymod = 4.5}
+
+
+	
+	t_leftflank_final_attackers_infantry = {}
+	t_leftflank_final_attackers_infantry[1] = {sgroup = sg_defAll_empAxis[5], bp = SBP.AXIS.GRENADIER, kind = "Infantry", accuracymod = 4.5}
+	t_leftflank_final_attackers_infantry[2] = {sgroup = sg_defAll_empAxis[6], bp = SBP.AXIS.VOLKSGRENADIER, kind = "Infantry", accuracymod = 4.5}
+	t_leftflank_final_attackers_infantry[3] = {sgroup = sg_defAll_empAxis[7], bp = SBP.AXIS.GRENADIER, kind = "Infantry", accuracymod = 4.5}
+	
+	t_leftflank_final_attackers_infantry_wave_2 = {}
+	t_leftflank_final_attackers_infantry_wave_2[1] = {sgroup = sg_defAll_empAxis[8], bp = SBP.AXIS.GRENADIER, kind = "Infantry", accuracymod = 4.5}
+	t_leftflank_final_attackers_infantry_wave_2[2] = {sgroup = sg_defAll_empAxis[9], bp = SBP.AXIS.VOLKSGRENADIER, kind = "Infantry", accuracymod = 4.5}
+	t_leftflank_final_attackers_infantry_wave_2[3] = {sgroup = sg_defAll_empAxis[10], bp = SBP.AXIS.GRENADIER, kind = "Infantry", accuracymod = 4.5}
+	t_leftflank_final_attackers_infantry_wave_2[4] = {sgroup = sg_defAll_empAxis[11], bp = SBP.AXIS.GRENADIER, kind = "Infantry", accuracymod = 4.5}
+	
+	-- possible routes for the third and final wave
+	t_leftflank_final_tankroutes = {}
+	t_leftflank_final_tankroutes[1] = {spawn = mkr_leftflank_finalattacker_spawnleft, routes = {"path_finalattackleft1", "path_finalattackleft2", "path_finalattackleft3"}}
+	t_leftflank_final_tankroutes[2] = {spawn = mkr_leftflank_finalattacker_spawnright, routes = {"path_finalattackright1", "path_finalattackright2", "path_finalattackright3"}}
+	t_leftflank_final_infantryroutes = {}
+	t_leftflank_final_infantryroutes[1] = {spawn = mkr_leftflank_finalattacker_infantryspawn1, routes = {mkr_leftflank_finalattacker_infantrydest2, mkr_leftflank_finalattacker_infantrydest1}}
+	t_leftflank_final_infantryroutes[2] = {spawn = mkr_leftflank_finalattacker_infantryspawn2, routes = {mkr_leftflank_finalattacker_infantrydest1, mkr_leftflank_finalattacker_infantrydest4}}
+	t_leftflank_final_infantryroutes[3] = {spawn = mkr_leftflank_finalattacker_infantryspawn3, routes = {mkr_leftflank_finalattacker_infantrydest2, mkr_leftflank_finalattacker_infantrydest3}}
+
+	
+	t_leftflank_final_infantryroutes_wave_2 = {}
+	t_leftflank_final_infantryroutes_wave_2[1] = {spawn = mkr_leftflank_finalattacker_infantryspawn1, routes = {mkr_leftflank_finalattacker_infantrydest2, mkr_leftflank_finalattacker_infantrydest5}}
+	t_leftflank_final_infantryroutes_wave_2[2] = {spawn = mkr_leftflank_finalattacker_infantryspawn2, routes = {mkr_leftflank_finalattacker_infantrydest1, mkr_leftflank_finalattacker_infantrydest6}}
+	t_leftflank_final_infantryroutes_wave_2[3] = {spawn = mkr_leftflank_finalattacker_infantryspawn3, routes = {mkr_leftflank_finalattacker_infantrydest2, mkr_leftflank_finalattacker_infantrydest1}}
+	t_leftflank_final_infantryroutes_wave_2[4] = {spawn = mkr_leftflank_finalattacker_infantryspawn3, routes = {mkr_leftflank_finalattacker_infantrydest2, mkr_leftflank_finalattacker_infantrydest3}}
+	
+	threat_leftflank_first_attackers = ThreatArrow_CreateGroup()
+	threat_leftflank_atgun_attackers = ThreatArrow_CreateGroup()
+	threat_leftflank_final_attackers = ThreatArrow_CreateGroup()
+	
+	sg_player_at_emplacement = SGroup_CreateIfNotFound("sg_player_at_emplacement")
+	sg_AT_First_Offering = SGroup_CreateIfNotFound("sg_AT_First_Offering")
+	sg_smoke_target = SGroup_CreateIfNotFound("sg_smoke_target")
+	t_smoke_targets = Marker_GetTable("mkr_howitzer_smoke_%d")
+	g_smoke_end = false
+	sg_temp_retreat = SGroup_CreateIfNotFound("sg_temp_retreat")
+	eg_playerboforsgun1 = EGroup_CreateIfNotFound("eg_playerboforsgun1")
+	sg_player_bofors_emplacement = SGroup_CreateIfNotFound("sg_player_bofors_emplacement")
+	g_AT_built = false
+	g_Bofor = false
+	g_Buildsapper_event_at = false
+	g_howitzer_fired = false
+	g_first_selection_bofors = false
+	
+end
+
+
+
+-------------------------------------------------------------------------
+-- Start the attack on the left flank
+-------------------------------------------------------------------------
+
+function LeftFlank_StartAttack()
+
+	-- create MG squad to go into the building
+	Util_CreateSquads(player2, sg_leftflank_hmg, SBP.AXIS.HEAVYMG, mkr_offmap9, eg_emp_farmhouse, 1)
+	Cmd_Garrison(sg_leftflank_hmg, eg_emp_farmhouse, false, true)
+	SGroup_AddGroup(sg_leftflank_firstattackers, sg_leftflank_hmg)
+	
+	-- modify the hmg
+	Modify_SightRadius(sg_leftflank_hmg, 4)
+	Modify_WeaponAccuracy(sg_leftflank_hmg, "hardpoint_01", 0.1)
+	Modify_WeaponDamage(sg_leftflank_hmg, "hardpoint_01", 0.1)
+	Modify_WeaponRange(sg_leftflank_hmg, "hardpoint_01", 3)
+
+	-- modify the farm house
+	Modify_SightRadius(eg_emp_farmhouse, 3)
+
+	Rule_AddOneShot(LeftFlank_StartAttackB, 15)
+	
+end
+function LeftFlank_StartAttackB()
+
+	-- a position at the base of the tree
+	for k, this in pairs(t_leftflank_first_attackers) do 
+		Util_CreateSquads(player2, this.sgroup, this.bp, Table_GetRandomItem({mkr_leftflank_enemyspawn_1, mkr_leftflank_enemyspawn_2}))
+		SGroup_AddGroup(sg_leftflank_firstattackers, this.sgroup)
+		Cmd_Move(this.sgroup, this.dest, true, NIL_DELETE, NIL_FACE, NIL_OFFSET, NIL_DIST, 10)
+		-- modifiers
+		Modify_SightRadius(this.sgroup, 3)
+		Modify_WeaponAccuracy(this.sgroup, "hardpoint_01", .1)
+		Modify_WeaponRange(this.sgroup, "hardpoint_01", 2)
+	end
+
+	Rule_AddInterval(LeftFlank_AttackerManager, 15)
+	
+end
+
+
+-- monitor the threat and keep it running
+function LeftFlank_AttackerManager()
+
+	if flag_firstattackover == true then
+		Rule_RemoveMe()
+	else
+		
+		-- a position at the base of the tree
+		for k, this in pairs(t_leftflank_first_attackers) do 
+			if SGroup_IsEmpty(this.sgroup) then
+				Util_CreateSquads(player2, this.sgroup, this.bp, Table_GetRandomItem({mkr_leftflank_enemyspawn_1, mkr_leftflank_enemyspawn_2}))
+				SGroup_AddGroup(sg_leftflank_firstattackers, this.sgroup)
+				ThreatArrow_Add(threat_leftflank_first_attackers, this.sgroup)
+				Cmd_Move(this.sgroup, this.dest, true, NIL_DELETE, NIL_FACE, NIL_OFFSET, NIL_DIST, 10)
+				-- modifiers
+				Modify_SightRadius(this.sgroup, 3)
+				Modify_WeaponAccuracy(this.sgroup, "hardpoint_01", .1)
+				Modify_WeaponRange(this.sgroup, "hardpoint_01", 2)
+				break
+			end
+		end
+		local rand = World_GetRand(1, 4)
+		Cmd_Move(sg_ally_EmpAttacker[rand], mkr_firstattackers_forwardrally, true, NIL_DELETE, NIL_FACE, NIL_OFFSET, NIL_DIST, 10)
+		
+	end
+	
+end
+
+
+
+-- pull the camera over to the attack
+function LeftFlank_FocusOnAttack()
+
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		FOW_RevealMarker(mkr_fow_leftflank1, -1)
+		
+		
+		Camera_ClampToMarker(mkr_camera_phase2b)
+		Misc_RestrictCommandsToMarker(mkr_camera_phase2b)
+		Camera_MoveToPosition(mkr_LeftB1, true, SLOW_CAMERA_PANNING)
+		
+		Objective_Start(OBJ_LeftFlank)
+		OBJ_LeftFlank.PingIDA = Objective_AddUIElements(OBJ_LeftFlank, mkr_LeftB1, false, nil, true)
+		
+		Util_StartIntel(EVENTS.LeftFlank_EnemyFirstSpotted)
+		
+		Rule_AddInterval(LeftFlank_FocusOnAttackB, 1)
+
+	end
+	
+end
+function LeftFlank_FocusOnAttackB()
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		Util_StartIntel(EVENTS.LeftFlank_GetHowitzerFiring)
+				
+						
+		if Misc_IsEGroupSelected(eg_playerhowitzer1, ANY) == false then
+			LeftFlank_SelectHowitzer()
+		else
+			Rule_AddInterval(LeftFlank_HowitzerSelected, 1)
+		end
+		
+		
+		
+	end
+end
+
+
+
+-------------------------------------------------------------------------
+-- Select Howitzer and attack enemy
+-------------------------------------------------------------------------
+
+-- tell the player to select the howitzer
+function LeftFlank_SelectHowitzer()
+
+	
+	
+	
+	Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingIDA)
+	
+	
+	-- now enable the threat arrow...
+	ThreatArrow_Add(threat_leftflank_first_attackers, sg_leftflank_firstattackers)
+	
+	
+	
+	if g_howitzer_fired == false then
+		OBJ_LeftFlank.PingID = Objective_AddUIElements(OBJ_LeftFlank, eg_playerhowitzer1, false, 1319710, false, 2)
+		Camera_MoveToEGroup(eg_playerhowitzer1, true, SLOW_CAMERA_PANNING)
+		Rule_AddInterval(LeftFlank_HowitzerSelected, 1)
+	end
+	
+	
+end
+
+
+-- howitzer selected, now flash the barrage button
+function LeftFlank_HowitzerSelected()
+	
+	if Misc_IsEGroupSelected(eg_playerhowitzer1, ANY) then
+		
+		Rule_RemoveMe()
+		
+		Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingID)
+		
+		flashid_howitzerbarrage = UI_FlashAbilityButton(ABILITY.CW.PDR_25_BARRAGE, true, BT_UI_Strong_AbilityBtn)
+		hpid_howitzerbarrage = HintPoint_AddToAbilityButton(ABILITY.CW.PDR_25_BARRAGE, 1319711, true)
+		
+		
+		
+	end
+	
+end
+
+
+-- somewhere here you need to hook up EVENTS.LeftFlank_SetHowitzerTarget to play upon the player clicking on the arty button
+function LeftFlank_HowitzerArtilleryButtonPressed(ability, phase)
+	
+	if ability == ABILITY.CW.PDR_25_BARRAGE and phase == MAP_Placing then
+		
+		UI_ClearModalAbilityPhaseCallback()
+		Util_StartIntel(EVENTS.LeftFlank_SetHowitzerTarget)
+		
+		Camera_MoveToPosition(mkr_LeftB1, true, SLOW_CAMERA_PANNING)
+		
+		
+		OBJ_LeftFlank.PingID = Objective_AddUIElements(OBJ_LeftFlank, mkr_LeftB1, true, 1319712, true)
+		
+		Rule_AddInterval(LeftFlank_HowitzerStartedFiring, 1)
+		Util_CreateEntities(player1, eg_smoke, EBP.SP.SP_SMOKE, mkr_LeftB1, 1)
+		Rule_AddInterval(Rule_Set_Smoke_Target, 25)
+		
+		g_howitzer_fired = true
+	end
+	
+end
+
+function Rule_Set_Smoke_Target()
+
+	if g_smoke_end == false then
+	
+		sg_smoke_target = Player_GetSquadConcentration(player2, nil, nil, nil, nil, t_smoke_targets)
+		EGroup_DestroyAllEntities(eg_smoke)
+		
+		if  sg_smoke_target then
+			Util_CreateEntities(player1, eg_smoke, EBP.SP.SP_SMOKE, SGroup_GetPosition(sg_smoke_target), 1)
+		end
+	
+	elseif g_smoke_end == true then
+	
+		EGroup_DestroyAllEntities(eg_smoke)
+		Rule_RemoveMe()
+	
+	
+	end
+
+end
+
+
+
+function LeftFlank_HowitzerStartedFiring()
+
+	SGroup_Clear(sg_temp)
+	EGroup_GetSquadsHeld(eg_playerhowitzer1, sg_temp)
+	
+	if SGroup_IsDoingAbility(sg_temp, ABILITY.CW.PDR_25_BARRAGE, ANY) then
+		
+		Rule_RemoveMe()
+		
+		Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingID)
+		
+		EGroup_DestroyAllEntities(eg_smoke)
+		
+		Rule_AddDelayedInterval(LeftFlank_RetreatFirstAttack, 115, 10)
+		Rule_AddOneShot(Rule_Howitzer_Intel_Event, 60)
+		FOW_RevealMarker(mkr_reveal_retreating_infantry, -1)
+		
+		Rule_AddInterval(LeftFlank_HowitzerStartedFiringB, 1)
+		Rule_AddOneShot(LeftFlank_AutoBuildSecondHowitzer, 1)
+		
+	end
+	
+end
+function LeftFlank_HowitzerStartedFiringB()
+	if Event_IsAnyRunning() == false then
+		Rule_RemoveMe()
+		Util_StartAmbient(EVENTS.LeftFlank_HowitzerFiring)
+		Rule_AddInterval(LeftFlank_HowitzerStoppedFiring, 1)
+	end
+end
+
+
+-- the howitzer has stopped firing its barrage - tell player to fire it again
+function LeftFlank_HowitzerStoppedFiring()
+
+	SGroup_Clear(sg_temp)
+	EGroup_GetSquadsHeld(eg_playerhowitzer1, sg_temp)
+	
+	if Event_IsAnyRunning() == false and SGroup_IsDoingAbility(sg_temp, ABILITY.CW.PDR_25_BARRAGE, ANY) == false then
+		
+		Rule_RemoveMe()
+		
+		Util_StartIntel(EVENTS.LeftFlank_FireHowitzerAgain)
+		OBJ_LeftFlank.PingID_Barrage = Objective_AddUIElements(OBJ_LeftFlank, eg_playerhowitzer1, true, 1319714, true)
+		
+		Rule_AddInterval(LeftFlank_HowitzerStoppedFiringB, 1)
+		
+	end
+	
+end
+function LeftFlank_HowitzerStoppedFiringB()
+
+	SGroup_Clear(sg_temp)
+	EGroup_GetSquadsHeld(eg_playerhowitzer1, sg_temp)
+	
+	if SGroup_IsDoingAbility(sg_temp, ABILITY.CW.PDR_25_BARRAGE, ANY) then
+		Rule_RemoveMe()
+		Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingID_Barrage)
+		HowitzerHelper_AddGroup(eg_playerhowitzer1)
+		HowitzerHelper_Start()
+	end
+	
+end
+
+
+
+-- automatically build a second howitzer, then pass control to the player
+function LeftFlank_AutoBuildSecondHowitzer()
+
+	Util_CreateSquads(player3, sg_player3sappers, SBP.CW.SAPPER, mkr_offmap1)
+	Cmd_Construct(sg_player3sappers, EBP.CW.HOWITZER_NEST, mkr_howitzer2spawn, Util_CreateFacingPosFromMarker(mkr_howitzer2spawn))
+	
+	Rule_AddInterval(LeftFlank_AutoBuildSecondHowitzerB, 1)
+	
+end
+function LeftFlank_AutoBuildSecondHowitzerB()
+
+	Player_GetAllEntitiesNearMarker(player3, eg_temp, mkr_howitzer2spawn, 20)
+	EGroup_Filter(eg_temp, EBP.CW.HOWITZER_NEST, FILTER_KEEP)
+	EGroup_FilterUnderConstruction(eg_temp, FILTER_REMOVE)
+	
+	if EGroup_Count(eg_temp) >= 1 then
+		
+		Rule_RemoveMe()
+		
+		EGroup_AddEGroup(eg_playerhowitzer2, eg_temp)
+		EGroup_SetPlayerOwner(eg_playerhowitzer2, player1)
+		EGroup_SetInvulnerable(eg_playerhowitzer2, 0.5)
+		
+		SGroup_Clear(sg_temp)
+		EGroup_GetSquadsHeld(eg_playerhowitzer2, sg_temp)
+		SGroup_SetPlayerOwner(sg_temp, player1)
+		
+		Player_GetAll(player1, sg_player_control_groups, eg_player_control_groups)
+		
+		if SGroup_IsEmpty(sg_player_control_groups) == false then
+			for i = 1, SGroup_Count(sg_player_control_groups) do
+
+				g_temp_ctrl_group = Misc_GetSquadControlGroup( SGroup_GetSpawnedSquadAt(sg_player_control_groups, i))
+			
+				if g_temp_ctrl_group ~= -1 then
+				
+					if g_temp_ctrl_group == 0 then 
+						g_temp_ctrl_group = 10
+					end
+					t_ctrl_table[g_temp_ctrl_group] = false
+				
+				
+				end
+			
+			end
+			
+		end
+
+
+		if EGroup_IsEmpty(eg_player_control_groups) == false then
+			
+			for i = 1, EGroup_Count(eg_player_control_groups) do
+	
+				g_temp_ctrl_group = Misc_GetEntityControlGroup( EGroup_GetSpawnedEntityAt(eg_player_control_groups, i))
+
+				if g_temp_ctrl_group ~= -1 then
+				
+					if g_temp_ctrl_group == 0 then 
+						g_temp_ctrl_group = 10
+					end
+					t_ctrl_table[g_temp_ctrl_group] = false
+				
+				
+				end
+			
+			end
+
+		end
+		
+		for k, this in pairs(t_ctrl_table) do
+
+			if this == true then
+		
+				if k == 10 then
+					k = 0
+
+				end
+				
+				g_second_howitzer_ctrl_group = k
+				Misc_SetEntityControlGroup(EGroup_GetSpawnedEntityAt(eg_playerhowitzer2, 1), g_second_howitzer_ctrl_group)
+				break	
+
+			end
+		end
+		
+		
+		
+		-- highlight the shortcut button
+		flashid_secondhowitzer = UI_FlashSquadControlGroupIcon(g_second_howitzer_ctrl_group, false, BT_UI_Weak_SquadControl)
+		hpid_secondhowitzer = HintPoint_AddToSquadControlGroup(g_second_howitzer_ctrl_group, 1319950, false)
+		Rule_AddOneShot(SetUpBase_RemoveSquadGroupUIHighlight2, 10)
+		
+		
+		
+		-- send the sappers back off the map
+		Cmd_Move(sg_player3sappers, mkr_offmap1, false, mkr_offmap1)
+		
+		Rule_AddInterval(LeftFlank_AutoBuildSecondHowitzerC, 1)
+		Rule_AddInterval(LeftFlank_SecondHowitzerFired, 1)
+		
+	end
+	
+end
+
+
+function SetUpBase_RemoveSquadGroupUIHighlight2()
+	UI_StopFlashing(flashid_secondhowitzer)
+	HintPoint_Remove(hpid_secondhowitzer)
+end
+
+
+function LeftFlank_AutoBuildSecondHowitzerC()
+	
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		Util_StartIntel(EVENTS.LeftFlank_SecondHowitzerReady)
+		
+		-- trigger an event cue (which we're gonna highlight)
+		cueid_secondhowitzer = EventCue_Create(CUE.NORMAL, 1319901, 1319999, eg_playerhowitzer2, 1319801, LeftFlank_EventCueCallback, -1)
+		
+		Rule_AddOneShot(LeftFlank_AutoBuildSecondHowitzerD, 2)
+		
+	end
+	
+end
+function LeftFlank_AutoBuildSecondHowitzerD()
+
+	if flag_eventcueclicked ~= true then		-- check that the player hasn't clicked the event cue already
+		
+		-- flash the event cue
+		UI_FlashEventCue(cueid_secondhowitzer, true, BT_UI_Strong_EventCue)
+		HintPoint_AddToEventCue(cueid_secondhowitzer, 1319900, true)
+		
+	end
+	
+end
+function LeftFlank_EventCueCallback()
+
+	if flag_eventcueclicked ~= true then
+		if flag_secondhowitzerfired == true then
+			HowitzerHelper_RemoveGroup(eg_playerhowitzer2)
+			Rule_AddOneShot(LeftFlank_EventCueCallbackB, 8)
+		end
+	end
+	
+	UI_ClearEventCues()
+	flag_eventcueclicked = true
+	
+end
+function LeftFlank_EventCueCallbackB()
+	HowitzerHelper_AddGroup(eg_playerhowitzer2)
+end
+
+
+function LeftFlank_SecondHowitzerFired()
+
+	SGroup_Clear(sg_temp)
+	EGroup_GetSquadsHeld(eg_playerhowitzer2, sg_temp)
+	
+	if SGroup_IsDoingAbility(sg_temp, ABILITY.CW.PDR_25_BARRAGE, ANY) then
+		Rule_RemoveMe()
+		flag_secondhowitzerfired = true
+		HowitzerHelper_AddGroup(eg_playerhowitzer2)
+	end
+	
+end
+
+
+function Rule_Howitzer_Intel_Event()
+
+	Util_StartIntel(EVENTS.LeftFlank_FirstAttackOver)
+	
+
+end
+
+
+
+function LeftFlank_RetreatFirstAttack()
+	
+	 if table.getn(t_leftflank_first_attackers) > 0 then
+		 for k, this in pairs(t_leftflank_first_attackers) do
+		
+			if SGroup_IsEmpty(this.sgroup) == false then
+				
+
+				Cmd_Retreat(this.sgroup, mkr_leftflank_firstattackers_retreat, mkr_leftflank_firstattackers_retreat, false)
+				SGroup_Add(sg_temp_retreat, SGroup_GetSpawnedSquadAt(this.sgroup, 1))
+				SGroup_RemoveGroup(this.sgroup, sg_temp_retreat)
+				
+				
+				table.remove(t_leftflank_first_attackers, k)
+			end
+		end	
+	else
+	
+		
+		HowitzerHelper_Stop()
+		ThreatArrow_DestroyGroup(threat_leftflank_first_attackers)
+	
+		
+		flag_firstattackover = true
+		Rule_AddInterval(LeftFlank_BuildATGun, 1)
+		Rule_AddInterval(Rule_Sapper_Reserve_AT, 0.5)
+		g_smoke_end = true
+		Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingID_Barrage)
+		Rule_RemoveMe()
+	end
+end
+
+
+
+-------------------------------------------------------------------------
+-- Select Sappers and build AT Gun
+-------------------------------------------------------------------------
+
+function LeftFlank_BuildATGun()
+	Player_GetAll(player1, sg_playersapper)
+	SGroup_Filter(sg_playersapper, SBP.CW.SAPPER, FILTER_KEEP)
+
+	if Event_IsAnyRunning() == false then
+		
+		FOW_UnRevealMarker(mkr_reveal_retreating_infantry)
+		Rule_RemoveMe()
+		
+		-- update objective to "Build AT Gun"
+		Objective_UpdateText(OBJ_LeftFlank, 1319205, 1319226)
+		Player_SetEntityProductionAvailability(player1, EBP.CW.ANTITANK_NEST, ITEM_DEFAULT)
+		
+		if Misc_IsSGroupSelected(sg_playersapper, ANY) then
+			
+			Util_StartIntel(EVENTS.LeftFlank_BuildATGun)
+			Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingID)
+			
+			flashid_buildmenu = UI_FlashConstructionMenu("tp_construction_commonwealth_sapper", false, BT_UI_Strong_CommandBtn)
+			hpid_buildmenu = HintPoint_AddToConstructionMenu("tp_construction_commonwealth_sapper", 1319707, false)
+			
+			if Rule_Exists(LeftFlank_SappersBuildMenuSelected) == false then
+				Rule_AddInterval(LeftFlank_SappersBuildMenuSelected, 0.5)
+			end
+		else
+			
+			Util_StartIntel(EVENTS.LeftFlank_BuildATGun)
+			LeftFlank_SelectSappers()
+			
+			--stop the howitzer in case of queued orders
+			if EGroup_Exists("eg_playerhowitzer1") and EGroup_IsEmpty(eg_playerhowitzer1) == false then
+				Cmd_Stop(eg_playerhowitzer1)
+			end	
+			--stop the howitzer in case of queued orders
+			if EGroup_Exists("eg_playerhowitzer2") and EGroup_IsEmpty(eg_playerhowitzer2) == false then
+				Cmd_Stop(eg_playerhowitzer2)
+			end
+			UI_RestrictBuildingPlacement(mkr_atgun1spawn)
+		end
+		
+	end
+	
+end
+--//////////////////////////////////////////////////////////////////////
+function Rule_Sapper_Reserve_AT()
+
+	if g_AT_built == true then
+		
+		Rule_RemoveMe()
+	
+	else
+		Player_GetAll(player1)
+		SGroup_Filter(sg_allsquads, SBP.CW.SAPPER, FILTER_KEEP)
+		
+		if SGroup_Count(sg_allsquads) >= 1 then
+
+			Player_SetSquadProductionAvailability(player1, SBP.CW.SAPPER, ITEM_LOCKED)
+			
+		
+		else
+		
+			Player_SetSquadProductionAvailability(player1, SBP.CW.SAPPER, ITEM_DEFAULT)
+					
+
+			if Event_IsAnyRunning() == false then
+				
+				if g_Buildsapper_event_at == false then
+				Util_StartIntel(EVENTS.SetUpBase_BuildSappers)
+					g_Buildsapper_event_at = true
+				end
+				OBJ_SetUpBase.PingID = Objective_AddUIElements(OBJ_SetUpBase, sg_ally_Inf_HQ, true, 1319703, true, 1)
+				
+				Camera_MoveToSGroup(sg_ally_Inf_HQ, true, SLOW_CAMERA_PANNING)
+
+			end
+
+			
+			
+			Rule_Add(ATSetUpBase_HQSelected)
+			Rule_RemoveMe()
+		end	
+		
+	end	
+end
+
+
+function Rule_Backup_Sapper_Selection()
+	Player_GetAll(player1, sg_playersapper)
+	SGroup_Filter(sg_playersapper, SBP.CW.SAPPER, FILTER_KEEP)
+
+	if Misc_IsSGroupSelected(sg_playersapper, ANY) then
+		
+		Util_StartIntel(EVENTS.LeftFlank_BuildATGun)
+		Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingID)
+		
+		flashid_buildmenu = UI_FlashConstructionMenu("tp_construction_commonwealth_sapper", false, BT_UI_Strong_CommandBtn)
+		
+		hpid_buildmenu = HintPoint_AddToConstructionMenu("tp_construction_commonwealth_sapper", 1319707, false)
+		if Rule_Exists(LeftFlank_SappersBuildMenuSelected) == false then
+			Rule_AddInterval(LeftFlank_SappersBuildMenuSelected, 0.5)
+		end
+	end
+
+end
+
+
+
+
+-- HQ selected, now flash the Sapper button
+function ATSetUpBase_HQSelected()
+	
+	if Misc_IsSGroupSelected(sg_ally_Inf_HQ, ANY) then
+		
+				
+		Rule_RemoveMe()
+		
+		Objective_RemoveUIElements(OBJ_SetUpBase, OBJ_SetUpBase.PingID)
+		
+		flashid_sapper = UI_FlashProductionButton(PITEM_Spawn, SBP.CW.SAPPER, true, BT_UI_Strong_CommandBtn)
+		hpid_sapper = HintPoint_AddToProductionButton(PITEM_Spawn, SBP.CW.SAPPER, 1319704, true)
+		
+		
+		Rule_Add(ATSetUpBase_SappersOrdered)
+		Rule_RemoveMe()
+	end
+	
+end
+
+
+function ATSetUpBase_SappersOrdered()
+	
+	
+	local sid = SGroup_GetSpawnedSquadAt(sg_ally_Inf_HQ, 1)
+	
+	if Squad_HasProductionQueue(sid) and Squad_GetProductionQueueSize(sid) >= 1 then
+		
+		Rule_RemoveMe()
+		
+		--flashid_sapper = UI_FlashProductionQueueIcon(0, false, BT_UI_Weak_CommandBtn)
+		hpid_sapper = HintPoint_AddToProductionQueueItem(0, 1319705, false)		
+		
+		Player_SetSquadProductionAvailability(player1, SBP.CW.SAPPER, ITEM_LOCKED)
+		
+		
+		
+		local queue_size = Squad_GetProductionQueueSize(sid)
+		
+		if queue_size >= 2 then
+			for i = 2, queue_size do
+				infantryhq_productionqueue = infantryhq_productionqueue + 1
+				Command_SquadExt(player1, sg_ally_Inf_HQ, SCMD_CancelProduction, infantryhq_productionqueue, false)
+			end
+		end
+		
+		Rule_AddInterval(ATSetUpBase_SappersDeployed, 0.5)
+		
+	elseif Misc_IsSGroupSelected(sg_ally_Inf_HQ, ANY) == false then			-- if player deselects HQ, go back to the select HQ step
+		
+		Rule_RemoveMe()
+		
+		UI_StopFlashing(flashid_sapper)
+		HintPoint_Remove(hpid_sapper)
+		
+		ATSetUpBase_HQSelected()
+		
+	end
+	
+end
+
+
+function ATSetUpBase_SappersDeployed()
+
+	local sid = SGroup_GetSpawnedSquadAt(sg_ally_Inf_HQ, 1)
+	
+	Player_GetAll(player1)
+	SGroup_Filter(sg_allsquads, SBP.CW.SAPPER, FILTER_KEEP)
+	
+	if SGroup_Count(sg_allsquads) >= 1 then
+		
+		Rule_RemoveMe()
+		
+		infantryhq_productionqueue = infantryhq_productionqueue + 1
+		
+		SGroup_AddGroup(sg_playersapper, sg_allsquads)
+		
+		--UI_StopFlashing(flashid_sapper)
+		HintPoint_Remove(hpid_sapper)
+		
+				
+		
+		if Rule_Exists(Rule_Backup_Sapper_Selection) == false then
+			Rule_AddOneShot(Rule_Backup_Sapper_Selection, 1)
+		end
+		Rule_AddInterval(Rule_Sapper_Reserve_AT, 0.5)
+		LeftFlank_SelectSappers()
+	elseif Squad_HasProductionQueue(sid) and Squad_GetProductionQueueSize(sid) == 0 then
+		
+		-- player must have cancelled the order
+		
+		infantryhq_productionqueue = infantryhq_productionqueue + 1
+		
+		Player_SetSquadProductionAvailability(player1, SBP.CW.SAPPER, ITEM_DEFAULT)
+		
+		if Misc_IsSGroupSelected(sg_ally_Inf_HQ, ANY) then
+			
+			Rule_RemoveMe()
+			
+			flashid_sapper = UI_FlashProductionButton(PITEM_Spawn, SBP.CW.SAPPER, true, BT_UI_Strong_CommandBtn)
+			hpid_sapper = HintPoint_AddToProductionButton(PITEM_Spawn, SBP.CW.SAPPER, 1319704, true)
+			
+			Rule_AddInterval(ATSetUpBase_SappersOrdered, 0.5)
+			
+		else
+			
+			OBJ_SetUpBase.PingID = Objective_AddUIElements(OBJ_SetUpBase, sg_ally_Inf_HQ, true, 1319703, true, 1)
+			
+			Camera_MoveToSGroup(sg_ally_Inf_HQ, true, SLOW_CAMERA_PANNING)
+			if Rule_Exists(ATSetUpBase_HQSelected) == false then
+				Rule_AddInterval(ATSetUpBase_HQSelected, 0.5)
+			end
+			
+			
+		end
+		
+	end
+	
+end
+
+--////////////////////////////////////////////////////////////////////////
+-- tell the player to select the sappers
+function LeftFlank_SelectSappers()
+
+	Camera_MoveToSGroup(sg_playersapper, true, SLOW_CAMERA_PANNING)
+	
+	OBJ_LeftFlank.PingID = Objective_AddUIElements(OBJ_LeftFlank, sg_playersapper, true, 1319706, true)
+	if Rule_Exists(LeftFlank_SappersSelected) == false then
+		Rule_AddInterval(LeftFlank_SappersSelected, 0.5)
+	end
+end
+
+
+-- sappers selected, now flash the build menu button
+function LeftFlank_SappersSelected()
+	Player_GetAll(player1, sg_playersapper)
+	SGroup_Filter(sg_playersapper, SBP.CW.SAPPER, FILTER_KEEP)
+	if Misc_IsSGroupSelected(sg_playersapper, ANY) then
+		
+		Rule_RemoveMe()
+		
+		Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingID)
+		
+		flashid_buildmenu = UI_FlashConstructionMenu("tp_construction_commonwealth_sapper", true, BT_UI_Strong_CommandBtn)
+		hpid_buildmenu = HintPoint_AddToConstructionMenu("tp_construction_commonwealth_sapper", 1319707, false)
+		
+		if g_Bofor == false then
+			if Rule_Exists(LeftFlank_SappersBuildMenuSelected) == false then
+				Rule_AddInterval(LeftFlank_SappersBuildMenuSelected, 0.5)
+			end
+		elseif g_Bofor == true then
+			if Rule_Exists(LeftFlank_SappersBuildMenuSelected_Bofor) == false then
+				Rule_AddInterval(LeftFlank_SappersBuildMenuSelected_Bofor, 0.5)
+			end
+		end
+		
+		
+		
+	end
+	
+end
+
+
+-- build menu selected, now flash the AT gun button
+function LeftFlank_SappersBuildMenuSelected()
+
+	if _ConstructionMenuStatus == "tp_construction_commonwealth_sapper" then
+		
+		Rule_RemoveMe()
+		
+		UI_StopFlashing(flashid_buildmenu)
+		HintPoint_Remove(hpid_buildmenu)
+		
+		flashid_howitzer = UI_FlashConstructionButton(EBP.CW.ANTITANK_NEST, true, BT_UI_Strong_CommandBtn)
+		hpid_howitzer = HintPoint_AddToConstructionButton(EBP.CW.ANTITANK_NEST, 1319715, true)
+		
+		UI_SetBuildingPlacementCallback(LeftFlank_SappersPlacingATGun)
+		
+		if Rule_Exists(LeftFlank_ATGunSappersDeselected) == false then
+			Rule_AddInterval(LeftFlank_ATGunSappersDeselected, 0.5)
+		end
+	elseif Misc_IsSGroupSelected(sg_playersapper, ANY) == false then
+		
+		Rule_RemoveMe()
+		
+		UI_StopFlashing(flashid_buildmenu)
+		HintPoint_Remove(hpid_buildmenu)
+		
+		LeftFlank_SelectSappers()
+		
+	end
+
+end
+
+
+-- callback function deals with stages for building the AT gun
+function LeftFlank_SappersPlacingATGun(ebp, phase)
+	
+	if ebp == EBP.CW.ANTITANK_NEST then
+		
+		-- placing
+		if phase == CP_Selected then
+			
+			UI_StopFlashing(flashid_howitzer)
+			HintPoint_Remove(hpid_howitzer)
+			
+			Camera_MoveToPosition(mkr_atgun1spawn, true, SLOW_CAMERA_PANNING)
+			
+			
+			OBJ_LeftFlank.PingID_AT_Place = Objective_AddUIElements(OBJ_LeftFlank, mkr_atgun1spawn, false, 1319709, true)
+			
+		-- rotating
+		elseif phase == CP_StartedPlacing then
+			
+			if flag_mentionedatgunrotation ~= true then
+				Util_StartIntel(EVENTS.LeftFlank_BuildATGunSetRotation)
+				flag_mentionedatgunrotation = true
+			end
+			
+			Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingID_AT_Place)
+			OBJ_LeftFlank.PingID_AT_Rotate = Objective_AddUIElements(OBJ_LeftFlank, mkr_atgun1spawn_facing, false, 1319720, true)
+						
+			EGroup_ReSpawn(eg_helperarrow_atgun)			-- show rotation arrow
+			
+		-- placed
+		elseif phase == CP_FinishedPlacing then
+			
+			UI_ClearBuildingPlacementCallback()
+			
+			Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingID_AT_Rotate)
+			EGroup_DeSpawn(eg_helperarrow_atgun)			-- hide rotation arrow
+			
+			if Rule_Exists(LeftFlank_ATGunBuilt) == false then
+				Rule_AddInterval(LeftFlank_ATGunBuilt, 1)
+			end
+			Rule_RemoveIfExist(LeftFlank_ATGunSappersDeselected)
+			
+		end
+		
+	end		
+	
+end
+
+
+-- the AT gun is building
+function LeftFlank_ATGunSappersDeselected()
+
+	Player_GetAll(player1, sg_playersapper)
+	SGroup_Filter(sg_playersapper, SBP.CW.SAPPER, FILTER_KEEP)
+	if Misc_IsSGroupSelected(sg_playersapper, ANY) == false then
+		
+		Rule_RemoveMe()
+		
+		Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingID_AT_Rotate)
+		Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingID_AT_Place)
+		EGroup_DeSpawn(eg_helperarrow_atgun)			-- hide rotation arrow
+		UI_ClearBuildingPlacementCallback()
+		
+		
+		LeftFlank_SelectSappers()
+		
+	end
+
+end
+
+
+
+-- the AT gun is built
+function LeftFlank_ATGunBuilt()
+
+	Player_GetAll(player1)
+	EGroup_Filter(eg_allentities, EBP.CW.ANTITANK_NEST, FILTER_KEEP)
+	EGroup_FilterUnderConstruction(eg_allentities, FILTER_REMOVE)
+	
+	if EGroup_Count(eg_allentities) >= 1 then
+		HintPoint_RemoveAll()
+		
+		Rule_RemoveMe()
+		
+		EGroup_AddEGroup(eg_playeratgun1, eg_allentities)
+		EGroup_SetInvulnerable(eg_playeratgun1, 0.5)
+		Modify_ReceivedDamage(eg_playeratgun1, 0.5)
+		
+		
+		EGroup_GetSquadsHeld(eg_playeratgun1, sg_player_at_emplacement)
+		
+		Modify_WeaponRange(sg_player_at_emplacement, "hardpoint_01", 1.5)		-- make it shoot farther
+		Modify_WeaponAccuracy(sg_player_at_emplacement, "hardpoint_01", 5)
+		Modify_WeaponCooldown(sg_player_at_emplacement, "hardpoint_01", 0.25)
+		Modify_WeaponDamage(sg_player_at_emplacement, "hardpoint_01", 1.5)
+		
+
+		
+		
+		Util_StartIntel(EVENTS.LeftFlank_ATGunBuilt)
+		
+		-- update objective back to "Defend Left Flank"
+		Objective_UpdateText(OBJ_LeftFlank, 1319206, 1319222)
+		Player_SetEntityProductionAvailability(player1, EBP.CW.ANTITANK_NEST, ITEM_LOCKED)
+				
+		g_AT_Target = sg_leftflank_atgunattackers
+
+		
+		Rule_AddDelayedInterval(LeftFlank_BuildBofors, 1, 1)
+		UI_UnrestrictBuildingPlacement()
+		
+		
+	end
+	
+end
+
+
+
+function LeftFlank_BuildBofors()
+--now let's build a Bofor
+	if Event_IsAnyRunning() == false then
+		g_Bofor= true
+		Rule_RemoveMe()
+		
+		
+		LeftFlank_SelectSappers_Bofor()
+		
+	end
+	
+end
+
+
+-- tell the player to select the sappers
+function LeftFlank_SelectSappers_Bofor()
+
+	Camera_MoveToSGroup(sg_playersapper, true, SLOW_CAMERA_PANNING)
+	
+	OBJ_LeftFlank.PingID = Objective_AddUIElements(OBJ_LeftFlank, sg_playersapper, true, 1319706, true)
+	
+	Rule_AddInterval(LeftFlank_SappersSelected_Bofor, 0.5)
+
+	
+end
+
+
+-- sappers selected, now flash the build menu button
+function LeftFlank_SappersSelected_Bofor()
+	Player_GetAll(player1, sg_playersapper)
+	SGroup_Filter(sg_playersapper, SBP.CW.SAPPER, FILTER_KEEP)
+	
+	if Misc_IsSGroupSelected(sg_playersapper, ANY) then
+		
+		Rule_RemoveMe()
+		
+		Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingID)
+		
+		flashid_buildmenu = UI_FlashConstructionMenu("tp_construction_commonwealth_sapper", true, BT_UI_Strong_CommandBtn)
+		flashid_buildmenu2 = UI_FlashConstructionMenu("tp_construction_commonwealth_sapper", true, BT_UI_Strong_CommandBtn)
+		hpid_buildmenu = HintPoint_AddToConstructionMenu("tp_construction_commonwealth_sapper", 1319707, false)
+		
+		if Rule_Exists(LeftFlank_BoforsGunBuilt) == false then
+			Rule_AddInterval(LeftFlank_BoforsGunBuilt, 1)
+		end
+		if Rule_Exists(LeftFlank_SappersBuildMenuSelected_Bofor) == false then
+			Rule_AddInterval(LeftFlank_SappersBuildMenuSelected_Bofor, 0.5)
+		end
+		
+		
+	end
+	
+end
+
+-- build menu selected, now flash the Bofor gun button
+function LeftFlank_SappersBuildMenuSelected_Bofor()
+	
+	if _ConstructionMenuStatus == "tp_construction_commonwealth_sapper" then
+		
+		Rule_RemoveMe()
+		
+		UI_StopFlashing(flashid_buildmenu)
+		UI_StopFlashing(flashid_buildmenu2)
+		HintPoint_Remove(hpid_buildmenu)
+		
+		flashid_howitzer = UI_FlashConstructionButton(EBP.CW.BOFORS_NEST, true, BT_UI_Strong_CommandBtn)
+		hpid_howitzer = HintPoint_AddToConstructionButton(EBP.CW.BOFORS_NEST, 1319729, true)
+		
+		UI_SetBuildingPlacementCallback(LeftFlank_SappersPlacingBofors)
+		
+		if g_first_selection_bofors == false then
+			UI_RestrictBuildingPlacement(mkr_boforsspawn)
+			Player_SetEntityProductionAvailability(player1, EBP.CW.BOFORS_NEST, ITEM_DEFAULT)
+			g_first_selection_bofors = true
+		end
+		
+		if Rule_Exists(LeftFlank_BoforsGunSappersDeselected) == false then
+			Rule_AddInterval(LeftFlank_BoforsGunSappersDeselected, 0.5)
+		end
+	elseif Misc_IsSGroupSelected(sg_playersapper, ANY) == false then
+		
+		Rule_RemoveMe()
+		
+		UI_StopFlashing(flashid_buildmenu)
+		HintPoint_Remove(hpid_buildmenu)
+		
+		LeftFlank_SelectSappers_Bofor()
+		
+	end
+
+end
+
+-- callback function deals with stages for building the AT gun
+function LeftFlank_SappersPlacingBofors(ebp, phase)
+	
+	if ebp == EBP.CW.BOFORS_NEST then
+		
+		-- placing
+		if phase == CP_Selected then
+			
+			UI_StopFlashing(flashid_howitzer)
+			HintPoint_Remove(hpid_howitzer)
+			
+			Camera_MoveToPosition(mkr_boforsspawn, true, SLOW_CAMERA_PANNING)
+			
+			OBJ_LeftFlank.PingID_Bofors_Place = Objective_AddUIElements(OBJ_LeftFlank, mkr_boforsspawn, false, 1319709, true)
+			
+			
+			
+		-- rotating
+		elseif phase == CP_StartedPlacing then
+			
+		
+			Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingID_Bofors_Place)
+			OBJ_LeftFlank.PingID_Bofors_Rotate = Objective_AddUIElements(OBJ_LeftFlank,  mkr_boforsgunspawn_facing, false, 1319730, false)
+			
+		
+			
+			
+
+			EGroup_ReSpawn(eg_helperarrow_bofors)			-- show rotation arrow
+			
+		-- placed
+		elseif phase == CP_FinishedPlacing then
+			
+			UI_ClearBuildingPlacementCallback()
+			
+			Objective_RemoveUIElements(OBJ_LeftFlank, OBJ_LeftFlank.PingID_Bofors_Rotate)
+			EGroup_DeSpawn(eg_helperarrow_bofors)			-- hide rotation arrow
+			
+			
+			Rule_RemoveIfExist(LeftFlank_BoforsGunSappersDeselected)
+			Rule_RemoveIfExist(LeftFlank_ATGunSappersDeselected)
+			
+			
+			
+			
+			
+			
+		end
+		
+	end		
+	
+end
+
+
+
+-- the AT gun is building
+function LeftFlank_BoforsGunSappersDeselected()
+
+	Player_GetAll(player1, sg_playersapper)
+	SGroup_Filter(sg_playersapper, SBP.CW.SAPPER, FILTER_KEEP)
+	if Misc_IsSGroupSelected(sg_playersapper, ANY) == false then
+		
+		Rule_RemoveMe()
+		
+		Objective_RemoveUIElements(OBJ_LeftFlank,OBJ_LeftFlank.PingID_Bofors_Place)
+		Objective_RemoveUIElements(OBJ_LeftFlank,OBJ_LeftFlank.PingID_Bofors_Rotate)
+		UI_ClearBuildingPlacementCallback()
+		EGroup_DeSpawn(eg_helperarrow_bofors)			-- hide rotation arrow
+		print("tada")
+		LeftFlank_SelectSappers_Bofor()
+		
+	end
+
+end
+
+
+
+-- the AT gun is built
+function LeftFlank_BoforsGunBuilt()
+
+	Player_GetAll(player1)
+	EGroup_Filter(eg_allentities, EBP.CW.BOFORS_NEST, FILTER_KEEP)
+	EGroup_FilterUnderConstruction(eg_allentities, FILTER_REMOVE)
+	
+	if EGroup_Count(eg_allentities) >= 1 then
+		HintPoint_RemoveAll()
+		Rule_RemoveMe()
+		
+		EGroup_AddEGroup(eg_playerboforsgun1, eg_allentities)
+		EGroup_SetInvulnerable(eg_playerboforsgun1, 0.5)
+		Modify_ReceivedDamage(eg_playerboforsgun1, 0.5)
+		
+		
+		EGroup_GetSquadsHeld(eg_playerboforsgun1, sg_player_bofors_emplacement)
+		
+		Modify_WeaponRange(sg_player_bofors_emplacement, "hardpoint_01", 1.5)		-- make it shoot farther
+		Modify_WeaponAccuracy(sg_player_bofors_emplacement, "hardpoint_01", 1)
+		Modify_WeaponCooldown(sg_player_bofors_emplacement, "hardpoint_01", 0.25)
+		Modify_WeaponDamage(sg_player_bofors_emplacement, "hardpoint_01", 1.5)
+		
+
+		Rule_AddInterval(LeftFlank_StartATGunAttack, 1)
+		Rule_AddDelayedInterval(Rule_Left_Flank_Infantry, 5, 5)
+		Rule_AddOneShot(LeftFlank_FinalAttackCreateSmokeHints, 20)
+		
+		Player_SetEntityProductionAvailability(player1, EBP.CW.BOFORS_NEST, ITEM_LOCKED)
+		g_AT_built = true
+	end
+	
+	
+	
+end
+
+
+
+
+
+
+
+-- start the enemies coming
+function LeftFlank_StartATGunAttack()
+
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		g_player_cam_Position = Camera_GetTargetPos()
+			
+		FOW_RevealMarker(mkr_fow_leftflank2, -1)
+		
+		Rule_AddDelayedInterval(DA_Emplacement_ATComplete, 20, 1)
+		
+		Rule_AddInterval(LeftFlank_ATGunAttackers, 1)
+		Rule_AddInterval(LeftFlank_ATGunAttackersSpotted, 5)
+		
+		
+
+		
+	end
+
+end
+
+function Rule_Follow_Sacrifical()
+	
+	if Prox_AreSquadMembersNearMarker(sg_AT_First_Offering, mkr_camera_phase2b, ALL) then
+		Camera_MoveToPosition(SGroup_GetPosition(sg_AT_First_Offering),true, SLOW_CAMERA_PANNING)
+		
+		Camera_FollowSGroup(sg_AT_First_Offering)
+
+		Rule_AddInterval(Rule_Release_Camera, 1)
+		Rule_RemoveMe()
+		
+	end
+end
+
+
+function Rule_Release_Camera()
+
+	if SGroup_IsEmpty(sg_AT_First_Offering) == true then
+		
+		Camera_MoveToPosition(g_player_cam_Position, true, SLOW_CAMERA_PANNING)
+		Rule_RemoveMe()
+	end
+
+end
+
+-- spawn the attackers
+function LeftFlank_ATGunAttackers()
+
+	
+	if table.getn(t_leftflank_atgun_attackers) > 0 then
+		for k, this in pairs(t_leftflank_atgun_attackers) do
+			
+			this.delay = this.delay - 1
+			
+			if this.delay == 0 then
+				
+				-- create the unit and add it to the "all" group
+				SGroup_Clear(sg_temp)
+				Util_CreateSquads(player2, sg_temp, this.bp, this.spawnpos)
+				print(this.initial)
+				if this.initial == true then
+								
+					SGroup_AddGroup(sg_AT_First_Offering, sg_temp)
+					Rule_AddInterval(Rule_Follow_Sacrifical, 1)
+					this.initial = false
+				
+				end
+				
+				SGroup_AddGroup(sg_leftflank_atgunattackers, sg_temp)
+				
+				
+				ThreatArrow_Add(threat_leftflank_atgun_attackers, sg_temp)
+				
+				-- apply modifiers to the new unit
+				Modify_Vulnerability(sg_temp, 1.6)
+				Modify_UnitSpeed(sg_temp, 1.4)
+				if this.accuracymod ~= nil then
+					Modify_ReceivedAccuracy(sg_temp, this.accuracymod)
+				end
+				
+				-- send the unit along it's defined route, and then back to the map edge where it'll be deleted
+				Cmd_SquadPath(sg_temp, this.route, true, false, false)
+				
+				table.remove(t_leftflank_atgun_attackers, k)
+				
+
+				
+			end
+			
+		end
+	
+	else
+		
+		Rule_RemoveMe() 
+	end
+	
+end
+
+
+-- trigger speech when the player spots the vehicles, and ambient chatter after that
+function LeftFlank_ATGunAttackersSpotted()
+	if Player_CanSeeSGroup(player1, sg_leftflank_atgunattackers, ANY) then
+		Rule_RemoveMe()
+		Util_StartIntel(EVENTS.LeftFlank_AxisVehiclesAttack)
+		Rule_AddInterval(LeftFlank_ATGunAttackersSpottedB, 5)
+	end
+end
+function LeftFlank_ATGunAttackersSpottedB()
+	if Event_IsAnyRunning() == false then
+		Rule_RemoveMe()
+		Util_StartAmbient(EVENTS.LeftFlank_AxisVehiclesAttackChatter1)
+		Rule_AddDelayedInterval(LeftFlank_ATGunAttackersSpottedC, 10, 5)
+	end
+end
+function LeftFlank_ATGunAttackersSpottedC()
+	if Event_IsAnyRunning() == false then
+		Rule_RemoveMe()
+		Util_StartAmbient(EVENTS.LeftFlank_AxisVehiclesAttackChatter2)
+	end
+end
+
+
+-- done building the AT gun?
+function DA_Emplacement_ATComplete()
+	if Event_IsAnyRunning() == false then
+		if table.getn(t_leftflank_atgun_attackers) == 0 and SGroup_IsEmpty(sg_leftflank_atgunattackers) then
+			
+			Rule_AddOneShot(LeftFlank_FinalAttackStart, 1)
+			g_AT_Target = sg_leftflank_finaltanks
+			Rule_RemoveMe()
+		end
+	end
+
+end
+
+
+
+
+-- the final attack, combined infantry and tanks
+function LeftFlank_FinalAttackStart()
+
+
+	Rule_AddInterval(LeftFlank_FinalAttackSpawn, 5)
+	Rule_AddInterval(LeftFlank_FinalAttackSpotted, 5)
+	Rule_AddDelayedInterval(DA_Emplacement_ShootingGallery_Cheat, 5, 1)
+
+end
+
+
+-- indicates a few choice places to attack
+function LeftFlank_FinalAttackCreateSmokeHints()
+	
+	-- tell the player to use artillery
+	Util_StartIntel(EVENTS.LeftFlank_FinalAttackWave_UseArtillery)
+	
+	Util_CreateEntities(player1, eg_smoke, EBP.SP.SP_SMOKE, mkr_LeftB3, 1)
+	Util_CreateEntities(player1, eg_smoke, EBP.SP.SP_SMOKE, mkr_LeftB4, 1)
+	
+	Rule_AddDelayedInterval(LeftFlank_FinalAttackRemoveSmokeHints, 20, 1)
+	
+	HowitzerHelper_Start()
+	
+end
+
+function LeftFlank_FinalAttackRemoveSmokeHints()
+	
+	if flag_leftflank_finalattackartilleryreminder ~= true then
+		
+		if Event_IsAnyRunning() == false and HowitzerHelper_AnyReadyToFire() == true then
+			
+			Util_StartIntel(EVENTS.LeftFlank_FinalAttackWave_UseArtilleryReminder)
+			flag_leftflank_finalattackartilleryreminder = true
+			
+		end
+		
+	end
+	
+	Player_GetAll(player1, sg_ally_All, eg_ally_howitzersAll)
+	local egroup = eg_ally_howitzersAll
+	EGroup_Filter(egroup, EBP.CW.HOWITZER_NEST, FILTER_KEEP)
+	
+	if EGroup_IsUsingAbility( egroup, false ) then
+		
+
+		EGroup_DestroyAllEntities(eg_smoke)
+		
+		Rule_RemoveMe()
+		
+	end
+	
+end
+
+
+
+
+-- spend X minutes calling in various light vehicles
+function LeftFlank_FinalAttackSpawn()
+
+	if table.getn(t_leftflank_final_attackers) > 0 then
+		for k, this in pairs(t_leftflank_final_attackers) do 
+			
+			if SGroup_IsEmpty(this.sgroup) then
+				
+				done = false 
+				
+				
+					
+				local pick = Table_GetRandomItem(t_leftflank_final_tankroutes)
+				local spawn = pick.spawn
+				local route = Table_GetRandomItem(pick.routes)
+				
+				Util_CreateSquads(player2, this.sgroup, this.bp, spawn, nil, 1)
+				SGroup_AddGroup(sg_leftflank_finaltanks, this.sgroup)
+				ThreatArrow_Add(threat_leftflank_final_attackers, this.sgroup)
+				
+				if this.accuracymod ~= nil then
+					Modify_ReceivedAccuracy(this.sgroup, this.accuracymod)
+				end
+				
+				Cmd_SquadPath(this.sgroup, route, true, false, false, 0)
+				
+				Modify_WeaponRange(this.sgroup, "hardpoint_01", 3)
+				table.remove(t_leftflank_final_attackers, k)
+				break
+						
+			end
+			
+		end
+	else
+
+		Rule_AddInterval(DA_Emplacement_ShootingGallery_Check, 5)
+		Rule_RemoveMe()
+	end
+	
+end
+
+function Rule_Left_Flank_Infantry()
+	
+	if table.getn(t_leftflank_final_attackers_infantry) > 0 then
+
+		for k, this in pairs(t_leftflank_final_attackers_infantry) do 
+			local pick = Table_GetRandomItem(t_leftflank_final_infantryroutes)
+			local spawn = pick.spawn
+			local dest = Table_GetRandomItem(pick.routes)
+			
+			Util_CreateSquads(player2, this.sgroup, this.bp, spawn, dest)
+			SGroup_AddGroup(sg_leftflank_finalinfantry, this.sgroup)
+			
+			Modify_WeaponRange(this.sgroup, "hardpoint_01", 3)
+			table.remove(t_leftflank_final_attackers_infantry, k)
+			break
+				
+		end
+	else
+		Rule_AddDelayedInterval(Rule_Left_Flank_Infantry_Wave_2, 30, 5)
+		Rule_RemoveMe()
+
+	end
+	
+end
+
+
+function Rule_Left_Flank_Infantry_Wave_2()
+	
+	if table.getn(t_leftflank_final_attackers_infantry_wave_2) > 0 then
+
+		for k, this in pairs(t_leftflank_final_attackers_infantry_wave_2) do 
+			local pick = Table_GetRandomItem(t_leftflank_final_infantryroutes_wave_2)
+			local spawn = pick.spawn
+			local dest = Table_GetRandomItem(pick.routes)
+			
+			Util_CreateSquads(player2, this.sgroup, this.bp, spawn, dest)
+			SGroup_AddGroup(sg_leftflank_finalinfantry, this.sgroup)
+			
+			Modify_WeaponRange(this.sgroup, "hardpoint_01", 3)
+			table.remove(t_leftflank_final_attackers_infantry_wave_2, k)
+			break
+				
+		end
+	else
+
+		Rule_RemoveMe()
+
+	end
+	
+end
+
+
+
+
+
+-- trigger speech when the player sees these tanks	
+function LeftFlank_FinalAttackSpotted()
+	
+	if Event_IsAnyRunning() == false and Player_CanSeeSGroup(player1, sg_leftflank_finaltanks, ANY) then
+		
+		Rule_RemoveMe()
+		Util_StartIntel(EVENTS.LeftFlank_FinalAttackWaveStarts)
+		flashid_atgunarmourpiercing = UI_FlashAbilityButton(ABILITY.CW.ATGUN_ARMOURPIERCING, true, BT_UI_Strong_AbilityBtn)
+		
+	end
+	
+end
+
+
+
+-- THE EMPLACEMENT section win rule
+function DA_Emplacement_ShootingGallery_Check()
+	
+	if SGroup_IsEmpty(sg_leftflank_finaltanks) then
+		
+		Cmd_Move(sg_leftflank_finaltanks, mkr_offmap6, false, mkr_offmap6)
+		
+		flag_shootingGalleryDone = true
+		
+		-- add Final
+		DA_Emplacement_Final()
+		
+		FOW_UnRevealMarker(mkr_fow_leftflank2)
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+function DA_Emplacement_ShootingGallery_Cheat()
+	local sgroup = sg_defAll_empAxis
+	if flag_shootingGalleryDone == true then
+		Rule_RemoveMe()
+	else
+		for i = 1, table.getn(sgroup) do 
+			if SGroup_GetAvgHealth(sgroup[i]) < .5 then
+				SGroup_Kill(sgroup[i])
+			end
+		end
+	end
+end
+
+
+
+
+
+
+-------------------------------------------------------------------------
+
+-- send some messages about Tommies and defenses
+function DA_Emplacement_Final()
+
+	Cmd_Retreat(sg_leftflank_finalinfantry, Marker_GetPosition(mkr_offmap6), mkr_offmap6, false)
+
+	
+		--stop the howitzer in case of queued orders
+	if EGroup_Exists("eg_playerhowitzer1") and EGroup_IsEmpty(eg_playerhowitzer1) == false  then
+		Cmd_Stop(eg_playerhowitzer1)
+	end	
+	--stop the howitzer in case of queued orders
+	if EGroup_Exists("eg_playerhowitzer2") and EGroup_IsEmpty(eg_playerhowitzer2) == false then
+		Cmd_Stop(eg_playerhowitzer2)
+	end
+	
+	-- message
+	Util_StartIntel(EVENTS.LeftFlank_VehicleAttackOver)
+	
+	
+	HowitzerHelper_Stop()
+	UI_StopFlashing(flashid_atgunarmourpiercing)
+	
+	Objective_Complete(OBJ_LeftFlank)
+	
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- Build Defenses
+-------------------------------------------------------------------------
+-- The player's Ally starts the task of assembling defenses
+-- once the Panther trap is sprung
+-------------------------------------------------------------------------
+function Ally_Init()
+
+	-- tommies for the chargers
+	sg_ally_All = SGroup_CreateIfNotFound("sg_ally_All")
+	
+	-- ally egroups
+	eg_ally_Inf_HQ = EGroup_CreateIfNotFound("eg_ally_Inf_HQ")
+	eg_ally_howitzersAll = EGroup_CreateIfNotFound("eg_ally_howitzersAll")
+
+	-- added here instead of with its Obj
+	-- to prevent data from crashing
+	DefendAllies_Init()
+	
+end
+
+
+
+
+-------------------------------------------------------------------------
+-- Defend Ally - Functions 
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Obj data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function DefendAllies_Init()
+
+	-- define sgroups, egroups, etc associated with this obj
+	sg_defAll_chargeAll = SGroup_CreateIfNotFound("sg_defAll_chargeAll")
+	sg_defAll_tanks = SGroup_CreateTable("sg_defAll_tanks%d", 8)
+	sg_defAll_tanksAll = SGroup_CreateIfNotFound("sg_defAll_tanksAll")
+	sg_defAll_units = SGroup_CreateIfNotFound("sg_defAll_units")
+	
+	-- new things - based on 2nd rewrite - deg
+	sg_ally_Inf_HQ = SGroup_CreateIfNotFound("sg_ally_Inf_HQ")
+	sg_ally_HQs = SGroup_CreateTable("sg_ally_HQs%d", 2)
+	
+	eg_smoke = EGroup_CreateIfNotFound("eg_smoke")
+	
+ 	sg_handOver_cromwells = SGroup_CreateIfNotFound("sg_handOver_cromwells")
+	sg_handOver_infantry = SGroup_CreateIfNotFound("sg_handOver_infantry")
+	sg_handOver_p1 = SGroup_CreateIfNotFound("sg_handOver_p1")
+	sg_handOver_p2 = SGroup_CreateIfNotFound("sg_handOver_p2")
+	
+	eg_handOver_p1 = EGroup_CreateIfNotFound("eg_handOver_p1")
+	
+
+end
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- OBJECTIVE Push up Right Flank
+-------------------------------------------------------------------------
+-- This is the attack on the left flank that occurs after the player has 
+-- built his first set of defences
+-------------------------------------------------------------------------
+function Initialize_OBJ_RightFlank()
+
+	OBJ_RightFlank = {
+		
+		SetupUI = function() 
+			OBJ_RightFlank.PingID = Objective_AddUIElements(OBJ_RightFlank, eg_flag_right2, true, 1319718, true, 2.3)
+		end,
+		
+		OnStart = function()
+			Sound_PlayMusic("Music/SP/Caen/Trepidation/coh_force_beyond.bsc",2,0)
+			-- tag as always show
+			Objective_SetAlwaysShowDetails(OBJ_RightFlank, true, false, true)
+			
+
+			
+			Rule_Add(RightFlank_PostSitRep)
+			
+		end,
+		
+		OnComplete = function()
+			
+			-- tell the player they did good
+			
+		end,
+		
+		OnFail = function()
+			-- tell the player they lost
+		end,
+		
+		Title = 1319207,
+		Description = 1319223,
+		TitleEnd = 1319243,
+		Type = OT_Primary,
+		
+		SitRep = {
+			Movie = "CXP1_SR_01-02",         -- should just need to replace this with SR_02-01 / SR_02-02 / SR_02-03
+			Force = true,
+			SpeechTiming =
+			{
+				{ 1,	ACTOR.CXP1.Cutting, 1311410 },
+				{ 5.5,	ACTOR.CXP1.Cutting, 1311420 },
+				{ 9.5,	ACTOR.CXP1.Blackmore, 1311430 },
+				{ 13,	ACTOR.CXP1.Blackmore, 1311440 },
+				{ 18,	ACTOR.CXP1.Blackmore, 1311441 },
+				--{ 18,	ACTOR.CXP1.Blackmore, 1311442 }, <- <ALT> Speech for 1311441 
+				{ 22,	ACTOR.CXP1.Blackmore, 1311450 },
+			},
+			
+			
+			
+			PrologueEvent = function()
+			
+				--stop the howitzer in case of queued orders
+				if EGroup_Exists("eg_playerhowitzer1") and EGroup_IsEmpty(eg_playerhowitzer1) == false then
+					Cmd_Stop(eg_playerhowitzer1)
+				end	
+				--stop the howitzer in case of queued orders
+				if EGroup_Exists("eg_playerhowitzer2")  and EGroup_IsEmpty(eg_playerhowitzer2) == false then
+					Cmd_Stop(eg_playerhowitzer2)
+				end
+			
+			
+				-- recentre and reclamp the camera
+				Camera_MoveToPosition(mkr_camera_rightflankstart)
+				
+				Camera_ClampToMarker(mkr_camera_phase3a)
+				Misc_RestrictCommandsToMarker(mkr_camera_phase3a)
+				
+				-- spawn all the relevant units
+				Util_CreateSquads(player2, sg_rightflank_panzerschreck1, SBP.AXIS.GRENADIER, mkr_abbey_atgun1spawn, nil, nil, nil, nil, nil, UPG.AXIS.GREN_PANZERSCHRECK)
+				Util_CreateSquads(player2, sg_rightflank_panzerschreck2, SBP.AXIS.GRENADIER, mkr_abbey_atgun2spawn)
+				Util_CreateSquads(player2, sg_rightflank_panzerschreck3, SBP.AXIS.GRENADIER, mkr_abbey_atgun3spawn)
+				Util_CreateSquads(player2, sg_rightflank_atgun1, SBP.AXIS.PAK_38, mkr_abbey_atgun4spawn)
+				
+				Util_CreateSquads(player2, sg_rightflank_abbeyguys1, SBP.AXIS.GRENADIER, mkr_abbey_guard1)
+				Util_CreateSquads(player2, sg_rightflank_abbeyguys2, SBP.AXIS.GRENADIER, mkr_abbey_guard2)
+				Util_CreateSquads(player2, sg_rightflank_abbeyhmg1, SBP.AXIS.HEAVYMG, eg_abbey_bldg5) 
+				Util_CreateSquads(player2, sg_rightflank_abbeymortar1, SBP.AXIS.MORTAR, mkr_abbey_mortarspawn) 
+				
+				SGroup_AddGroup(sg_abbey_defenders, sg_rightflank_panzerschreck1)
+				SGroup_AddGroup(sg_abbey_defenders, sg_rightflank_panzerschreck2)
+				SGroup_AddGroup(sg_abbey_defenders, sg_rightflank_panzerschreck3)
+				SGroup_AddGroup(sg_abbey_defenders, sg_rightflank_atgun1)
+				SGroup_AddGroup(sg_abbey_defenders, sg_rightflank_abbeyguys1)
+				SGroup_AddGroup(sg_abbey_defenders, sg_rightflank_abbeyguys2)
+				SGroup_AddGroup(sg_abbey_defenders, sg_rightflank_abbeyhmg1)
+				SGroup_AddGroup(sg_abbey_defenders, sg_rightflank_abbeymortar1)
+				
+				SGroup_AddGroup(sg_rightflank_panzerschrecksfront, sg_rightflank_panzerschreck1)
+				SGroup_AddGroup(sg_rightflank_panzerschrecksfront, sg_rightflank_panzerschreck2)
+				SGroup_AddGroup(sg_rightflank_panzerschrecksfront, sg_rightflank_panzerschreck3)
+				
+				-- set up the at gun to use the AT Gun Manager
+				t_abbeyatgun_directions = {}
+				t_abbeyatgun_directions[1] = {trigger = mkr_abbey_atguntrigger1, dest = mkr_abbey_atgundest1}
+				t_abbeyatgun_directions[2] = {trigger = mkr_abbey_atguntrigger2, dest = mkr_abbey_atgundest2}
+				
+				
+				Camera_ResetToDefault()
+			
+			end,
+			
+			EpilogueEvent = function()
+				
+				
+				
+				
+				RightFlank_BringInCromwells()				
+				Camera_MoveToSGroup(sg_rightflank_infantry1)
+				Camera_FollowSGroup(sg_rightflank_infantry1)
+				
+			
+				CTRL.Event_Delay(13)			
+				CTRL.WAIT()
+			
+			end,
+			
+			
+		},
+	}
+	
+	-- Register Objective and initialise data
+	Objective_Register(OBJ_RightFlank)
+	RightFlank_Init()
+	TankAmbush_Init()
+	
+end
+
+
+
+
+
+
+function RightFlank_Init()
+
+	sg_rightflank_infantry1 = SGroup_CreateIfNotFound("sg_rightflank_infantry1")
+	sg_rightflank_infantry2 = SGroup_CreateIfNotFound("sg_rightflank_infantry2")
+	
+	eg_rightplayerhowitzer1 = EGroup_CreateIfNotFound("eg_rightplayerhowitzer1")
+	eg_rightplayerhowitzer2 = EGroup_CreateIfNotFound("eg_rightplayerhowitzer2")
+	eg_rightplayerhowitzer3 = EGroup_CreateIfNotFound("eg_rightplayerhowitzer3")
+
+	sg_rightflank_atgun1 = SGroup_CreateIfNotFound("sg_rightflank_atgun1")
+	sg_rightflank_panzerschreck1 = SGroup_CreateIfNotFound("sg_rightflank_panzerschreck1")
+	sg_rightflank_panzerschreck2 = SGroup_CreateIfNotFound("sg_rightflank_panzerschreck2")
+	sg_rightflank_panzerschreck3 = SGroup_CreateIfNotFound("sg_rightflank_panzerschreck3")
+	sg_rightflank_panzerschrecksfront = SGroup_CreateIfNotFound("sg_rightflank_panzerschrecksfront")
+	
+	sg_rightflank_abbeyguys1 = SGroup_CreateIfNotFound("sg_rightflank_abbeyguys1")
+	sg_rightflank_abbeyguys2 = SGroup_CreateIfNotFound("sg_rightflank_abbeyguys2")
+	sg_rightflank_abbeyguys3 = SGroup_CreateIfNotFound("sg_rightflank_abbeyguys3")
+	
+	sg_rightflank_abbeyhmg1 = SGroup_CreateIfNotFound("sg_rightflank_abbeyhmg1")
+	sg_rightflank_abbeymortar1 = SGroup_CreateIfNotFound("sg_rightflank_abbeymortar1")
+	
+	sg_rightflank_panzer = SGroup_CreateIfNotFound("sg_rightflank_panzer")
+
+	sg_abbey_defenders = SGroup_CreateIfNotFound("sg_abbey_defenders")
+	
+	t_rightflank_howitzers = {}
+	t_rightflank_howitzers[1] = {egroup = eg_playerhowitzer1}
+	t_rightflank_howitzers[2] = {egroup = eg_playerhowitzer2}
+	
+	t_rightflank_cromwells = {}
+	t_rightflank_cromwells[1] = {group = sg_Cromwell1, spawn = mkr_rightflank_cromwell1spawn, rally = mkr_rightflank_cromwell1rally, rally_forward = mkr_rightflank_cromwell1rally_forward,bp = SBP.CW.CROMWELL}
+	t_rightflank_cromwells[2] = {group = sg_Cromwell2, spawn = mkr_rightflank_cromwell2spawn, rally = mkr_rightflank_cromwell2rally, rally_forward = mkr_rightflank_cromwell2rally_forward, bp = SBP.CW.CROMWELL}
+--	t_rightflank_cromwells[3] = {group = sg_Cromwell3, spawn = mkr_rightflank_cromwell3spawn, rally = mkr_rightflank_cromwell3rally, rally_forward = mkr_rightflank_cromwell3rally_forward, bp = SBP.CW.CROMWELL}
+	
+	t_rightflank_infantry = {}
+	t_rightflank_infantry[1] = {group = sg_rightflank_infantry1, spawn = mkr_rightflank_infantry1spawn, rally = mkr_rightflank_infantry1rally, rally_forward = mkr_rightflank_infantry1rally_forward, bp = SBP.CW.TOMMIES, upgrades = UPG.CW.RECON_TEAM}
+	t_rightflank_infantry[2] = {group = sg_rightflank_infantry2, spawn = mkr_rightflank_infantry2spawn, rally = mkr_rightflank_infantry2rally, rally_forward = mkr_rightflank_infantry2rally_forward, bp = SBP.CW.TOMMIES, upgrades = UPG.CW.RECON_TEAM}
+	
+	time_rightflank_replacement = 0
+	flag_rightflank_overwatch = false
+	sg_tommy_infantry = SGroup_CreateIfNotFound("sg_tommy_infantry")
+	sg_tommy_example = SGroup_CreateIfNotFound("sg_tommy_example")
+	Modify_CaptureTime(eg_flag_right2, 0.5)
+	
+	Rule_AddInterval(RightFlank_Start, 1)
+	
+end
+
+
+
+
+function RightFlank_Start()
+
+	if Event_IsAnyRunning() == false and Objective_IsComplete(OBJ_LeftFlank) then
+		
+		Rule_RemoveMe()
+		ATGun_AddGroup(sg_rightflank_atgun1, player2)
+		
+		--stop the howitzer in case of queued orders
+		if EGroup_Exists("eg_playerhowitzer1") and EGroup_IsEmpty(eg_playerhowitzer1) == false then
+			Cmd_Stop(eg_playerhowitzer1)
+		end	
+		--stop the howitzer in case of queued orders
+		if EGroup_Exists("eg_playerhowitzer2") and EGroup_IsEmpty(eg_playerhowitzer2) == false then
+			Cmd_Stop(eg_playerhowitzer2)
+		end
+		
+		
+		Objective_Start(OBJ_RightFlank)
+		
+
+		
+	end
+	
+end
+
+
+
+function RightFlank_PostSitRep()
+	
+	if Event_IsAnyRunning() == false then	
+		
+		Rule_RemoveMe()
+		
+		-- start replacing tanks
+		
+		Rule_AddInterval(RightFlank_ReplaceCromwells, 0.5)
+		Rule_AddInterval(Rule_Update_Right_Flank_Rally, 1)
+		
+		Rule_AddInterval(RightFlank_StartCharge, 1)
+		Rule_AddInterval(Rule_Highlight_Tommy, 1)
+		
+		
+	end
+	
+end
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- Bring in the Cromwells
+-------------------------------------------------------------------------
+
+function RightFlank_BringInCromwells()
+	
+	-- create the cromwells
+	for k, this in pairs(t_rightflank_cromwells) do
+		Util_CreateSquads(player1, this.group, SBP.CW.CROMWELL, this.spawn, this.rally)
+		SGroup_AddGroup(sg_CromwellAll, this.group)
+	end
+	
+	-- create the infantry
+	for k, this in pairs(t_rightflank_infantry) do
+		Util_CreateSquads(player1, this.group, SBP.CW.TOMMIES, this.spawn, this.rally, nil, nil, nil, nil, UPG.CW.RECON_TEAM)
+		SGroup_AddGroup(sg_tommy_infantry, this.group)
+	end
+
+end
+
+function Rule_Update_Right_Flank_Rally()
+	
+	if SGroup_IsEmpty(sg_rightflank_panzerschrecksfront) then
+
+		for k, this in pairs(t_rightflank_cromwells) do
+	
+			this.rally = this.rally_forward
+		
+		end
+		
+		for k, this in pairs(t_rightflank_infantry) do
+	
+			this.rally = this.rally_forward
+		
+		end
+		
+		Rule_RemoveMe()
+	end
+end
+
+function RightFlank_ReplaceCromwells()
+	
+	
+	
+	if Objective_IsComplete(OBJ_RightFlank) then
+		Rule_RemoveMe()
+	else
+		
+		local replace = false
+		if (World_GetGameTime() - time_rightflank_replacement) > 8 then
+			replace = true
+		end
+		
+		for k, this in pairs(t_rightflank_cromwells) do
+			
+			-- whilst on their initial entrance move order, stop them if they're selected by the player
+			if this.incoming == true then
+				if Misc_IsSGroupSelected(this.group, ANY) == true or SGroup_IsMoving(this.group, ANY) == false then
+					Cmd_Stop(this.group)
+					this.incoming = false
+					if this.speedmodifier ~= nil then
+						Modifier_Remove(this.speedmodifier)
+						this.speedmodifier = nil
+					end
+				end
+			end
+			
+			if replace == true and SGroup_IsEmpty(this.group) then
+				
+				-- replaces one at a time
+				Util_CreateSquads(player1, this.group, SBP.CW.CROMWELL, mkr_offmap1, this.rally, 1)
+				Util_ReinforceEvent(this.group)
+				SGroup_AddGroup(sg_CromwellAll, this.group)
+				this.speedmodifier = Modify_UnitSpeed(this.group, 1.3)
+				this.incoming = true
+				
+				time_rightflank_replacement = World_GetGameTime()
+				replace = false
+				
+			end
+			
+		end
+		
+		for k, this in pairs(t_rightflank_infantry) do
+			if SGroup_Count(this.group) == 0 then
+				Util_CreateSquads(player1, this.group, SBP.CW.TOMMIES, this.spawn, this.rally, nil, nil, nil, nil, UPG.CW.RECON_TEAM)
+				Util_ReinforceEvent(this.group)
+				break
+			end
+		end
+		
+	end
+
+end
+
+-------------------------------------------------------------------------
+-- Highlight Marksman
+-------------------------------------------------------------------------
+
+function Rule_Highlight_Tommy()
+	
+	if SGroup_IsEmpty(sg_tommy_infantry) == false then
+		if SGroup_IsEmpty(sg_rightflank_infantry2) == false and SGroup_IsOnScreen(player1,sg_rightflank_panzerschrecksfront, false) then
+		
+			SGroup_AddGroup(sg_tommy_example, sg_rightflank_infantry2)
+			OBJ_RightFlank.PingID_Marksman = Objective_AddUIElements(OBJ_RightFlank, sg_tommy_example, true, 1319428, true)
+			Rule_AddInterval(Rule_Tommy_Selected, 0.5)
+			Rule_RemoveMe()
+		elseif SGroup_IsEmpty(sg_rightflank_infantry1) == false and SGroup_IsOnScreen(player1,sg_rightflank_panzerschrecksfront, false) then
+			SGroup_AddGroup(sg_tommy_example, sg_rightflank_infantry1)
+			OBJ_RightFlank.PingID_Marksman = Objective_AddUIElements(OBJ_RightFlank, sg_tommy_example, true, 1319428, true)
+			Rule_AddInterval(Rule_Tommy_Selected, 0.5)
+			Rule_RemoveMe()
+		end
+		
+		
+	else
+	
+		Rule_RemoveMe()
+	
+	end
+end
+
+-- Tommy selected now flash the ability button
+function Rule_Tommy_Selected()
+	
+	if Misc_IsSGroupSelected(sg_tommy_example, ANY) then
+		
+		
+		Rule_RemoveMe()
+		
+		Objective_RemoveUIElements(OBJ_RightFlank,OBJ_RightFlank.PingID_Marksman)
+		
+		
+		
+		flashid_marksman = UI_FlashAbilityButton(ABILITY.CW.TOMMY_MARKSMAN, true, BT_UI_Strong_AbilityBtn)
+		hpid_marksman = HintPoint_AddToAbilityButton(ABILITY.CW.TOMMY_MARKSMAN, 1319426, true)
+		
+		UI_SetModalAbilityPhaseCallback(Rule_Marksman_Ability_Pressed)
+		
+	end
+	
+end
+
+
+function Rule_Marksman_Ability_Pressed(ability, phase)
+	
+	if ability == ABILITY.CW.TOMMY_MARKSMAN and phase == MAP_Placing then
+		
+		UI_ClearModalAbilityPhaseCallback()
+		
+		if SGroup_IsEmpty(sg_tommy_example) == false then		
+			local dist = 9999
+			local tommypos = SGroup_GetPosition(sg_tommy_example)
+			local closest = nil
+			
+			local _FindClosest = function(gid, idx, sid)
+				local thisdist = World_DistancePointToPoint(tommypos, Squad_GetPosition(sid))
+				if thisdist < dist then
+					dist = thisdist
+					closest = sid
+				end
+			end
+			
+			SGroup_ForEach(sg_rightflank_panzerschrecksfront, _FindClosest)
+			
+			if closest ~= nil then
+				
+				OBJ_RightFlank.PingID_Marksman_Target = Objective_AddUIElements(OBJ_RightFlank, closest, true, 1319427, true)
+				Rule_AddInterval(Rule_Remove_Marksman, 0.5)
+			end
+			Rule_RemoveMe()
+			
+		else
+		
+			Rule_RemoveMe()
+		
+		end
+	end
+	
+end
+
+function Rule_Remove_Marksman()
+
+	if SGroup_IsDoingAbility(sg_tommy_example, ABILITY.CW.TOMMY_MARKSMAN, ANY) then
+
+		Objective_RemoveUIElements(OBJ_RightFlank, OBJ_RightFlank.PingID_Marksman_Target)
+		Rule_RemoveMe()
+	end
+end
+-------------------------------------------------------------------------
+-- THE CHARGE
+-------------------------------------------------------------------------
+
+-- the guys in the right field get impatient and charge the abbey
+function RightFlank_StartCharge()
+	
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		-- give the go ahead message
+		Util_StartIntel(EVENTS.RightFlank_Start)
+		
+		-- rules for progressively revealing FOW
+		Rule_AddInterval(RightFlank_BringATGunForward, 3)
+		Rule_AddDelayedInterval(RightFlank_RunInfantry1BackIntoAbbey, 1, 3)
+		Rule_AddDelayedInterval(RightFlank_Infantry1Killed, 2, 3)
+		Rule_AddDelayedInterval(RightFlank_RunInfantry2BackIntoAbbey, 3, 3)
+		Rule_AddDelayedInterval(RightFlank_RearATGunKilled, 4, 3)
+		Rule_AddDelayedInterval(RightFlank_BringInPanther, 5, 3)
+		
+		-- start the sequence of hints
+		Rule_AddInterval(RightFlank_HintThePanzerschrecks, 5)
+		
+		-- say something once the player starts the howitzers firing
+		Rule_AddInterval(RightFlank_HowitzersFiring, 1)
+		
+		-- have the howitzer helper hintpoints start up again
+		HowitzerHelper_Start()
+		
+		-- add an event to record the targets of the howitzers
+		for k, this in pairs(t_rightflank_howitzers) do 
+			SGroup_Clear(sg_temp)
+			EGroup_GetSquadsHeld(this.egroup, sg_temp)
+			Rule_AddSGroupEvent(RightFlank_RegisterHowitzerTarget, sg_temp, GE_AbilityExecuted)
+		end
+		
+		Rule_AddInterval(RightFlank_AbbeyIsClear, 1)
+		
+		Rule_Add(Rule_Remind_Player_Howitzer)
+		
+	end
+	
+end
+
+function Rule_Remind_Player_Howitzer()
+
+--ping the howitzer groups again to remind the player to use them
+	if Event_IsAnyRunning() == false then
+
+		flashid_firstHOW_Reminder = UI_FlashSquadControlGroupIcon(g_first_howitzer_ctrl_group, false, BT_UI_Weak_SquadControl)
+		flashid_secondHOW_Reminder = UI_FlashSquadControlGroupIcon(g_second_howitzer_ctrl_group, false, BT_UI_Weak_SquadControl)
+		Rule_AddOneShot(Rule_Remind_Player_Howitzer_Stop, 10)
+		Rule_RemoveMe()
+	
+	
+	end
+
+end
+
+
+function Rule_Remind_Player_Howitzer_Stop()
+	
+	UI_StopFlashing(flashid_firstHOW_Reminder)
+	UI_StopFlashing(flashid_secondHOW_Reminder)
+
+
+end
+
+
+-- Have the rear AT gun move forward
+function RightFlank_BringATGunForward()
+
+	if SGroup_Count(sg_rightflank_panzerschreck3) == 0 then
+		Rule_RemoveMe()
+		FOW_RevealMarker(mkr_fow_rightflank1, -1)
+	elseif Player_CanSeeSGroup(player1, sg_rightflank_panzerschreck1, ANY) or Player_CanSeeSGroup(player1, sg_rightflank_panzerschreck2, ANY) or Player_CanSeeSGroup(player1, sg_rightflank_panzerschreck3, ANY) then
+		Rule_RemoveMe()
+		Cmd_Move(sg_rightflank_panzerschreck3, mkr_abbey_atgun3dest)
+		FOW_RevealMarker(mkr_fow_rightflank1, -1)
+	end
+	
+end
+
+
+-- Have the infantry men in front of the gate scarper
+function RightFlank_RunInfantry1BackIntoAbbey()
+
+	if SGroup_Count(sg_rightflank_abbeyguys1) == 0 then
+		Rule_RemoveMe()
+		FOW_RevealMarker(mkr_fow_rightflank2, -1)
+	elseif SGroup_Count(sg_rightflank_panzerschreck1) + SGroup_Count(sg_rightflank_panzerschreck2) + SGroup_Count(sg_rightflank_panzerschreck3) <= 1 or SGroup_TotalMembersCount(sg_rightflank_abbeyguys1) <= 2 then
+		Cmd_Retreat(sg_rightflank_abbeyguys1, mkr_abbey_guard1retreat)
+		Rule_RemoveMe()
+		FOW_RevealMarker(mkr_fow_rightflank2, -1)
+	end
+	
+end
+
+
+-- If the infantry men die
+function RightFlank_Infantry1Killed()
+
+	if SGroup_Count(sg_rightflank_abbeyguys1) == 0 then
+		Rule_RemoveMe()
+		FOW_RevealMarker(mkr_fow_rightflank3, -1)
+	end
+	
+end
+
+
+-- Have the infantry men behind the gate scarper back to the chapel
+function RightFlank_RunInfantry2BackIntoAbbey()
+
+	if SGroup_Count(sg_rightflank_abbeyguys2) == 0 then
+		Rule_RemoveMe()
+		FOW_RevealMarker(mkr_fow_rightflank4, -1)
+	elseif SGroup_TotalMembersCount(sg_rightflank_abbeyguys2) <= 2 then
+		Cmd_Retreat(sg_rightflank_abbeyguys2, mkr_abbey_guard2retreat)
+		Rule_RemoveMe()
+		FOW_RevealMarker(mkr_fow_rightflank4, -1)
+	end
+	
+end
+
+
+-- If the rear AT gun dies
+function RightFlank_RearATGunKilled()
+
+	if SGroup_Count(sg_rightflank_atgun1) == 0 then
+		Rule_RemoveMe()
+		FOW_RevealMarker(mkr_fow_rightflank5, -1)
+	end
+	
+end
+
+
+-- bring in a panzer as well
+function RightFlank_BringInPanther()
+
+	if Prox_ArePlayersNearMarker(player1, mkr_abbey_atguntrigger2, ANY) then
+		Rule_RemoveMe()
+		Util_CreateSquads(player2, sg_rightflank_panzer, SBP.AXIS.PANZER, mkr_offmap4, mkr_abbeypanzer_waypoint)
+		Cmd_AttackMove(sg_rightflank_panzer, mkr_abbeypanzer_dest, true)
+		SGroup_AddGroup(sg_abbey_defenders, sg_rightflank_panzer)
+		Rule_AddInterval(RightFlank_RetreatPanther, 1)
+	end
+	
+end
+function RightFlank_RetreatPanther()
+	
+	if SGroup_Count(sg_rightflank_panzer) == 0 then
+		Rule_RemoveMe()
+	elseif SGroup_GetAvgHealth(sg_rightflank_panzer) <= 0.35 then
+		Rule_RemoveMe()
+		Cmd_Move(sg_rightflank_panzer, mkr_offmap4, nil, mkr_offmap4)
+		Modify_Vulnerability(sg_rightflank_panzer, 1.4)
+	end
+
+end
+
+
+-- add a hintpoint telling the player to shell the atguns
+function RightFlank_HintThePanzerschrecks()
+	if SGroup_Count(sg_rightflank_panzerschrecksfront) == 0 then
+		Rule_RemoveMe()
+		Rule_AddInterval(RightFlank_HintTheMGHouse, 1)		-- move onto next hint
+	elseif HowitzerHelper_AnyReadyToFire() == true and Player_CanSeeSGroup(player1, sg_rightflank_panzerschrecksfront, ANY) then
+		Rule_RemoveMe()
+		Rule_AddOneShot(RightFlank_HintThePanzerschrecksB, 5)
+	end
+end
+function RightFlank_HintThePanzerschrecksB()
+	OBJ_RightFlank.BomBHintID = Objective_AddUIElements(OBJ_RightFlank, mkr_rightflank_panzerschreck_hint, false, 1319726, true)
+	Rule_AddInterval(RightFlank_HintThePanzerschrecksRemove, 1)
+end
+function RightFlank_HintThePanzerschrecksRemove()
+	print( Player_CanSeePosition(player1, Marker_GetPosition(mkr_rightflank_panzerschreck_hint)))
+	if Player_CanSeePosition(player1, Marker_GetPosition(mkr_rightflank_panzerschreck_hint)) then
+		Rule_RemoveMe()
+		Rule_AddOneShot(Remove_HintThePanzerschrecks_Delayed, 10)
+		Rule_AddInterval(RightFlank_HintTheMGHouse, 1)		-- move onto next hint
+	end
+end
+
+function Remove_HintThePanzerschrecks_Delayed()
+
+	Objective_RemoveUIElements(OBJ_RightFlank, OBJ_RightFlank.BomBHintID)
+
+end
+
+-- add a hintpoint telling the player to shell the hmg gun in the building
+function RightFlank_HintTheMGHouse()
+	if SGroup_Count(sg_rightflank_abbeyhmg1) == 0 then
+		Rule_RemoveMe()
+		Rule_AddInterval(RightFlank_HintTheMortar, 1)		-- move onto next hint
+	elseif HowitzerHelper_AnyReadyToFire() == true and Player_CanSeeEGroup(player1, eg_abbey_bldg5, ANY) then
+		Rule_RemoveMe()
+		Rule_AddOneShot(RightFlank_HintTheMGHouseB, 5)
+	end
+end
+function RightFlank_HintTheMGHouseB()
+	OBJ_RightFlank.ArtyHintID = Objective_AddUIElements(OBJ_RightFlank, eg_abbey_bldg5, false, 1319717, true,-7)
+	Rule_AddInterval(RightFlank_HintTheMGHouseRemove, 1)
+end
+function RightFlank_HintTheMGHouseRemove()
+	if SGroup_Count(sg_rightflank_abbeyhmg1) == 0 or RightFlank_HaveHowitzersTargettedHereRecently(sg_rightflank_abbeyhmg1) then
+		Rule_RemoveMe()
+		Objective_RemoveUIElements(OBJ_RightFlank, OBJ_RightFlank.ArtyHintID)
+		Rule_AddInterval(RightFlank_HintTheMortar, 1)		-- move onto next hint
+	end
+end
+
+
+
+-- add a hintpoint telling the player to shell the mortar
+function RightFlank_HintTheMortar()	if SGroup_Count(sg_rightflank_abbeymortar1) == 0 then
+		Rule_RemoveMe()
+		-- move onto next hint
+	elseif HowitzerHelper_AnyReadyToFire() == true and Player_CanSeeSGroup(player1, sg_rightflank_abbeymortar1, ANY) then
+		Rule_RemoveMe()
+		Rule_AddOneShot(RightFlank_HintTheMortarB, 5)
+	end
+end
+function RightFlank_HintTheMortarB()
+	OBJ_RightFlank.ArtyHintID = Objective_AddUIElements(OBJ_RightFlank, sg_rightflank_abbeymortar1, false, 1319721, true)
+	Rule_AddInterval(RightFlank_HintTheMortarRemove, 1)
+end
+function RightFlank_HintTheMortarRemove()
+	if SGroup_Count(sg_rightflank_abbeymortar1) == 0 or RightFlank_HaveHowitzersTargettedHereRecently(sg_rightflank_abbeymortar1) then
+		Rule_RemoveMe()
+		Objective_RemoveUIElements(OBJ_RightFlank, OBJ_RightFlank.ArtyHintID)
+		Rule_AddInterval(RightFlank_HintTheFinalATGun, 1)		-- move onto next hint
+	end
+end
+
+
+
+-- add a hintpoint telling the player to shell the final AT gun
+function RightFlank_HintTheFinalATGun()	if SGroup_Count(sg_rightflank_atgun1) == 0 then
+		Rule_RemoveMe()
+		-- move onto next hint
+	elseif HowitzerHelper_AnyReadyToFire() == true and Player_CanSeeSGroup(player1, sg_rightflank_atgun1, ANY) then
+		Rule_RemoveMe()
+		Rule_AddOneShot(RightFlank_HintTheFinalATGunB, 5)
+	end
+end
+function RightFlank_HintTheFinalATGunB()
+	OBJ_RightFlank.ArtyHintID = Objective_AddUIElements(OBJ_RightFlank, sg_rightflank_atgun1, false, 1319722, true)
+	Rule_AddInterval(RightFlank_HintTheFinalATGunRemove, 1)
+end
+function RightFlank_HintTheFinalATGunRemove()
+	if SGroup_Count(sg_rightflank_atgun1) == 0 or RightFlank_HaveHowitzersTargettedHereRecently(sg_rightflank_atgun1) then
+		Rule_RemoveMe()
+		Objective_RemoveUIElements(OBJ_RightFlank, OBJ_RightFlank.ArtyHintID)
+		Rule_AddInterval(RightFlank_HintThePanzer, 1)			-- move onto next hint
+	end
+end
+
+
+
+-- add a hintpoint telling the player to shell the panzer
+function RightFlank_HintThePanzer()	if SGroup_Count(sg_rightflank_panzer) == 0 then
+		Rule_RemoveMe()
+		-- move onto next hint
+	elseif HowitzerHelper_AnyReadyToFire() == true and Player_CanSeeSGroup(player1, sg_rightflank_panzer, ANY) then
+		Rule_RemoveMe()
+		Rule_AddOneShot(RightFlank_HintThePanzerB, 5)
+	end
+end
+function RightFlank_HintThePanzerB()
+	OBJ_RightFlank.ArtyHintID = Objective_AddUIElements(OBJ_RightFlank, sg_rightflank_panzer, false, 1319725, true)
+	Rule_AddInterval(RightFlank_HintThePanzerRemove, 1)
+end
+function RightFlank_HintThePanzerRemove()
+	if SGroup_Count(sg_rightflank_panzer) == 0 or RightFlank_HaveHowitzersTargettedHereRecently(sg_rightflank_panzer) then
+		Rule_RemoveMe()
+		Objective_RemoveUIElements(OBJ_RightFlank, OBJ_RightFlank.ArtyHintID)
+		-- move onto next hint
+	end
+end
+
+
+
+
+
+
+-- called each time a howitzer is fired in this section, and it records the target location
+function RightFlank_RegisterHowitzerTarget(sid, ability, target)
+	
+	if ability == ABILITY.CW.PDR_25_BARRAGE then
+		
+		if Squad_IsInHoldEntity(sid) then
+			for k, this in pairs(t_rightflank_howitzers) do 
+				if EGroup_ContainsEntity(this.egroup, Squad_GetHoldEntity(sid)) then
+					this.target = target
+					this.time = World_GetGameTime()
+					break
+				end
+			end
+		end
+		
+	end
+	
+end
+
+
+
+-- function to see if an area was targetted recently (used for removing hintpoints)
+function RightFlank_HaveHowitzersTargettedHereRecently(location)
+	
+	location = Util_GetPosition(location)
+	
+	for k, this in pairs(t_rightflank_howitzers) do
+		if this.time ~= nil then
+			if (World_GetGameTime() - this.time) <= 10 then
+				if World_DistancePointToPoint(location, this.target) <= 5 then
+					return true
+				end
+			end
+		end
+	end
+	
+end
+
+
+
+-- say something when the player fires their howitzers
+function RightFlank_HowitzersFiring()
+	
+	for k, this in pairs(t_rightflank_howitzers) do 
+		
+		SGroup_Clear(sg_temp)
+		EGroup_GetSquadsHeld(this.egroup, sg_temp)
+		
+		if SGroup_IsDoingAbility(sg_temp, ABILITY.CW.PDR_25_BARRAGE, ANY) then
+			Rule_RemoveMe()
+			Rule_AddOneShot(RightFlank_HowitzersFiringB, 5)
+			break
+		end
+		
+	end
+	
+end
+function RightFlank_HowitzersFiringB()
+
+	Util_StartAmbient(EVENTS.RightFlank_ArtilleryFiring)
+end
+
+
+
+
+
+
+-- THE CHARGE section win check
+function RightFlank_AbbeyIsClear()
+
+	if Event_IsAnyRunning() == false and Player_OwnsEGroup(player1, eg_flag_right2, ANY) and SGroup_Count(sg_abbey_defenders) <= 2 and SGroup_IsEmpty(sg_rightflank_panzer) then
+		
+		Rule_RemoveMe()
+		
+		HowitzerHelper_Stop()
+		
+		if SGroup_IsEmpty(sg_abbey_defenders) == false then 
+			Cmd_Move(sg_abbey_defenders, mkr_offmap4, NO_QUEUE, mkr_offmap4)
+		end
+		
+		-- say that the Abbey is clear
+		Util_StartIntel(EVENTS.RightFlank_AbbeyClear)
+		
+		-- remove smoke 
+		EGroup_DestroyAllEntities(eg_smoke)
+		
+		-- remove the event that records targets
+		for k, this in pairs(t_rightflank_howitzers) do 
+			SGroup_Clear(sg_temp)
+			EGroup_GetSquadsHeld(this.egroup, sg_temp)
+			Rule_RemoveSGroupEvent(RightFlank_RegisterHowitzerTarget, sg_temp)
+		end
+		
+		-- next
+		Rule_AddDelayedInterval(RightFlank_Done, 10, 1)
+		
+	end
+	
+end
+
+
+	
+function RightFlank_Done()
+
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		-- unreveal all the areas we revealed during the abbey section
+		FOW_UnRevealMarker(mkr_fow_rightflank1)
+		FOW_UnRevealMarker(mkr_fow_rightflank2)
+		FOW_UnRevealMarker(mkr_fow_rightflank3)
+		FOW_UnRevealMarker(mkr_fow_rightflank4)
+		FOW_UnRevealMarker(mkr_fow_rightflank5)
+		
+		Objective_Complete(OBJ_RightFlank)
+		
+	end
+	
+end
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- Objective Capture Authie
+-------------------------------------------------------------------------
+-- Destroy the Axis out of the fortified village of Authie
+-- once the waves are defeated
+-------------------------------------------------------------------------
+function Initialize_OBJ_CaptureAuthie()
+
+	OBJ_CaptureAuthie = {
+		
+		SetupUI = function() 
+		end,
+		
+		OnStart = function()
+			Sound_PlayMusic("Music/SP/Caen/Motivation/coh_m01_cue_05.bsc",2,0)
+			Objective_SetAlwaysShowDetails(OBJ_CaptureAuthie, true, true, true)
+			Rule_AddDelayedInterval(Rule_Ping_Flag_Middle, 15, 1)
+			Rule_AddInterval(SetUpBase_HQSetUp_Forward, 1)
+
+			--Camera_ClampToMarker(mkr_camera_phase3a)		
+			
+			
+		end,
+		
+		OnComplete = function()
+			
+			-- tell the player they did good
+			
+			Rule_Add(Rule_EndMission)
+			
+		end,
+		
+		IsComplete = function()
+			
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			
+		end,
+		
+		Title = 1319210,
+		Description = 1319229,
+		TitleEnd = 1319244,
+		Type = OT_Primary,
+		
+		SitRep = {
+			Movie = "CXP1_SR_01-03",         -- should just need to replace this with SR_02-01 / SR_02-02 / SR_02-03
+			Force = true,
+			SpeechTiming =
+			{
+				{ 1,	ACTOR.CXP1.Cutting, 1311710 },
+				{ 4.6,	ACTOR.CXP1.Cutting, 1311720 },
+				{ 9,	ACTOR.CXP1.Cutting, 1311730 },
+				{ 11.5,	ACTOR.CXP1.Cutting, 1311740 },
+				{ 13,	ACTOR.CXP1.Cutting, 1311750 },
+				{ 16,	ACTOR.CXP1.Cutting, 1311760 },
+				{ 21,	ACTOR.CXP1.Blackmore, 1311770 },
+				--{ 21,	ACTOR.CXP1.Blackmore, 1311771 }, <- <ALT> speech for 1311770
+				{ 29,	ACTOR.CXP1.Blackmore, 1311780 },
+				{ 34,	ACTOR.CXP1.Blackmore, 1311790 },
+			},
+			
+			
+			PrologueEvent = function()
+			
+				
+				-- recentre and reclamp the camera
+				Camera_MoveToPosition(mkr_camera_tankambushstart)
+				Camera_Unclamp()
+				Camera_ResetToDefault()
+				Misc_RemoveCommandRestriction()
+				
+				-- move out the cromwells
+
+				
+			
+			end,
+			
+			EpilogueEvent = function()
+				
+				
+				
+				g_ambush_start = true
+				
+				Camera_MoveToSGroup(sg_ambushvictim2)
+				Camera_FollowSGroup(sg_ambushvictim2)
+				
+				CTRL.Event_Delay(10)			
+				CTRL.WAIT()
+				
+				-- spawn in the Inf HQ
+				
+				Util_CreateSquads(player1, sg_ally_Inf_HQ_Forward, SBP.CW.HQ_REINFORCEMENT, mkr_infantryhqspawn_forward, mkr_infantryhqdest_forward, 1)
+				Cmd_Ability(sg_ally_Inf_HQ_Forward, ABILITY.CW.HQ_SETUP, mkr_infantryhqdest_forward)
+				SGroup_SetSelectable(sg_ally_Inf_HQ_Forward, false)
+							
+				CTRL.Event_Delay(1)			
+				CTRL.WAIT()
+				
+				Camera_MoveToSGroup(sg_ally_Inf_HQ_Forward)
+				Camera_FollowSGroup(sg_ally_Inf_HQ_Forward)
+				
+				CTRL.Event_Delay(9)			
+				CTRL.WAIT()
+				
+					
+					
+			
+			end,
+			
+			
+		},
+		
+	}
+	
+	-- Register Objective and Initialize Data
+	Objective_Register(OBJ_CaptureAuthie)
+	CaptureAuthie_Init()
+	
+end
+
+
+function SetUpBase_HQSetUp_Forward()
+
+	if Event_IsAnyRunning() == false and Util_GetCommonwealthHQMobility(sg_ally_Inf_HQ) == false then
+		
+		Rule_RemoveMe()
+		
+		SGroup_SetSelectable(sg_ally_Inf_HQ_Forward, true)
+		Player_SetConstructionMenuAvailability(player2, "tp_construction_commonwealth_hq", ITEM_LOCKED)
+	
+		
+	end
+	
+end
+
+function Rule_Ping_Flag_Middle()
+
+
+	g_Flag_Middle_HPID = HintPoint_Add(eg_flag_middle, true, 1429010)
+	g_middle_flag = true
+	Rule_AddInterval(Rule_Check_Flag_Middle, 1)
+	Rule_RemoveMe()
+
+end
+
+function Rule_Check_Flag_Middle()
+
+	if EGroup_IsCapturedByPlayer(eg_flag_middle, player1, ALL) then
+
+		HintPoint_Remove(g_Flag_Middle_HPID)
+		Rule_RemoveMe()
+	
+	
+	end
+
+end
+
+function CaptureAuthie_Init()
+
+	sg_capAuth_mardars = SGroup_CreateTable("sg_capAuth_mardars%d", 8)
+	sg_capAuth_panzer = SGroup_CreateTable("sg_capAuth_panzer%d", 8)
+	
+	sg_capAuth_defenders = SGroup_CreateTable("sg_capAuth_defenders%d", 8)
+	sg_defAll_tanks = SGroup_CreateTable("sg_defAll_tanks%d", 8)
+	sg_capAuth_defendersAll = SGroup_CreateIfNotFound("sg_capAuth_defendersAll")
+	sg_capAuth_converge	= SGroup_CreateIfNotFound("sg_capAuth_converge")
+ 	sg_capAuthie_p2All	= SGroup_CreateIfNotFound("sg_capAuthie_p2All")
+
+	t_capAuthie = {
+		fg_axisDead = false,
+		fg_actionStarted = false,
+		fg_objGranted = false,
+		spawn = {
+			{sgroup = sg_capAuth_defenders[1], sbp = SBP.AXIS.GRENADIER, 	src = mkr_offmap5, pos = mkr_capAuth_def1, 	face = mkr_pth_Middleend, rule = function() Cmd_InstantUpgrade(sg_capAuth_defenders[1], UPG.AXIS.GREN_PANZERSCHRECK, 1) end},
+			{sgroup = sg_capAuth_defenders[2], sbp = SBP.AXIS.VOLKSGRENADIER, src = mkr_offmap5, pos = mkr_capAuth_def2,	face = mkr_pth_Middleend, rule = function() Cmd_InstantUpgrade(sg_capAuth_defenders[2], UPG.AXIS.GREN_MG42, 1) end},
+			{sgroup = sg_capAuth_defenders[3], sbp = SBP.AXIS.MORTAR, 		src = mkr_offmap5, pos = mkr_capAuth_def3,	face = mkr_pth_Middleend, rule = function() end},
+			{sgroup = sg_capAuth_defenders[4], sbp = SBP.AXIS.STORMTROOPER, src = mkr_offmap5, pos = mkr_capAuth_def4,	face = mkr_pth_Middleend, rule = function() Cmd_InstantUpgrade(sg_capAuth_defenders[4], UPG.AXIS.STORM_MG42, 1) end},
+			{sgroup = sg_capAuth_defenders[5], sbp = SBP.AXIS.GRENADIER, 	src = mkr_offmap5, pos = mkr_capAuth_def5,	face = mkr_pth_Middleend, rule = function() Cmd_InstantUpgrade(sg_capAuth_defenders[5], UPG.AXIS.GREN_PANZERSCHRECK, 1) end},
+			{sgroup = sg_capAuth_defenders[6], sbp = SBP.AXIS.STORMTROOPER, src = mkr_offmap5, pos = mkr_capAuth_def6,	face = mkr_pth_Middleend, rule = function() Cmd_InstantUpgrade(sg_capAuth_defenders[6], UPG.AXIS.STORM_PANZERSCHRECK, 1) end},
+			{sgroup = sg_capAuth_defenders[7], sbp = SBP.AXIS.MORTAR, 		src = mkr_offmap5, pos = mkr_capAuth_def7,	face = mkr_pth_Middleend, rule = function() end},
+		},
+		tankdefenders = {
+			--sg_defAll_chargeAll
+			{sgroup = sg_capAuth_mardars[1], bp = SBP.ELITE.HALFTRACK_SNIPER, src = mkr_offmap5, goTo = mkr_authie_mardar1, face = mkr_capAuth_def2, hint = false},
+			{sgroup = sg_capAuth_mardars[2], bp = SBP.ELITE.HALFTRACK_SNIPER, src = mkr_offmap5, goTo = mkr_authie_mardar2, face = mkr_capAuth_def3, hint = false},
+			{sgroup = sg_capAuth_mardars[3], bp = SBP.ELITE.MARDER, src = mkr_offmap10, goTo = mkr_authie_mardar3, face = mkr_capAuth_def1, hint = false},
+		},
+		counterattack = {
+			--sg_defAll_chargeAll
+			{sgroup = sg_capAuth_panzer[1], bp = SBP.ELITE.MARDER, src = mkr_offmap5, goTo = mkr_authie_center, hint = false},
+			{sgroup = sg_capAuth_panzer[2], bp = SBP.AXIS.PANZER, src = mkr_offmap3, goTo = mkr_capAuth_def6, hint = false},
+		},
+		
+	}
+
+	sg_ambush_all = SGroup_CreateIfNotFound("sg_ambush_all")
+	sg_ambush_atgun1 = SGroup_CreateIfNotFound("sg_ambush_atgun1")
+	sg_ambush_atgun2 = SGroup_CreateIfNotFound("sg_ambush_atgun2")
+	sg_ambush_atgun3 = SGroup_CreateIfNotFound("sg_ambush_atgun3")
+	sg_ambush_atgun4 = SGroup_CreateIfNotFound("sg_ambush_atgun4")
+	sg_ambush_hmg1 = SGroup_CreateIfNotFound("sg_ambush_hmg1")
+	sg_ambush_hmg2 = SGroup_CreateIfNotFound("sg_ambush_hmg2")
+	sg_ambush_grenadiers1 = SGroup_CreateIfNotFound("sg_ambush_grenadiers1")
+	sg_ambush_grenadiers2 = SGroup_CreateIfNotFound("sg_ambush_grenadiers2")
+	sg_ambush_grenadiers3 = SGroup_CreateIfNotFound("sg_ambush_grenadiers3")
+	sg_ambush_marder1 = SGroup_CreateIfNotFound("sg_ambush_marder1")
+	sg_ambush_marder2 = SGroup_CreateIfNotFound("sg_ambush_marder2")
+	
+	sg_ambush_pak = SGroup_CreateTable("sg_ambush_pak%d", 5)
+	sg_ambush_mad = SGroup_CreateTable("sg_ambush_mad%d", 3)
+	
+	t_tankambush_playerunits = {}
+	t_tankambush_playerunits[1] = {group = sg_Cromwell1, warp = mkr_ambush_cromwellwarp1, offsetdirection = OFFSET_BACK, offsetdistance = 0, incoming = true, bp = SBP.CW.CROMWELL, speedboost = true, 
+	capdest = mkr_cap_authie_dest_1, rallyA = mkr_ambush_cromwelldest1_rally_A,	rallyB = mkr_ambush_cromwelldest1_rally_B,}
+	t_tankambush_playerunits[2] = {group = sg_Cromwell2, warp = mkr_ambush_cromwellwarp2, offsetdirection = OFFSET_BACK_LEFT, offsetdistance = 10, incoming = true, bp = SBP.CW.CROMWELL, speedboost = true, 
+	capdest = mkr_cap_authie_dest_2, rallyA = mkr_ambush_cromwelldest2_rally_A, rallyB = mkr_ambush_cromwelldest2_rally_B,}
+	t_tankambush_playerunits[3] = {group = sg_Cromwell3, warp = mkr_ambush_cromwellwarp3, offsetdirection = OFFSET_BACK_RIGHT, offsetdistance = 15, incoming = true, bp = SBP.CW.CROMWELL, speedboost = true, 
+	capdest = mkr_cap_authie_dest_3,rallyA = mkr_ambush_cromwelldest3_rally_A, rallyB = mkr_ambush_cromwelldest3_rally_B,}
+	t_tankambush_playerunits[4] = {group = sg_rightflank_infantry1, warp = mkr_ambush_cromwellwarp4, offsetdirection = OFFSET_BACK_LEFT, offsetdistance = 20, incoming = true, bp = SBP.CW.TOMMIES, 
+	upgrades = UPG.CW.RECON_TEAM, capdest = mkr_cap_authie_dest_4,rallyA = mkr_ambush_infantrydest1_rally_A, rallyB = mkr_ambush_infantrydest1_rally_B,}
+	t_tankambush_playerunits[5] = {group = sg_rightflank_infantry2, warp = mkr_ambush_cromwellwarp5, offsetdirection = OFFSET_BACK_RIGHT, offsetdistance = 25, incoming = true, bp = SBP.CW.TOMMIES, 
+	upgrades = UPG.CW.RECON_TEAM, capdest = mkr_cap_authie_dest_5,rallyA = mkr_ambush_infantrydest1_rally_A,rallyB = mkr_ambush_infantrydest2_rally_B,}
+
+	captureauthie_rallylocation = mkr_ambush_cromwelldest1
+	
+	t_tankambush_ambushunits = {}
+	t_tankambush_ambushunits[1] = {group = sg_ambush_hmg1, spawn = eg_ambush_house1, sbp = SBP.AXIS.HEAVYMG}
+	t_tankambush_ambushunits[2] = {group = sg_ambush_hmg2, spawn = mkr_ambush_hmg2, sbp = SBP.AXIS.HEAVYMG}
+	t_tankambush_ambushunits[3] = {group = sg_ambush_atgun1, spawn = mkr_ambush_atgun1, sbp = SBP.AXIS.PAK_38}
+	t_tankambush_ambushunits[4] = {group = sg_ambush_atgun2, spawn = mkr_ambush_atgun2, sbp = SBP.AXIS.PAK_38}
+	t_tankambush_ambushunits[5] = {group = sg_ambush_atgun3, spawn = mkr_ambush_atgun3, sbp = SBP.AXIS.PAK_38}
+	
+	t_tankambush_grenadiers = {}
+	t_tankambush_grenadiers[1] = {group = sg_ambush_grenadiers1, spawn = eg_ambush_house1, dest = mkr_ambush_grenadier1dest, upgrades = UPG.AXIS.GREN_PANZERSCHRECK }
+--	t_tankambush_grenadiers[2] = {group = sg_ambush_grenadiers2, spawn = eg_ambush_house2, dest = mkr_ambush_grenadier2dest, upgrades = UPG.AXIS.GREN_PANZERSCHRECK }
+--	t_tankambush_grenadiers[3] = {group = sg_ambush_grenadiers3, spawn = eg_ambush_house3, dest = mkr_ambush_grenadier3dest, upgrades = {UPG.AXIS.GREN_PANZERSCHRECK, UPG.AXIS.GREN_PANZERSCHRECK}}
+
+	t_tankambush_marders = {}
+	t_tankambush_marders[1] = {group = sg_ambush_marder1, spawn = mkr_offmap3, path = "path_marder_1", dest = mkr_ambush_grenadier1dest}
+	t_tankambush_marders[2] = {group = sg_ambush_marder2, spawn = mkr_offmap5, path = "path_marder_2",dest = mkr_ambush_grenadier2dest}
+	
+	time_captureauthie_replacement = 0
+	
+	Rule_AddInterval(CaptureAuthie_Start, 1)
+	g_ambush_start = false
+	g_rally_point_A_set = false
+	g_rally_point_B_set = false
+	sg_ally_Inf_HQ_Forward = SGroup_CreateIfNotFound("sg_ally_Inf_HQ_Forward")
+	sg_authie_rallyA_defenders = SGroup_CreateIfNotFound("sg_authie_rallyA_defenders")
+	sg_authie_rallyB_defenders = SGroup_CreateIfNotFound("sg_authie_rallyB_defenders")
+	
+end
+
+
+
+function CaptureAuthie_Preset()
+	
+	-- spawn units to defend Authie
+	Rule_AddInterval(CaptureAuthie_EarlyTrigger, 5)
+	
+end
+
+
+
+
+
+-- start the related action
+function CaptureAuthie_Start()
+	
+	if Event_IsAnyRunning() == false and Objective_IsComplete(OBJ_RightFlank) then
+		
+		Rule_RemoveMe()
+		
+		--stop the howitzer in case of queued orders
+		if EGroup_Exists("eg_playerhowitzer1")and EGroup_IsEmpty(eg_playerhowitzer1) == false then
+			Cmd_Stop(eg_playerhowitzer1)
+		end	
+		--stop the howitzer in case of queued orders
+
+		if EGroup_Exists("eg_playerhowitzer2") and EGroup_IsEmpty(eg_playerhowitzer2) == false then
+			Cmd_Stop(eg_playerhowitzer2)
+		end	
+		
+		Objective_Start(OBJ_CaptureAuthie)
+		TankAmbush_CreateAmbushUnits()
+		TankAmbush_CreateAmbushVictims()
+		Rule_AddInterval(TankAmbush_Start, 1)
+		
+	end
+	
+end
+
+
+function Rule_Authie_Rally_Point_Redeploy()
+--keeps the rally points moving forward based on the player's progression
+
+	if SGroup_IsEmpty(sg_authie_rallyA_defenders) and g_rally_point_A_set == false then
+	
+		for k, this in pairs(t_tankambush_playerunits) do
+		
+			this.capdest = this.rallyA
+			g_rally_point_A_set = true
+			
+			HintPoint_Remove(g_Authie_Rally_PointID)
+			
+			g_Authie_Rally_PointID = HintPoint_Add(mkr_ally_howitzer6, true, 1319650)
+
+		end
+		
+		
+		
+		
+	elseif SGroup_IsEmpty(sg_authie_rallyB_defenders) and g_rally_point_B_set == false then
+	
+		for k, this in pairs(t_tankambush_playerunits) do
+		
+			this.capdest = this.rallyB
+			g_rally_point_B_set = true
+			
+			HintPoint_Remove(g_Authie_Rally_PointID)
+			
+			g_Authie_Rally_PointID = HintPoint_Add(mkr_authie_rally_B, true, 1319650)
+			
+			Rule_RemoveMe()
+
+		end
+	
+	end
+end
+
+
+
+-- replace units the player loses
+function CaptureAuthie_ReplacePlayerUnits()
+
+	if Objective_IsComplete(OBJ_CaptureAuthie) == true then
+		Rule_RemoveMe()
+	else
+		
+		local replace = false
+		if (World_GetGameTime() - time_captureauthie_replacement) > 8 then
+			replace = true
+		end
+		
+		for k, this in pairs(t_tankambush_playerunits) do 
+			
+			-- whilst on their initial entrance move order, stop them if they're selected by the player
+			if this.incoming == true then
+				if Misc_IsSGroupSelected(this.group, ANY) == true or SGroup_IsMoving(this.group, ANY) == false then
+					Cmd_Stop(this.group)
+					this.incoming = false
+					if this.speedmodifer ~= nil then
+						Modifier_Remove(this.speedmodifier)
+						this.speedmodifier = nil
+					end
+				end
+			end
+			
+			-- if it's been 8 seconds since the last replacement, and this group is empty...
+			if replace == true and SGroup_IsEmpty(this.group) then
+				
+				-- replaces one at a time
+				
+				Util_CreateSquads(player1, this.group, this.bp, mkr_offmap1, this.capdest, 1, nil, nil, nil, this.upgrades)
+				Util_ReinforceEvent(this.group)
+				if this.bp == SBP.CW.CROMWELL then
+					SGroup_AddGroup(sg_CromwellAll, this.group)
+				end
+				if this.speedboost == true then
+					this.speedmodifier = Modify_UnitSpeed(this.group, 1.4)
+				end
+				this.incoming = true
+				
+				time_captureauthie_replacement = World_GetGameTime()
+				replace = false
+				
+			end
+			
+		end
+		
+	end
+	
+end
+
+
+
+
+-------------------------------------------------------------------------
+-- THE TANKS
+-------------------------------------------------------------------------
+	
+
+function TankAmbush_Init()
+	
+	sg_ambushvictims = SGroup_CreateIfNotFound("sg_ambushvictims")
+	sg_ambushvictim1 = SGroup_CreateIfNotFound("sg_ambushvictim1")
+	sg_ambushvictim2 = SGroup_CreateIfNotFound("sg_ambushvictim2")
+	g_wrapup = false
+	
+end
+
+
+
+	
+function TankAmbush_Start()
+
+	if g_ambush_start == true then
+		
+		Util_StartAmbient(EVENTS.TankAmbush_Start)
+		
+		-- move the Cromwells into their new positions
+		for k, this in pairs(t_tankambush_playerunits) do 
+			if SGroup_Count(this.group) == 0 then
+				Util_CreateSquads(player1, this.group, this.bp, this.warp, nil, 1, nil, nil, nil, this.upgrades)
+				if this.bp == SBP.CW.CROMWELL then
+					SGroup_AddGroup(sg_CromwellAll, this.group)
+				end
+			else
+				Cmd_Stop(this.group)
+				Cmd_Move(this.group, this.capdest)
+			end
+		--	Cmd_SquadPath(this.group, "path_ambushcromwell", true, false, false, 0)
+		--	local dest = Util_GetOffsetPosition(captureauthie_rallylocation, this.offsetdirection, this.offsetdistance)
+			Cmd_Move(this.group, this.capdest, true)
+		end
+		
+		-- start replacing lost units
+		Rule_AddDelayedInterval(CaptureAuthie_ReplacePlayerUnits,30,  0.5)
+		Rule_AddDelayedInterval(Rule_Authie_Rally_Point_Redeploy, 60, 1)
+		
+		-- start the recon planes
+		Rule_AddOneShot(TankAmbush_StartSpotterPlanes, 1)
+		
+		
+		Rule_RemoveMe()
+		
+	end
+	
+end
+
+
+	
+-- create the enemy units that take part in the ambush
+function TankAmbush_CreateAmbushUnits()
+
+	Util_CreateSquads(player2, sg_ambush_atgun1, SBP.AXIS.PAK_38, mkr_ambush_atgun1)
+	SGroup_AddGroup(sg_authie_rallyA_defenders, sg_ambush_atgun1)
+	Util_CreateSquads(player2, sg_ambush_atgun2, SBP.AXIS.PAK_38, mkr_ambush_atgun2)
+	SGroup_AddGroup(sg_authie_rallyA_defenders, sg_ambush_atgun2)
+	Util_CreateSquads(player2, sg_ambush_atgun3, SBP.AXIS.PAK_38, mkr_ambush_atgun3)
+	SGroup_AddGroup(sg_authie_rallyA_defenders, sg_ambush_atgun3)
+	
+	ATGun_AddGroup(sg_ambush_atgun1, player2, nil, nil, nil, nil, true)
+	ATGun_AddGroup(sg_ambush_atgun2, player2, nil, nil, nil, nil, true)
+	ATGun_AddGroup(sg_ambush_atgun3, player2, nil, nil, nil, nil, true)
+
+	Util_CreateSquads(player2, sg_ambush_hmg1, SBP.AXIS.HEAVYMG, eg_ambush_house1)
+	Util_CreateSquads(player2, sg_ambush_hmg2, SBP.AXIS.HEAVYMG, mkr_ambush_hmg2)
+	Cmd_InstantSetupTeamWeapon(sg_ambush_hmg2, true)
+	
+	SGroup_AddGroup(sg_authie_rallyA_defenders, sg_ambush_hmg2)
+	
+	SGroup_AddGroup(sg_ambush_all, sg_ambush_atgun1)
+	SGroup_AddGroup(sg_ambush_all, sg_ambush_atgun2)
+	SGroup_AddGroup(sg_ambush_all, sg_ambush_atgun3)
+	
+	SGroup_AddGroup(sg_ambush_all, sg_ambush_hmg1)
+	SGroup_AddGroup(sg_ambush_all, sg_ambush_hmg2)
+	
+	Rule_AddInterval(TankAmbush_RunInGrenadiers, 7)
+	
+	
+end
+
+function TankAmbush_RunInGrenadiers()
+
+	-- only check for tommies or cromwells (don't want the spotter planes triggering this!)
+	Player_GetAllSquadsNearMarker(player1, sg_temp, mkr_ambush_triggerarea)
+	SGroup_Filter(sg_temp, {SBP.CW.CROMWELL, SBP.CW.TOMMIES}, FILTER_KEEP)
+	
+	if SGroup_Count(sg_temp) >= 1 then
+		
+		Rule_RemoveMe()
+		
+		for k, this in pairs(t_tankambush_grenadiers) do
+			
+			if EGroup_GetAvgHealth(this.spawn) > 0 then
+				Util_CreateSquads(player2, this.group, SBP.AXIS.GRENADIER, this.spawn, this.dest, 1, nil, true, nil, this.upgrades)
+				Cmd_AttackMove(this.group, sg_CromwellAll, true)
+				SGroup_AddGroup(sg_ambush_all, this.group)
+				EGroup_SetInvulnerable(this.spawn, false)
+			end
+		end
+		
+		Rule_AddOneShot(TankAmbush_MoveATGun3, 5)
+		Rule_AddOneShot(TankAmbush_BringInMarders, 13)
+		
+		SGroup_AddGroup(sg_authie_rallyB_defenders, sg_ambush_grenadiers2)
+	end
+	
+end
+
+
+-- makes the at gun cross the road
+function TankAmbush_MoveATGun3()
+
+	Cmd_Move(sg_ambush_atgun3, mkr_ambush_atgun3dest, false, false, Util_CreateFacingPosFromMarker(mkr_ambush_atgun3dest))
+
+end
+
+
+-- bring the marders into the rear of the attack area
+function TankAmbush_BringInMarders()
+
+	for k, this in pairs(t_tankambush_marders) do
+		Util_CreateSquads(player2, this.group, SBP.ELITE.MARDER, this.spawn, this.dest, 1)
+		Cmd_SquadPath(this.group, this.path, true, LOOP_NONE, true)
+	
+		SGroup_AddGroup(sg_ambush_all, this.group)
+	end
+	
+end
+
+
+-- create the victims for the ambush and start their manager rule	
+function TankAmbush_CreateAmbushVictims()
+
+	Util_CreateSquads(player3, sg_ambushvictim1, SBP.CW.CROMWELL, mkr_ambushvictim_spawn1, mkr_pth_Middleend)
+	SGroup_AddGroup(sg_ambushvictims, sg_ambushvictim1)
+	Util_CreateSquads(player3, sg_ambushvictim2, SBP.CW.CROMWELL, mkr_ambushvictim_spawn2, mkr_pth_Middleend)
+	SGroup_AddGroup(sg_ambushvictims, sg_ambushvictim2)
+	
+	-- apply modifiers to make them "willing victims"
+	Modify_Vulnerability(sg_ambushvictims, 2)
+	Modify_WeaponDamage(sg_ambushvictims, "hardpoint_01", 0.5)
+	
+	-- ensure that we can see them
+	FOW_RevealSGroup(sg_ambushvictims, -1)
+	
+end
+
+	
+
+
+
+
+
+
+-- spawn the recon planes
+function TankAmbush_StartSpotterPlanes()
+
+	Rule_AddInterval(TankAmbush_SpotterPlane1, 1)
+	Rule_AddDelayedInterval(TankAmbush_SpotterPlane2, 8, 1)
+	Rule_AddDelayedInterval(TankAmbush_SpotterPlane3, 16, 1)
+	Rule_AddInterval(TankAmbush_KillAmbush, 1)
+	
+	Rule_AddOneShot(TankAmbush_MentionSpotterPlanes, 10)
+
+end
+
+	
+function TankAmbush_SpotterPlane1()
+	Cmd_Ability(player1, ABILITY.CW.TYPHOON_RECON, Marker_GetPosition(mkr_ambush_flypast1), Marker_GetDirection(mkr_ambush_flypast1), true)
+	Rule_ChangeInterval(TankAmbush_SpotterPlane1, World_GetRand(30, 40))
+end
+function TankAmbush_SpotterPlane2()
+	Cmd_Ability(player1, ABILITY.CW.TYPHOON_RECON, Marker_GetPosition(mkr_ambush_flypast2), Marker_GetDirection(mkr_ambush_flypast2), true)
+	Rule_ChangeInterval(TankAmbush_SpotterPlane2, World_GetRand(30, 40))
+end
+function TankAmbush_SpotterPlane3()
+	Cmd_Ability(player1, ABILITY.CW.TYPHOON_RECON, Marker_GetPosition(mkr_ambush_flypast3), Marker_GetDirection(mkr_ambush_flypast3), true)
+	Rule_ChangeInterval(TankAmbush_SpotterPlane3, World_GetRand(30, 40))
+end
+
+
+function TankAmbush_MentionSpotterPlanes()
+	Util_StartAmbient(EVENTS.TankAmbush_Spotted)
+end
+
+
+
+-- ask the player to destroy the ambush units
+function TankAmbush_KillAmbush()
+	if Event_IsAnyRunning() == false then
+		
+		-- give the player the creeping barrage ability
+		Cmd_InstantUpgrade(player1, UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY_13)
+		Modify_AbilityMaxCastRange(player1, ABILITY.COMMANDER_TREE.CW.PDR_25_CREEPING_BARRAGE, 1.8)
+		Modify_AbilityRechargeTime(player1,ABILITY.COMMANDER_TREE.CW.PDR_25_CREEPING_BARRAGE ,0.5)
+		
+		UI_FlashAbilityButton( ABILITY.COMMANDER_TREE.CW.PDR_25_CREEPING_BARRAGE, true, BT_UI_Strong_AbilityBtn ) 
+		HintPoint_AddToAbilityButton(ABILITY.COMMANDER_TREE.CW.PDR_25_CREEPING_BARRAGE, 1319727, true)
+		
+		-- message
+		Util_StartIntel(EVENTS.TankAmbush_CallInCreepingBarrage)
+		
+		flashid_first_creeping = UI_FlashSquadControlGroupIcon(g_first_howitzer_ctrl_group, false, BT_UI_Weak_SquadControl)
+		flashid_second_creeping = UI_FlashSquadControlGroupIcon(g_second_howitzer_ctrl_group, false, BT_UI_Weak_SquadControl)
+		Rule_AddOneShot(Rule_Remove_Barrage_Flash, 10)
+		
+		Rule_AddOneShot(Rule_Remind_Player_Howitzer_Stop, 10)
+		
+		-- add Munitions
+		Player_AddResource(player1, RT_Munition, 800)
+		
+		FOW_RevealArea(Marker_GetPosition(mkr_ally_howitzer6), 50, 9999)
+		
+		-- smoke
+		 t_creeping_barrage = {
+			
+			{
+				marker = mkr_ambush_atgun1, 
+				ID = false,
+			
+			},
+			
+			{
+				marker = mkr_ambush_atgun2, 
+				ID = false,
+				
+			},
+			
+			{
+				marker = mkr_ambush_atgun3, 
+				ID = false,
+			
+			},
+						
+			
+			}
+		for k, this in pairs(t_creeping_barrage)  do 
+			Util_CreateEntities(player1, eg_smoke, EBP.SP.SP_SMOKE, this.marker, 1)
+			this.ID = HintPoint_Add(this.marker, true, 1319727)
+		end
+		
+		UI_SetModalAbilityPhaseCallback(Rule_Creeping_Barrage_Button_Pressed)
+		
+		-- track the death of all the ambush units
+		Rule_AddInterval(TankAmbush_AmbushDead, 2)
+		
+		Rule_RemoveMe()
+	end
+end
+
+-- somewhere here you need to hook up EVENTS.LeftFlank_SetHowitzerTarget to play upon the player clicking on the arty button
+function Rule_Creeping_Barrage_Button_Pressed(ability, phase)
+	
+	if ability == ABILITY.CW.CREEPING_BARRAGE and phase == MAP_Confirmed then
+		
+		UI_ClearModalAbilityPhaseCallback()
+
+	
+		for k, this in pairs(t_creeping_barrage)  do 
+			HintPoint_Remove(this.ID)
+		end
+	end
+	
+end
+
+
+function Rule_Remove_Barrage_Flash()
+
+	if flashid_first_creeping ~= nil then
+	
+		UI_StopFlashing(flashid_first_creeping)
+	
+	end
+
+
+	if flashid_second_creeping ~= nil then
+	
+		UI_StopFlashing(flashid_second_creeping)
+	
+	end
+end
+
+-- once the ambush units take are dead, ambush with some panzers
+function TankAmbush_AmbushDead()
+	if SGroup_Count(sg_ambush_all) <= 2 then
+		-- get rid of survivors if they're still around
+		if SGroup_IsEmpty(sg_ambush_all) == false then
+			Cmd_Move(sg_ambush_all, mkr_offmap3, NO_QUEUE, mkr_offmap3) 
+		end
+		
+		-- once the smoke clears handover the cromwells
+		EGroup_DestroyAllEntities(eg_smoke)
+		
+		if g_wrapup == false then
+		Rule_AddOneShot(TankAmbush_WrapUp, 2)
+			g_wrapup = true
+		end
+		Rule_RemoveMe()
+	elseif Player_AreSquadsNearMarker(player1, mkr_authie_final_check) then
+
+
+		FOW_UnRevealArea(Marker_GetPosition(mkr_ally_howitzer6), 40)
+		
+		-- go take Authie
+		-- done the deed
+		flag_tankambush_done = true
+
+		-- placeholder using existing sgroups - deg
+		Player_GetAll(player3, sg_handOver_infantry)
+		
+		if SGroup_IsEmpty(sg_defAll_chargeAll) == false then
+			Util_SetPlayerOwner(sg_defAll_chargeAll, player1)
+		end
+		
+		CaptureAuthie_StartPart2()
+		Rule_AddOneShot(TankAmbush_ForceMedalObjective, 25)
+		Rule_RemoveMe()
+	end
+end
+
+
+-- 
+function TankAmbush_WrapUp()	
+
+	-- message
+	Util_StartIntel(EVENTS.TankAmbush_Done)
+	
+	FOW_UnRevealArea(Marker_GetPosition(mkr_ally_howitzer6), 40)
+	
+	-- go take Authie
+	-- done the deed
+	flag_tankambush_done = true
+
+	-- placeholder using existing sgroups - deg
+	Player_GetAll(player3, sg_handOver_infantry)
+	
+	if SGroup_IsEmpty(sg_defAll_chargeAll) == false then
+		Util_SetPlayerOwner(sg_defAll_chargeAll, player1)
+	end
+	
+	CaptureAuthie_StartPart2()
+	Rule_AddOneShot(TankAmbush_ForceMedalObjective, 25)
+	Rule_RemoveMe()
+end
+
+
+-- set the flag that kicks off the medal objective	
+function TankAmbush_ForceMedalObjective()
+	flag_startmedalobjective = true
+end
+
+
+
+
+
+--------------------------------------------------------------------------------
+-- THE TANK AMBUSH
+--------------------------------------------------------------------------------
+
+
+function CaptureAuthie_StartPart2()
+
+	t_capAuthie.fg_objGranted = true
+	
+	-- pump up the volume
+	Player_SetPopCapOverride(player1, 90)
+	
+	-- update the objective
+	Objective_UpdateText(OBJ_CaptureAuthie, 1319208, 1319227)
+	OBJ_CaptureAuthie.PingID = Objective_AddUIElements(OBJ_CaptureAuthie, mkr_hold_authie_hintpoint, true, 1319724, true, 2)
+	
+
+	
+	
+	-- announce the goal
+	Util_StartIntel(EVENTS.CaptureAuthie_Start)
+	
+	if SGroup_IsEmpty(sg_defAll_chargeAll) == false then
+		Cmd_Move(sg_defAll_chargeAll, mkr_ally_howitzer6, true)
+	end
+	
+	-- update the rally point
+	g_Authie_Rally_PointID = HintPoint_Add(mkr_ally_howitzer6, true, 1319650)
+	captureauthie_rallylocation = mkr_ambush_cromwelldest2
+
+	-- add the fourth cromwell (the manager will spawn it on its next cycle)
+	table.insert(t_tankambush_playerunits, {group = sg_Cromwell4, warp = mkr_ambush_cromwellwarp3, offsetdirection = OFFSET_BACK, offsetdistance = 15, incoming = true, bp = SBP.CW.CROMWELL, speedboost = true})
+
+	-- FOW
+	FOW_RevealArea(Marker_GetPosition(mkr_authie_center), 50, -1)
+	FOW_RevealArea(Marker_GetPosition(mkr_pth_Middleend), 30, -1)
+	FOW_RevealMarker(mkr_FOW_toAuthie, -1)
+	
+	-- win/lose check
+	Rule_AddInterval(CaptureAuthie_PointCaptured, 3)
+	Rule_AddInterval(CaptureAuthie_FlashFlankingSpeedButton, 1)
+	
+	if t_capAuthie.fg_actionStarted ~= true then
+		t_capAuthie.fg_actionStarted = true
+		CaptureAuthie_Kickoff()
+	end
+	Rule_RemoveMe()
+end
+
+function Rule_Remove_Flanking()
+
+	if FLash_FlankID ~= nil then
+	
+		UI_StopFlashing(FLash_FlankID)
+	
+	end
+	
+	if Hint_FlankID ~= nil then
+	
+		HintPoint_Remove(Hint_FlankID)
+	
+	end
+end
+
+function CaptureAuthie_FlashFlankingSpeedButton()
+	
+	if Misc_IsSGroupSelected(sg_CromwellAll, ANY) then
+		
+		Rule_RemoveMe()
+		
+		FLash_FlankID = UI_FlashAbilityButton(ABILITY.CW.FLANKING_SPEED, true, BT_UI_Strong_AbilityBtn)
+		Hint_FlankID = HintPoint_AddToAbilityButton(ABILITY.CW.FLANKING_SPEED, 1319429, true)
+		
+		Rule_AddOneShot(Rule_Remove_Flanking, 30)
+	
+	end
+	
+end
+
+
+-- a check to see if the HMG's in Authie are attacking or under attack
+-- if they are, start the action but not the obj
+function CaptureAuthie_EarlyTrigger()
+	if t_capAuthie.fg_actionStarted == true then
+		Rule_RemoveMe()
+	elseif SGroup_IsDoingAttack(sg_authie_hmgsAuthie, ANY, 10) or SGroup_IsUnderAttack(sg_authie_hmgsAuthie, ANY, 10) then
+		t_capAuthie.fg_actionStarted = true
+		CaptureAuthie_Kickoff()
+	end		
+end
+
+function CaptureAuthie_Kickoff()
+	
+	-- checker to see if there are any Axis around Authie
+	-- old spot to add this - deg
+	-- delayed til after Panzers arrive
+	-- Rule_AddInterval(CaptureAuthie_AxisClear, 15)
+	
+	-- deploy the troops
+	Rule_AddInterval(CaptureAuthie_Spawn, 7)
+	Rule_AddDelayedInterval(CaptureAuthie_TankDefendersCreate, 40, 8)
+	
+	-- random recon planes
+	Rule_AddInterval(FOWReveal_Authie_Random, 20)
+	
+	-- watch the point
+	Rule_AddInterval(CaptureAuthie_Converge, 1)
+	
+	-- trigger light armour kickoff
+	LightArmour_Kickoff()
+end
+
+
+
+-- create marders that sit around and wait for the player
+function CaptureAuthie_TankDefendersCreate()
+	local done = true
+	for k,v in pairs(t_capAuthie.tankdefenders) do 
+		if SGroup_IsEmpty(v.sgroup) then
+			-- replaces one at a time
+			Util_CreateSquads(player2, v.sgroup, v.bp, v.src, v.goTo, 1)
+			Modify_SightRadius(v.sgroup, 2)
+			Modify_WeaponRange(v.sgroup, "hardpoint_01", 2)
+			--SGroup_AddGroup(sg_defAll_tanksAll, v.sgroup)
+			Cmd_Move(v.sgroup, v.goTo, NO_QUEUE, NIL_DELETE, v.face)
+			done = false
+			break
+		end
+	end
+
+	if done then
+		Rule_AddInterval(CaptureAuthie_TankDefendersWatch, 12)
+		Rule_RemoveMe()
+	end
+end
+-- currently, the only activity they do is run away when they get hurt
+function CaptureAuthie_TankDefendersWatch()
+	local done = true
+	for k,v in pairs(t_capAuthie.tankdefenders) do 
+		if SGroup_IsEmpty(v.sgroup) == false then
+			done = false
+			if SGroup_GetAvgHealth(v.sgroup) < .3 then
+				Cmd_Move(v.sgroup, v.src, NO_QUEUE, v.src)
+			end
+		end
+	end
+
+	if done then
+		Rule_RemoveMe()
+	end
+end
+
+
+
+function CaptureAuthie_Converge()
+	if EGroup_IsCapturedByPlayer(eg_flag_authie, player2, false) == false then
+		Player_GetAll(player2, sg_capAuth_converge)
+		if SGroup_CountSpawned(sg_capAuth_converge) > 0 then
+			Cmd_AttackMove(sg_capAuth_converge, Marker_GetPosition(mkr_authie_center), false, nil, 10)
+		end
+		-- panzers attack!
+		Rule_AddInterval(CaptureAuthie_PanzersCreate, 4)
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+-- create marders that sit around and wait for the player
+function CaptureAuthie_PanzersCreate()
+	if Objective_IsStarted(OBJ_CaptureAuthie) then
+		local done = true
+		for k,v in pairs(t_capAuthie.counterattack) do 
+			if SGroup_IsEmpty(v.sgroup) then
+				-- replaces one at a time
+				Util_CreateSquads(player2, v.sgroup, v.bp, v.src, v.goTo, 1)
+				Modify_SightRadius(v.sgroup, 2)
+				Modify_WeaponRange(v.sgroup, "hardpoint_01", 2)
+				--SGroup_AddGroup(sg_defAll_tanksAll, v.sgroup)
+				Cmd_Move(v.sgroup, v.goTo)
+				done = false
+				break
+			end
+		end
+		
+		if done then
+			-- checker to see if there are any Axis around Authie
+			Rule_AddDelayedInterval(CaptureAuthie_AxisClear, 30, 5)
+			
+			Rule_AddInterval(CaptureAuthie_PanzersWatch, 1)
+			Rule_RemoveMe()
+		end
+	end
+end
+-- currently, the only activity they do is run away when they get hurt
+function CaptureAuthie_PanzersWatch()
+	local done = true
+	for k,v in pairs(t_capAuthie.counterattack) do 
+		if SGroup_IsEmpty(v.sgroup) == false then
+			done = false
+			if SGroup_GetAvgHealth(v.sgroup) < .3 then
+				Cmd_Move(v.sgroup, v.src, NO_QUEUE, v.src)
+			elseif SGroup_IsMoving(v.sgroup, false) and SGroup_IsUnderAttack(v.sgroup, false, 10) then
+				Cmd_Stop(v.sgroup)
+			end
+		end
+	end
+
+	if done then
+		t_capAuthie.fg_panzersArrive = true
+		Rule_RemoveMe()
+	end
+end
+
+
+function CaptureAuthie_AxisClear()
+	if Prox_ArePlayersNearMarker(player2, mkr_authie_center, ANY, 60) then
+		if EGroup_IsCapturedByPlayer(eg_flag_authie, player1, ANY) then
+			Player_GetAll(player2, sg_capAuthie_p2All)
+			print(SGroup_IsInHoldEntity(sg_capAuthie_p2All, ANY))
+			if SGroup_IsInHoldEntity(sg_capAuthie_p2All, ANY) then
+			
+				Cmd_UngarrisonSquad(sg_capAuthie_p2All)
+				return
+			end
+			Cmd_Move(sg_capAuthie_p2All, mkr_offmap5, false, mkr_offmap5)
+		end
+	else
+		t_capAuthie.fg_axisDead = true
+		Rule_RemoveMe()
+	end
+end
+
+
+function CaptureAuthie_Spawn()
+	if Objective_IsStarted(OBJ_CaptureAuthie) then
+		Rule_RemoveMe()
+	else
+		local done = true
+		for k,v in pairs(t_capAuthie.spawn) do 
+			if SGroup_IsEmpty(v.sgroup) then
+				Util_CreateSquads(player2, v.sgroup, v.sbp, v.src, v.pos, 1, nil, false, v.face)
+				
+				SGroup_AddGroup(sg_capAuth_defendersAll, v.sgroup)
+				Modify_SightRadius(v.sgroup, 2)
+				v.rule()
+				
+				Cmd_Move(v.sgroup, v.pos, NO_QUEUE, NIL_DELETE, NIL_FACE, NIL_OFFSET, NIL_DIST, 10)
+				
+				done = false
+				break
+			end
+		end
+		if done then
+			-- trigger the next sector
+			Rule_AddInterval(CaptureAuthie_Manager, 17)
+			
+			Rule_RemoveMe()
+		end
+	end
+end
+
+function CaptureAuthie_Manager()
+	if SGroup_IsEmpty(sg_capAuth_defendersAll) or SGroup_TotalMembersCount(sg_capAuth_defendersAll) < 20 then
+		
+		-- redeploy the troops
+		Rule_AddInterval(CaptureAuthie_Spawn, 7)
+		
+		Rule_RemoveMe()
+	else
+		for k,v in pairs(t_capAuthie.spawn) do 
+			if SGroup_IsEmpty(v.sgroup) == false then
+				if SGroup_TotalMembersCount(v.sgroup) < 3 then
+					Cmd_Move(v.sgroup, mkr_offmap5, false, mkr_offmap5)
+				elseif SGroup_IsMoving(v.sgroup, false) == false and SGroup_IsUnderAttack(v.sgroup, false, 10) then
+					Cmd_Move(v.sgroup, v.sgroup, false, NIL_DELETE, NIL_FACE, OFFSET_BACK, World_GetRand(10, 17), 10)
+				end
+			end
+		end
+	end
+end
+
+
+
+
+-- wait for the point to be captured
+function CaptureAuthie_PointCaptured()
+
+	if EGroup_IsCapturedByPlayer(eg_flag_authie, player1, false) then 
+		
+		Rule_RemoveMe()
+		
+		-- change objective to "Hold Authie"
+		Objective_UpdateText(OBJ_CaptureAuthie, 1319209, 1319228)
+		
+		-- change the objective arrow so that it no longer has text
+		Objective_RemoveUIElements(OBJ_CaptureAuthie, OBJ_CaptureAuthie.PingID)
+		OBJ_CaptureAuthie.PingID = Objective_AddUIElements(OBJ_CaptureAuthie, mkr_hold_authie_hintpoint, true, false, true, 2)
+		
+		Rule_AddInterval(CaptureAuthie_WinCheck, 3)
+		
+	end	
+
+end
+
+
+-- wait for the counterattack to be finished
+function CaptureAuthie_WinCheck()
+
+	if EGroup_IsCapturedByPlayer(eg_flag_authie, player1, false) and t_capAuthie.fg_axisDead == true then 
+		
+		Rule_RemoveMe()
+		
+		Rule_AddOneShot(Rule_Complete_Authie, 2)
+		
+	end	
+		
+	end	
+	
+
+
+	
+function Rule_Complete_Authie()
+
+	Objective_Complete(OBJ_CaptureAuthie)
+	
+	
+end	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- Medal Objective: Capture all territory sectors
+-------------------------------------------------------------------------
+-- What more is there to say?
+-------------------------------------------------------------------------
+function Initialize_OBJ_CaptureWholeMap()
+
+	OBJ_CaptureWholeMap = {
+		
+		SetupUI = function() 
+		end,
+		
+		OnStart = function()
+			Rule_AddInterval(CaptureWholeMap_WinCheck, 3)
+			
+			
+			
+			local _CheckEntity = function(gid, idx, eid)
+			if Player_OwnsEntity(player1, eid) == false then
+				UI_CreateMinimapBlip(eid, 5, BT_GeneralPing)
+			end
+	
+			EGroup_ForEach(eg_flags_all, _CheckEntity)
+			
+			end
+		end,
+		
+		OnComplete = function()
+		end,
+		
+		IsComplete = function()
+		end,
+		
+		OnFail = function()
+		end,
+		
+		Title = 1319211,
+		Description = 1319230,
+		TitleEnd = 1319245,
+		Type = OT_Medal,
+		MedalID = MEDALS.CXP1.AUTHIE,
+		
+	}
+	
+	-- Register Objective and Initialize Data
+	Objective_Register(OBJ_CaptureWholeMap)
+	CaptureWholeMap_Init()
+	
+end
+
+function CaptureWholeMap_Init()
+	
+	eg_flags_all = EGroup_CreateIfNotFound("eg_flags_all")
+	eg_flags_medalflags = EGroup_CreateIfNotFound("eg_flags_medalflags")
+	
+	
+	-- create the group with ALL the flags
+	EGroup_AddEGroup(eg_flags_all, eg_flag_left1)
+	EGroup_AddEGroup(eg_flags_all, eg_flag_left2)
+	EGroup_AddEGroup(eg_flags_all, eg_flag_left3)
+	EGroup_AddEGroup(eg_flags_all, eg_flag_right1)
+	EGroup_AddEGroup(eg_flags_all, eg_flag_right2)
+	EGroup_AddEGroup(eg_flags_all, eg_flag_right3)
+	EGroup_AddEGroup(eg_flags_all, eg_flag_start)
+	EGroup_AddEGroup(eg_flags_all, eg_flag_middle)
+	EGroup_AddEGroup(eg_flags_all, eg_flag_authie)
+	
+	-- create the group with the flags that can be captured to trigger the medal objective
+	EGroup_AddEGroup(eg_flags_medalflags, eg_flag_left2)
+	EGroup_AddEGroup(eg_flags_medalflags, eg_flag_left3)
+	EGroup_AddEGroup(eg_flags_medalflags, eg_flag_right3)
+	EGroup_AddEGroup(eg_flags_medalflags, eg_flag_middle)
+	EGroup_AddEGroup(eg_flags_medalflags, eg_flag_authie)
+	
+	Rule_AddInterval(CaptureWholeMap_GiveObjective, 5)
+	
+end
+
+
+function CaptureWholeMap_GiveObjective()
+	
+	if Player_OwnsEGroup(player1, eg_flags_medalflags, ANY) or flag_startmedalobjective == true then
+		
+		Rule_RemoveMe()
+		
+		Objective_Start(OBJ_CaptureWholeMap)
+		flag_startmedalobjective = true
+		
+		
+		
+		
+		Rule_AddInterval(CaptureWholeMap_PingRemainingPoints, 30)
+		
+		if g_middle_flag == true then
+		
+		
+			HintPoint_Remove(g_Flag_Middle_HPID)
+		
+		end
+		
+	end
+	
+end
+
+
+function CaptureWholeMap_PingRemainingPoints()
+	
+	local _CheckEntity = function(gid, idx, eid)
+		if Player_OwnsEntity(player1, eid) == false then
+			UI_CreateMinimapBlip(eid, 5, BT_GeneralPing)
+		end
+	end
+	EGroup_ForEach(eg_flags_all, _CheckEntity)
+	
+end
+	
+
+function CaptureWholeMap_WinCheck()
+
+	if Player_OwnsEGroup(player1, eg_flags_all, ALL) == true then
+		
+		Rule_RemoveMe()
+		Rule_RemoveIfExist(CaptureWholeMap_PingRemainingPoints)
+		
+		Objective_Complete(OBJ_CaptureWholeMap)
+		
+	end
+	
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+
+-- FOW Reveal
+
+-------------------------------------------------------------------------
+function FOWReveal_Authie_Random()
+
+	if t_capAuthie.fg_axisDead == true then
+		Rule_RemoveMe()
+	elseif Objective_IsStarted(OBJ_CaptureAuthie) then
+		
+		SGroup_Clear(sg_temp)
+		Player_GetAll(player2, sg_temp)
+		local count = SGroup_CountSpawned(sg_temp)
+		if count >= 1 then
+			local rand = World_GetRand(1, count)
+			local squad = SGroup_GetSpawnedSquadAt(sg_temp, rand)
+			if squad ~= nil then
+				local pos = Squad_GetPosition(squad)
+				FOWReveal_PlaneFlight(pos) 
+			end
+		end
+		
+	end
+end
+
+function FOWReveal_PlaneFlight(location) 
+	if Timer_GetRemaining(timer_fow_plane) == 0 then
+		-- trigger a spotter plane
+		Cmd_Ability(player1,  ABILITY.CW.TYPHOON_RECON, location, Marker_GetDirection(mkr_offmap1), true)
+		-- set the delay
+		local delay = World_GetRand(30, 45)
+		Timer_Start(timer_fow_plane, delay)
+	end
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+
+-- Light Armour Rush
+
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Encounter data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function LightArmour_Init()
+
+	-- define sgroups, egroups, etc associated with this Encounter
+	sg_infRush_lead = SGroup_CreateIfNotFound("sg_infRush_lead")
+	sg_infRush_right = SGroup_CreateIfNotFound("sg_infRush_right") 
+	sg_infRush_left = SGroup_CreateIfNotFound("sg_infRush_left")
+	sg_infRush_all = SGroup_CreateIfNotFound("sg_infRush_all")
+	
+	t_infRush = {
+		fg_rushOver = false, -- flag indicating the infantry rush is over
+		spawn = {
+			{sgroup = sg_infRush_lead, sbp = SBP.AXIS.STUG, 	pos = mkr_authie_center, 		face = mkr_offmap1, rule = function() Modify_UnitSpeed(sg_infRush_lead, .5) end},
+			{sgroup = sg_infRush_right, sbp = SBP.AXIS.GRENADIER, 	pos = Util_GetRandomPosition(mkr_authie_center, 40), 	face = mkr_offmap1, rule = function() end},
+			{sgroup = sg_infRush_left, sbp = SBP.AXIS.GRENADIER,	pos = Util_GetRandomPosition(mkr_authie_center, 40),		face = mkr_offmap1, rule = function() end},
+		},
+		targetChoice = {mkr_MGEmplacement1, mkr_ally_howitzer5, mkr_MGEmplacement2, mkr_ATEmplacement1, mkr_MGEmplacement3},
+		target = false,
+	}
+end
+
+
+-- start the related action
+function LightArmour_Kickoff()
+
+	-- switch to the other respawn
+	if Rule_Exists(LightArmour_Respawn) == false then Rule_AddInterval(LightArmour_Respawn, 8) end
+	
+end
+
+
+function LightArmour_Respawn()
+	if t_infRush.fg_rushOver == true then
+		
+		Rule_RemoveMe()
+	elseif SGroup_IsEmpty(sg_infRush_all) then
+		-- choose a target for the pack hunter
+		local num = table.getn(t_infRush.targetChoice)
+		if num == 0 then
+			t_infRush.fg_rushOver = true
+		else
+			local rand = World_GetRand(1, num)
+			t_infRush.target = t_infRush.targetChoice[rand]
+			-- respawn squads
+			Rule_AddInterval(LightArmour_Spawn, 17)
+			Rule_RemoveMe()
+		end
+	end
+end
+
+
+
+
+function LightArmour_Spawn()
+	
+	local done = true
+	if t_infRush.fg_rushOver == true or t_capAuthie.fg_panzersArrive == true then
+		Rule_RemoveMe()
+	else
+		for k,v in pairs(t_infRush.spawn) do 
+			if SGroup_IsEmpty(v.sgroup) then
+				if Prox_ArePlayersNearMarker(player1, mkr_offmap5, false, 60) == false then
+					Util_CreateSquads(player2, v.sgroup, v.sbp, mkr_offmap5, v.pos, 1, nil, false, v.face)
+					SGroup_AddGroup(sg_infRush_all, v.sgroup)
+					v.rule()
+				end
+				done = false
+				break
+			end
+		end
+	end
+	if done == true then 
+		PackHunters_Add(sg_infRush_lead, sg_infRush_right, sg_infRush_left, t_infRush.target, mkr_offmap5)
+		if Rule_Exists(LightArmour_Respawn) == false then Rule_AddInterval(LightArmour_Respawn, 8) end
+		Rule_RemoveMe() 
+	end
+	
+end
+
+
+
+
+
+
+
+
+-----------------------------------------------------------------------------
+
+--LOSS CONDITION
+
+-----------------------------------------------------------------------------
+
+
+function Rule_Player_No_Units()
+
+
+	local  t_loss_blueprints_sbp = {SBP.CW.TOMMIES, SBP.CW.CROMWELL, SBP.CW.SAPPER, EBP.CW.HQ_REINFORCEMENT, EBP.CW.INFANTRY_HQ}
+
+	if Player_HasLost(player1, t_loss_blueprints_sbp) then
+		
+		Game_EndSP(false)
+	
+	end
+end
+
+
+
+
+--------------------------------------------------------------------------------
+-- END MISSION
+--------------------------------------------------------------------------------
+
+function Rule_EndMission()
+	
+	if Event_IsAnyRunning() == false then
+		
+		Rule_RemoveMe()
+		
+		Rule_AddDelayedInterval(Rule_EndMissionB, 1, 1)
+		
+	end
+	
+end
+function Rule_EndMissionB()
+	if Event_IsAnyRunning() == false then
+		Camera_MoveToPosition(mkr_authie_center, true, SLOW_CAMERA_PANNING)
+		Game_EndSP(true, nil, true)
+	end
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+--AT Gun that get created by putting up a Marker
+--Will turn around if if being attacked from behind
+--this is a still type
+function ATGunAlpha_Init()
+	-- define sgroups, egroups, etc associated with this Encounter
+	tmkr_ATGunAlpha = Marker_GetTable("mkr_ATGunAlpha%d")
+	tsg_ATGunAlpha = SGroup_CreateTable("sg_ATGunAlpha%d", table.getn(tmkr_ATGunAlpha))
+	sg_ATGunAlpha1Attacker = SGroup_CreateIfNotFound("sg_ATGunAlpha1Attacker")
+	sg_ATGunAlpha2Attacker = SGroup_CreateIfNotFound("sg_ATGunAlpha2Attacker")
+	sg_ATGunAlpha3Attacker = SGroup_CreateIfNotFound("sg_ATGunAlpha3Attacker")
+	
+	
+	t_ATGunAlpha = {
+		{
+			phase = 2,
+			facing = mkr_offmap1, 
+			attacker = sg_ATGunAlpha1Attacker ,
+			depart = mkr_offmap5, 
+		},
+		{
+			phase = 2,
+			facing = mkr_offmap1,
+			attacker = sg_ATGunAlpha2Attacker ,
+			depart = mkr_offmap5, 
+		},
+	}
+	
+	for i = 1, table.getn(t_ATGunAlpha) do
+		t_ATGunAlpha[i].sgroup = tsg_ATGunAlpha[i]
+		t_ATGunAlpha[i].spawn = tmkr_ATGunAlpha[i]
+	end
+	
+	ATGunAlpha_Preset()
+
+
+end
+
+-- preset any units or events needed before the kickoff
+function ATGunAlpha_Preset()
+	-- spawn squads
+	-- start enemy behavior
+	-- do other cool things
+	for k, this in pairs(t_ATGunAlpha) do
+		Util_CreateSquads(player2, this.sgroup, SBP.AXIS.PAK_38, this.spawn)
+		this.phase = 2
+	end
+	
+	SGroup_AddGroup(sg_authie_rallyB_defenders, t_ATGunAlpha[2].sgroup)
+	
+	Rule_AddInterval(ATGunAlpha_Kickoff, 10)
+
+end
+
+-- start the related action
+function ATGunAlpha_Kickoff()
+	-- action that starts when this interval is triggered
+	
+	for k, this in pairs(t_ATGunAlpha) do
+		--print(SGroup_GetAvgHealth(this.sgroup))
+		if SGroup_TotalMembersCount(this.sgroup) < 4 then
+			--this.phase = 5
+		end
+		if this.phase == 2 then 
+			if SGroup_TotalMembersCount(this.sgroup) == 3 and SGroup_IsUnderAttackFromDirection(this.sgroup, ANY, OFFSET_DIRECTION_BACK, 1) then 
+				SGroup_GetLastAttacker(this.sgroup, this.attacker)
+				Cmd_Attack(this.sgroup, this.attacker)
+			end
+		end	
+		if this.phase == 5 then 
+			if Prox_AreSquadsNearMarker(this.sgroup, this.depart, ANY) == false and SGroup_Count(this.sgroup) > 0 then
+				Cmd_AbandonTeamWeapon(t_ATGunAlpha[1].sgroup)
+				Cmd_Move(this.sgroup, this.depart, true, this.depart)
+			end
+		end
+	end
+end
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- Pack Hunters Related
+-------------------------------------------------------------------------
+
+function PackHunters_Add(sgroup1, sgroup2, sgroup3, posInitial, markerDelete)
+	if _pakHunters == nil then
+		_pakHunters = {}
+	end
+	
+	table.insert(_pakHunters, {lead = sgroup1, right = sgroup2, left = sgroup3, goto = posInitial, retreat = markerDelete})
+
+	if Rule_Exists(PackHunters_Manager) == false then
+		Rule_AddInterval(PackHunters_Manager, 8)
+	end
+end
+
+-- assumes paks are deleting at a mkr_offMap03
+function PackHunters_Manager()
+	for k,v in pairs(_pakHunters) do 
+		if v.goto ~= nil and v.goto ~= false then
+			Cmd_Move(v.lead, v.goto)
+			Cmd_Move(v.right, v.goto, NO_QUEUE, NIL_DELETE, NIL_FACE, NIL_OFFSET, NIL_DIST, 10)
+			Cmd_Move(v.left, v.goto, NO_QUEUE, NIL_DELETE, NIL_FACE, NIL_OFFSET, NIL_DIST, 10)
+			v.goto = false
+		elseif SGroup_IsEmpty(v.lead) == false then
+			local count = 0
+			count = count+SGroup_TotalMembersCount(v.lead)+SGroup_TotalMembersCount(v.right)+SGroup_TotalMembersCount(v.left)
+			if count >= 5 then
+				Player_GetAll(player1)
+				if SGroup_IsEmpty(sg_allsquads) == false then
+				print("subsequent "..SGroup_GetName(v.lead))
+					if SGroup_IsMoving(v.lead, false) == false and SGroup_IsUnderAttack(v.lead, false, 10) == false and SGroup_IsEmpty(v.lead) then
+						
+						Cmd_AttackMove(v.lead, sg_allsquads)
+						--Cmd_Move(v.lead, v.goto)
+						if SGroup_IsEmpty(v.right) == false then Cmd_Move(v.right, v.lead, NO_QUEUE, NIL_DELETE, NIL_FACE, OFFSET_RIGHT, 15) end
+						if SGroup_IsEmpty(v.left) == false then Cmd_Move(v.left, v.lead, NO_QUEUE, NIL_DELETE, NIL_FACE, OFFSET_LEFT, 15) end
+					elseif SGroup_IsUnderAttack(v.lead, false, 10) then
+						Cmd_Stop(v.lead)
+						if SGroup_IsEmpty(v.right) == false then Cmd_Move(v.right, v.lead, NO_QUEUE, NIL_DELETE, NIL_FACE, OFFSET_RIGHT, 15) end
+						if SGroup_IsEmpty(v.left) == false then Cmd_Move(v.left, v.lead, NO_QUEUE, NIL_DELETE, NIL_FACE, OFFSET_LEFT, 15) end
+					else
+						if SGroup_IsEmpty(v.right) == false then Cmd_AttackMove(v.right, sg_allsquads) end
+						if SGroup_IsEmpty(v.left) == false then Cmd_AttackMove(v.left, sg_allsquads) end
+					end
+				end
+			else
+				Cmd_Move(v.lead, Marker_GetPosition(v.retreat), false, v.retreat)
+				Cmd_Move(v.right, Marker_GetPosition(v.retreat), false, v.retreat)
+				Cmd_Move(v.left, Marker_GetPosition(v.retreat), false, v.retreat)
+			end
+		else
+			table.remove(_pakHunters, k)
+			break
+		end
+	end
+
+end
+
+
+
+
+
+
+function MouseOverPlayer3Hint_Init()
+
+	eg_mouseoverhintpoint = EGroup_CreateIfNotFound("eg_mouseoverhintpoint")
+	sg_mouseoverhintpoint = SGroup_CreateIfNotFound("sg_mouseoverhintpoint")
+	
+	Rule_Add(MouseOverPlayer3Hint_Manager)
+	
+end
+Scar_AddInit(MouseOverPlayer3Hint_Init)
+
+
+
+function MouseOverPlayer3Hint_Manager()
+
+	local mouseover = Misc_GetMouseOverEntity()
+	local eid = nil
+	local sid = nil
+	
+	if mouseover ~= nil then
+		if Player_OwnsEntity(player3, mouseover) then
+			if Entity_IsPartOfSquad(mouseover) then
+				sid = Entity_GetSquad(mouseover)
+				if Squad_IsInHoldEntity(sid) then
+					eid = Squad_GetHoldEntity(sid)
+					sid = nil
+				end
+			else
+				eid = mouseover
+			end
+		end
+	end
+	
+	if hpid_mouseoverhint == nil then 
+		
+		-- looking to add a hintpoint to an object
+		
+		if sid ~= nil then
+			
+			SGroup_Single(sg_mouseoverhintpoint, sid)
+			
+			hpid_mouseoverhint = HintPoint_Add(sg_mouseoverhintpoint, true, 1319800)
+			hpid_mouseovergameid = Squad_GetGameID(sid)
+			hpid_mouseovertype = "squad"
+			
+		elseif eid ~= nil then
+			
+			EGroup_Single(eg_mouseoverhintpoint, eid)
+			
+			local blueprint = Entity_GetBlueprint(eid)
+			local message = 1319800
+			if blueprint == EBP.CW.SLITTRENCH_NEST then
+				message = 1319802
+			elseif blueprint == EBP.CW.MG_NEST then
+				message = 1319803
+			elseif blueprint == EBP.CW.HOWITZER_NEST then
+				message = 1319804
+			end
+			
+			hpid_mouseoverhint = HintPoint_Add(eg_mouseoverhintpoint, true, message)
+			hpid_mouseovergameid = Entity_GetGameID(eid)
+			hpid_mouseovertype = "entity"
+			
+		end
+		
+	else
+		
+		-- we have a hintpoint up already, so we're looking to clear it
+		
+		-- not over anything, or over something not 
+		if (hpid_mouseovertype == "squad" and (sid == nil or hpid_mouseovergameid ~= Squad_GetGameID(sid))) or
+		   (hpid_mouseovertype == "entity" and (eid == nil or hpid_mouseovergameid ~= Entity_GetGameID(eid))) then
+			
+			HintPoint_Remove(hpid_mouseoverhint)
+			hpid_mouseoverhint = nil
+			hpid_mouseovergameid = nil
+			hpid_mouseovertype = nil
+			
+		end
+		
+	end
+	
+end
+
+
+
+function Util_CreateFacingPosFromMarker(marker)
+	
+	local result = Marker_GetPosition(marker)
+	local facing = Marker_GetDirection(marker)
+	
+	result.x = result.x + (facing.x * 100)
+	result.y = result.y + (facing.y * 100)
+	result.z = result.z + (facing.z * 100)
+	
+	return result
+	
+end
+
+
+
+
+--------------------------------------------------------------------------------
+-- Howitzer Helpers
+-- These routines add a hintpoint to a howitzer when it can be fired again
+--------------------------------------------------------------------------------
+
+function HowitzerHelper_AddGroup(group)
+
+	if t_helper_howitzers == nil then
+		t_helper_howitzers = {}
+	end
+	
+	table.insert(t_helper_howitzers, {group = group, hint = nil})
+	
+end
+
+
+-- start the manager up
+function HowitzerHelper_Start()
+
+	if t_helper_howitzers == nil then
+		t_helper_howitzers = {}
+	end
+	
+	if Rule_Exists(HowitzerHelper_Manager) == false then
+		Rule_AddInterval(HowitzerHelper_Manager, 1)
+	end
+
+	flag_howitzerhelper = true
+	
+end
+
+
+-- stop the manager for the time being (removes all current hintpoints as well)
+function HowitzerHelper_Stop()
+
+	if t_helper_howitzers == nil then
+		t_helper_howitzers = {}
+	end
+	
+	-- remove all current hintpoints
+	for k, this in pairs(t_helper_howitzers) do
+		
+		if this.hint ~= nil then
+			HintPoint_Remove(this.hint)
+			this.hint = nil
+		end
+		
+	end
+	
+	-- stop the manager rule
+	if Rule_Exists(HowitzerHelper_Manager) == true then
+		Rule_Remove(HowitzerHelper_Manager)
+	end
+
+	flag_howitzerhelper = false
+	
+end
+
+function HowitzerHelper_RemoveGroup(group)
+
+	if t_helper_howitzers == nil then
+		t_helper_howitzers = {}
+	end
+	
+	-- remove all current hintpoints
+	for k, this in pairs(t_helper_howitzers) do
+		
+		if this.group == group then
+			
+			if this.hint ~= nil then
+				HintPoint_Remove(this.hint)
+				this.hint = nil
+			end
+			
+			table.remove(t_helper_howitzers, k)
+			
+		end
+		
+	end
+	
+end
+
+function HowitzerHelper_RemoveAll()
+
+	if t_helper_howitzers == nil then
+		t_helper_howitzers = {}
+	end
+	
+	-- remove all current hintpoints
+	for k, this in pairs(t_helper_howitzers) do
+		
+		if this.hint ~= nil then
+			HintPoint_Remove(this.hint)
+			this.hint = nil
+		end
+		
+	end
+	
+	t_helper_howitzers = {}
+	
+end
+
+
+-- when a gun stops firing, put a hintpoint on it
+function HowitzerHelper_Manager()
+	
+	if flag_howitzerhelper == true then
+		
+		for k, this in pairs(t_helper_howitzers) do
+			
+			-- get the gun's occumpant
+			SGroup_Clear(sg_temp)
+			EGroup_GetSquadsHeld(this.group, sg_temp)
+			
+			if SGroup_IsDoingAbility(sg_temp, ABILITY.CW.PDR_25_BARRAGE, ANY) then
+				if this.hint ~= nil then
+					HintPoint_Remove(this.hint)
+					this.hint = nil
+				end
+			else
+				if this.hint == nil then
+					this.hint = HintPoint_Add(this.group, true, 1319810)
+				end
+			end
+			
+		end
+		
+	end
+	
+end
+
+
+-- find out if any howitzers are hintpointed right now
+function HowitzerHelper_AnyReadyToFire()
+	
+	if t_helper_howitzers == nil then
+		t_helper_howitzers = {}
+	end
+	
+	if Rule_Exists(HowitzerHelper_Manager) == false then
+		return false
+	end
+	
+	for k, this in pairs(t_helper_howitzers) do
+		
+		if this.hint ~= nil then
+			return true
+		end
+		
+	end
+	
+	return false
+	
+end
+
+
+-- ensures that the player has AT LEAST the amount of resources requested
+function Tutorial_SafetySetResources(player, items)
+
+	-- if it's a single item, put it into a table
+	if items.mp ~= nil then
+		items = {items}
+	end
+	
+	-- total up the cost of all the items
+	local manpower = 0
+	local munitions = 0
+	local fuel = 0
+	
+	for n = 1, table.getn(items) do
+		manpower = manpower + items[n].mp
+		munitions = munitions + items[n].mn
+		fuel = fuel + items[n].fu
+	end
+	
+	-- bump player esources up to those amounts if needs be
+	if Player_GetResource(player, RT_Manpower) < manpower then
+		Player_SetResource(player, RT_Manpower, manpower)
+	end
+	
+	if Player_GetResource(player, RT_Munition) < munitions then
+		Player_SetResource(player, RT_Munition, munitions)
+	end
+	
+	if Player_GetResource(player, RT_Fuel) < fuel then
+		Player_SetResource(player, RT_Fuel, fuel)
+	end
+	
+end
+
+
+
+
+-- callback function, keeps the table that states which menu the player is in updated
+function _ConstructionMenuCallback(menu, bool)
+	if bool == true then
+		_ConstructionMenuStatus = menu
+	else
+		_ConstructionMenuStatus = nil
+	end
+end
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,1441 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+--
+-- Script File for Mission 13 Mortain
+--
+-------------------------------------------------------------------------
+------------------------------------------------------------------------
+
+import("ScarUtil.scar")
+
+-------------------------------------------------------------------------
+-- GLOBAL VARIABLES
+-------------------------------------------------------------------------
+
+-------------------------------------------------------------------------
+-- STARTUP SCRIPTS
+-------------------------------------------------------------------------
+
+-- Called immediately on startup, this just sets out some parameters for the mission
+function OnGameSetup()
+
+	-- set up the players
+	player1 = Setup_Player(1,339040, TRACE_ALLIES, 1)
+	player2 = Setup_Player(2,339041, TRACE_AXIS, 2)
+ 	player3 = Setup_Player(3,339042, TRACE_ALLIES, 1)
+	player4 = Setup_Player(4,339041, TRACE_AXIS, 2)
+	
+--~ 	player4 = Setup_Player(4,"Dog Company", TRACE_ALLIES, 1)
+--~ 	player5 = Setup_Player(5,"101st Airborne Company",TRACE_ALLIES,1)
+--~ 	player6 = Setup_Player(6,"Luftwaffe 6th Parachute Regiment ",TRACE_AXIS, TEAM_NEUTRAL)		-- neutral enemy player, used for special units like the damaged Stug
+end
+
+
+
+-- Called immediately on starting up a saved game
+function OnGameRestore()
+
+	-- assign player IDs again
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+ 	player3 = World_GetPlayerAt(3)
+--~ 	player4 = World_GetPlayerAt(4)
+--~ 	player5 = World_GetPlayerAt(5)
+--~ 	player6 = World_GetPlayerAt(6)
+
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+	
+end
+
+function Initialize_OBJECTIVE1 ()
+
+	OBJECTIVE1 =
+	{
+	
+		SetupUI = function()
+			Objective_AddUIElements(OBJECTIVE1, Entity_Hill_317_VP, true) 
+		end,
+		
+		OnStart = function()
+		Util_PlayMusic("SOUND/Music/genericmissionmusic_Legacy", 0, 0)
+			--Timer_Start ( Countdown_Win, 30*60 )
+			--Rule_AddInterval( rule_timer_countdown, 1 )
+			Objective_StartTimer( OBJECTIVE1, COUNT_DOWN, 30*60 )
+			Rule_AddInterval(Rule_EndMission, 1)
+			Rule_AddInterval( player_loss_base_check, 5 )
+			Rule_AddInterval( rule_objective_abbey, 1.5 )
+		end,
+		
+		OnComplete = function()
+--			Player_AddUnspentCommandPoints(player1, 1)
+			Rule_Remove(Rule_EndMission)
+			Rule_AddOneShot(Game_OverWin, 8)
+		end,
+		
+		IsComplete = function()
+			
+		end,
+		
+		OnFail = function()
+			Rule_AddOneShot(Game_OverLose, 8)
+		
+		end,
+		
+		SitRep =
+			{
+				Movie = "SR_13-01",
+				Force = true,
+				SpeechTiming =
+				{
+					{ 0.9, ACTOR.Conti, 338960 },
+					{ 6.95, ACTOR.Conti, 338962 },
+					{ 9.7, ACTOR.Conti, 338963 },
+ 					{ 15.95, ACTOR.Conti, 338964 },
+					{ 21.25, ACTOR.Conti, 338961 },
+				},
+			},
+		
+		Title = 339020,
+		Description = 339030,
+		Type = OT_Primary,
+		
+		Icon= IT_P_Defend,
+	}
+	
+	Objective_Register(OBJECTIVE1)
+	
+end
+
+function Initialize_OBJECTIVE2 ()
+
+	OBJECTIVE2 =
+	{
+		SetupUI = function()
+			Objective_AddUIElements(OBJECTIVE2, EG_mortain_vp, true, 339943, false)
+		end,
+		
+		OnStart = function()
+			Rule_AddInterval(Second_OBJ_complete,1)
+			Rule_AddInterval( Check_Mortain_Owner, 60 )
+		end,
+		
+		OnComplete = function()
+--          Player_AddUnspentCommandPoints(player1, 1)
+		  Rule_Remove(Second_OBJ_complete)
+		end,
+		
+		IsComplete = function()
+--			Player_AddUnspentCommandPoints( player1, 1)
+		end,
+		
+		OnFail = function()
+		
+		end,
+		
+		SitRep =
+			{
+				Movie = "SR_13-02",
+				Force = true,
+				SpeechTiming =
+				{
+					{ 1.25, ACTOR.Conti, 338941 },
+					{ 7.6, ACTOR.Conti, 338945 },
+					{ 15.2, ACTOR.Conti, 338942 },
+					{ 18.5, ACTOR.Conti, 338943 },
+					{ 21.5, ACTOR.Conti, 338944 },
+				},
+			},
+		
+		Title = 339021,
+		Description = 339943,
+		Type = OT_Secondary,
+	}
+	
+	Objective_Register(OBJECTIVE2)
+	
+end
+
+function Initialize_OBJECTIVE_ABBEY ()
+
+	OBJECTIVE_ABBEY =
+	{
+		SetupUI = function()
+		
+		end,
+		
+		OnStart = function()
+
+			Objective_AddPing(OBJECTIVE_ABBEY, abbey_radius_trigger, 10)			
+			Abbey_Infantry = SGroup_CreateIfNotFound ("Abbey_Infantry")
+			Util_CreateSquadsAndGarrison(player3, Abbey_Infantry, SBP.ALLIES.RANGER, Abbey_Blanche, 1 )
+			Cmd_InstantUpgrade( Abbey_Infantry, UPG.ALLIES.BAZOOKA_SP_M13 )
+			Modify_ReceivedDamage( Abbey_Infantry, 0.1 )
+			Modify_WeaponDamage(Abbey_Infantry, "hardpoint_01", 0.25)
+			Modify_WeaponAccuracy(Abbey_Infantry, "hardpoint_01", 0.25)
+			SGroup_IncreaseVeterancyRank(Abbey_Infantry)
+			SGroup_IncreaseVeterancyRank(Abbey_Infantry)
+			SGroup_IncreaseVeterancyRank(Abbey_Infantry)
+			Rule_AddInterval( rule_check_abbey_complete, 1.5 )
+			
+		end,
+		
+		OnComplete = function()
+			SGroup_SetPlayerOwner( Abbey_Infantry, player1 )
+			Cmd_UngarrisonSquad( Abbey_Infantry, abbey_radius_trigger )
+			Modifier_RemoveAllFromSGroup(Abbey_Infantry)
+		end,
+		
+		IsComplete = function()
+			
+			return false
+			
+		end,
+		
+		OnFail = function()
+		
+		end,
+		
+		OnSitRep = function()
+		
+		end,
+		
+		Title = 339931,
+		Description = 339032,
+		Type = OT_Medal,
+		MedalID = MEDALS.ARMY_EXPERT_BADGE,
+		
+	}
+	
+	Objective_Register(OBJECTIVE_ABBEY)
+	
+end
+
+-- Called once things have been initialised proper, and is used to trigger off the game script
+function OnInit()
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	M13_Difficulty()
+	g_MissionSpeechPath = "Mission13"
+	Sound_PreCacheSinglePlayerSpeech( g_MissionSpeechPath )	
+	-- mute the sound before the NIS plays
+	Util_MuteAmbientSound(true)
+	
+	--[[ TECH TREE ]]
+	TechTreeSetup()
+	
+	Game_FadeToBlack(FADE_OUT, 0.0)
+	Game_Letterbox(true, 0.0)
+	
+	Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS13_01)')]])")
+	Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS13_02)')]])")
+
+	
+	-- use default veteran squads if necessary
+	if not Player_HasPersistentSquadFile(player1) then
+		Player_LoadPersistentSquadsFromFile(player1, "data:scenarios/sp/M13_mortain/default_veteran_squads.lua")
+	end
+
+	
+	Camera_SetDefault()
+	
+	print ("------------------------------------------------------------------------------------------")
+	print ("------------------------------------- MISSION STARTED ------------------------------------")
+	print ("------------------------------------------------------------------------------------------")
+	
+	ABILITY_MORTAR_STRIKE_NORMAL= BP_GetAbilityBlueprint("abilities/sp/sp_gen_single_off_map_artillery_strike.lua")
+	ABILITY_MORTAR_STRIKE		= BP_GetAbilityBlueprint("abilities/sp/sp_gen_single_off_map_artillery_strike_m13.lua")
+	
+--Axis Upgrades for Squads
+	
+	Player_SetPopCapOverride(player1, 75 ) -- player
+	Player_SetPopCapOverride(player2, 75 ) -- scripted Axis
+	Player_SetPopCapOverride(player3, 75 ) -- Allied rangers in the abbey
+	Player_SetPopCapOverride(player4, 75 ) -- Not used in this mission.
+	
+	Initialize_OBJECTIVE1()
+	Initialize_OBJECTIVE2()
+	Initialize_OBJECTIVE_ABBEY()
+
+	eg_securepoints	=	EGroup_CreateIfNotFound( "eg_securepoints" )
+	Util_CreateEntities(player1, eg_securepoints, EBP.ALLIES.OBSERVATION_POST,  EGroup_GetPosition_EVEN_IF_EMPTY(EG_resource1), 1)
+	Util_CreateEntities(player1, eg_securepoints, EBP.ALLIES.OBSERVATION_POST,  EGroup_GetPosition_EVEN_IF_EMPTY(EG_resource2), 1)
+	Util_CreateEntities(player1, eg_securepoints, EBP.ALLIES.OBSERVATION_POST,  EGroup_GetPosition_EVEN_IF_EMPTY(EG_resource3), 1)
+
+	artillary_init()
+	artillary_init2()
+	
+	EGroup_Hide( EG_88_invis, true )
+	EGroup_SetInvulnerable( EG_88_invis, true )
+	 
+	Abbey_Medal_Timer = 123123
+	TIMER_VP = 1
+	
+	sg_temp = SGroup_CreateIfNotFound("sg_temp")
+	sg_temp1 = SGroup_CreateIfNotFound("sg_temp1")
+	sg_temp2 = SGroup_CreateIfNotFound("sg_temp2")
+	sg_temp3 = SGroup_CreateIfNotFound("sg_temp3")
+	sg_temp4 = SGroup_CreateIfNotFound("sg_temp4")
+	sg_temp5 = SGroup_CreateIfNotFound("sg_temp5")
+	sg_temp6 = SGroup_CreateIfNotFound("sg_temp6")
+	sg_temp7 = SGroup_CreateIfNotFound("sg_temp7")
+	sg_temp8 = SGroup_CreateIfNotFound("sg_temp8")
+	sg_temp10 = SGroup_CreateIfNotFound("sg_temp10")
+	sg_temp100 = SGroup_CreateIfNotFound("sg_temp100")
+	
+	eg_temp = EGroup_CreateIfNotFound("eg_temp")
+
+	
+
+	--Rule_AddInterval( HQ_health_check, 1.5 )
+	
+	 
+	Rule_AddOneShot( rule_spawn_wave_2, 10*62 )
+
+	
+	Rule_AddOneShot( spawn_mortain_harass1, 12*60 )
+	
+	Rule_AddOneShot( rule_spawn_wave_3, 15*60 )
+
+	
+	Rule_AddOneShot( rule_spawn_wave_4, 18*60 )
+
+	
+	Rule_AddOneShot( wave_three_hillmob, 20*60)
+	
+	Rule_AddOneShot( rule_spawn_wave_5, 22*60 )
+	
+	Rule_AddOneShot( rule_spawn_wave_6, 25*60 )
+	
+	Rule_AddOneShot( spawn_halftrack1, 25*62 )
+	
+	Rule_AddOneShot( rule_spawn_wave_7, 26*60 )
+	
+	Rule_AddOneShot( rule_spawn_wave_8, 27.5*60 )
+
+	Rule_AddOneShot( rule_spawn_HQ_harass, 10*60 ) 
+	
+--Wave table
+	waves = {First_Wave_East, Second_Wave_North_East, mortain_harass1, Third_Wave_North, Fourth_Wave_North_Pincher,  Fifth_Wave_South, sixth_wave_hillmob1, seventh_wave, eighth_wave }
+	
+--	Countdown_Win = 1
+
+	Rule_AddOneShot( rule_start_mission, 1 )
+	Rule_AddInterval(rule_check_mortain_points, 5)
+	
+	Rule_AddInterval( autosave_15, 1 )
+--~ 	Rule_AddInterval( autosave_5, 1 )
+	
+--	theses need to match the waves
+	
+	UI_EnableEventCueType( GE_PlayerBeingAttacked, true )
+	
+--give these Egroups larger LOS than normal	
+	Modify_SightRadius( Entity_Hill_317_VP, 400 )
+	Modify_SightRadius( Entity_Mortain_Victory_Point, 400 )
+	Modify_SightRadius( EG_OP, 7 )
+	Modify_ReceivedDamage( EG_OP, 2.0)
+	
+--give the sentries larger LOS than usual
+--Modify_SightRadius( SG_Sentries, 1.4 )
+	
+--Checks for the Speech events (generic ally)
+	Rule_AddInterval(Mortain_Nazi_Check, 3)
+	Rule_AddInterval(Trench_Nazi_Check, 3)
+	Rule_AddInterval(HQ_Nazi_Check, 4)
+	Rule_AddInterval(HQ_Destroyed_Check, 4)
+	
+	
+--	Cmd_InstantUpgrade(player1, ABILITY.ALLIES.STICKY_BOMB)
+	Cmd_InstantUpgrade(player1, UPG.ALLIES.GRENADE)
+--	Cmd_InstantUpgrade(player1, UPG.ALLIES.STICKY_BOMBS)
+	Cmd_InstantUpgrade(player2, UPG.AXIS.PHASE4)
+	
+
+
+	
+	--Triggers for NIS's
+	Rule_Add(Trigger_First_NIS)
+	
+	Rule_AddInterval(flare_south, 3.24)
+	Rule_AddInterval(flare_east, 3.14)
+	Rule_AddInterval(flare_mortain, 3.14)
+	Rule_AddInterval(flare_trench, 3.14)
+	
+	World_SetDesignerSupply(EGroup_GetPosition_EVEN_IF_EMPTY(Entity_Hill_317_VP), true) 
+	
+	
+end
+
+Scar_AddInit(OnInit)
+
+---------------------------------flares--------------------------------------------------------------
+
+function flare_south()
+	if Player_AreSquadsNearMarker( player2, MRK_flare_south ) then
+		EGroup_SetAnimatorEvent(EG_flare_south, "flare_fire_00")
+		Rule_AddOneShot(flare_south2, 5)
+		Rule_RemoveMe()
+	end
+end
+function flare_south2()
+	EGroup_SetAnimatorEvent(EG_flare_south, "flare_fire_00")
+	Rule_AddOneShot(flare_south3, 200 ) --make "5" 200 after testing
+end
+function flare_south3()
+	Rule_AddInterval( flare_south, 3.24 )
+end
+
+----------------------------
+function flare_east()
+	if Player_AreSquadsNearMarker( player2, bombard9 ) then
+		EGroup_SetAnimatorEvent(EG_flare_east, "flare_fire_00")
+		Rule_AddOneShot(flare_east2, 5)
+		Rule_RemoveMe()
+	end
+end
+function flare_east2()
+	EGroup_SetAnimatorEvent(EG_flare_east, "flare_fire_00")
+	Rule_AddOneShot(flare_east3, 200 ) 
+end
+function flare_east3()
+	Rule_AddInterval( flare_east, 3.14 )
+end
+------------------------------------
+
+function flare_mortain()
+	if Player_AreSquadsNearMarker( player2, Marker_Mortain_Nazi_Check ) then
+		EGroup_SetAnimatorEvent(EG_flare_mortain, "flare_fire_00")
+		Rule_AddOneShot(flare_mortain2, 5)
+		Rule_RemoveMe()
+	end
+end
+function flare_mortain2()
+	EGroup_SetAnimatorEvent(EG_flare_mortain, "flare_fire_00")
+	Rule_AddOneShot(flare_mortain3, 200 ) 
+end
+function flare_mortain3()
+	Rule_AddInterval( flare_mortain, 3.44 )
+end
+---------------------------------------
+
+function flare_trench()
+	if Player_AreSquadsNearMarker( player2, MRK_flare_trench ) then
+		EGroup_SetAnimatorEvent(EG_flare_trench, "flare_fire_00")
+		Rule_AddOneShot(flare_trench2, 5)
+		Rule_RemoveMe()
+	end
+end
+function flare_trench2()
+	EGroup_SetAnimatorEvent(EG_flare_trench, "flare_fire_00")
+	Rule_AddOneShot(flare_trench3, 200 ) 
+end
+function flare_trench3()
+	Rule_AddInterval( flare_trench, 3.44 )
+end
+
+-------------------------------------Autosave---------------------------------------------------------
+ function autosave_15()
+ 	if	Objective_IsTimerSet( OBJECTIVE1 ) and Objective_GetTimerSeconds( OBJECTIVE1 ) <= 15*60 then
+			Util_MissionTitle( 339025 ) --Dawn is approaching
+			Rule_AddOneShot( autosave_10left, 3 )
+			Rule_RemoveMe()
+	end	
+ end
+ 
+ function autosave_10left()
+		Scar_Autosave(339056) -- 15 minutes left
+ end
+ 
+
+--~ function autosave_5()
+--~ 	if	Timer_GetRemaining(Abbey_Medal_Timer) <= 5*60 then
+--~ 			Scar_Autosave(339057) --5 minutes left
+--~ 			Rule_RemoveMe()
+--~ 	end	
+--~ end
+
+---------------------------------------Difficulty-------------------------------------------------------
+
+function M13_Difficulty()
+
+            -- get the difficulty
+            g_dif = Game_GetSPDifficulty()
+
+            -- set health bonus and AI difficulty (if applicable) for player 1
+            Setup_Difficulty(player1, g_dif) -- pass the player and difficulty global variable 
+
+            -- set health handicap and AI difficulty (if applicable) for player 2
+            Setup_Difficulty(player2, g_dif) -- do it for each player that you have defined
+            Setup_Difficulty(player3, 2) -- do it for each player that you have defined
+
+end
+--Turn off team player being attacked queue
+--we need a cleaner function that gets rid of 'team is under attack'
+
+-------------------------------------------howitzer hint point check-----------------------------------------
+function Howitzer_check()
+
+	if Misc_IsSGroupSelected(SG_howitzer, ANY) then
+		HintPoint_Remove(HP_howitzerID)
+		Rule_RemoveMe()
+	end
+end
+
+-------------------------------------------defend point hint point removal----------------------------------------
+
+
+function defend_hint1_check()
+	Player_GetAllSquadsNearMarker(player1, sg_temp1, MRK_defend_hint1)
+	if SGroup_TotalMembersCount(sg_temp1) >= 3 then
+		HintPoint_Remove(HP_defend_hint1)
+		Rule_RemoveMe()
+	end
+end
+
+function defend_hint2_check()
+	Player_GetAllSquadsNearMarker(player1, sg_temp2, MRK_defend_hint2)
+	if SGroup_TotalMembersCount(sg_temp2) >= 3 then
+		HintPoint_Remove(HP_defend_hint2)
+		Rule_RemoveMe()
+	end
+end
+
+function defend_hint3_check()
+	Player_GetAllSquadsNearMarker(player1, sg_temp3, MRK_defend_hint3)
+	if SGroup_TotalMembersCount(sg_temp3) >= 3 then
+		HintPoint_Remove(HP_defend_hint3)
+		Rule_RemoveMe()
+	end
+end
+
+function defend_hint4_check()
+	Player_GetAllSquadsNearMarker(player1, sg_temp4, MRK_defend_hint4)
+	if SGroup_TotalMembersCount(sg_temp4) >= 3 then
+		HintPoint_Remove(HP_defend_hint4)
+		Rule_RemoveMe()
+	end
+end
+
+function defend_hint5_check()
+	Player_GetAllSquadsNearMarker(player1, sg_temp5, MRK_defend_hint5)
+	if SGroup_TotalMembersCount(sg_temp5) >= 3 then
+		HintPoint_Remove(HP_defend_hint5)
+		Rule_RemoveMe()
+	end
+end
+
+function defend_hint6_check()
+	Player_GetAllSquadsNearMarker(player1, sg_temp6, MRK_defend_hint6)
+	if SGroup_TotalMembersCount(sg_temp6) >= 3 then
+		HintPoint_Remove(HP_defend_hint6)
+		Rule_RemoveMe()
+	end
+end
+
+function defend_hint7_check()
+	Player_GetAllSquadsNearMarker(player1, sg_temp7, MRK_defend_hint7)
+	if SGroup_TotalMembersCount(sg_temp7) >= 3 then
+		HintPoint_Remove(HP_defend_hint7)
+		Rule_RemoveMe()
+	end
+end
+function defend_hint8_check()
+	Player_GetAllSquadsNearMarker(player1, sg_temp8, MRK_defend_hint8)
+	if SGroup_TotalMembersCount(sg_temp8) >= 3 then
+		HintPoint_Remove(HP_defend_hint8)
+		Rule_RemoveMe()
+	end
+end
+
+
+------------------------------------------------NIS's-------------------------------------------------------------
+--NIS trigger "Able relieves Dog"
+function Trigger_First_NIS()
+
+		Util_StartNIS(EVENTS.NIS13_01)
+		Rule_Add(Rule_TriggerNISOver)
+		Rule_RemoveMe()
+		
+end
+
+function Rule_TriggerNISOver()
+	if (Event_IsAnyRunning() == false) then
+--~ 		Player_SetResource( player1, RT_Manpower, 950 )			-- now set with global Util_SetStartingResources
+--~ 		Player_SetResource( player1, RT_Munition, 500 )
+--~ 		Player_SetResource( player1, RT_Fuel, 25 )
+
+		Util_SetStartingResources(12)
+	
+			Game_LoadAtmosphere("data:art/scenarios/presets/atmosphere/m13_lighting.aps", 0)
+		HP_howitzerID		= HintPoint_Add(SG_howitzer, true, 339912)
+			
+		Rule_AddInterval(Howitzer_check, 3)
+			
+		HP_defend_hint1		= HintPoint_Add(MRK_defend_hint1, true, 339913)
+		HP_defend_hint2		= HintPoint_Add(MRK_defend_hint2, true, 339913)
+		HP_defend_hint3		= HintPoint_Add(MRK_defend_hint3, true, 339913)
+		HP_defend_hint4		= HintPoint_Add(MRK_defend_hint4, true, 339913)
+		HP_defend_hint5		= HintPoint_Add(MRK_defend_hint5, true, 339913)
+		HP_defend_hint6		= HintPoint_Add(MRK_defend_hint6, true, 339913)
+		HP_defend_hint7		= HintPoint_Add(MRK_defend_hint7, true, 339913)
+		HP_defend_hint8		= HintPoint_Add(MRK_defend_hint8, true, 339913)
+		
+		Rule_AddInterval(defend_hint1_check, 5)
+		Rule_AddInterval(defend_hint2_check, 4)
+		Rule_AddInterval(defend_hint3_check, 5)
+		Rule_AddInterval(defend_hint4_check, 4)
+		Rule_AddInterval(defend_hint5_check, 5)
+		Rule_AddInterval(defend_hint7_check, 4)
+		Rule_AddInterval(defend_hint6_check, 4)
+		Rule_AddInterval(defend_hint8_check, 4)
+			
+		EGroup_Hide( LAYER_N13_01,false)
+		Rule_AddOneShot(Trigger_Second_NIS, 5*60 )
+		Rule_RemoveMe()
+		Objective_Start( OBJECTIVE1 )
+
+	end
+end
+
+--NIS trigger "Flares"
+function Trigger_Second_NIS()
+		Util_StartNIS(EVENTS.NIS13_02)
+		Rule_Add(Rule_TriggerNISOver_02)
+end
+
+--Spawn Wave 0 and clean up the NIS 
+function Rule_TriggerNISOver_02()
+	if (Event_IsAnyRunning() == false) then
+		Rule_RemoveMe()
+		Util_CreateSquadsAtMarker( player1, sg_temp100, SBP.ALLIES.RIFLEMEN, MRK_NIS2_GI, 1, 2 )	
+		Wave_0A = SGroup_CreateIfNotFound( "Wave_0A" )
+		Util_CreateSquadsAtMarker(player2, Wave_0A, SBP.AXIS.PIONEER, Marker_Axis_Wave_0A, 2)
+		Cmd_AttackMove(Wave_0A, Marker_Axis_Main_Attack)
+		Wave_0B = SGroup_CreateIfNotFound ("Wave_0B")
+		Util_CreateSquadsAtMarker(player2, Wave_0B, SBP.AXIS.GRENADIER, Marker_Axis_Wave_0B, 1)
+		Cmd_AttackMove(Wave_0B ,Marker_Axis_Main_Attack)
+		Rule_AddOneShot( rule_spawn_wave_1, 2*45 )
+		Rule_AddOneShot( rule_spawn_wave_1_MG42, 2*55 ) 
+		Rule_AddOneShot( motorcyle_mortain, 10 )
+		Util_StartIntel( EVENTS.FIRST_ATTACK  )
+	end
+end	
+
+
+---------------------------------------------------Mission Startup ----------------------------------------------------------
+
+function rule_start_mission()
+
+	Rule_AddInterval(StrategicPoint_Check, 5)
+	Timer_Start(Abbey_Medal_Timer, 15*60)
+	SGroup_IncreaseVeterancyRank( SG_Starting_Vets )
+	SGroup_IncreaseVeterancyRank( SG_Starting_Vets )
+	SGroup_IncreaseVeterancyRank( SG_Starting_Vets )
+	  
+end
+
+
+--------------------------------------------------------------- Player Speech Warnings ---------------------------------------------
+
+--Checking for Nazi's in Mortain
+function Mortain_Nazi_Check()
+	if Prox_ArePlayersNearMarker( player2, Marker_Mortain_Nazi_Check, ANY ) == true then
+		Util_StartIntel(EVENTS.MORTAIN_ATTACK1)
+		Rule_AddOneShot( Mortain_Axis_CheckA, 200)
+		Rule_RemoveMe()
+	end
+end
+
+function Mortain_Axis_CheckA()
+	Rule_AddInterval( Mortain_Axis_Check1, 3)
+end
+
+function Mortain_Axis_Check1()
+	if Prox_ArePlayersNearMarker( player2, Marker_Mortain_Nazi_Check, ANY ) == true then
+		Util_StartIntel( EVENTS.MORTAIN_ATTACK2) 
+		Rule_AddOneShot( Mortain_Axis_CheckB, 220)
+		Rule_RemoveMe()
+	end
+end
+
+function Mortain_Axis_CheckB()
+	Rule_AddInterval( Mortain_Axis_Check2, 3)
+end
+
+function Mortain_Axis_Check2()
+	if Prox_ArePlayersNearMarker( player2, Marker_Mortain_Nazi_Check, ANY ) == true then
+		Util_StartIntel(EVENTS.MORTAIN_ATTACK1)
+		Rule_AddOneShot( Mortain_Axis_CheckA, 225)
+		Rule_RemoveMe()
+	end
+end
+
+-------------------------------------------------Check for Nazi's on Hill 317----------------------------------------------------
+	--Check for Nazi's on Hill 317
+function Trench_Nazi_Check() 
+	if Prox_ArePlayersNearMarker(player2, Marker_Trench_Nazi_Check, ANY) == true then
+		Util_StartIntel(EVENTS.KRAUTS_ON_HILL1)
+		Rule_RemoveMe()
+		Rule_AddOneShot(Trench_Nazi_Check_B, 250)
+	end
+end
+function Trench_Nazi_Check_B()
+	Rule_AddInterval( Trench_Nazi_Check2, 3)
+end
+
+function Trench_Nazi_Check2() 
+	if Prox_ArePlayersNearMarker(player2, Marker_Trench_Nazi_Check, ANY) == true then
+		Util_StartIntel(EVENTS.KRAUTS_ON_HILL2)
+		Rule_RemoveMe()
+		Rule_AddOneShot(Trench_Nazi_Check_A, 250)
+	end
+end
+function Trench_Nazi_Check_A()
+	Rule_AddInterval( Trench_Nazi_Check, 3)
+end
+-------------------------------------------------------------------------------------------------------------------------------
+
+
+	--Check HQ is Under Attack
+function HQ_Nazi_Check()
+	if EGroup_IsUnderAttack( EG_HQ, ANY, 3 ) == true then
+		Util_StartIntel(EVENTS.HQ_ATTACK)
+		Rule_RemoveMe()
+		Rule_AddOneShot (HQ_Nazi_Check_B, 200)
+	end
+end
+function HQ_Nazi_Check_B()
+	
+	Rule_AddInterval( HQ_Nazi_Check, 3)
+	Rule_RemoveMe()
+
+end
+
+	--Check whether the HQ is Destroyed
+function HQ_Destroyed_Check()
+	if EGroup_Count (EG_HQ) == 0 then
+		Util_StartIntel(EVENTS.HQ_DESTROYED)
+		Rule_RemoveMe()
+	end
+end
+
+
+
+
+--------------------------------------------ABBEY-------------------------------------------------------------
+
+--Abbey medal objective
+function rule_objective_abbey()
+	if Prox_ArePlayersNearMarker(player1, abbey_radius_trigger, ANY) or Objective_GetTimerSeconds(OBJECTIVE1) == 20*60 then
+		Objective_Start(OBJECTIVE_ABBEY)
+		Rule_RemoveMe()
+	end	
+end
+function rule_check_abbey_complete()
+	if SGroup_Count (SG_Abbey_Attack_2) == 0 and SGroup_Count (SG_Abbey_Attack_1) == 0 then 
+		Objective_Complete(OBJECTIVE_ABBEY)
+		Rule_RemoveMe()
+		
+	elseif SGroup_Count( Abbey_Infantry ) == 0 then
+		
+		Objective_Fail(OBJECTIVE_ABBEY)
+		Rule_RemoveMe()
+		
+	end	
+end
+	
+
+
+
+--------------------------------------------ARTILLERY-------------------------------------------------------------
+
+function artillary_init()
+	
+	artillary_locations = {bombard1, bombard2, bombard3, bombard4, bombard5, 
+							bombard6, bombard7, bombard8, bombard9, bombard10,
+							bombard11, bombard12, bombard13, bombard14, bombard15}
+	
+	artillary_timing = {1, 2, 2, 4, 4, 4, 8, 15}
+	
+end
+
+function artillary_do()
+
+	if Rule_Exists(artillary_dohits) == false then
+		Rule_AddInterval(artillary_dohits, 5)
+		UI_CreateEventCue(CUE.ATTACKED.icon, CUE.ATTACKED.sound, 339500, 339500 )
+		--Incoming Artillery!
+		
+		artillary_currenttime = 1
+	end
+	
+end
+
+
+function artillary_dohits()
+
+	local found = 0
+	
+	-- find how many times we're supposed to be firing this time through...
+	for n = 1, table.getn(artillary_timing) do
+		print("Current Value: "..artillary_timing[n].."   Looking for: "..artillary_currenttime)
+		if artillary_timing[n] == artillary_currenttime then
+			found = found + 1
+		end
+	end
+	
+	print(found)
+	
+	-- drop the right number of shells
+	for n = 1, found do
+		local rand = World_GetRand(1, table.getn(artillary_locations))
+		Cmd_Ability(player2, ABILITY_MORTAR_STRIKE, Marker_GetPosition( artillary_locations[rand] ), nil, true)
+		print(rand)
+	end
+	--this kills the rule after its all done
+	if artillary_currenttime >= artillary_timing[table.getn(artillary_timing)] then
+		Rule_RemoveMe()
+	end
+	
+	artillary_currenttime = artillary_currenttime + 1
+	
+end
+---------------------------------------------------  Artillery2   ---------------------------------------------------
+function artillary_init2()
+	
+	artillary_locations2 = {MRK_trappop7, MRK_trappop6, MRK_trappop5, MRK_trappop4, MRK_trappop3, MRK_trappop2, MRK_trappop1}
+	
+	artillary_timing2 = {1, 1.5, 2.5, 4.5, 5.5, 4, 8.5, 15}
+	
+end
+
+function artillary_do2()
+
+	if Rule_Exists(artillary_dohits2) == false then
+		Rule_AddInterval(artillary_dohits2, 5)
+		artillary_currenttime2 = 1
+	end
+	
+end
+
+
+function artillary_dohits2()
+
+	local found = 0
+	
+	-- find how many times we're supposed to be firing this time through...
+	for n = 1, table.getn(artillary_timing2) do
+		print("Current Value: "..artillary_timing2[n].."   Looking for: "..artillary_currenttime2)
+		if artillary_timing2[n] == artillary_currenttime2 then
+			found = found + 1
+		end
+	end
+	
+	print(found)
+	
+	-- drop the right number of shells
+	for n = 1, found do
+		local rand = World_GetRand(1, table.getn(artillary_locations2))
+		Cmd_Ability(player2, ABILITY_MORTAR_STRIKE, Marker_GetPosition( artillary_locations2[rand] ), nil, true)
+		print(rand)
+	end
+	--this kills the rule after its all done
+	if artillary_currenttime2 >= artillary_timing2[table.getn(artillary_timing2)] then
+		Rule_RemoveMe()
+	end
+	
+	artillary_currenttime2 = artillary_currenttime2 + 1
+	
+end
+
+
+
+---------------------------------------------------- Wave 1 ---------------------------------------------------------------------
+
+
+function rule_spawn_wave_1()
+
+--Fire the first artillary barrage
+	artillary_do()
+	Util_StartIntel(EVENTS.TO_THE_TRENCHES)
+	
+--send in the clowns
+	First_Wave_North_East = SGroup_CreateIfNotFound( "First_Wave_North_East" )
+	Util_CreateSquadsAtMarker( player2, First_Wave_North_East, SBP.AXIS.GRENADIER, Marker_Axis_North_East, 1 )
+	Cmd_AttackMove( First_Wave_North_East, NE_Outer_Perimeter , true)
+	Cmd_AttackMove( First_Wave_North_East, N_Inner_Perimeter , true)
+	Cmd_AttackMove( First_Wave_North_East, E_Inner_Perimeter , true)
+	Cmd_AttackMoveThenCapture(First_Wave_North_East, Entity_Hill_317_VP, true)
+	
+	First_Wave_East = SGroup_CreateIfNotFound( "First_Wave_East" )
+	Util_CreateSquadsAtMarker( player2, First_Wave_East, SBP.AXIS.PIONEER, Marker_Axis_East, 1 )
+	Cmd_InstantUpgrade( First_Wave_East, UPG.AXIS.PIONEER_FLAMETHROWER)
+	Util_CreateSquadsAtMarker( player2, First_Wave_East, SBP.AXIS.VOLKSGRENADIER, Marker_Axis_East, 1 )
+	Util_CreateSquadsAtMarker( player2, First_Wave_East, SBP.AXIS.GRENADIER, Marker_Axis_East, 1 )
+	Cmd_AttackMove( First_Wave_East, E_Outer_Perimeter , true)
+	Cmd_AttackMove( First_Wave_East, E_Inner_Perimeter , true)
+	Cmd_AttackMove( First_Wave_East, S_Inner_Perimeter , true)
+	Cmd_AttackMoveThenCapture( First_Wave_East, Entity_Hill_317_VP, true )
+
+	First_Wave_South_East = SGroup_CreateIfNotFound( "First_Wave_South_East" )
+	Util_CreateSquadsAtMarker( player2, First_Wave_South_East, SBP.AXIS.PIONEER, Marker_Axis_South_East, 1 )
+	Cmd_InstantUpgrade( First_Wave_South_East, UPG.AXIS.PIONEER_FLAMETHROWER)
+	Util_CreateSquadsAtMarker( player2, First_Wave_South_East, SBP.AXIS.VOLKSGRENADIER, Marker_Axis_South_East, 1 )
+	Util_CreateSquadsAtMarker( player2, First_Wave_South_East, SBP.AXIS.MOTORCYCLE, Marker_Axis_South_East, 1 )
+	Cmd_AttackMove( First_Wave_South_East, SE_Outer_Perimeter , true)
+	Cmd_AttackMove( First_Wave_South_East, S_Inner_Perimeter , true)
+	Cmd_AttackMove( First_Wave_South_East, W_Inner_Perimeter , true)
+	Cmd_AttackMoveThenCapture( First_Wave_South_East, Entity_Hill_317_VP, true )
+
+end	
+
+--Spawn the MG42 squads separately...Attack move the MG42's to Hill 317
+function rule_spawn_wave_1_MG42()
+
+	First_Wave_North_East_MG42 = SGroup_CreateIfNotFound( "First_Wave_North_East_MG42" )
+	Util_CreateSquadsAtMarker( player2, First_Wave_North_East_MG42, SBP.AXIS.HEAVYMG, Marker_Axis_North_East, 1 )
+	Cmd_AttackMove ( First_Wave_North_East_MG42, NE_Outer_Perimeter)
+
+end
+
+-----------------------------------------------------------Wave 2 -------------------------------------------------------------------
+
+function rule_spawn_wave_2()
+
+	artillary_do()
+	artillary_do2()
+	Util_StartIntel(EVENTS.INCOMING)
+	
+	Second_Wave_North_East = SGroup_CreateIfNotFound( "Second_Wave_North_East" )
+	Util_CreateSquadsAtMarker( player2, Second_Wave_North_East, SBP.AXIS.HALFTRACK, Marker_Axis_North_East, 1 )
+	Cmd_InstantUpgrade( Second_Wave_North_East, UPG.AXIS.HALFTRACK_FLAMETHROWER )
+	Util_CreateSquadsAtMarker( player2, Second_Wave_North_East, SBP.AXIS.GRENADIER, Marker_Axis_North_East, 1 )
+	Cmd_AttackMove( Second_Wave_North_East, NE_Outer_Perimeter , true)
+	Cmd_AttackMove( Second_Wave_North_East, N_Outer_Perimeter , true)
+	Cmd_AttackMove( Second_Wave_North_East, NW_Outer_Perimeter , true)
+	Cmd_AttackMove( Second_Wave_North_East, W_Inner_Perimeter , true)
+	Cmd_AttackMoveThenCapture(Second_Wave_North_East, Entity_Hill_317_VP, true)
+	
+	Second_Wave_East = SGroup_CreateIfNotFound( "Second_Wave_East" )
+	Util_CreateSquadsAtMarker( player2, Second_Wave_East, SBP.AXIS.GRENADIER, Marker_Axis_East, 1 )
+	Util_CreateSquadsAtMarker( player2, Second_Wave_East, SBP.AXIS.VOLKS_2PANZERF, Marker_Axis_East, 1 )
+	Cmd_AttackMove( Second_Wave_East, E_Outer_Perimeter , true)
+	Cmd_AttackMove( Second_Wave_East, SE_Outer_Perimeter , true)
+	Cmd_AttackMove( Second_Wave_East, E_Inner_Perimeter , true)
+	Cmd_AttackMove( Second_Wave_East, S_Inner_Perimeter , true)
+	Cmd_AttackMoveThenCapture( Second_Wave_East, Entity_Hill_317_VP, true )
+	
+	Second_Wave_South_East_1 = SGroup_CreateIfNotFound( "Second_Wave_South_East_1" )
+	Util_CreateSquadsAtMarker( player2, Second_Wave_South_East_1, SBP.AXIS.VOLKSGRENADIER, Marker_Axis_South_East, 1 )
+	Cmd_InstantUpgrade( Second_Wave_South_East_1, UPG.AXIS.GREN_MG42 )
+	Cmd_AttackMove( Second_Wave_South_East_1, SE_Outer_Perimeter, true)
+	Cmd_AttackMove( Second_Wave_South_East_1, SW_Outer_Perimeter, true)
+	Cmd_AttackMove( Second_Wave_South_East_1, S_Inner_Perimeter, true)
+	Cmd_AttackMoveThenCapture( Second_Wave_South_East_1, Entity_Hill_317_VP, true)
+	
+	Second_Wave_South_East_2 = SGroup_CreateIfNotFound( "Second_Wave_South_East_2" )
+	Util_CreateSquadsAtMarker(player2, Second_Wave_South_East_2, SBP.AXIS.STORMTROOPER, Marker_Axis_South_East, 1)
+	Cmd_AttackMove( Second_Wave_South_East_2, S_Outer_Perimeter, true)
+	Cmd_AttackMove( Second_Wave_South_East_2, SW_Outer_Perimeter, true)
+	Cmd_AttackMove( Second_Wave_South_East_2, S_Inner_Perimeter, true)
+	Cmd_AttackMove( Second_Wave_South_East_2, W_Inner_Perimeter, true)
+	Cmd_AttackMoveThenCapture( Second_Wave_South_East_2, Entity_Hill_317_VP, true )
+
+--Mortar Squads
+	Second_Wave_North_East_Mortar = SGroup_CreateIfNotFound( "Second_Wave_North_East_Mortar" )	
+	Util_CreateSquadsAtMarker( player2, Second_Wave_North_East_Mortar, SBP.AXIS.MORTAR, Marker_Axis_North_East, 2 )
+	Rule_AddInterval(rule_mortar_main_attack_second_wave, 15)
+	
+--~ 	
+end
+		
+--Mortar boyz bombing Main attack markers and bombard areas
+function rule_mortar_main_attack_second_wave()
+	if SGroup_Count( Second_Wave_North_East_Mortar ) == 0 then
+		Rule_RemoveMe()
+	else
+		Cmd_Ability(Second_Wave_North_East_Mortar, ABILITY.AXIS.MORTAR_SMOKE, Marker_GetPosition( Marker_Axis_Main_Attack ), nil, true)
+	end		
+end
+
+function rule_mortar_main_attack_second_wave_2()
+	if SGroup_Count( Second_Wave_North_East_Mortar_2 ) == 0 then
+		Rule_RemoveMe()
+	else
+		Cmd_Ability(Second_Wave_North_East_Mortar_2, ABILITY.AXIS.MORTAR_SMOKE, Marker_GetPosition( bombard13 ), nil, true)
+	end
+end	
+------------------------------------------------------HQ/Mortain Harassment -----------------------------------------------------------
+function motorcyle_mortain()
+	sg_temp10 = SGroup_CreateIfNotFound("sg_temp10")
+	Util_CreateSquadsAtMarker(player2, sg_temp10, SBP.AXIS.MOTORCYCLE, Marker_Axis_East, 1)
+	Cmd_SquadPath(sg_temp10, "PTH_N_road", true, false, true, 0)
+	
+	
+end
+
+function rule_spawn_HQ_harass()
+	HQ_Harass = SGroup_CreateIfNotFound("HQ_Harass")
+	Util_CreateSquadsAtMarker(player2, HQ_Harass, SBP.AXIS.VOLKS_2PANZERF, Marker_Axis_North, 1)
+	Util_CreateSquadsAtMarker(player2, HQ_Harass, SBP.AXIS.GRENADIER, Marker_Axis_North, 1)
+	Cmd_AttackMove(HQ_Harass, Marker_Axis_North_Pincher)
+	Cmd_AttackMoveThenCapture(HQ_Harass, EG_mortain_vp, true)
+	Cmd_AttackMoveThenCapture(HQ_Harass, EG_mortain_point1, true)
+	Cmd_AttackMoveThenCapture(HQ_Harass, EG_mortain_point2, true)
+	Cmd_AttackMoveThenCapture(HQ_Harass, EG_mortain_point3, true)
+	
+end	
+
+function spawn_mortain_harass1()
+
+	--da boyz come up from da Sout' and take points close to mortain
+	Objective_Start(OBJECTIVE2)
+	mortain_harass1 = SGroup_CreateIfNotFound("mortain_harass1")
+	Util_CreateSquadsAtMarker(player2, mortain_harass1, SBP.AXIS.GRENADIER, Marker_Axis_South, 1)
+	
+	Cmd_AttackMoveThenCapture(mortain_harass1,EG_southvp, true)
+	Cmd_AttackMoveThenCapture(mortain_harass1,EG_southroad, true)
+	Cmd_AttackMoveThenCapture(mortain_harass1,EG_southwest1, true)
+	Cmd_AttackMoveThenCapture(mortain_harass1,EG_southwest2, true)
+	Cmd_AttackMoveThenCapture(mortain_harass1,EG_mortain_point3, true)
+	Cmd_AttackMoveThenCapture(mortain_harass1,EG_mortain_point2, true)
+	Cmd_AttackMoveThenCapture(mortain_harass1, EG_mortain_vp, true)
+	Cmd_AttackMove(mortain_harass1, EG_HQ, true)
+	Cmd_AttackMoveThenCapture(mortain_harass1, Entity_Hill_317_VP, true )
+	
+	mortain_harass2 = SGroup_CreateIfNotFound("mortain_harass2")
+	Util_CreateSquadsAtMarker(player2, mortain_harass2, SBP.AXIS.STORMTROOPER, Marker_Axis_East, 2)
+	Cmd_AttackMoveThenCapture(mortain_harass2,EG_northeast2, true)
+	Cmd_AttackMoveThenCapture(mortain_harass2,EG_east1, true)
+	Cmd_AttackMoveThenCapture(mortain_harass2,EG_northeast1, true)
+	Cmd_AttackMoveThenCapture(mortain_harass2,EG_northeast2, true)
+	Cmd_AttackMoveThenCapture(mortain_harass2,EG_mortain_point2, true)
+
+	mortain_halftrack 	= SGroup_CreateIfNotFound( "mortain_halftrack" )
+	halftrack_troopers	= SGroup_CreateIfNotFound( "halftrack_troopers")
+	Util_CreateSquadsAtMarker( player2, mortain_halftrack, SBP.AXIS.HALFTRACK, Marker_Axis_East, 1 )
+	Util_CreateSquadsAndGarrison( player2, halftrack_troopers, SBP.AXIS.STORMTROOPER, mortain_halftrack, 1 )
+	Modify_UnitSpeed( mortain_halftrack, 0.65 )
+	Cmd_Ungarrison( mortain_halftrack, Marker_Axis_North_Pincher )
+	
+end
+
+
+	
+-------------------------------------------------------Third Wave--------------------------------------------------------------
+
+
+
+function rule_spawn_wave_3()	
+
+--Fire the third artillary barrage
+	artillary_do()
+	artillary_do2()
+	
+--send in the clowns
+	
+	Third_Wave_North = SGroup_CreateIfNotFound( "Third_Wave_North" )
+	Util_CreateSquadsAtMarker( player2, Third_Wave_North, SBP.AXIS.VOLKSGRENADIER, Marker_Axis_North, 2 )
+	Util_CreateSquadsAtMarker( player2, Third_Wave_North, SBP.AXIS.SNIPER, Marker_Axis_North, 1 )
+	Cmd_AttackMove( Third_Wave_North, N_Outer_Perimeter, true)
+	Cmd_AttackMove( Third_Wave_North, NW_Outer_Perimeter, true)
+	Cmd_AttackMoveThenCapture ( Third_Wave_North, Entity_Hill_317_VP, true )
+	
+	Third_Wave_North_East = SGroup_CreateIfNotFound( "Third_Wave_North_East" )	
+	--Util_CreateSquadsAtMarker( player2, Third_Wave_North_East, SBP.AXIS.GRENADIER, Marker_Axis_North_East, 1 )
+	Util_CreateSquadsAtMarker( player2, Third_Wave_North_East, SBP.AXIS.VOLKS_2PANZERF, Marker_Axis_North_East, 1 )
+	Cmd_AttackMove( Third_Wave_North_East, NE_Outer_Perimeter, true)
+	Cmd_AttackMove( Third_Wave_North_East, W_Inner_Perimeter, true)
+	Cmd_AttackMoveThenCapture ( Third_Wave_North_East, Entity_Hill_317_VP, true )
+	
+	Third_Wave_East_HMG = SGroup_CreateIfNotFound("Third_Wave_East_HMG")
+	Util_CreateSquadsAtMarker( player2, Third_Wave_East_HMG, SBP.AXIS.HEAVYMG, Marker_Axis_East, 1)
+	Cmd_AttackMove( Third_Wave_East_HMG, E_Outer_Perimeter)
+	
+--Halftrack dropoff	
+	Third_Wave_Halftrack = SGroup_CreateIfNotFound( "Third_Wave_Halftrack" )
+	Third_Wave_Halftrack_Stormtrooper = SGroup_CreateIfNotFound( "Third_Wave_Halftrack_Stormtrooper" )	
+	Util_CreateSquadsAtMarker( player2, Third_Wave_Halftrack, SBP.AXIS.HALFTRACK, Marker_Axis_East, 1 )
+	Util_CreateSquadsAndGarrison( player2, Third_Wave_Halftrack_Stormtrooper, SBP.AXIS.STORMTROOPER, Third_Wave_Halftrack, 1 )
+	Cmd_Ungarrison( Third_Wave_Halftrack, Marker_Halftrack )
+	
+--Sniper and Puma flank from the south
+	Third_Wave_South = SGroup_CreateIfNotFound( "Third_Wave_South" )
+	Util_CreateSquadsAtMarker( player2, Third_Wave_South, SBP.AXIS.PUMA, Marker_Axis_South, 1 )
+	Util_CreateSquadsAtMarker( player2, Third_Wave_South, SBP.AXIS.SNIPER, Marker_Axis_South, 1 )
+	Cmd_SquadPath ( Third_Wave_South, "PTH_S_to_hill", true, false, true, 0 )	
+	
+end
+-----------------------------------------------------WAVE 3.5--------------------------------------------------
+
+function wave_three_hillmob()
+
+	Util_StartIntel(EVENTS.ANOTHER_WAVE)
+	
+	third_wave_hillmob1 = SGroup_CreateIfNotFound( "third_wave_hillmob1")
+	Util_CreateSquadsAtMarker( player2, third_wave_hillmob1, SBP.AXIS.GRENADIER, Marker_Axis_South, 1 )
+	Cmd_InstantUpgrade( third_wave_hillmob1, UPG.AXIS.GREN_PANZERSCHRECK )
+	Util_CreateSquadsAtMarker( player2, third_wave_hillmob1, SBP.AXIS.VOLKSGRENADIER, Marker_Axis_South, 1 )
+	Cmd_AttackMove( third_wave_hillmob1, SE_Outer_Perimeter, true)
+	Cmd_AttackMove( third_wave_hillmob1, E_Inner_Perimeter, true)
+	Cmd_AttackMove( third_wave_hillmob1, S_Inner_Perimeter, true)
+	Cmd_AttackMoveThenCapture ( third_wave_hillmob1, Entity_Hill_317_VP, true )
+
+	third_wave_hillmob2 = SGroup_CreateIfNotFound( "third_wave_hillmob2")
+	Util_CreateSquadsAtMarker( player2, third_wave_hillmob2, SBP.AXIS.VOLKSGRENADIER, Marker_Axis_East, 1 )
+	Util_CreateSquadsAtMarker( player2, third_wave_hillmob2, SBP.AXIS.STORMTROOPER, Marker_Axis_East, 1 )
+	Cmd_AttackMove( third_wave_hillmob2, N_Outer_Perimeter, true)
+	Cmd_AttackMove( third_wave_hillmob2, NE_Outer_Perimeter, true)
+	Cmd_AttackMove( third_wave_hillmob2, N_Inner_Perimeter, true)
+	Util_CreateSquadsAtMarker( player2, third_wave_hillmob2, SBP.AXIS.SNIPER, Marker_Axis_East, 1 )
+	Cmd_AttackMoveThenCapture ( third_wave_hillmob2, Entity_Hill_317_VP, true )
+	
+	mortain_halftrack1 	= SGroup_CreateIfNotFound( "mortain_halftrack1" )
+	halftrack_troopers1	= SGroup_CreateIfNotFound( "halftrack_troopers1")
+	Util_CreateSquadsAtMarker( player2, mortain_halftrack1, SBP.AXIS.HALFTRACK, Marker_Axis_South, 1 )
+	Util_CreateSquadsAndGarrison( player2, halftrack_troopers1, SBP.AXIS.STORMTROOPER, mortain_halftrack1, 1 )
+	Modify_UnitSpeed( mortain_halftrack1, 0.65 )
+	Cmd_AttackMove ( mortain_halftrack1, Marker_Axis_Main_Attack )
+	
+	
+end
+
+
+-----------------------------------------------------Wave 4----------------------------------------------------
+
+function rule_spawn_wave_4()
+
+--Fire the fourth artillary barrage
+	artillary_do()
+	artillary_do2()
+	
+	Fourth_Wave_North_Pincher = SGroup_CreateIfNotFound( "Fourth_Wave_North_Pincher" )
+	Util_CreateSquadsAtMarker( player2, Fourth_Wave_North_Pincher, SBP.AXIS.HALFTRACK, Marker_Axis_North, 1 )
+	Cmd_InstantUpgrade( Fourth_Wave_North_Pincher, UPG.AXIS.HALFTRACK_FLAMETHROWER )
+	Util_CreateSquadsAtMarker( player2,  Fourth_Wave_North_Pincher, SBP.AXIS.GRENADIER, Marker_Axis_North, 1 )
+	Cmd_AttackMoveThenCapture(Fourth_Wave_North_Pincher, Entity_Mortain_Victory_Point)	
+	
+	Fourth_Wave_North_Pincher_1 = SGroup_CreateIfNotFound( "Fourth_Wave_North_Pincher_1" )
+	Util_CreateSquadsAtMarker( player2, Fourth_Wave_North_Pincher_1, SBP.AXIS.VOLKSGRENADIER, Marker_Axis_North, 1 )
+	Cmd_AttackMoveThenCapture(Fourth_Wave_North_Pincher_1, Entity_Mortain_Manpower_Point )	
+	Cmd_AttackMoveThenCapture (Fourth_Wave_North_Pincher_1 , Entity_Hill_317_VP, true )
+	
+	Fourth_Wave_North_Pincher_2 = SGroup_CreateIfNotFound( "Fourth_Wave_North_Pincher_2" )
+	Util_CreateSquadsAtMarker( player2, Fourth_Wave_North_Pincher_2, SBP.AXIS.STUG, Marker_Axis_North, 1 )
+	UI_CreateEventCue(CUE.ATTACKED.icon, CUE.ATTACKED.sound, 339510, 339510 )
+	Cmd_AttackMove( Fourth_Wave_North_Pincher_2, Marker_Axis_North_Pincher )
+	
+	Fourth_Wave_North_Pincher_3 = SGroup_CreateIfNotFound( "Fourth_Wave_North_Pincher_3" )
+	Util_CreateSquadsAtMarker( player2, Fourth_Wave_North_Pincher_3, SBP.AXIS.GRENADIER, Marker_Axis_South, 1 )
+	Cmd_InstantUpgrade( Fourth_Wave_North_Pincher_3, UPG.AXIS.GREN_PANZERSCHRECK )
+	Cmd_AttackMoveThenCapture(Fourth_Wave_North_Pincher_3, Entity_Mortain_Victory_Point)
+	
+--~ 	Fourth_Wave_North_Pincher_4 = SGroup_CreateIfNotFound( "Fourth_Wave_North_Pincher_4" )
+--~ 	Util_CreateSquadsAtMarker( player2, Fourth_Wave_North_Pincher_4, SBP.AXIS.VOLKSGRENADIER, Marker_Axis_South, 2 )
+--~ 	Cmd_AttackMoveThenCapture(Fourth_Wave_North_Pincher_4, Entity_Mortain_Manpower_Point)
+	
+	Fourth_Wave_North_Pincher_5 = SGroup_CreateIfNotFound( "Fourth_Wave_North_Pincher_5" )
+	Util_CreateSquadsAtMarker( player2, Fourth_Wave_North_Pincher_5, SBP.AXIS.PANZER, Marker_Axis_South, 1 )
+	Cmd_SquadPath( Fourth_Wave_North_Pincher_5, "PTH_S_road2", true, false, true, 0 )
+	
+	fourth_wave_hillmob1 = SGroup_CreateIfNotFound( "fourth_wave_hillmob1")
+	Util_CreateSquadsAtMarker( player2, fourth_wave_hillmob1, SBP.AXIS.GRENADIER, Marker_Axis_South, 1 )
+	Util_CreateSquadsAtMarker( player2, fourth_wave_hillmob1, SBP.AXIS.STORMTROOPER, Marker_Axis_South, 1 )
+	Cmd_AttackMove( fourth_wave_hillmob1, SE_Outer_Perimeter, true)
+	Cmd_AttackMove( fourth_wave_hillmob1, E_Inner_Perimeter, true)
+	Cmd_AttackMove( fourth_wave_hillmob1, S_Inner_Perimeter, true)
+	Cmd_AttackMoveThenCapture ( fourth_wave_hillmob1, Entity_Hill_317_VP, true )
+	
+end
+		
+--If the Nazi's have captured Mortain then begin patrol routes and move some me back up to hill 317
+--This needs to be fixed when the map is done being beautified
+function rule_check_mortain_points()
+	if Player_OwnsEGroup(player2, Entity_Mortain_Victory_Point) and Player_OwnsEGroup(player2, Entity_Mortain_Manpower_Point) == true then
+		Cmd_AttackMove (Fourth_Wave_North_Pincher, Marker_Axis_Main_Attack)
+		Rule_RemoveMe()
+	end
+end
+		
+		
+---------------------------------------------------Fifth Wave-----------------------------------------------------
+
+function rule_spawn_wave_5()
+
+	artillary_do()
+	artillary_do2()
+	Util_StartIntel(EVENTS.INCOMING)
+
+	-- Smash the HQ, capture the town point, then move back up the hill and flank to the west.
+	Fifth_Wave_South = SGroup_CreateIfNotFound( "Fifth_Wave_South" )
+	
+		Util_CreateSquadsAtMarker( player2, Fifth_Wave_South, SBP.AXIS.GRENADIER, Marker_Axis_South, 1 )
+		Cmd_InstantUpgrade( Fifth_Wave_South, UPG.AXIS.GREN_PANZERSCHRECK )
+		
+		Util_CreateSquadsAtMarker( player2, Fifth_Wave_South, SBP.AXIS.STORMTROOPER, Marker_Axis_South, 1 )
+		Cmd_AttackMove ( Fifth_Wave_South, Marker_Axis_North_Pincher , true)
+		Cmd_AttackMoveThenCapture( Fifth_Wave_South, Entity_Mortain_Manpower_Point, true )
+		Cmd_AttackMove ( Fifth_Wave_South, Player_Building_Perimeter , true)
+		Cmd_AttackMove ( Fifth_Wave_South, W_Outer_Perimeter, true)
+		Cmd_AttackMove ( Fifth_Wave_South, W_Inner_Perimeter, true)
+		Cmd_AttackMoveThenCapture( Fifth_Wave_South, Entity_Hill_317_VP, true )
+		
+	Fifth_Wave_North = SGroup_CreateIfNotFound("Fifth_Wave_North")
+		Util_CreateSquadsAtMarker( player2, Fifth_Wave_North, SBP.AXIS.PANZER, Marker_Axis_North, 1 )
+		Cmd_AttackMove(Fifth_Wave_North, Player_Building_Perimeter, true)
+		Cmd_AttackMove(Fifth_Wave_North, Marker_Axis_Main_Attack, true)
+	
+	--these bastards try to take the flag from the southeast
+	Fifth_Wave_South_East = SGroup_CreateIfNotFound( "Fifth_Wave_South_East" )
+		Util_CreateSquadsAtMarker( player2, Fifth_Wave_South_East, SBP.AXIS.VOLKSGRENADIER, Marker_Axis_South_East, 1 )
+		UI_CreateEventCue(CUE.ATTACKED.icon, CUE.ATTACKED.sound, 339510, 339510)
+		Util_CreateSquadsAtMarker( player2, Fifth_Wave_South_East, SBP.AXIS.STORMTROOPER, Marker_Axis_South_East, 1 )
+		Cmd_AttackMove( Fifth_Wave_South_East,S_Outer_Perimeter , true)
+		Cmd_AttackMove( Fifth_Wave_South_East, SE_Outer_Perimeter , true)
+		Cmd_AttackMove( Fifth_Wave_South_East, SW_Outer_Perimeter , true)
+		Cmd_AttackMove( Fifth_Wave_South_East, S_Inner_Perimeter , true)
+		Cmd_AttackMoveThenCapture( Fifth_Wave_South_East, Entity_Hill_317_VP, true )
+		
+	Fifth_Wave_South_East_Stug = SGroup_CreateIfNotFound( "Fifth_Wave_South_East_Stug" )
+		Cmd_SquadPath( Fifth_Wave_South_East_Stug, "PTH_S_to_hill", true, false, true, 0 )
+	
+	-- Run 'em over from East
+	Fifth_Wave_East = SGroup_CreateIfNotFound( "Fifth_Wave_East" )
+		Util_CreateSquadsAtMarker( player2, Fifth_Wave_East,SBP.AXIS.STORMTROOPER, Marker_Axis_East, 1 )
+		Util_CreateSquadsAtMarker( player2, Fifth_Wave_East, SBP.AXIS.PANZER, Marker_Axis_East, 1 )
+		Cmd_AttackMove ( Fifth_Wave_East, E_Outer_Perimeter , true)
+		Cmd_AttackMove ( Fifth_Wave_East, NE_Outer_Perimeter , true)
+		Cmd_AttackMove ( Fifth_Wave_East, W_Outer_Perimeter , true)
+		Cmd_AttackMove ( Fifth_Wave_East, W_Inner_Perimeter, true)
+		
+	-- Infantry Mass from the NE, again these try to capture the hill.
+	Fifth_Wave_North_East = SGroup_CreateIfNotFound ( "Fifth_Wave_North_East" )
+		Util_CreateSquadsAtMarker( player2, Fifth_Wave_North_East, SBP.AXIS.STORMTROOPER, Marker_Axis_North_East, 1 )
+		Util_CreateSquadsAtMarker( player2, Fifth_Wave_North_East, SBP.AXIS.SNIPER, Marker_Axis_North_East, 1 )
+		Cmd_AttackMove( Fifth_Wave_North_East, E_Outer_Perimeter, true)
+		Cmd_AttackMove( Fifth_Wave_North_East, NE_Outer_Perimeter, true)
+		Cmd_AttackMove( Fifth_Wave_North_East, N_Outer_Perimeter, true)
+		Cmd_AttackMove( Fifth_Wave_North_East, N_Inner_Perimeter, true)
+		Cmd_AttackMove( Fifth_Wave_North_East, W_Inner_Perimeter, true)
+		Cmd_AttackMoveThenCapture ( Fifth_Wave_North_East, Entity_Hill_317_VP, true )
+end		
+		
+	
+--------------------------------------------------6th wave-----------------------------------------------------	
+function rule_spawn_wave_6()
+	
+	sixth_wave_hillmob1 = SGroup_CreateIfNotFound( "sixth_wave_hillmob1")
+	Util_CreateSquadsAtMarker( player2, sixth_wave_hillmob1, SBP.AXIS.STORMTROOPER, Marker_Axis_North_East, 1 )
+	Util_CreateSquadsAtMarker( player2, sixth_wave_hillmob1, SBP.AXIS.STORMTROOPER, Marker_Axis_East, 1 )
+	Util_CreateSquadsAtMarker( player2, sixth_wave_hillmob1, SBP.AXIS.VOLKSGRENADIER, Marker_Axis_North_East, 1 )
+	
+	Util_CreateSquadsAtMarker( player2, sixth_wave_hillmob1, SBP.AXIS.VOLKSGRENADIER, Marker_Axis_South, 1 )
+	Util_CreateSquadsAtMarker( player2, sixth_wave_hillmob1, SBP.AXIS.GRENADIER, Marker_Axis_South, 1 )
+	Cmd_AttackMove( sixth_wave_hillmob1, SE_Outer_Perimeter, true)
+	Cmd_AttackMove( sixth_wave_hillmob1, E_Inner_Perimeter, true)
+	Cmd_AttackMove( sixth_wave_hillmob1, S_Inner_Perimeter, true)
+	Cmd_AttackMoveThenCapture ( sixth_wave_hillmob1, Entity_Hill_317_VP, true )
+
+end	
+-----------------------------------------------halftrack with Troopers---------------------------------------------
+function spawn_halftrack1()
+	
+	halftrack_smash		=		SGroup_CreateIfNotFound("halftrack_smash" )
+	halftrack_troopers2 = 		SGroup_CreateIfNotFound("halftrack_troopers2")
+	Util_CreateSquadsAtMarker( player2, halftrack_smash, SBP.AXIS.HALFTRACK, Marker_Axis_South, 1 )
+	Util_CreateSquadsAndGarrison( player2, halftrack_troopers2, SBP.AXIS.STORMTROOPER, halftrack_smash, 1 )
+	Modify_UnitSpeed( halftrack_smash, 0.4 )
+	Cmd_Ungarrison( halftrack_smash, bombard10 )
+
+end
+
+
+--------------------------------------------------7th Wave------------------------------------------------------------
+
+function rule_spawn_wave_7()
+	artillary_do()
+	artillary_do2()
+	
+	seventh_wave = SGroup_CreateIfNotFound( "seventh_wave" )
+	seventh_wave2 = SGroup_CreateIfNotFound( "seventh_wave2" )
+	seventh_wave3 = SGroup_CreateIfNotFound( "seventh_wave3" )
+	seventh_wave4 = SGroup_CreateIfNotFound( "seventh_wave4" )
+	seventh_wave5 = SGroup_CreateIfNotFound( "seventh_wave5" )
+	Util_CreateSquadsAtMarker( player2, seventh_wave, SBP.AXIS.PIONEER, Marker_Axis_North_East, 1 )
+	Cmd_InstantUpgrade( seventh_wave, UPG.AXIS.PIONEER_FLAMETHROWER)
+	Util_CreateSquadsAtMarker( player2, seventh_wave, SBP.AXIS.STORMTROOPER, Marker_Axis_North_East, 1 )
+	Util_CreateSquadsAtMarker( player2, seventh_wave, SBP.AXIS.GRENADIER, Marker_Axis_North_East, 1 )
+	Cmd_AttackMove( seventh_wave, W_Outer_Perimeter, true)
+	Cmd_AttackMove( seventh_wave, NW_Outer_Perimeter, true)
+	Cmd_AttackMove( seventh_wave, N_Outer_Perimeter, true)
+	Cmd_AttackMove( seventh_wave, N_Inner_Perimeter, true)
+	Cmd_AttackMoveThenCapture ( seventh_wave, Entity_Hill_317_VP, true )
+	
+	Util_CreateSquadsAtMarker( player2, seventh_wave3, SBP.AXIS.PANZER, Marker_Axis_South, 1 )
+	Cmd_AttackMove( seventh_wave3, S_Outer_Perimeter, true)
+	Cmd_AttackMove( seventh_wave3, SW_Outer_Perimeter, true)
+	Cmd_AttackMove( seventh_wave3, W_Outer_Perimeter, true)
+
+	
+	Util_CreateSquadsAtMarker( player2, seventh_wave4, SBP.AXIS.PANZER, Marker_Axis_South_East, 1 )
+	Cmd_AttackMove( seventh_wave4, bombard10, true)
+	Cmd_AttackMove( seventh_wave4, NE_Outer_Perimeter, true)
+	Cmd_AttackMove( seventh_wave4, N_Outer_Perimeter, true)
+	Cmd_AttackMove( seventh_wave4, NE_Outer_Perimeter, true)
+	
+	Util_CreateSquadsAtMarker( player2, seventh_wave5, SBP.AXIS.PANZER, Marker_Axis_East, 1 )
+	Cmd_AttackMove( seventh_wave5, E_Outer_Perimeter, true)
+	Cmd_AttackMove( seventh_wave5, SE_Outer_Perimeter, true)
+	Cmd_AttackMove( seventh_wave5, S_Outer_Perimeter, true)
+	Cmd_AttackMove( seventh_wave5, NE_Outer_Perimeter, true)
+	Cmd_AttackMove( seventh_wave5, NE_Outer_Perimeter, true)
+	
+	UI_CreateEventCue(CUE.ATTACKED.icon, CUE.ATTACKED.sound, 339510, 339510)--enemy tanks spotted
+end
+
+-----------------------------------------------8th----------------------------------------------------------------
+
+function rule_spawn_wave_8()
+	
+	eighth_wave = SGroup_CreateIfNotFound ("eighth_wave")
+	eighth_wave2 = SGroup_CreateIfNotFound ("eighth_wave2")
+	Util_CreateSquadsAtMarker( player2, eighth_wave, SBP.AXIS.PIONEER, Marker_Axis_South_East, 2 )
+	Cmd_InstantUpgrade( eighth_wave, UPG.AXIS.PIONEER_FLAMETHROWER)
+	Util_CreateSquadsAtMarker( player2, eighth_wave, SBP.AXIS.STORMTROOPER, Marker_Axis_South_East, 2 )
+	Util_CreateSquadsAtMarker( player2, eighth_wave, SBP.AXIS.VOLKSGRENADIER, Marker_Axis_East, 2 )
+	Util_CreateSquadsAtMarker( player2, eighth_wave, SBP.AXIS.VOLKSGRENADIER, Marker_Axis_North, 2 )
+	Util_CreateSquadsAtMarker( player2, eighth_wave, SBP.AXIS.STUG, Marker_Axis_South_East, 1 )
+	Util_CreateSquadsAtMarker( player2, eighth_wave, SBP.AXIS.PANZER, Marker_Axis_East, 1 )
+	Util_CreateSquadsAtMarker( player2, eighth_wave, SBP.AXIS.PANZER, Marker_Axis_South_East, 1 )
+	UI_CreateEventCue(CUE.ATTACKED.icon, CUE.ATTACKED.sound, 339510, 339510) --Enemy tanks spotted!
+		
+	Cmd_AttackMove( eighth_wave, E_Outer_Perimeter, true)
+	Cmd_AttackMove( eighth_wave, NE_Outer_Perimeter, true)
+	Cmd_AttackMove( eighth_wave, N_Outer_Perimeter, true)
+	Cmd_AttackMove( eighth_wave, N_Inner_Perimeter, true)
+	Cmd_AttackMoveThenCapture ( eighth_wave, Entity_Hill_317_VP, true )
+	
+	Rule_AddInterval( retreat_check, 1 )
+
+end
+
+
+
+
+------------------------------------------------retreat check -------------------------------------------------------
+
+
+
+function retreat_check()
+	if Objective_GetTimerSeconds( OBJECTIVE1 ) <= 45 and Player_OwnsEGroup( player1, Entity_Hill_317_VP ) then
+		Player_GetAll( player2 )
+		Cmd_Retreat( sg_allsquads )
+		Cmd_Move( sg_allsquads, MRK_HQ1  )
+		Util_MissionTitle( 339026 ) -- Axis is retreating
+		Rule_RemoveMe()
+	end
+end
+
+	
+-----------------------------------------2nd OBJ complete / fail ---------------------------------------------------------	
+function Second_OBJ_complete()
+	if Player_OwnsEGroup(player1, EG_mortain_vp) and Objective_GetTimerSeconds(OBJECTIVE1) < 35 then
+		--Use the timer from the first objective to check if the Obj. is complete.
+		Objective_Complete(OBJECTIVE2, 339911)
+		Rule_RemoveMe()
+	elseif
+		Player_OwnsEGroup(player1, EG_mortain_vp) == false and Objective_GetTimerSeconds(OBJECTIVE1) < 35 then
+		Objective_Fail(OBJECTIVE2, 339911)
+		Rule_RemoveMe()
+	end
+end	
+function Check_Mortain_Owner()
+
+	if Player_OwnsEGroup(player1, EG_mortain_vp)  == false then
+		UI_CreateEventCue(CUE.NORMAL.icon, CUE.NORMAL.sound, 339982, 339982 ) --Recapture Mortain!
+	end
+	
+end
+
+------------------------------------------- Primary Objective Win/Loss -------------------------------------------------------------
+
+function StrategicPoint_Check()
+	-- if the player has lost hill 317...
+	if Player_OwnsEGroup(player1, Entity_Hill_317_VP) == false then
+		Util_StartIntel(EVENTS.REGAIN_CONTROL)
+		Util_MissionTitle( 339024 )--Main strategic point lost! recapture the point on Hill 317!
+		Rule_AddInterval(StrategicPoint_CheckTimer, 1)
+		Rule_RemoveMe()
+	end
+end
+
+function StrategicPoint_CheckTimer()
+
+	if Player_OwnsEGroup(player1, Entity_Hill_317_VP) == true then
+		Rule_AddInterval(StrategicPoint_Check, 1)
+		Rule_RemoveMe()
+	end		
+end
+
+
+
+
+
+function Rule_EndMission()		
+	if	Player_OwnsEGroup( player2, Entity_Hill_317_VP) and Objective_GetTimerSeconds(OBJECTIVE1) == 0 then
+		Objective_Fail( OBJECTIVE1, 339930)
+		Rule_RemoveMe()
+	elseif Player_OwnsEGroup(player1, Entity_Hill_317_VP) and Objective_GetTimerSeconds(OBJECTIVE1) == 0 then
+		Objective_Complete(OBJECTIVE1, 339930)
+		Rule_RemoveMe()
+	end
+end
+
+
+function Game_OverWin()
+	Game_EndSP(true, nil, true)
+end
+function Game_OverLose()
+	Game_EndSP(false, 339934, true)
+end
+
+
+function player_loss_base_check()
+
+	if Player_HasLost(player1, CRITICAL_BUILDINGS.ALLIES) then
+		Game_EndSP(false, nil, true)
+	end
+	
+end
+---------------------------------------------Scar util to be added later (thanks Neil)-------------------------
+
+
+--? @group UI
+--? @shortdesc Returns true if ANY or ALL of the SGroup is selected
+--? @args SGroupID sgroup, Boolean all
+--? @result Boolean
+function Misc_IsSGroupSelected(sgroup, all)
+
+	local _CheckSquad = function(gid, idx, sid)
+		return Misc_IsSquadSelected(sid)
+	end
+
+	return SGroup_ForEachAllOrAny(sgroup, all, _CheckSquad)
+	
+end
+--? @group UI
+--? @shortdesc Returns true if ANY or ALL of the EGroup is selected
+--? @args EGroupID egroup, Boolean all
+--? @result Boolean
+function Misc_IsEGroupSelected(egroup, all)
+
+	local _CheckEntity = function(gid, idx, eid)
+		return Misc_IsSquadSelected(eid)
+	end
+
+	return EGroup_ForEachAllOrAny(egroup, all, _CheckEntity)
+	
+end

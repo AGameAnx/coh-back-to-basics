@@ -1,0 +1,55 @@
+function OnInitID()
+	-- [[ BtB map fixes ]]
+	
+	-- AI markers
+	local nilPos = World_Pos(0, 0, 0)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(116.4, 24.5, -139.3), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-56.7, 23.5, 139.5), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-135.2, 22.8, 129.5), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-43.1, 26.4, 42.5), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_HIGH, World_Pos(138.0, 23.5, -72.4), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_HIGH, World_Pos(-104.5, 22.8, 88.2), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(61.6, 24.5, 118.8), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-112.0, 24.0, 127.6), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-74.6, 25.1, 84.5), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-5.0, 25.6, 38.5), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-8.8, 24.8, 82.1), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-55.4, 24.6, 106.5), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-149.5, 22.8, 25.0), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-133.4, 24.2, -3.7), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-106.1, 24.3, -12.7), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-78.2, 25.5, -18.3), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-79.2, 25.6, 19.6), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-36.5, 26.0, -23.5), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-1.9, 27.4, -17.5), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(7.0, 25.4, -45.0), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(125.1, 24.2, 1.5), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-22.9, 24.3, -84.3), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(36.1, 26.3, -42.9), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-107.5, 24.4, -85.5), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(124.1, 22.8, -30.4), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-151.8, 24.4, -105.9), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(84.0, 24.2, -11.9), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(-63.4, 25.6, -115.2), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(136.1, 24.2, -124.0), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(55.9, 24.1, -100.1), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(75.4, 27.5, -143.7), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(99.9, 24.3, -99.2), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(134.0, 24.8, 38.2), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(105.1, 24.7, 83.3), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(149.9, 24.9, 90.2), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_MEDIUM, World_Pos(150.3, 23.6, -101.7), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_HIGH, World_Pos(-120.1, 25.3, -36.2), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_HIGH, World_Pos(-128.6, 22.6, 45.5), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_HIGH, World_Pos(-22.4, 27.2, 8.7), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_HIGH, World_Pos(34.4, 25.1, 15.1), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_HIGH, World_Pos(83.4, 26.3, -35.1), nilPos)
+	Entity_CreateENV(EBP.STRAT_POINT.AI_HIGH, World_Pos(92.6, 25.2, 18.8), nilPos)
+	
+	-- [[ Markers ]]
+
+	-- [[ Squad Groups ]]
+
+	-- [[ Entity Groups ]]
+
+end

@@ -1,0 +1,655 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+-- Mission Villers_B
+
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+--~ t_Achievements = {}
+import("DLC1Import.scar")
+import("VillersBocage_AIScavenger.scar")   -- *** NOTE this file must be imported before objective, to ensure that preset units are not managed by the AI Scavenger
+import("VillersBocage_B_Escape.scar")
+import("VillersBocage_B_Mechanics.scar")
+import("VillersBocage_B_MarkReference.scar")
+import("VillersBocage_B_BuildDefenses.scar")
+import("VillersBocage_RPGTracker.scar")
+import("VillersBocage_RPGMechanics.scar")
+import("VillersBocage_Bounty.scar")
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ SETUP ]]
+
+-------------------------------------------------------------------------
+
+function OnGameSetup()
+	-- string numbers should reference dat files
+	-- "allies_commonwealth" "allies" "axis" "axis_panzer_elite"
+	player1 = Setup_Player(1, 6000100, TRACE_AXIS, 1)
+	player2 = Setup_Player(2, 6000110, TRACE_ALLIES_COMMONWEALTH, 2)
+	player3 = Setup_Player(3, 6000100, TRACE_AXIS, TEAM_NEUTRAL)
+	player4 = Setup_Player(4, 6000100, TRACE_AXIS_PANZER_ELITE, 1)
+	
+	-- AI slot (ensure that the AI is on the same team as the other Axis player by setting the second parameter
+	
+end
+
+function OnGameRestore()
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+	player3 = World_GetPlayerAt(3)
+	player4 = World_GetPlayerAt(4)
+	
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+	
+	-- ensure that the victory points are still hidden
+	EGroup_Hide(LAYER_VillersCObjToShow, true)
+end
+
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ ONINIT ]]
+
+-------------------------------------------------------------------------
+
+function OnInit()
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	-- a constant that stores the mission number for use with
+	-- setting the global speech paths, tech tree setup, and 
+	-- the player's starting resources
+	MISSION_NUMBER = 0302
+	
+	--[[ PRESET GAME STATE ]]
+	Setup_MissionPreset(MISSION_NUMBER)
+	
+	--[[ PRESET DEBUG CONDITIONS ]]
+	Villers_B_Debug()
+	
+	--[[ MOD INITIAL STATS ]]
+	Villers_B_ModifyStats()
+	
+	--[[ SET RESTRICTIONS ]]
+	Villers_B_Restrictions()
+	
+	--[[ SET AI ]]
+	Villers_B_CpuInit()
+	
+	--[[ SET DIFFICULTY ]]
+	Villers_B_Difficulty()
+	
+	--[[ COUNTER ATTACK CLEANUP ]]
+	Villers_B_CounterattackCleanup()
+	
+	--[[ MISSION PRESETS ]]
+	Villers_B_MissionPreset()
+	
+	--[[ GAME START CHECK ]]
+	Rule_Add(Villers_B_NISStart)
+	
+end
+
+Scar_AddInit(OnInit)
+
+
+function Villers_B_Debug()
+	
+	-- looks for the command line option [-debug]
+	if Misc_IsCommandLineOptionSet("debug") then
+		
+		g_debug = true
+		
+		-- reveal FOW
+		FOW_Enable(false)
+		
+	end
+	
+		-- set up bindings for NISes
+		Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(NIS_OPENING)')]])")
+		Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('Objective_Complete(OBJ_Escape)')]])")
+--~ 		Scar_DebugConsoleExecute("bind([[ALT+3]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS03)')]])")
+	
+end
+
+function Villers_B_ModifyStats()
+	
+	--[[ saved as example - deg
+	Player_SetDefaultSquadMoodMode(player1, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player2, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player3, MM_ForceTense)
+	
+	-- shorten vision ranges
+	Modify_PlayerSightRadius(player1, 0.75)
+	]]	
+	
+	-- mod resource rates
+	t_player1_res_mods= {}
+	t_player1_res_mods[1] = Modify_PlayerResourceRate(player1, RT_Manpower, 0)
+	
+
+	
+end
+
+function Villers_B_Restrictions()
+
+	--[[ UN/RESTRICT UPGRADES ]]
+	Cmd_InstantUpgrade(player1, UPG.AXIS.PHASE2)
+	Cmd_InstantUpgrade(player1, UPG.AXIS.PHASE3)
+	Cmd_InstantUpgrade(player1, UPG.AXIS.PHASE4)
+	Cmd_InstantUpgrade(player1, UPG.AXIS.VETERANCY.INFANTRY1)
+	Cmd_InstantUpgrade(player1, UPG.AXIS.VETERANCY.INFANTRY2)
+	Cmd_InstantUpgrade(player1, UPG.AXIS.VETERANCY.INFANTRY3)
+	
+	Player_SetUpgradeAvailability(player1, UPG.AXIS.GREN_PANZERSCHRECK, ITEM_REMOVED)
+	Player_SetUpgradeAvailability(player1, UPG.AXIS.GREN_MG42, ITEM_REMOVED)
+	Player_SetUpgradeAvailability( player1, UPG.AXIS.CONVERT_AMBIENT_BUILDING, ITEM_REMOVED)
+	
+	Player_SetUpgradeAvailability(player2, UPG.CW.RIFLE_GRENADE, ITEM_UNLOCKED)
+
+	--[[ RESOURCES 	]]
+
+	Player_SetResource(player1, RT_Manpower, 0)
+	Player_AddResource(player1, RT_Munition, 100)
+	Player_SetResource(player1, RT_Fuel, 0)	
+	
+	
+	
+	--[[ UN/RESTRICT ABILITIES 	]]
+	Player_SetAbilityAvailability(player1, ABILITY.SP.VILLERS_BOCAGE.GRID_REFERENCE, ITEM_REMOVED)
+	Player_SetAbilityAvailability(player1, ABILITY.SP.VILLERS_BOCAGE.DROP_WEAPONS, ITEM_REMOVED)
+	Player_SetAbilityAvailability(player1, ABILITY.SP.VILLERS_BOCAGE.CREW_ASSAULT, ITEM_REMOVED)
+	Player_SetAbilityAvailability(player1, ABILITY.SP.VILLERS_BOCAGE.CREW_SATCHEL, ITEM_REMOVED)
+--~ 	Player_SetAbilityAvailability(player1, ABILITY.AXIS.MEDICAL_KIT_FIELD, ITEM_REMOVED)
+	
+--~ 	Player_SetAbilityAvailability(player1, ABILITY.SP.VILLERS_BOCAGE.CREW_PANZERFAUST, ITEM_REMOVED)
+
+	
+	
+	
+--~ 	Player_SetAbilityAvailability(player1, ABILITY.ALLIES.SATCHEL_CHARGE, ITEM_REMOVED)
+--~ 	Player_SetAbilityAvailability(player2, ABILITY.AXIS.GRENADE, ITEM_UNLOCKED)
+
+	
+	-- UN/RESTRICT POP CAP
+	Player_SetPopCapOverride(player1, 75)
+
+	--[[ UN/RESTRICT UI ]]
+	Player_SetCommandAvailability(player1, SCMD_Retreat, ITEM_REMOVED)
+	
+	
+	
+	--[[ UN/RESTRICT SBPS 
+	local sbps = {SBP.ALLIES_SHERMAN, SBP.ALLIES_CROCODILE, SBP.ALLIES_GREYHOUN, SBP.ALLIES_PERSHING }
+	for i = 1, table.getn(sbps) do
+		Player_SetSquadProductionAvailability(player1, sbps[i], ITEM_LOCKED)
+	end
+	]]
+end
+
+
+
+function Villers_B_CpuInit()
+
+	--[[ left as an example
+	
+	-- set up Player3 AI  
+	Util_AI_Setup(player3, {Util_DifVar({10, 15, 20, 30}), 5}, player3, Game_GetSPDifficulty(), 7, Util_DifVar({1, 2, 3, 5}), 2, 3)
+	
+	-- Set up AI's resources
+	Player_SetResource(player3, RT_Manpower, 1000)
+	Player_SetResource(player3, RT_Munition, 100)
+	Player_SetResource(player3, RT_Fuel, 100)
+	
+	-- tell AI to go after strongest threat instead of the weakest
+	AI_DoString( player3, "s_personality.attack_prefer_threat = true" )
+	AI_DoString( player3, "s_personality.defend_prefer_threat = true" )
+
+	-- tell AI not to "defend" territories outside of the ring around its base
+	AI_EnableComponent(player3, false, COMPONENT_ForwardDefending)
+	
+	-- disable use of comapny commander menu and abilities
+	AI_DoString( player3, "s_commandtree_enabled = false" )
+	AI_DoString( player3, "s_playerabilities_enabled = false" )
+	
+	AI_EnableComponent(player3, false, COMPONENT_Attacking)
+	
+	]]
+
+end
+
+
+
+function Villers_B_Difficulty()
+
+	
+	-- get the difficulty
+	g_difficulty = Game_GetSPDifficulty()  -- set a global difficulty variable
+	print("********* DIFFICULTY: "..g_difficulty)
+	
+	-- set health bonus for player 1
+	Setup_Difficulty(player1, g_difficulty) -- pass the player and difficulty global variable into the Set Health function
+	Setup_Difficulty(player2, g_difficulty) -- do it for each player that you have defined
+	
+	t_difficulty = {
+		crew_vulnerability			= Util_DifVar( {0.7, 0.75, 0.85, 0.9} ),
+		crew_wpn_damage				= Util_DifVar( {1.2, 1.2, 1.15, 1.1} ),
+		crew_wpn_accuracy			= Util_DifVar( {1.5, 1.5, 1.4, 1.3} ),
+		crew_suppression			= Util_DifVar( {0.65, 0.7, 0.75, 0.8} ),
+	}
+
+	
+end
+
+function Villers_B_CounterattackCleanup()
+
+	RPGTracker_UpdateCommandPointLimit()
+
+--~ 	SGroup_Clear(sg_temp)
+--~ 	Player_GetAll(player2, sg_temp)
+--~ 	local sbps = { SBP.CW.CROMWELL, SBP.CW.FIREFLY }
+	
+	-- remove certain squads from the enemy
+--~ 	SGroup_Filter(sg_temp, sbps, FILTER_KEEP)
+--~ 	SGroup_DestroyAllSquads(sg_temp)
+
+
+end
+
+
+-------------------------------------------------------------------------
+
+-- MISSION Preset 
+
+-------------------------------------------------------------------------
+
+function Villers_B_MissionPreset()
+
+	
+
+	g_CompleteMyMission = false
+
+	--unhide the barbed wire
+	EGroup_Hide(LAYER_VillersCObjToShow, true)
+	
+	eg_MapEntry = EGroup_CreateIfNotFound("eg_MapEntry")
+	if EGroup_IsEmpty(eg_MapEntry) == false then
+		EGroup_DestroyAllEntities(eg_MapEntry)
+	end
+	
+	Util_CreateEntities(player1, eg_MapEntry, EBP.STRAT_POINT.ENTRY, mkr_Villers_B_MapEntry, 1)
+
+	-- spawn squads
+	tmkr_PlayerStart = Marker_GetTable("mkr_Escape_PlayerStart%d")
+	tmkr_TigerStart = Marker_GetTable("mkr_Escape_TigerStart%d")
+	sg_DeadTiger = SGroup_CreateIfNotFound("sg_DeadTiger")
+	eg_MunitionDrop = EGroup_CreateIfNotFound("eg_MunitionDrop")
+	sg_FreeRide = SGroup_CreateIfNotFound("sg_FreeRide")
+	g_StartObj = "TIMER START OBJECTIVE"
+	
+	local rand = World_GetRand(1, table.getn(tmkr_PlayerStart)) 
+	local posStart = tmkr_PlayerStart[rand]
+	local posTiger = tmkr_TigerStart[rand]
+
+	t_PlayerSquads = {}
+	
+	if IsCounterattackMission() == true then
+		SGroup_Clear(sg_temp)
+		Player_GetAll(player1, sg_temp)
+		SGroup_AddGroup(sg_DeadTiger, sg_temp)
+		
+		if SGroup_IsEmpty(sg_temp) == false then
+			posTiger = SGroup_GetPosition(sg_temp)
+		else
+			-- g_TigerPosition is defined in Mission A
+			posTiger = g_TigerPosition
+		end
+		
+		posStart = Util_GetRandomPosition(posTiger, 10)
+		posMun = Util_GetRandomPosition(posTiger, 15)
+
+	else
+		Player_AddResource(player1, RT_Command, 5)
+		if g_commandPointLimit ~= nil then
+			g_commandPointLimit = g_commandPointLimit + 5
+		end
+	end
+	
+	t_slotItems = { 
+		{
+			slotItem 	= SLOT_ITEM.PANZERSCHRECK, 
+			ebp 		= EBP.PICKUP.AXIS.PANZERSCHRECK,
+		},
+		{
+			slotItem 	= SLOT_ITEM.CW.LMG_BREN, 
+			ebp 		= EBP.PICKUP.CW.LMG_BREN,
+		},
+		{
+			slotItem 	= SLOT_ITEM.VILLERS_BOCAGE.CW.PIAT_HIGH_PENETRATION, 
+			ebp 		= EBP.PICKUP.VILLERS_BOCAGE.CW.PIAT_HIGH_PENETRATION,
+		},
+		{
+			slotItem 	= SLOT_ITEM.LMG_42, 
+			ebp 		= EBP.PICKUP.AXIS.LMG_42,
+		},
+		{
+			slotItem 	= SLOT_ITEM.VILLERS_BOCAGE.CW.BOYS_RIFLE, 
+			ebp 		= EBP.PICKUP.VILLERS_BOCAGE.CW.BOYS_RIFLE,
+		},
+	}
+	
+	
+	
+	if tiger_sbp == nil then
+		tiger_sbp = SBP.VILLERS_BOCAGE.AXIS.TIGER
+	end
+	
+	-- this is the fix for bug 8193
+	-- if the tiger is repairing at the end of A 
+	-- the ability will still be active in B 
+	-- so destroy it and create a new one
+	if SGroup_IsEmpty(sg_DeadTiger) == false then
+		posTiger = SGroup_GetPosition(sg_DeadTiger)
+	else
+		Util_CreateSquads( player3, sg_DeadTiger, SBP.VILLERS_BOCAGE.AXIS.TIGER, posTiger )		
+	end
+	
+	SGroup_SetAvgHealth( sg_DeadTiger, 0.5 )
+	Modify_UnitSpeed( sg_DeadTiger, -1 )
+	SGroup_SetSelectable( sg_DeadTiger, false )
+	
+	-- adds a broken tread
+	if IsCounterattackMission() ~= true then
+	     Cmd_Ability(player3, ABILITY.SP.SINGLE_MORTAR_SMOKEENTRANCE, SGroup_GetPosition(sg_DeadTiger))
+	end
+	SGroup_SetInvulnerable(sg_DeadTiger, false)
+	--SGroup_SetInvulnerable(sg_DeadTiger, true)
+	SGroup_EnableMinimapIndicator( sg_DeadTiger, false)
+	
+	-- counter to track the artillery
+	artilleryUsed = 0
+	
+	local posTiger = SGroup_GetPosition(sg_DeadTiger)
+	local posStart = Util_GetRandomPosition(posTiger, 10)
+	local posStart2 = Util_GetRandomPosition(posStart, 6)
+	
+	Camera_MoveToPosition(posTiger)
+	
+	t_PlayerEntities = {}
+	t_PlayerSquads = {}
+	table.insert(t_PlayerSquads, 
+	{
+		pos 			= SGroup_GetOffsetPosition( sg_DeadTiger, OFFSET_BACK_LEFT, 3 ),
+		posTiger		= posTiger,
+		sbp 			= SBP.VILLERS_BOCAGE.AXIS.CREW,
+		
+	})
+	table.insert(t_PlayerSquads, 
+	{
+		pos 			= SGroup_GetOffsetPosition( sg_DeadTiger, OFFSET_BACK_LEFT, 6 ),
+		posTiger		= posTiger,
+		sbp				= SBP.VILLERS_BOCAGE.AXIS.VOSS,
+	})
+
+	tsg_player = SGroup_CreateTable("sg_player%d", table.getn(t_PlayerSquads))
+	local entIndex = 1
+	
+	for k, this in pairs(t_PlayerSquads) do
+		this.sgroup = tsg_player[k]
+		Util_CreateSquads(player1, tsg_player[k], this.sbp, this.pos)
+		SGroup_SetInvulnerable(this.sgroup, 0.4, 10)
+		Modify_Vulnerability(this.sgroup, t_difficulty.crew_vulnerability)
+		Modify_WeaponDamage(this.sgroup, "hardpoint_01", t_difficulty.crew_wpn_damage)
+		Modify_WeaponAccuracy(this.sgroup, "hardpoint_01", t_difficulty.crew_wpn_accuracy)
+		Modify_ReceivedSuppression(this.sgroup, t_difficulty.crew_suppression)
+		Modify_SightRadius( this.sgroup, 1.5 )		
+		Rule_AddSGroupEvent(Villers_B_AbilityListener, this.sgroup, GE_AbilityExecuted)
+		Misc_SetSquadControlGroup(SGroup_GetSpawnedSquadAt(this.sgroup, 1), k)
+		-- prevent the squads from being crushed
+		SGroup_SetCrushable( this.sgroup, false )
+				
+		local _CheckSquad = function(gid, idx, sid)
+			
+			for n = 1, Squad_Count(sid) do
+				local eid = Squad_EntityAt(sid, n-1)
+				t_PlayerEntities[entIndex] = {
+					eid = Entity_GetGameID( eid ),
+					pos = Entity_GetPosition( eid ),
+				}
+				entIndex = entIndex + 1
+			end
+			
+		end
+		
+		SGroup_ForEachEx(this.sgroup, _CheckSquad, true, true)
+		
+	end
+	
+	if g_FreeRide == true then
+		Util_CreateSquads( player1, sg_FreeRide, SBP.VILLERS_BOCAGE.AXIS.SCHWIMMWAGEN, Util_GetRandomPosition(posStart, 10) )
+	end
+	
+	VB_RPGMechanics_KickOff(t_PlayerSquads[2].sgroup)
+	VBBounty_SetSGroupKicker(t_PlayerSquads[2].sgroup)
+	RPGTracker_SetSGroup(t_PlayerSquads[2].sgroup)
+	
+	Player_GetAllSquadsNearMarker(player2, sg_temp, posTiger, 40)
+	Cmd_UngarrisonSquad( sg_temp )
+	SGroup_DestroyAllSquads(sg_temp)	
+	
+	sg_AttackSquad = SGroup_CreateIfNotFound("sg_AttackSquad")
+	Util_CreateSquads(player2, sg_AttackSquad, SBP.CW.LIEUTENANT, SGroup_GetOffsetPosition( sg_DeadTiger, OFFSET_FRONT, 10 ), nil, 1, 1)
+	Cmd_Attack ( sg_AttackSquad, t_PlayerSquads[1].sgroup )
+	Util_CreateSquads(player2, sg_AttackSquad, SBP.CW.TOMMIES, SGroup_GetOffsetPosition( sg_DeadTiger, OFFSET_FRONT_LEFT, 15 ), nil, 1, 2)
+	Cmd_Attack( sg_AttackSquad, t_PlayerSquads[2].sgroup )
+	Util_CreateSquads(player2, sg_AttackSquad, SBP.CW.TOMMIES, SGroup_GetOffsetPosition( sg_DeadTiger, OFFSET_FRONT, 20 ), nil, 1, 2)
+--~ 	Cmd_InstantUpgrade( sg_AttackSquad, UPG.CW.RIFLE_GRENADE, 2 )
+	Cmd_Attack( sg_AttackSquad, t_PlayerSquads[1].sgroup )
+	
+--~ 	SGroup_Clear(sg_temp)
+--~ 	Util_CreateSquads(player2, sg_temp, SBP.CW.SIXPOUNDER, SGroup_GetOffsetPosition( sg_DeadTiger, OFFSET_LEFT, 30 ), nil, 1, nil, sg_DeadTiger)
+--~ 	Modify_WeaponDamage(sg_temp, "hardpoint_01", 0.2)
+--~ 	Modify_WeaponAccuracy(sg_temp, "hardpoint_01", 0.2)
+--~ 	Cmd_Attack(sg_temp, SGroup_GetPosition(sg_DeadTiger))
+	
+	SGroup_SetPlayerOwner(sg_DeadTiger, player3) -- set the sgroup to the neutral player
+	
+	EGroup_CreateIfNotFound("eg_EscapePickup")
+	SGroup_Clear(sg_temp)
+	Player_GetAll(player1, sg_temp)
+	local pos = Util_GetRandomPosition(SGroup_GetPosition(sg_temp), 3)
+	if SGroup_IsEmpty(tsg_player[2]) == false then
+		pos = SGroup_GetPosition(tsg_player[2])
+	end
+	Util_CreateEntities(nil, "eg_EscapePickup", EBP.PICKUP.AXIS.LMG_42, pos, 1)
+	
+end
+
+function Villers_B_FreeRideSpeech()
+
+	if Event_IsAnyRunning() == false then
+		local speech = {
+			{ ACTOR.VILLERS_BOCAGE.Voss, 6020989 },
+			{ ACTOR.VILLERS_BOCAGE.Voss, 6020990 },
+			{ ACTOR.VILLERS_BOCAGE.Voss, 6020991 },
+		}
+		
+		Util_AutoAmbient( speech, true)
+		Rule_RemoveMe()
+	end
+
+end
+
+-------------------------------------------------------------------------
+
+-- MISSION START 
+
+-------------------------------------------------------------------------
+function Villers_B_NISStart()
+
+	if g_debug ~= true then
+		Util_StartNIS(NIS_OPENING, Villers_B_MissionStart)
+	else
+		Util_MuteAmbientSound(false)
+		Game_Letterbox(false, 1)
+		Game_FadeToBlack(FADE_IN, 1)
+		Rule_AddOneShot(Villers_B_MissionStart, 0.2)
+	end
+	
+	Rule_RemoveMe()
+
+end
+
+function Villers_B_MissionStart()
+
+	if Event_IsAnyRunning() == false then
+		
+		Timer_Start(g_StartObj, 30)
+		Rule_AddInterval(Villers_B_MissionStartReal,2)
+		Rule_Add(Villers_B_RuleCauseCasualty)
+		Rule_Add(Villers_B_Rule_HealInCover)
+		Sound_PlayMusic("Music/DLC/Villers_Bocage/M02/dlc_defeat.bsc",3,0)
+		Cmd_CriticalHit( player2, sg_DeadTiger, CRIT.VEH.IMMOBILIZE, CRIT.DAMAGE_YELLOW )
+		
+		-- turns the engine sound off
+		SGroup_SetAnimatorState(sg_DeadTiger, "engine_backfire", "trouble")
+		Rule_RemoveMe()
+		
+	end
+end
+
+function Villers_B_MissionStartReal()
+	if Timer_GetRemaining(g_StartObj) == 0
+	or SGroup_IsEmpty(sg_AttackSquad) then
+		
+		Objective_Start(OBJ_Escape)
+		Rule_AddOneShot(Villers_B_DelayStart, 5)
+		
+		Rule_RemoveMe()
+	end
+end
+
+function Villers_B_DelayStart()
+	
+	Rule_AddInterval(Rule_MarkReference_InitOnProx,2)
+
+	Rule_AddInterval(Villers_B_Rule_Main, 3)
+	if g_FreeRide == true then
+		Rule_AddInterval(Villers_B_FreeRideSpeech, 5)
+	end
+	
+end
+
+function Villers_B_DelayStartA()
+	Objective_Start(OBJ_MarkReference)
+end
+
+function Villers_B_Rule_Main()
+	
+	if SGroup_IsEmpty(sg_AttackSquad) == false
+	and SGroup_IsMoving( sg_AttackSquad, ANY) == false
+	and SGroup_IsUnderAttack( sg_AttackSquad, ANY, 10) == false then
+		Cmd_AttackMove( sg_AttackSquad, t_PlayerSquads[1].sgroup )
+	end
+	
+	if Objective_IsStarted(OBJ_Escape) then
+		if g_CompleteMyMission == true then
+--~ 			if Objective_IsComplete(OBJ_Escape) then
+	--~ 			Objective_Complete(OBJ_Escape)
+				
+				-- remove all the ammo crates at the end of the mission
+				for k,this in pairs(t_Escape.t_pickupMun) do 
+					if EGroup_IsEmpty( this.egroup ) == false then
+						EGroup_DestroyAllEntities( this.egroup)
+					end
+				end
+	
+				RPGTracker_SaveXP()
+				Game_EndSP(true, nil, nil, true)
+				Rule_RemoveMe()
+				return
+		end
+	end
+	
+	-- if the player loses either squad or both squads, then he has lost the mission
+	if SGroup_IsEmpty(tsg_player[1] ) == true
+	or SGroup_IsEmpty(tsg_player[2] ) == true
+	or Player_HasLost(player1, CRITICAL_BUILDINGS.AXIS ) == true then
+		Game_EndSP(false)
+		Rule_RemoveMe()
+		return
+	end
+
+end
+
+function Villers_B_CleanupForNextMission()
+
+--~ 	SGroup_Clear(sg_temp)
+--~ 	Player_GetAll(player2, sg_temp)
+--~ 	local sbps = { SBP.CW.CROMWELL, SBP.CW.FIREFLY }
+	
+	-- remove certain squads from the enemy
+--~ 	SGroup_Filter(sg_temp, sbps, FILTER_KEEP)
+--~ 	SGroup_DestroyAllSquads(sg_temp)
+
+end
+
+function Villers_B_RuleCauseCasualty()
+	
+	-- force the player to have a casualty so that he can safely learn how to recover that
+	-- casualty for his squad.
+	Player_GetAll( player1, sg_temp)
+	SGroup_Filter( sg_temp, SBP.VILLERS_BOCAGE.AXIS.SCHWIMMWAGEN, FILTER_REMOVE)
+	if SGroup_TotalMembersCount( sg_temp ) >= 5
+	and SGroup_TotalMembersCount( sg_AttackSquad ) <= 3 then
+		eid = Squad_EntityAt(SGroup_GetSpawnedSquadAt( sg_temp , 1), 0)
+		Cmd_CriticalHit(player1, eid, CRIT.SOLDIER.CASUALTY, CRIT.DAMAGE_RED)
+		if SGroup_TotalMembersCount( sg_temp ) < 5 then
+			Rule_RemoveMe()
+		end
+	elseif SGroup_TotalMembersCount( sg_temp ) < 5 then
+		Rule_RemoveMe()
+	end
+
+end
+
+
+function Villers_B_LogSyncW(sgroup)
+	if _KillSyncW == nil then
+		_KillSyncW = {}
+	end
+	local syncw = false
+	if SGroup_IsEmpty(sgroup) == false then
+		syncw = SyncWeapon_GetFromSGroup(sgroup)
+	end
+	if syncw ~= nil and syncw ~= false then
+		table.insert(_KillSyncW, syncw)
+		
+		if Rule_Exists(Villers_KillSyncW) == false then
+			Rule_AddInterval(Villers_KillSyncW, 1)
+		end
+	end
+end
+
+function Villers_KillSyncW()
+	local count = table.getn(_KillSyncW)
+	if count > 0 then
+		for i = count, 1, -1 do 
+			local syncw = _KillSyncW[i]
+			if SyncWeapon_IsOwnedByPlayer(syncw, nil) then
+				local entity = SyncWeapon_GetEntity(syncw)
+				local egroup = EGroup_CreateIfNotFound("eg_killentity"..i)
+				EGroup_Add(egroup, entity)
+				EGroup_DestroyAllEntities(egroup)
+				table.remove(_KillSyncW, i)
+			end
+		end
+	end	
+end

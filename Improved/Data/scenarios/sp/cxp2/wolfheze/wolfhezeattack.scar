@@ -1,0 +1,5327 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+-- Wolfheze Glider
+
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+import("ScarUtil.scar")
+
+
+
+--[[ Table of Contents]]
+-- OnGameSetup
+-- OnGameRestore
+-- OnInit
+-- WolfAttack_Debug
+-- WolfAttack_ObjectiveRegister
+-- WolfAttack_ModifyStats
+-- WolfAttack_Restrictions
+-- WolfAttack_CpuInit
+-- WolfAttack_Difficulty
+-- WolfAttack_MissionPreset
+-- WolfAttack_MissionStart
+-- Rule_Spawn_Player_Force
+-- WolfAttack_DelayObjTitle
+-- Rule_Timer	/keeps an internal clock going for the level and prints the time to the console every minute.
+
+
+
+-- Initialize_OBJ_Clear_LZ	/The player must capture the points linked to the landing zone and make sure that the enemy does not retake them.
+-- OBJ_Clear_LZ_Init
+-- OBJ_Clear_LZ_Kickoff
+-- Rule_LZ1_Setup_Weapons
+-- Rule_LZ_Win_Check
+-- Rule_AI_Player_Reactions
+-- Rule_Create_INF_Relief_Force
+-- Rule_Spawn_Infantry_Relief
+-- Rule_HMG_Face_Attacker
+-- Rule_Start_Tanks
+-- Rule_Tank_Repair
+-- Rule_Surrender
+-- Rule_Reinforce_Check
+-- Rule_Reinforce_Heal
+-- Rule_Delay_OBJ_Counterattack_Start
+
+
+
+-- Initialize_OBJ_Counterattack /paratroopers suddenly counterattack. They must be wiped out or else all will be lost.
+-- OBJ_Counterattack_Init
+-- OBJ_Counterattack_Kickoff
+-- Rule_Spawn_Paratroopers
+-- Rule_Final_Attack
+-- Rule_Counterattack_Wincheck
+
+-- Initialize_OBJ_Medal_Kill_Snipers()
+-- OBJ_Medal_Kill_Snipers_Init
+-- OBJ_Kill_Snipers_Kickoff
+-- Rule_Sniper_Patrol
+
+-- Test Area
+
+-------------------------------------------------------------------------
+
+-- [[ SETUP ]]
+
+-------------------------------------------------------------------------
+
+function OnGameSetup()
+	-- string numbers should reference dat files
+	-- "allies_commonwealth" "allies" "axis" "axis_panzer_elite"
+	player1 = Setup_Player(1, 1309230, TRACE_AXIS_PANZER_ELITE, 1) --The player
+	player2 = Setup_Player(2, 1309231, TRACE_ALLIES_COMMONWEALTH, 2) -- The Allied paratroopers
+	player3 = Setup_Player(3, 1309232, TRACE_AXIS, 1) --Whermacht allied with the player.
+	player4 = Setup_Player(4, 1309233, TRACE_ALLIES_COMMONWEALTH, 2) -- The Allied airplanes
+	
+
+end
+
+function OnGameRestore()
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+	player3 = World_GetPlayerAt(3)
+	player4 = World_GetPlayerAt(4)
+	
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+end
+
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ ONINIT ]]
+
+-------------------------------------------------------------------------
+
+function OnInit()
+	g_MissionSpeechPath = "omg\\sp\\Mission2"
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	-- a constant that stores the mission number for use with
+	-- setting the global speech paths, tech tree setup, and 
+	-- the player's starting resources
+	MISSION_NUMBER = 0202
+	
+	--[[ PRESET GAME STATE ]]
+	Setup_MissionPreset(MISSION_NUMBER)
+	
+	--[[ PRESET DEBUG CONDITIONS ]]
+	WolfAttack_Debug()
+	
+	--[[ REGISTER OBJECTIVES ]]
+	WolfAttack_ObjectiveRegister()
+	
+	--[[ MOD INITIAL STATS ]]
+	WolfAttack_ModifyStats()
+	
+	--[[ SET RESTRICTIONS ]]
+	WolfAttack_Restrictions()
+	
+	--[[ SET AI ]]
+	WolfAttack_CpuInit()
+	
+	--[[ SET DIFFICULTY ]]
+	WolfAttack_Difficulty()
+	
+	--[[ MISSION PRESETS ]]
+	WolfAttack_MissionPreset()
+		
+
+	--[[ GAME START CHECK ]]
+	Rule_AddOneShot(Rule_Warp_Ungarrisoned_Troops, 2)
+	Rule_AddOneShot(Rule_Opening_Nis, 3)
+
+end
+
+Scar_AddInit(OnInit)
+
+function WolfAttack_Debug()
+	
+	-- looks for the command line option [-debug]
+	if Misc_IsCommandLineOptionSet("debug") then
+		
+		g_debug = true
+		
+		-- reveal FOW
+		FOW_RevealAll()
+	end
+	
+	-- set up bindings for NISes
+	Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(NIS_OPENING)')]])")
+	Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('Util_StartNIS(NIS_CLOSING)')]])")
+		
+
+	
+end
+
+function WolfAttack_ObjectiveRegister()
+
+	--[[ *** MUST INITIALIZE THE OBJ TABLE BEFORE REGISTERING *** ]]
+
+	Initialize_OBJ_Clear_LZ()
+	Initialize_OBJ_Counterattack()
+	Initialize_OBJ_Medal_Kill_Snipers()
+
+	
+end
+
+function WolfAttack_ModifyStats()
+	
+	--[[ saved as example - deg
+	Player_SetDefaultSquadMoodMode(player1, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player2, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player3, MM_ForceTense)
+	
+	-- shorten vision ranges
+	Modify_PlayerSightRadius(player1, 0.75)
+
+	-- mod resource rates
+	t_player1_res_mods= {}
+	t_player1_res_mods[1] = Modify_PlayerResourceRate(player1, RT_Manpower, 2)
+	t_player1_res_mods[2] = Modify_PlayerResourceRate(player1, RT_Munition, 2)
+	t_player1_res_mods[3] = Modify_PlayerResourceRate(player1, RT_Fuel, 1)
+	
+	]]	
+	
+	Modify_PlayerResourceRate(player1, RT_Manpower, 0.5)
+	Modify_PlayerResourceRate(player1, RT_Munition, 0.8)
+	Modify_PlayerResourceRate(player1, RT_Fuel, 0.2)
+	
+	Modify_PlayerResourceRate(player2, RT_Manpower, 6)
+	Modify_PlayerResourceRate(player2, RT_Munition, 6)
+	Modify_PlayerResourceRate(player2, RT_Fuel, 2)
+	
+	
+	
+end
+
+function WolfAttack_Restrictions()
+
+	--[[ UN/RESTRICT UPGRADES ]]
+--[[	Player_SetUpgradeAvailability(player1, UPG.ELITE.PANZER_ARTILLERIE, ITEM_REMOVED)
+	Player_SetUpgradeAvailability(player1, UPG.ELITE.PANZERJAGER, ITEM_REMOVED)]]
+	
+	Player_SetUpgradeAvailability(player2, UPG.ALLIES.DEMOLITION, ITEM_UNLOCKED)
+	
+	--[[ RESOURCES ]]
+	Player_SetResource(player1, RT_Manpower, 500)
+	Player_SetResource(player1, RT_Munition, 200)
+	Player_SetResource(player1, RT_Fuel, 100)
+	
+	--[[ Restrict Buildings ]]
+	-- brw - moved to the MissionPresets.scar
+	
+	--set the player's commander tree to defence
+--	UI_ForceCommanderTreeChoice(player1, UPG.COMMANDER_TREE.ELITE.LUFTWAFFE)
+	
+	--[[ UN/RESTRICT ABILITIES]] 
+	Player_SetAbilityAvailability(player2, ABILITY.ALLIES.GRENADE, ITEM_UNLOCKED)
+	
+	Player_SetAbilityAvailability(player2, ABILITY.COMMANDER_TREE.ALLIES.SUPPLY_DROP, ITEM_UNLOCKED)
+	
+	-- UN/RESTRICT POP CAP
+	g_player_cap = 50
+	Player_SetPopCapOverride(player1, g_player_cap)
+	Player_SetPopCapOverride(player2, 120)
+
+	--[[ UN/RESTRICT UI ]]
+	
+	--[[ UN/RESTRICT SBPS ]]
+	-- brw - moved to the MissionPresets.scar
+	Modify_AbilityRechargeTime(player1, ABILITY.ELITE.INCENDIARY_GRENADE_GREN, .15)
+end
+
+
+
+function WolfAttack_CpuInit()
+
+	--[[ left as an example]]
+	
+	-- set up Player3 AI  
+--	Util_AI_Setup(player2, {Util_DifVar({10, 15, 20, 30}), 5}, player3, Game_GetSPDifficulty(), 7, Util_DifVar({1, 2, 3, 5}), 2, 3)
+	
+	-- Set up AI's resources
+--	Player_SetResource(player2, RT_Manpower, 1000)
+	Player_SetResource(player2, RT_Munition, 600)
+--	Player_SetResource(player2, RT_Fuel, 100)
+	
+	-- tell AI to go after strongest threat instead of the weakest
+--	AI_DoString( player2, "s_personality.attack_prefer_threat = true" )
+--	AI_DoString( player2, "s_personality.defend_prefer_threat = true" )f
+
+	-- tell AI not to "defend" territories outside of the ring around its base
+--	AI_EnableComponent(player3, false, COMPONENT_ForwardDefending)
+	
+	-- disable use of comapny commander menu and abilities
+--	AI_DoString( player2, "s_commandtree_enabled = false" )
+--	AI_DoString( player2, "s_playerabilities_enabled = true" )
+	
+--	AI_EnableComponent(player2, false, COMPONENT_Attacking)
+
+end
+
+
+
+function WolfAttack_Difficulty()
+
+	-- get the difficulty
+	g_difficulty = Game_GetSPDifficulty()  -- set a global difficulty variable
+	print("*******************Wolfheze Attack*****************")
+	print("********* DIFFICULTY: "..g_difficulty)
+
+	-- set health bonus for player 1
+	Setup_Difficulty(player1, g_difficulty, TRACE_AXIS_PANZER_ELITE) -- pass the player and difficulty global variable into the Set Health function
+	Setup_Difficulty(player2, g_difficulty, TRACE_ALLIES_COMMONWEALTH) -- do it for each player that you have defined
+	Setup_Difficulty(player3, g_difficulty, TRACE_AXIS) -- do it for each player that you have defined
+	Setup_Difficulty(player4, g_difficulty, TRACE_ALLIES_COMMONWEALTH) -- do it for each player that you have defined
+
+	
+--[[	t_difficulty = {
+		base_def_spawn 			= Util_DifVar(( {2*60, 1.5*60, 1*60, 0.75*60} ),			-- amount of time required before spawning base defense soldiers
+		base_def_squad_num		= Util_DifVar( {1, 1, 2, 3} ),							-- number of squads to spawn for the base defense
+		sniper_vulnerability 	= Util_DifVar( {2.5, 2, 1.5, 1} ),						-- the vulnerability factor on the snipers
+		sniper_number			= Util_DifVar( {1, 2, 2, 3} ),							-- number of snipers to spawn
+		sniper_wpn_cooldown		= Util_DifVar( {2, 1.5, 1, 1} ),						-- weapon cooldown time for the snipers
+		stronghold_attack_num	= Util_DifVar( {1, 1, 2, 2} ),							-- number of squads to spawn from the guard tower to spawn and attack the player on alert
+		aa_def_sbps				= Util_DifVar( {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER, SBP.AXIS.STORMTROOPER, SBP.AXIS.KNIGHTSCROSS} ), -- types of squads to defend the AA Guns
+	}]]
+	
+	
+	
+end
+
+
+-------------------------------------------------------------------------
+
+-- MISSION Preset 
+
+-------------------------------------------------------------------------
+
+function WolfAttack_MissionPreset()
+	
+	
+	
+	EGroup_ReSpawn(eg_wa_panzerschrecks)
+	EGroup_ReSpawn(eg_wa_strat_points)
+	EGroup_Hide(eg_wa_strat_points, false)
+	EGroup_EnableMinimapIndicator(eg_wa_strat_points, true)
+	
+	World_SetDesignerSupply(Marker_GetPosition(mkr_wa_supply_generator),true)
+	
+	if EGroup_IsEmpty(eg_aa_gun1) == false then
+
+		--setting the weapon IDs for the aa guns syncweapons
+		eg_aa_wpn_ID1 = SyncWeapon_GetFromEGroup(eg_aa_gun1)
+		eg_aa_wpn_ID2 = SyncWeapon_GetFromEGroup(eg_aa_gun2)
+		eg_aa_wpn_ID3 = SyncWeapon_GetFromEGroup(eg_aa_gun3)
+		eg_aa_wpn_ID4 = SyncWeapon_GetFromEGroup(eg_aa_gun4)
+		eg_aa_wpn_ID5 = SyncWeapon_GetFromEGroup(eg_aa_gun5)
+		eg_aa_wpn_ID6 = SyncWeapon_GetFromEGroup(eg_aa_gun6)
+	
+	end
+	
+	t_aa_gun_crews_filter = {SBP.AXIS.CAPTURE_88_AXIS, SBP.ELITE.FLAK_38_CAPTURED, SBP.AXIS.CAPTURE_QUAD_20_AXIS, SBP.ELITE.CAPTURE_88_ELITE}
+
+	
+	t_aa_wpn_ID = {
+		
+		{ 
+			syncwpn = eg_aa_wpn_ID1,
+			mkr = mkr_wg_AA_gun1,
+			popcap = false,
+		},
+		
+		{ 
+			syncwpn = eg_aa_wpn_ID2,
+			mkr = mkr_wg_AA_gun2,
+			popcap = false,
+		},
+		
+		{ 
+			syncwpn = eg_aa_wpn_ID3,
+			mkr = mkr_wg_AA_gun3,
+			popcap = false,
+		},
+		
+		{ 
+			syncwpn = eg_aa_wpn_ID4,
+			mkr = mkr_wg_AA_gun4,
+			popcap = false,
+		},
+		
+		{ 
+			syncwpn = eg_aa_wpn_ID5,
+			mkr = mkr_wg_AA_gun5,
+			popcap = false,
+		},
+		
+		{ 
+			syncwpn = eg_aa_wpn_ID6,
+			mkr = mkr_wg_AA_gun6,
+			popcap = false,
+		},
+		
+	}
+
+	local sg_temporary_aa_crew = SGroup_CreateIfNotFound("sg_temporary_aa_crew")
+	
+	--check to see how many AA guns are manned and transfer them to the ally player.
+	for k, this in pairs(t_aa_wpn_ID) do
+		
+		if SyncWeapon_IsOwnedByPlayer(this.syncwpn, player1)  then
+					
+			Player_GetAllSquadsNearMarker(player1,sg_temporary_aa_crew, SyncWeapon_GetPosition(this.syncwpn), 5)
+			SGroup_Filter(sg_temporary_aa_crew, t_aa_gun_crews_filter, FILTER_KEEP)
+			SGroup_SetPlayerOwner(sg_temporary_aa_crew, player3)
+			
+		end
+	end
+
+--[[/////////////////////////////]]		
+	g_builder_selected = false
+	
+	t_veteran_spawn_points = Marker_GetTable("mkr_wa_veteran_%d")
+	t_veteran_face_points = Marker_GetTable("mkr_wa_veteran_face_%d")
+	t_builder_filter = {SBP.ELITE.PANZERGRENADIER}
+	sg_builder = SGroup_CreateIfNotFound("sg_builder")
+	sg_ungarrisoned_veteran = SGroup_CreateIfNotFound("SGroup_AddGroup(sg_ungarrisoned_veteran, sg_temp_vet)")
+	eg_temp = EGroup_CreateIfNotFound("eg_temp")
+	sg_veterans =  SGroup_CreateIfNotFound("sg_veterans")
+	sg_temp_vet = SGroup_CreateIfNotFound("sg_temp_vet")
+	
+	
+	Player_GetAll(player1, sg_veterans, eg_temp)
+	SGroup_Filter(sg_veterans, t_aa_gun_crews_filter, FILTER_REMOVE)
+	
+	if SGroup_CountSpawned(sg_veterans) > 0 then
+		for i = SGroup_Count(sg_veterans), 1, -1 do
+			SGroup_Clear(sg_temp_vet)
+			SGroup_Add(sg_temp_vet, SGroup_GetSpawnedSquadAt(sg_veterans, i))
+			print("i = "..i)
+			if i <= table.getn(t_veteran_spawn_points) then
+				
+				j = i
+				print("j = "..j)
+			else
+				
+				j = World_GetRand(1, table.getn(t_veteran_spawn_points))
+				print("j = "..j)
+			end
+
+			if SGroup_IsInHoldEntity(sg_temp_vet, ALL) or SGroup_IsInHoldEntity(sg_temp_vet, ALL) then
+			
+				Cmd_UngarrisonSquad(sg_temp_vet)
+				SGroup_AddGroup(sg_ungarrisoned_veteran, sg_temp_vet)
+			else
+			
+				SGroup_WarpToMarker(sg_temp_vet, t_veteran_spawn_points[j])
+				SGroup_SetAvgHealth(sg_temp_vet, 1)
+			
+			end
+			
+			
+			
+		end
+		
+		
+		
+		
+	end
+	
+
+
+	
+	--set the camera on the player's start location.
+	Camera_FocusOnPosition(Marker_GetPosition(mkr_wa_player_start_pos), false)
+
+	t_strategic_points = EGroup_GetWBTable("eg_point_%d") 
+
+	--set up a series of strategic points that belong to the enemy
+	for k, this in pairs(t_strategic_points) do
+		
+		EGroup_InstantCaptureStrategicPoint(this, player2)
+		
+	end
+	
+		EGroup_InstantCaptureStrategicPoint(eg_railroad_points_all, player2)
+	
+	--variable for the timer
+	g_timer = 0
+		
+
+	
+
+
+
+--little intro nis to set the mood. Very temporary (Berger 25/01/07)	
+	local pos1 = Marker_GetPosition(mkr_wa_player_start_pos)
+
+	
+	t_nislet_start = {
+		{camPos = pos1, waitType = NISLET_TIME, waitValue = 2},
+	}
+	
+
+	--[[/////////////////////////////]]
+	EGroup_ReSpawn(eg_lz1_hq)
+	EGroup_EnableMinimapIndicator(eg_lz1_hq, true)
+	
+	EGroup_ReSpawn(eg_lz2_hq)
+	EGroup_EnableMinimapIndicator(eg_lz2_hq, true)
+
+	EGroup_ReSpawn(eg_lz3_hq)
+	EGroup_EnableMinimapIndicator(eg_lz3_hq, true)	
+	
+	eg_pl_kommand = EGroup_CreateIfNotFound("eg_pl_kommand")
+	eg_pl_kompanie = EGroup_CreateIfNotFound("eg_pl_kompanie")
+	
+	
+	
+	Util_CreateEntities(player1, eg_pl_kommand, EBP.ELITE.PANZERJAGER, mkr_wa_kommand, 1,mkr_wa_kommand_face)
+	
+
+
+	--give the player his starting territory.
+	EGroup_InstantCaptureStrategicPoint(eg_wa_player_strat_point, player1)
+	
+	
+	-- set up the construction menu callbacks so we can check the status with a variable check
+	UI_SetConstructionMenuCallback(_ConstructionMenuCallback)
+	
+	
+	t_medal_snipers = {
+		
+
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_sniper_3"),
+			sbp = SBP.CW.COMMANDOS_SNIPER,
+			pos = eg_non_zone_building_1,
+			difficulty_threshold = GD_EASY,
+			marker = mkr_wa_sniper3_pos2,
+			lastpos	= false,		
+		},
+		
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_sniper_4"),
+			sbp = SBP.CW.COMMANDOS_SNIPER,
+			pos = eg_non_zone_building_2,
+			difficulty_threshold = GD_EASY,
+			marker = mkr_wa_sniper4_pos2,
+			lastpos	= false,
+		},
+		
+		
+	}
+	
+end
+
+-------------------------------------------------------------------------
+
+-- MISSION START
+
+-------------------------------------------------------------------------
+
+function Rule_Opening_Nis()
+
+	Util_StartNIS(NIS_OPENING_BLACK) 
+	Rule_Add(WolfAttack_MissionStart)
+	Rule_RemoveMe()
+
+end
+
+
+function WolfAttack_MissionStart()
+	
+
+   	if Event_IsAnyRunning() == false then
+		
+		Rule_AddInterval(Rule_Timer, 60)
+	
+		-- delay first objective
+   		Objective_Start(OBJ_Clear_LZ)
+		
+		Rule_AddOneShot(Rule_Spawn_Player_Force, 0.1)
+		
+		
+   		Rule_RemoveMe()
+   	end
+end
+
+function Rule_Warp_Ungarrisoned_Troops()
+
+	if SGroup_CountSpawned(sg_ungarrisoned_veteran) > 0 then
+		for i = SGroup_Count(sg_ungarrisoned_veteran), 1, -1 do
+			SGroup_Clear(sg_temp_vet)
+			SGroup_Add(sg_temp_vet, SGroup_GetSpawnedSquadAt(sg_ungarrisoned_veteran, i))
+			print("i = "..i)
+			if i <= table.getn(t_veteran_spawn_points) then
+				
+				j = i
+				print("j = "..j)
+			else
+				
+				j = World_GetRand(1, table.getn(t_veteran_spawn_points))
+				print("j = "..j)
+			end
+
+				SGroup_WarpToMarker(sg_temp_vet, t_veteran_spawn_points[j])
+				SGroup_SetAvgHealth(sg_temp_vet, 1)
+							
+						
+		end
+				
+		
+		
+	end
+		
+	
+	for k, this in pairs (t_medal_snipers) do
+		
+		if scartype(this.pos) ~= ST_EGROUP or EGroup_IsEmpty(this.pos) == false  then
+
+			EGroup_InstantRevertOccupiedBuilding(this.pos)
+		end
+
+	end
+
+	Rule_AddOneShot(OBJ_Medal_Kill_Snipers_Spawn, 2)
+
+
+end
+
+--the player's units are spawned after the buildings are given to him so that they can have four units and not just three.
+function Rule_Spawn_Player_Force()
+ 
+
+	if Player_GetSquadCount(player1) < 1 then
+--Spawn the player's initial force
+		t_player_start = {
+			
+			{ 
+				sgroup = SGroup_CreateIfNotFound("sg_player_initial_1"),
+				sbp = SBP.ELITE.PANZERGRENADIER,
+				pos = mkr_wa_start_force_1,
+				
+				
+			},
+			
+			{ 
+				sgroup = SGroup_CreateIfNotFound("sg_player_initial_2"),
+				sbp = SBP.ELITE.PANZERGRENADIER,
+				pos = mkr_wa_start_force_2,
+				
+				
+			},
+			
+			{ 
+				sgroup = SGroup_CreateIfNotFound("sg_player_initial_3"),
+				sbp = SBP.ELITE.PANZERGRENADIER,
+				pos = mkr_wa_start_force_3,
+				
+				
+			},
+			
+			{ 
+				sgroup = SGroup_CreateIfNotFound("sg_player_initial_4"),
+				sbp = SBP.ELITE.HALFTRACK_MORTAR,
+				pos = mkr_wa_start_force_4,
+				
+				
+			},
+			
+			
+		}
+			
+			
+			--spawn the player's starting units	
+		for k, this in pairs(t_player_start) do
+			
+			Util_CreateSquads(player1, this.sgroup, this.sbp, this.pos, nil, 1, 4 )
+			
+		end
+	end
+
+	
+	Util_CreateSquads(player1, sg_builder,SBP.ELITE.PANZERGRENADIER,mkr_wa_builder)
+	SGroup_FaceMarker(sg_builder, mkr_builder_face)
+	
+	
+	
+end
+
+
+
+function Rule_Timer()
+
+	--this function keeps an internal clock of the level. while the print statement can be removed the function should not
+	--as other functions will be refering back to the g_timer variable.
+	g_timer = g_timer +1
+	
+	print("Time played = "..g_timer)
+
+
+
+end
+
+
+
+-------------------------------------------------------------------------
+--Obj: Secure Landing Zones
+--
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+ 
+function Initialize_OBJ_Clear_LZ()
+
+	OBJ_Clear_LZ = {
+		
+		SetupUI = function() 
+			OBJ_Clear_LZ.mapElementID = {}
+
+						
+			OBJ_Clear_LZ.mapElementID[1] = Objective_AddUIElements(OBJ_Clear_LZ, eg_point_2, true, 1429010, true, 2)
+			OBJ_Clear_LZ.mapElementID[2] = Objective_AddUIElements(OBJ_Clear_LZ, eg_point_6, true, 1429010, true, 2)
+			OBJ_Clear_LZ.mapElementID[3] = Objective_AddUIElements(OBJ_Clear_LZ, eg_point_4, true, 1429010, true, 2)
+			OBJ_Clear_LZ.mapElementID[4] = Objective_AddUIElements(OBJ_Clear_LZ, eg_point_3, true, 1429010, true, 2)
+	
+		end,
+		
+		OnStart = function()
+		
+			OBJ_Clear_LZ_Kickoff()
+			Sound_PlayMusic("Music/SP/OMG/Trepidation/OMG/WOLFHEZE_MISSION_2.bsc",0,0)
+
+		
+		end,
+		
+		OnComplete = function()
+			
+			Rule_Add(Rule_Chatter_Dialogue_Obj_Accomplished)
+			Rule_AddOneShot(Rule_Faster_Objective, 2)
+			
+			Rule_Add(Rule_Chatter_Remove)
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			
+		end,
+		
+		Title = 1429001,
+		Description = 1429003,
+		TitleEnd = 1429002,
+		
+		Type = OT_Primary,
+		
+		SitRep = {
+			
+		Movie = "CXP2_SR_02-01",         
+		Force = true,
+		SpeechTiming = -- This SitRep is awaiting a timing update as of July 19, 2007 -cmartin
+			{
+				{ .5,	ACTOR.CXP2.Aldrich, 1420500 },	-- Wolfheze is secure Brother!
+				{ 2,	ACTOR.CXP2.Aldrich, 1420501 },	-- It is safe to expect the enemy to secure their drop zones and prepare defenses. The longer we take, the more time they have to dig in.   
+				{ 9.3,	ACTOR.CXP2.Wolfgang, 1420505 },	-- We still do not have contact with Division and MajorGeneral Voss, which means we're on our own.
+				{ 15,	ACTOR.CXP2.Wolfgang, 1420508 },	-- Assemble the Kamfgruppe and begin offensive operations at once.
+				{ 19.8,	ACTOR.CXP2.Wolfgang, 1420509 },	-- <<Removal was approved by Josh M>> // -- UPDATE: Aug. 23, 2007 --> This line is re-introduced due to the shipping of Issue ID#: 6280 -cmartin
+				{ 25,	ACTOR.CXP2.Wolfgang, 1420510 },	-- Have the Kampfgruppe move in and neutralize the enemy drop zones before they have time to get comfortable!
+				{ 31,	ACTOR.CXP2.Wolfgang, 1420515 },	-- In preparation for an assault, requisition reinforcements from the HQ and Kompanie Command, here.
+				{ 37,	ACTOR.CXP2.Wolfgang, 1420516 },	-- That's all Aldrich, I'm counting on you.
+			},  
+			PrologueEvent = function()
+				
+				print(table.getn(t_veteran_face_points))
+				if SGroup_CountSpawned(sg_veterans) > 0 then
+					for i = SGroup_Count(sg_veterans), 1, -1 do
+						SGroup_Clear(sg_temp_vet)
+						SGroup_Add(sg_temp_vet, SGroup_GetSpawnedSquadAt(sg_veterans, i))
+						
+											
+						SGroup_FaceMarker(sg_temp_vet, t_veteran_face_points[j])
+						
+						
+					end
+					
+										
+					
+				end	
+			
+			end,
+			
+			EpilogueEvent = function()
+				
+				
+					
+			
+			end,		
+		
+		},
+	
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_Clear_LZ)
+	-- Initialize Data
+	OBJ_Clear_LZ_Init()
+	
+end
+
+
+-------------------------------------------------------------------------
+-- Objective Clear Landing Zone 1 - Functions 
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Obj data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function OBJ_Clear_LZ_Init()
+
+
+
+	sg_lz1_at_guns = SGroup_CreateIfNotFound("sg_lz1_at_guns")
+	sg_lz2_at_guns = SGroup_CreateIfNotFound("sg_lz2_at_guns")
+	sg_lz3_at_guns = SGroup_CreateIfNotFound("sg_lz3_at_guns")
+	sg_lz4_at_guns = SGroup_CreateIfNotFound("sg_lz4_at_guns")
+	
+	
+	t_lz_prox_checks = {}
+
+	t_lz_prox_checks[1] = Marker_GetTable("mkr_lz1_at_check_%d")
+	t_lz_prox_checks[2] = Marker_GetTable("mkr_lz2_at_check_%d")
+	t_lz_prox_checks[3] = Marker_GetTable("mkr_lz3_at_check_%d")
+	t_lz_prox_checks[4] = Marker_GetTable("mkr_lz4_at_check_%d")
+
+	t_lz_triggered ={
+		{	
+			check = false, 
+			sgroup = sg_lz1_at_guns,
+			table_spawn = false,
+			
+		},
+		
+		{	--set directly to true because the second lz has no at guns
+			check = true, 
+			sgroup = sg_lz2_at_guns,
+			table_spawn = false,
+		},
+		
+		{	
+			check = false, 
+			sgroup = sg_lz3_at_guns,
+			table_spawn = false,
+		},
+		
+		{	
+			check = false, 
+			sgroup = sg_lz4_at_guns,
+			table_spawn = false,
+		},
+		
+	}
+
+--OBJ1 Speech
+	t_obj_clear_lz_chatter = {}	
+	
+	t_obj_clear_lz_chatter.intro_1 = {
+	{ACTOR.CXP2.Wolfgang, 1420600}, --"We hold everything south of Wolfheze, but the enemy paraforces are controlling the outlying area."
+	}
+
+	t_obj_clear_lz_chatter.intro_2 = {
+	{ACTOR.CXP2.Wolfgang, 1420610}, --"Assemble yourselves into combat groups and move to clear resistance in the DZs."
+	}
+	
+	--Landing Zone 1
+	t_obj_clear_lz_chatter.LZ1_congratulations = {
+	{ACTOR.CXP2.Wolfgang, 1420630}, --"The drop zone has been cleared! Keep momentum and move out."
+	}
+		
+	t_obj_clear_lz_chatter.LZ1_warning_mortars = {
+	{ACTOR.CXP2.Aldrich, 1420640}, --"Mortars!  Take cover!  Move!"
+	}
+	
+	t_obj_clear_lz_chatter.LZ1_advice_mortars = {
+	{ACTOR.CXP2.Aldrich, 1420650}, --"Assemble a combat group!  Find and destroy those mortars!"
+	}
+--[[	
+	t_obj_clear_lz_chatter.LZ1_advice_piat = {
+	{ACTOR.CXP2.Aldrich, 1420660}, --"They've got PIAT's!  Keep the vehicles away from them!"
+	}
+	]]
+	t_obj_clear_lz_chatter.LZ1_advice_AT = {
+	{ACTOR.CXP2.Aldrich, 1420670}, --"Contact!  Anti-tank gun.  Alert all vehicles to stay clear!  We'll have to destroy it!"
+	}
+	
+	t_obj_clear_lz_chatter.LZ1_comment_voss = {
+	{ACTOR.CXP2.GenericPanzerElite, 1420680}, --"Do we know what's going on yet? I hear they want MajorGeneral Voss!"
+	}
+	
+	t_obj_clear_lz_chatter.LZ1_comment_big_guns = {
+	{ACTOR.CXP2.GenericPanzerElite, 1420690}, --"With all these AT Guns, Piats, Mortars, it sounds like they came ready for a fight!"
+	}
+	
+	t_obj_clear_lz_chatter.LZ1_comment_cover = {
+	{ACTOR.CXP2.GenericPanzerElite, 1420700}, --"What the hell! It looks like they where setting up to stay!"
+	}
+	
+	--Landing Zone 2	
+	t_obj_clear_lz_chatter.LZ2_congratulations = {
+	{ACTOR.CXP2.Wolfgang, 1420710}, --"Precisely the kind of performance I like to see! Drop Zone is clear!"
+	}
+	
+	t_obj_clear_lz_chatter.LZ2_advice_flamethrowers = {
+	{ACTOR.CXP2.Aldrich, 1420720}, --"Get some mortars up here to clear the way for infantry!"
+	}
+	
+	t_obj_clear_lz_chatter.LZ2_advice_cover = {
+	{ACTOR.CXP2.Aldrich, 1420730}, --"Armored Cars would help the cause immensely!"
+	}
+	
+	t_obj_clear_lz_chatter.LZ2_comment_barracks = {
+	{ACTOR.CXP2.GenericPanzerElite, 1420740}, --"They've takin' over our barracks! I don't want Tommy filth in my bed."
+	}
+	
+	t_obj_clear_lz_chatter.LZ2_comment_flamethrowers = {
+	{ACTOR.CXP2.GenericPanzerElite, 1420750}, --"I hate flamethrowers. How come we don't got flamethrowers?"
+	}
+	
+	t_obj_clear_lz_chatter.LZ2_comment_commandos = {
+	{ACTOR.CXP2.GenericPanzerElite, 1420760}, --"And I thought the Commandos were bad out in the open. They're like rats in those houses."
+	}
+	
+	
+	--Landing Zone 3	
+	t_obj_clear_lz_chatter.LZ3_congratulations = {
+	{ACTOR.CXP2.Wolfgang, 1420770}, --"Bravo Kampfgruppen! Three of the Drop Zones have been cleared. Only one remains!"
+	}
+	
+	
+	t_obj_clear_lz_chatter.LZ3_advice_armor = {
+	{ACTOR.CXP2.Aldrich, 1420780}, --"Contact!  Enemy armor!  We need panzerschrecks or armored support up here!"
+	}
+	
+	t_obj_clear_lz_chatter.LZ3_advice_tanks = {
+	{ACTOR.CXP2.Aldrich, 1420790}, --"All squads concentrate fire on one target at a time!  Do not let enemy vehicles fall back for repairs!"
+	}
+	
+	t_obj_clear_lz_chatter.LZ3_advice_AT = {
+	{ACTOR.CXP2.Aldrich, 1420800}, --"Keep out of range of those AT guns! Keep your stand off distance!"
+	}
+	
+--[[	t_obj_clear_lz_chatter.LZ3_comment_homy = {
+	{ACTOR.CXP2.GenericPanzerElite, 1420810}, --"Contact! AT guns. Short, quick bursts!"
+	}]]
+	
+	t_obj_clear_lz_chatter.LZ3_comment_cover = {
+	{ACTOR.CXP2.GenericPanzerElite, 1420820}, --"Der Teufel wird los sein! These Brits sure fortified quickly!"
+	}
+	
+--[[	t_obj_clear_lz_chatter.LZ3_comment_fire = {
+	{ACTOR.CXP2.GenericPanzerElite, 1420825}, --"Flamethrowers! Hell, get out of range!"
+	}]]
+	
+	
+	--Landing Zone 4
+	t_obj_clear_lz_chatter.LZ4_congratulations = {
+	{ACTOR.CXP2.Wolfgang, 1420830}, --"Well done Kampfgruppe! That was the last of the Drop Zones."
+	}
+	
+	t_obj_clear_lz_chatter.LZ4_advice_mortar = {
+	{ACTOR.CXP2.Aldrich, 1420840}, --"Get the squads to neutralize the mortar threat!  We can't afford to stall the attack!"
+	}
+	
+	t_obj_clear_lz_chatter.LZ4_advice_AT = {
+	{ACTOR.CXP2.Aldrich, 1420850}, --"AT guns.  Make sure the vehicles keep clear of its firing arc!"
+	}
+	
+	t_obj_clear_lz_chatter.LZ4_chatter_asylum = {
+		
+		{{ACTOR.CXP2.Aldrich, 1420860}}, --"The asylum will be a tough nut to crack!  Have the troops use incindeary grenades!"
+		{{ACTOR.CXP2.GenericPanzerElite, 1420870}}, --"Poor Brits holed up in an Asylum. Scares the shit out of me!"
+		{{ACTOR.CXP2.GenericPanzerElite, 1420880}}, --"Verdammter Mist! Get some fire on their positions!"
+		{{ACTOR.CXP2.GenericPanzerElite, 1420890}}, --"Did you see the crazies? Lucasz says he ran into a couple this afternoon, didn't have a clue what's going on, sorry bastards!"
+		{{ACTOR.CXP2.GenericPanzerElite, 1420891}}, --"You think the escaped inmates are dangerous?"
+		
+	}
+	
+
+	t_obj_clear_lz_chatter.mission_tactical_gliderhq = {
+	{ACTOR.CXP2.Aldrich, 1420900}, --"That Glider is their HQ!  We need to destroy it to prevent enemy reinforcements from joining the battle!"
+	}
+		
+	t_obj_clear_lz_chatter.mission_comment_wonder_dialogue1 = {
+	{ACTOR.CXP2.Henze, 1420910}, --"What is this? The Brits seem to want this place pretty badly, what the hell are they doing here?"
+	}
+	
+	t_obj_clear_lz_chatter.mission_comment_wonder_dialogue2 = {
+	{ACTOR.CXP2.GenericPanzerElite, 1420911}, --"I don't know maybe it's a diversion? What do you care anyways. Fighting's fighting!"
+	}
+		
+	t_obj_clear_lz_chatter.mission_comment_wonder_dialogue3 = {
+	{ACTOR.CXP2.Henze, 1420912}, --"Thanks arschloch. I'm just curious. This is pretty fucking huge diversion if you ask me!"
+	}
+	
+	t_obj_clear_lz_chatter.mission_accomplished = {
+	{ACTOR.CXP2.Wolfgang, 1420980}, --"Excellent! All the British Drop Zones have been cleared! Tonight I will see you all receive twice your regular rations!"
+	}
+	
+	
+	t_obj_clear_lz_chatter.mission_accomplished_dialogue1 = {
+	{ACTOR.CXP2.Henze, 1421000}, --"Yahoo! We did it!"
+	}
+	
+	t_obj_clear_lz_chatter.mission_accomplished_dialogue2 = {
+	{ACTOR.CXP2.Henze, 1421010}, --"I love you guys... I mean... Good job!"
+	}
+	
+	t_obj_clear_lz_chatter.mission_accomplished_dialogue3 = {
+	{ACTOR.CXP2.Aldrich, 1421030}, --"(howls)"
+	}
+	
+	t_obj_clear_lz_chatter.mission_accomplished_dialogue4 = {
+	{ACTOR.CXP2.Aldrich, 1421040}, --"Hahaha listen to you!"
+	}
+	
+	t_obj_clear_lz_chatter.mission_accomplished_dialogue5 = {
+	{ACTOR.CXP2.Henze, 1421020}, --"For a minute there I thought I was dead for sure!"
+	}
+	
+	t_obj_clear_lz_chatter.mission_accomplished_dialogue6 = {
+	{ACTOR.CXP2.Aldrich, 1421050}, --"Go job Henze, I thought you were a bit of a jack ass until I saw you in action. You might make a good Officer someday if you keep it up!"
+	}
+	
+	t_obj_clear_lz_chatter.mission_comment_recruit_children = {
+	
+		{{ACTOR.CXP2.GenericLuftwaffe, 1421100}}, --"Look children, get your ass in line, or get out of my fucking squad."
+		{{ACTOR.CXP2.GenericLuftwaffe, 1421110}}, --"It won't be so easy out here without your mother!"
+		{{ACTOR.CXP2.GenericLuftwaffe, 1421120}}, --"How's it feel to hold a rifle?"
+		{{ACTOR.CXP2.GenericPanzerElite, 1421125}}, --"Deinhard's mother sent him sauerkraut? Have you tried it?  It's delectable."
+		
+	}
+	
+
+	
+	t_obj_clear_lz_chatter.mission_tactical_tetrarch = {
+	{ACTOR.CXP2.Wolfgang, 1422000}, --"Tetrarch Tank! Target it with our light vehicles! "
+	}
+	
+	t_obj_clear_lz_chatter.mission_tactical_tetrarch_infantry = {
+	{ACTOR.CXP2.Wolfgang, 1422005}, --"Tetrarch! Grenadiers, target it with your panzerschreck!"
+	}
+	
+	t_obj_clear_lz_chatter.mission_tactical_tetrarch_grenades = {
+	{ACTOR.CXP2.Wolfgang, 1422006}, --"Tetrarch! Grenadiers, target it with your AT grenades"
+	}
+	
+--[[	t_obj_clear_lz_chatter.mission_tactical_AT = {
+	{ACTOR.CXP2.Wolfgang, 1422010}, --"The enemy has anti-tank weapons! Keep our vehicles to keep them in one piece."
+	}]]
+	
+	t_obj_clear_lz_chatter.mission_tactical_HMG = {
+	{ACTOR.CXP2.Wolfgang, 1422020}, --"They're using heavy machine guns! All Grenadiers, maintain a defensive perimeter!"
+	}
+	
+	t_obj_clear_lz_chatter.mission_tactical_HMG_advice = {
+	{ACTOR.CXP2.Wolfgang, 1422025}, --"Use a mortar or a vehicle to take it out."
+	}
+	
+	t_obj_clear_lz_chatter.mission_tactical_sniper = {
+	{ACTOR.CXP2.Wolfgang, 1422030}, --"Sniper! His range is deadly to infantry! Bring in the Armored support!"
+	}
+	
+--[[	t_obj_clear_lz_chatter.mission_tactical_flamethrower = {
+	{ACTOR.CXP2.Wolfgang, 1422040}, --"Enemy sappers have been spotted with flamethrowers! Keep your infantry well out of reach of those flames or else!"
+	}
+	
+	t_obj_clear_lz_chatter.mission_tactical_piat = {
+	{ACTOR.CXP2.Wolfgang, 1422050}, --"PIATS! The may seem like rudimentary anti-tank weapons, but they have a range of 100 meters;"
+	}
+	
+	t_obj_clear_lz_chatter.mission_comment_piat = {
+	{ACTOR.CXP2.Wolfgang, 1422055}, --"Be careful or they'll tear a hole in our armored vehicles!"
+	}
+	
+	t_obj_clear_lz_chatter.mission_tactical_building = {
+	{ACTOR.CXP2.Wolfgang, 1422060}, --"The enemies are garrisoned in buildings. Burn them out with your incendiary grenades."
+	}
+	
+	t_obj_clear_lz_chatter.mission_tactical_fuel = {
+	{ACTOR.CXP2.Wolfgang, 1422070}, --"Kampfgruppe Lehr is running low on fuel supplies. Capture more fuel depots to replenish our supplies faster."
+	}
+	
+	t_obj_clear_lz_chatter.mission_tactical_lieutenant = {
+	{ACTOR.CXP2.Wolfgang, 1422080}, --"The common Brit soldier can't think for himself. Kill their officers to break their will."
+	}]]
+	
+	
+	
+	t_obj_clear_lz_chatter.ambient_plans_dialogue1 = {
+	{ACTOR.CXP2.GenericPanzerElite, 1422300}, --"Look! What do you think it is?"
+	}
+	
+	t_obj_clear_lz_chatter.ambient_plans_dialogue2 = {
+	{ACTOR.CXP2.GenericPanzerElite, 1422310}, --"I will bring it to Luetnant Berger, stand back."
+	}
+	
+	t_obj_clear_lz_chatter.ambient_plans_dialogue3 = {
+	{ACTOR.CXP2.Aldrich, 1422320}, --"Brother! Look we've found plans."
+	}
+	
+	t_obj_clear_lz_chatter.ambient_plans_dialogue4 = {
+	{ACTOR.CXP2.Aldrich, 1422330}, --"The British can't be this stupid. They must be fakes."
+	}
+	
+	t_obj_clear_lz_chatter.ambient_plans_dialogue5 = {
+	{ACTOR.CXP2.Aldrich, 1422340}, --"The Royal abschaum (scum) meant to throw us off course."
+	}
+	
+	t_obj_clear_lz_chatter.ambient_plans_dialogue6 = {
+	{ACTOR.CXP2.Wolfgang, 1422350}, --"Plans?"
+	}
+	
+	t_obj_clear_lz_chatter.ambient_plans_dialogue7 = {
+	{ACTOR.CXP2.Wolfgang, 1422360}, --"No matter, we need to give the plans to Voss, he will know what to make of them.?"
+	}
+	
+	t_obj_clear_lz_chatter.ambient_plans_dialogue8 = {
+	{ACTOR.CXP2.Wolfgang, 1422370}, --"Do we have radio uplink to Field Marshel's HQ in Arhhem yet? We need to alert Majorgeneral Voss."
+	}
+	
+	--generic british chit chat
+	
+	t_generic_british_chatter = {
+		{{ACTOR.CXP2.GenericCommonwealth, 1420520}}, --"Fucking hell Captain, we got some more Jerries here!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420521}}, --"Take your medicine like a good boy Jerry!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420522}}, --"A spoonful of sugar, eh!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420523}}, --"Go back to hell you buggery bastards!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420525}}, --"Die you Hun brown hatters!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420526}}, --"Move up men, away from the drop zones!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420527}}, --"Keep a solid line boys! Jerry's pushing back hard!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420528}}, --"This ain't nothing yet, just wait till 30th Corp arrives!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420529}}, --"Keep moving forward to Arnhem men!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420531}}, --"Protect the drop zones!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420532}}, --"We're here for your Major Gerneral Hun!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420533}}, --"Give up, and I got the first round Jerry!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420534}}, --"Fucking hell mates, that one looks like Matthew! I swear it!"
+		
+	--	{{ACTOR.CXP2.GenericCommonwealth, 1420535}},	 I removed this line because it feels confusing (it reads"we need to take that bridge") MB.
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420536}}, --"To Arnhem men!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420537}}, --"Protect the drop zones! WE are lost without them!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420538}}, --"Die you bastards!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420539}}, --"Drop the routine already Jerry!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420540}}, --"Did you see that one, I'd swear it was Stephen!"
+			
+		{{ACTOR.CXP2.GenericCommonwealth, 1420541}}, --"All hell's broke loose on you Jerry!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420542}}, --"WE need to keep a firm frontline!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420543}}, --"Protect the drop zones!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420544}}, --"Think again Jerry!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420545}}, --"I'll teach you Germans to mess with the Cloggies!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420546}}, --"Coming for some more are you Jerry?"
+	}
+	
+	-- Generic british glider encounter chatter
+	
+	t_generic_british_glider = {
+	
+		{{ACTOR.CXP2.GenericCommonwealth, 1420550}}, --"Protect HQ!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420551}}, --"We need that bloody glider lads!"
+	
+		{{ACTOR.CXP2.GenericCommonwealth, 1420553}}, --"Rip 'em apart lads!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420554}}, --"Stay away from my glider Hun!"
+
+		{{ACTOR.CXP2.GenericCommonwealth, 1420555}}, --"For fucksakes protect the god damn gliders mates!"
+	
+}	
+
+
+	g_repair_speech = false
+	g_speech_1_played = false
+	g_speech_2_played = false
+	g_speech_3_played = false
+	g_speech_4_played = false
+	
+	sg_LZ1_Retreat = SGroup_CreateIfNotFound("sg_LZ1_Retreat")
+	sg_LZ2_Retreat = SGroup_CreateIfNotFound("sg_LZ2_Retreat")
+	sg_LZ3_Retreat = SGroup_CreateIfNotFound("sg_LZ3_Retreat")
+	sg_LZ4_Retreat = SGroup_CreateIfNotFound("sg_LZ4_Retreat")
+	sg_Garrissoned_Retreat = SGroup_CreateIfNotFound("sg_Garrissoned_Retreat")
+
+t_retreat_master_list = {
+
+	{
+		sbp = SBP.CW.COMMANDOS,
+		count = 8,
+		team_weapon = false,	
+	
+	},
+
+	{
+		sbp = SBP.CW.COMMANDOS_MG,
+		count = 3,
+		team_weapon = true,	
+	
+	},
+	
+	{
+		sbp = SBP.CW.COMMANDOS_MORTAR,
+		count = 3,
+		team_weapon = true,	
+	
+	},
+	
+	{
+		sbp = SBP.CW.COMMANDOS,
+		count = 4,
+		team_weapon = false,	
+	
+	},
+
+	{
+		sbp = SBP.CW.SAPPER,
+		count = 4,
+		team_weapon = false,	
+	
+	},
+	
+	{
+		sbp = SBP.CW.COMMANDOS_AT_57MM_SP,
+		count = 3,
+		team_weapon = true,	
+	
+	},
+
+}
+	
+	
+	
+	sg_player2_all_units = SGroup_CreateIfNotFound("sg_player2_all_units")
+	sg_temp_retreat = SGroup_CreateIfNotFound("sg_temp_retreat")
+	
+	t_player2_sgroups = {}
+	
+	
+
+	--table with the strategic points linked to the landing zones
+	t_LZ_Points = {
+		--LZ1
+		{
+			Strat_Point = eg_point_2,
+			point_captured = false,
+			speech = t_obj_clear_lz_chatter.LZ1_congratulations,
+			retreat = sg_LZ1_Retreat,
+		},
+	
+		--LZ2
+		{
+			Strat_Point = eg_point_6,
+			point_captured = false,
+			speech = t_obj_clear_lz_chatter.LZ2_congratulations,
+			retreat = sg_LZ2_Retreat,
+		},
+		
+		--LZ3
+		{
+			Strat_Point = eg_point_4,
+			point_captured = false,
+			speech = t_obj_clear_lz_chatter.LZ3_congratulations,
+			retreat = sg_LZ3_Retreat,
+		
+		},
+		
+		--LZ4
+		{
+			Strat_Point = eg_point_3,
+			point_captured = false,
+			speech = t_obj_clear_lz_chatter.LZ4_congratulations,
+			retreat = sg_LZ4_Retreat,
+		
+		},
+	}
+
+
+
+	--Landing Zone 1
+	t_lz1_start = {
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz1_1"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = mkr_wa_lz1_1,
+			count = 3,
+			add = true,
+			skip = false,
+			
+		},
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz1_2"),
+			sbp = SBP.CW.COMMANDOS_MG,
+			pos = mkr_wa_lz1_2,
+			count = nil,
+			add = false,
+			skip = false,
+			
+		},
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz1_3"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = mkr_wa_lz1_3,
+			count = 3,
+			add = true,
+			skip = false,
+			
+		},
+		
+		
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz1_5"),
+			sbp = SBP.CW.COMMANDOS_MORTAR,
+			pos = mkr_wa_lz1_5,
+			count = nil,
+			add = true,
+			skip = false,
+			
+		},
+		
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz1_6"),
+			sbp = SBP.CW.COMMANDOS_MORTAR,
+			pos = mkr_wa_lz1_6,
+			count = nil,
+			add = true,
+			skip = false,
+		
+		},
+		
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz1_7"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = eg_lz1_building_3,
+			backup = mkr_wa_lz1_bld3_bkp,
+			count = nil,
+			add = true,
+			skip = false,
+		
+		},
+		
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz1_8"),
+			sbp = SBP.CW.COMMANDOS_AT_57MM_SP,
+			pos = mkr_wa_at_2,
+			count = nil,
+			add = true,
+			skip = true,
+		
+		},
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz1_9"),
+			sbp = SBP.CW.COMMANDOS_MG,
+			pos = mkr_wa_lz1_7,
+			count = nil,
+			add = true,
+			skip = false,
+			
+		},
+		
+		{ --this has been moved here because of the delayed spawning for entity count purposes
+			sgroup = SGroup_CreateIfNotFound("sg_lz4_4"),
+			sbp = SBP.CW.COMMANDOS_AT_57MM_SP,
+			pos = mkr_wa_at_3,
+			upgrade = nil,
+			add = false,
+			skip = true,
+		
+		},
+		
+	}
+
+	t_lz_triggered[1].table_spawn = t_lz1_start
+	--spawn the starting units for LZ1
+	for k, this in pairs (t_lz1_start) do
+		if scartype(this.pos) == ST_EGROUP then
+			print("t_lz1_start")
+
+			if EGroup_IsEmpty(this.pos) == false and EGroup_GetAvgHealth(this.pos) >= 0.3 then
+				
+				
+			else
+				print("go to backup")
+				this.pos = this.backup
+			
+			end
+			
+		end
+		
+		if this.skip == false then
+			Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, 1, this.count)		
+			SGroup_AddGroup(sg_player2_all_units, this.sgroup)
+			table.insert(t_player2_sgroups, this.sgroup)
+		end
+		
+		if this.add == true then
+		
+			SGroup_AddGroup(sg_LZ1_Retreat, this.sgroup)
+		
+		
+		end
+
+	end
+	
+	Rule_AddOneShot(Rule_LZ1_Setup_Weapons, 1)
+	
+
+
+--////////////////////////////////////////////////		
+	
+	t_lz1_pat = {
+	
+		
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz1_pat_1"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = mkr_wa_lz2_1,
+			upgrade = nil,
+			path = "wp_wa_lz1_pat_1",
+			loop = LOOP_NORMAL, 
+		},
+	
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz1_pat_2"),
+			sbp = SBP.CW.LIEUTENANT,
+			pos = mkr_wa_lz2_1,
+			upgrade = nil,
+			path = "wp_wa_lz1_pat_1",
+			loop = LOOP_NORMAL, 
+		},
+	
+	}
+	
+		
+	for k, this in pairs (t_lz1_pat) do
+		
+		Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, nil, nil, nil, nil, this.upgrade)
+		SGroup_AddGroup(sg_player2_all_units, this.sgroup)
+		Cmd_SquadPath(this.sgroup, this.path, true, this.loop, true, 0)
+	end	
+	
+--////////////////////////////////////////////////	
+	
+	--Landing Zone 2
+	t_lz2_start = {
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz2_1"),
+			sbp = SBP.CW.SAPPER,
+			pos = eg_lz2_building_5,
+			backup = mkr_wa_lz2_bld5_bkp,
+			upgrade = UPG.ALLIES.ENGINEER_FLAMETHROWER,
+			add = true,
+			skip = false,
+		},
+		
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz2_2"),
+			sbp = SBP.CW.SAPPER,
+			pos = eg_lz2_building_3,
+			backup = mkr_wa_lz2_bld3_bkp,
+			upgrade = UPG.ALLIES.ENGINEER_FLAMETHROWER,
+			add = true,
+			skip = false,
+		},
+	
+
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz2_3"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = eg_lz2_building_1,
+			backup = mkr_wa_lz2_bld1_bkp,
+			upgrade = nil,
+			add = true,
+			skip = false,
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz2_4"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = eg_lz2_building_4,
+			backup = mkr_wa_lz2_bld4_bkp,
+			upgrade = nil,
+			add = true,
+			skip = false,
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz2_5"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = mkr_wa_lz2_trench,
+			upgrade = nil,
+			add = false,
+			skip = false,
+		},
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz2_6"),
+			sbp = SBP.CW.SAPPER,
+			pos = mkr_wa_lz2_1,
+			upgrade = UPG.ALLIES.ENGINEER_FLAMETHROWER,
+			add = true,
+			skip = false,
+		},
+	
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz2_7"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = mkr_wa_lz2_2,
+			upgrade = nil,
+			add = true,
+			skip = false,
+		},
+		
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz2_8"),
+			sbp = SBP.CW.COMMANDOS_MORTAR,
+			pos = mkr_wa_lz2_3,
+			add = false,
+			skip = false,
+		
+		},
+	
+	}
+	
+	t_lz_triggered[2].table_spawn = t_lz2_start
+	
+		--spawn the starting units for LZ2
+	for k, this in pairs (t_lz2_start) do
+		
+		
+		if scartype(this.pos) == ST_EGROUP then
+
+			if EGroup_IsEmpty(this.pos) == false and EGroup_GetAvgHealth(this.pos) >= 0.3 then
+				
+				
+			else
+				print("go to backup")
+				this.pos = this.backup
+			
+			end
+			
+		end
+		
+		if this.skip == false then
+			Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, nil, nil, nil, nil, this.upgrade)
+			SGroup_AddGroup(sg_player2_all_units, this.sgroup)
+			table.insert(t_player2_sgroups, this.sgroup)
+		end
+		if this.add == true then
+		
+			SGroup_AddGroup(sg_LZ2_Retreat, this.sgroup)
+		
+		end
+
+	end
+	
+--////////////////////////////////////////////////	
+
+--Jeep patrols
+
+
+	t_jeep_patrols = {
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz2_9"),
+			sbp = SBP.CW.COMMANDOS_JEEP,
+			pos = mkr_jeep_pat_1,
+			path = "wp_wa_jeep_pat_1",
+			loop = LOOP_NORMAL, 
+
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz2_10"),
+			sbp = SBP.CW.COMMANDOS_JEEP,
+			pos = mkr_jeep_pat_2,
+			path = "wp_wa_jeep_pat_2",
+			loop = LOOP_NORMAL, 
+
+		},
+	
+	
+	}
+	
+		
+	for k, this in pairs (t_jeep_patrols) do
+		
+		Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos)
+		SGroup_AddGroup(sg_player2_all_units, this.sgroup)
+		Cmd_SquadPath(this.sgroup, this.path, true, this.loop, true, 0)
+		
+	end
+
+--////////////////////////////////////////////////		
+	
+	t_lz2_pat = {
+	
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz2_pat_1"),
+			sbp = SBP.CW.SAPPER,
+			pos = mkr_wa_lz2_1,
+			upgrade = UPG.ALLIES.ENGINEER_FLAMETHROWER,
+			path = "wp_wa_lz2_pat_1",
+			loop = LOOP_NORMAL, 
+		},
+	
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz2_pat_2"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = mkr_wa_lz2_1,
+			upgrade = nil,
+			path = "wp_wa_lz2_pat_2",
+			loop = LOOP_NORMAL, 
+		},
+	
+	
+	}
+	
+		
+	for k, this in pairs (t_lz2_pat) do
+		
+		Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, nil, nil, nil, nil, this.upgrade)
+		SGroup_AddGroup(sg_player2_all_units, this.sgroup)
+		Cmd_SquadPath(this.sgroup, this.path, true, this.loop, true, 0)
+	end
+	
+--////////////////////////////////////////////////
+	
+	--Landing Zone 3
+	t_lz3_start = {
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz3_1"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = eg_lz3_building_1,
+			backup = mkr_wa_lz3_bld1_bkp,
+			add = true,
+			skip = false,
+			
+		},
+		
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz3_2"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = eg_lz3_building_6,
+			backup = mkr_wa_lz3_bld6_bkp,
+			add = true,
+			skip = false,
+			
+		},
+	
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz3_3"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = eg_lz3_building_3,
+			backup = mkr_wa_lz3_bld3_bkp,
+			add = true,
+			skip = false,
+			
+		},
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz3_4"),
+			sbp = SBP.CW.COMMANDOS_AT_57MM_SP,
+			pos = mkr_wa_at_1,
+			add = true,
+			skip = true,
+			
+		
+		},
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz3_5"),
+			sbp = SBP.CW.COMMANDOS_AT_57MM_SP,
+			pos = mkr_wa_at_4,
+			add = true,
+			skip = true,
+			
+		},
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz3_6"),
+			sbp = SBP.CW.COMMANDOS_AT_57MM_SP,
+			pos = mkr_wa_at_5,
+			add = false,
+			skip = true,
+			
+		},
+		
+		
+	}
+	
+	t_lz_triggered[3].table_spawn = t_lz3_start
+
+		--spawn the starting units for LZ3
+	for k, this in pairs (t_lz3_start) do
+		
+		
+		if scartype(this.pos) == ST_EGROUP then
+			print("t_lz3_start")
+
+			if EGroup_IsEmpty(this.pos) == false and EGroup_GetAvgHealth(this.pos) >= 0.04 then
+				
+				
+			else
+				print("go to backup")
+				this.pos = this.backup
+			
+			end
+			
+		end
+		
+		if this.skip == false then
+			Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, nil, nil, nil, nil, this.upgrade)
+			SGroup_AddGroup(sg_player2_all_units, this.sgroup)
+			table.insert(t_player2_sgroups, this.sgroup)
+		end
+		if this.add == true then
+		
+			SGroup_AddGroup(sg_LZ3_Retreat, this.sgroup)
+		
+		end
+		
+		
+	end
+--////////////////////////////////////////////////		
+	
+	t_lz3_pat = {
+	
+		
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz3_pat_1"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = mkr_wa_lz2_1,
+			upgrade = nil,
+			path = "wp_wa_lz3_pat_1",
+			loop = LOOP_NORMAL, 
+		},
+	
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz3_pat_2"),
+			sbp = SBP.CW.LIEUTENANT,
+			pos = mkr_wa_lz2_1,
+			upgrade = nil,
+			path = "wp_wa_lz3_pat_2",
+			loop = LOOP_NORMAL, 
+		},
+	
+	}
+	
+		
+	for k, this in pairs (t_lz3_pat) do
+		
+		Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, nil, nil, nil, nil, this.upgrade)
+		SGroup_AddGroup(sg_player2_all_units, this.sgroup)
+		Cmd_SquadPath(this.sgroup, this.path, true, this.loop, true, 0)
+	end	
+--////////////////////////////////////////////////	
+--[[	
+	t_lz3_sappers = {
+	
+	
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz3_sapper"),
+			sbp = SBP.CW.SAPPER,
+			pos = eg_lz3_building_3,
+			backup = mkr_wa_lz3_bld3_bkp,
+			upgrade = UPG.ALLIES.ENGINEER_FLAMETHROWER,
+			
+		},
+						
+		
+	}
+	
+	
+		--spawn the starting units for LZ3
+	for k, this in pairs (t_lz3_sappers) do
+		
+		
+		if scartype(this.pos) == ST_EGROUP then
+
+			if EGroup_IsEmpty(this.pos) == false and EGroup_GetAvgHealth(this.pos) >= 0.04 then
+				
+				
+			else
+				print("go to backup")
+				this.pos = this.backup
+			
+			end
+			
+		end
+		
+		Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, 2, nil, nil, nil, this.upgrade)
+		SGroup_AddGroup(sg_LZ3_Retreat, this.sgroup)		
+		
+	end
+]]
+--////////////////////////////////////////////////
+	
+	--Landing Zone 3
+	t_lz3_tanks = {
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz3_tank_1"),
+			sbp = SBP.CW.TETRARCH,
+			pos = mkr_lz3_tank_1,
+			status = "ready",
+			retreat_pos = mkr_tank_retreat_1,
+			repair_pos = Util_GetRandomPosition(mkr_wa_tank_repair),
+			umbrella = SGroup_CreateIfNotFound("sg_lz3_tanks"),
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz3_tank_2"),
+			sbp = SBP.CW.TETRARCH,
+			pos = Util_GetOffsetPosition(mkr_lz3_tank_1, OFFSET_RIGHT, 20),
+			status = "ready",
+			retreat_pos = mkr_tank_retreat_2,
+			repair_pos = Util_GetRandomPosition(mkr_wa_tank_repair),
+			umbrella = SGroup_CreateIfNotFound("sg_lz3_tanks"),
+			
+		},
+		
+				{
+			sgroup = SGroup_CreateIfNotFound("sg_lz3_tank_3"),
+			sbp = SBP.CW.TETRARCH,
+			pos = Util_GetOffsetPosition(mkr_lz3_tank_1, OFFSET_BACK_LEFT, 25),
+			status = "ready",
+			retreat_pos = mkr_tank_retreat_3,
+			repair_pos = Util_GetRandomPosition(mkr_wa_tank_repair),
+			umbrella = SGroup_CreateIfNotFound("sg_lz3_tanks"),
+			
+		},
+		
+	}
+	
+	g_tank_status = "ready"
+	
+		--spawn the starting units for LZ3
+	for k, this in pairs (t_lz3_tanks) do
+		
+		Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos)
+		SGroup_AddGroup(this.umbrella, this.sgroup)
+		SGroup_AddGroup(sg_LZ3_Retreat, this.sgroup)
+	end
+	
+	t_tank_check = Marker_GetTable("mkr_wa_tank_target_%d")
+	
+--////////////////////////////////////////////////	
+	
+	--Landing Zone 4
+	t_lz4_start = {
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz4_1"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = eg_lz4_building_1,
+			backup = mkr_wa_lz4_bld1_bkp,
+			upgrade = nil,
+			add = true,
+			skip = false,
+		},
+		
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz4_2"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = eg_lz4_building_2,
+			backup = mkr_wa_lz4_bld2_bkp,
+			upgrade = nil,
+			add = true,
+			skip = false,
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz4_3"),
+			sbp = SBP.CW.COMMANDOS,
+			pos = eg_lz4_building_3,
+			backup = mkr_wa_lz4_bld3_bkp,
+			upgrade = nil,
+			add = true,
+			skip = false,
+		},
+		
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_lz4_5"),
+			sbp = SBP.CW.COMMANDOS_MORTAR,
+			pos = mkr_wa_lz4_1,
+			upgrade = nil,
+			add = true,
+			skip = false,
+		},
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz4_6"),
+			sbp = SBP.CW.COMMANDOS_MORTAR,
+			pos = mkr_wa_lz4_2,
+			upgrade = nil,
+			add = true,
+			skip = false,
+		
+		},
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz4_7"),
+			sbp = SBP.CW.COMMANDOS_AT_57MM_SP,
+			pos = mkr_wa_lz4_3,
+			upgrade = nil,
+			add = true,
+			skip = true,
+		
+		},
+		
+		{ 
+			sgroup = SGroup_CreateIfNotFound("sg_lz4_8"),
+			sbp = SBP.CW.COMMANDOS_AT_57MM_SP,
+			pos = mkr_wa_lz4_4,
+			upgrade = nil,
+			add = true,
+			skip = true,
+		
+		},
+		
+	
+	}
+	
+	t_lz_triggered[4].table_spawn = t_lz4_start
+
+		--spawn the starting units for LZ3
+	for k, this in pairs (t_lz4_start) do
+		
+		if scartype(this.pos) == ST_EGROUP then
+
+			if EGroup_IsEmpty(this.pos) == false and EGroup_GetAvgHealth(this.pos) >= 0.3 then
+				
+				
+			else
+				print("go to backup")
+				this.pos = this.backup
+			
+			end
+			
+		end
+		
+		if this.skip == false then
+			Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, nil, nil, nil, nil, nil, this.upgrade)
+			SGroup_AddGroup(sg_player2_all_units, this.sgroup)
+			table.insert(t_player2_sgroups, this.sgroup)
+		
+		end
+		if this.add == true then
+		
+		
+			SGroup_AddGroup(sg_LZ4_Retreat, this.sgroup)
+		
+		end
+		
+
+
+	end
+
+--////////////////////////////////////////////////	
+	t_force_1 = {
+		
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+		
+		},
+	
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+		
+		},
+	
+		{
+			name = "Lieutenant",
+			manpower = 250,
+			munition = 0,
+			fuel = 20,
+			sbp =  SBP.CW.LIEUTENANT,
+			prod_time = 30,
+			population = 1,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+		
+		},
+	
+	
+	}
+	
+	
+	t_force_2 = {
+	
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+		
+		},
+	
+		{
+			name = "Lieutenant",
+			manpower = 250,
+			munition = 0,
+			fuel = 20,
+			sbp =  SBP.CW.LIEUTENANT,
+			prod_time = 30,
+			population = 1,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+		
+		
+		},
+		
+		{
+			name = "Bren",
+			manpower = 240,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.BREN_CARRIER,
+			prod_time = 15,
+			population = 3,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = UPG.CW.BREN_CARRIER_MMG,
+		
+		
+		},
+	
+	
+	}
+	
+	
+	t_force_3 = {
+	
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+		
+		},
+		
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+		
+		},
+		
+		{
+			name = "Bren",
+			manpower = 240,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.BREN_CARRIER,
+			prod_time = 15,
+			population = 3,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = UPG.CW.BREN_CARRIER_MMG,
+			
+		
+		},
+	
+	
+	
+	}
+	
+	t_force_4 = {
+	
+		{
+			name = "Bren",
+			manpower = 240,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.BREN_CARRIER,
+			prod_time = 15,
+			population = 3,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = UPG.CW.BREN_CARRIER_MMG,
+				
+		},
+		
+		{
+			name = "Bren",
+			manpower = 240,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.BREN_CARRIER,
+			prod_time = 15,
+			population = 3,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = UPG.CW.BREN_CARRIER_MMG,
+				
+		},
+		
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+	
+		{
+			name = "Lieutenant",
+			manpower = 250,
+			munition = 0,
+			fuel = 20,
+			sbp =  SBP.CW.LIEUTENANT,
+			prod_time = 30,
+			population = 1,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+		
+		
+		},
+	
+	}
+	
+	
+	t_force_5 = {
+	
+		{
+			name = "Tetrarch",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.TETRARCH,
+			prod_time = 45,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+		
+		{
+			name = "Tetrarch",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.TETRARCH,
+			prod_time = 45,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+		
+	
+	}
+	
+	
+	t_force_6 = {
+	
+		{
+			name = "Tetrarch",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.TETRARCH,
+			prod_time = 45,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+	
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+		
+
+	
+	}
+	
+	
+	t_force_7 = {
+	
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+		
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+		
+
+	
+	}
+	
+	
+	t_force_8 = {
+	
+	
+	
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+		
+		{
+			name = "Mortar",
+			manpower = 240,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS_MORTAR,
+			prod_time = 15,
+			population = 3,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+	
+	
+	}
+	
+	
+	t_force_9 = {
+	
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+		
+		
+		{
+			name = "Lieutenant",
+			manpower = 250,
+			munition = 0,
+			fuel = 20,
+			sbp =  SBP.CW.LIEUTENANT,
+			prod_time = 30,
+			population = 1,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+	
+	
+	
+	}
+	
+	
+	t_force_10 = {
+	
+		{
+			name = "Commandos",
+			manpower = 240,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 15,
+			population = 3,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+	
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+	
+		{
+			name = "Lieutenant",
+			manpower = 250,
+			munition = 0,
+			fuel = 20,
+			sbp =  SBP.CW.LIEUTENANT,
+			prod_time = 30,
+			population = 1,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+	
+	
+	}
+	
+	
+	
+	t_force_11 = {
+	
+		{
+			name = "Tetrarch",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.TETRARCH,
+			prod_time = 45,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+		
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+		
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+	
+	
+	}
+	
+	
+	t_force_12 = {
+	
+		{
+			name = "Commandos",
+			manpower = 240,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 15,
+			population = 3,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+		
+		{
+			name = "Commandos",
+			manpower = 240,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 15,
+			population = 3,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+		
+		{
+			name = "Lieutenant",
+			manpower = 250,
+			munition = 0,
+			fuel = 20,
+			sbp =  SBP.CW.LIEUTENANT,
+			prod_time = 30,
+			population = 1,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+	
+	
+	
+	}
+	
+	
+	t_force_13 = {
+	
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+		
+		
+		{
+			name = "Commandos",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 30,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+	
+		{
+			name = "Commandos",
+			manpower = 240,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 15,
+			population = 3,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+		
+		{
+			name = "Commandos",
+			manpower = 240,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.COMMANDOS,
+			prod_time = 15,
+			population = 3,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+	
+	
+	}
+	
+	
+	t_force_14 = {
+	
+		{
+			name = "Tetrarch",
+			manpower = 560,
+			munition = 0,
+			fuel = 0,
+			sbp =  SBP.CW.TETRARCH,
+			prod_time = 45,
+			population = 6,
+			spawn_point = mkr_wa_relief_spawn,
+			upgrade = false,
+				
+		},
+		
+
+		
+	
+	}
+	t_inf_unit_repository = {t_force_1, t_force_2, t_force_3, t_force_4, t_force_7, t_force_8, t_force_9, t_force_10,  t_force_12, t_force_13, }
+
+--////////////////////////////////////////////////	
+	
+	
+	--the following are used for the relief force which the AI will generate (if it can) to go help its units when under attack.
+	
+	--sgroup and egroup that takes all of the AI's units and buildings
+	sg_enemy_squads = SGroup_CreateIfNotFound("sg_enemy_squads")
+	eg_enemy_buildings = EGroup_CreateIfNotFound("eg_enemy_buildings")
+	
+	--sgroup and egroup that takes all of the player's units and buildings
+	sg_player_squads = SGroup_CreateIfNotFound("sg_player_squads")
+	eg_player_buildings = EGroup_CreateIfNotFound("eg_player_buildings")
+	
+	--sgroup in which one of the player's squads engaged in combat will be placed
+	sg_attacker = SGroup_CreateIfNotFound("sg_attacker")
+	
+	--which of the AI's squad is being attacked currently
+	sg_under_attack = SGroup_CreateIfNotFound("sg_under_attack")
+	
+	--the relief forces, one AT and one infantry based on what is attacking.
+	sg_inf_relief_force = SGroup_CreateIfNotFound("sg_inf_relief_force")
+	
+	--global variable so that only one force gets created at a time (note there can be one AT force and one infantry force at the same time.
+	g_inf_relief_force_in_progress = false
+	
+	--global variable that determines how large the relief forces are
+	g_inf_relief_size = 4
+	
+	--global variable that is used in the iteration function that creates the relief force.
+	g_relief_infantry_iter = 1
+		
+	
+	sg_enemy_squads = SGroup_CreateIfNotFound("sg_enemy_squads")
+	
+
+	
+	
+	t_Reinforcing = {}
+	t_glider_HQ = {
+	
+		{ 
+			egroup = eg_lz1_hq,
+			marker = mkr_wa_lz1_hq,
+		},
+		
+		{ 
+			egroup = eg_lz2_hq,
+			marker = mkr_wa_lz2_hq,
+		},
+		
+		{ 
+			egroup = eg_lz3_hq,
+			marker = mkr_wa_lz3_hq,
+		},
+		
+		}
+	
+
+	
+	--this is tied to the objective for the counterattack. It's here because the troops are spawned before the objective is given.
+	sg_paratrooper_counterattack = SGroup_CreateIfNotFound("sg_paratrooper_counterattack")
+	
+	t_pre_counterattack = {
+
+	{
+		spawntype = "para",
+		status = "ready",
+		sgroup = SGroup_CreateIfNotFound("sg_warning_para_1"),
+		sbp = SBP.CW.COMMANDOS_PARATROOPER_SP,
+		
+		num = 1,
+		loadout = 8,
+	
+	
+	},
+	
+	{
+		spawntype = "para",
+		status = "ready",
+		sgroup = SGroup_CreateIfNotFound("sg_warning_para_2"),
+		sbp = SBP.CW.COMMANDOS_PARATROOPER_SP,
+		
+		num = 1,
+		loadout = 8,
+	
+	
+	},
+	
+	{
+		spawntype = "supply",
+		status = "ready",
+		sgroup = SGroup_CreateIfNotFound("sg_para_equipment"),
+		ability = ABILITY.COMMANDER_TREE.ALLIES.SUPPLY_DROP,
+		
+	
+	},
+	
+	{
+		spawntype = "supply",
+		status = "ready",
+		sgroup = SGroup_CreateIfNotFound("sg_para_equipment"),
+		ability = ABILITY.COMMANDER_TREE.ALLIES.SUPPLY_DROP,
+		
+	
+	},
+	
+	
+	{
+		spawntype = "supply",
+		status = "ready",
+		sgroup = SGroup_CreateIfNotFound("sg_para_equipment"),
+		ability = ABILITY.COMMANDER_TREE.ALLIES.SUPPLY_DROP,
+		
+	
+	},
+	
+	{
+		spawntype = "supply",
+		status = "ready",
+		sgroup = SGroup_CreateIfNotFound("sg_para_equipment"),
+		ability = ABILITY.COMMANDER_TREE.ALLIES.SUPPLY_DROP,
+		
+	
+	},
+	
+	{
+		spawntype = "supply",
+		status = "ready",
+		sgroup = SGroup_CreateIfNotFound("sg_para_equipment"),
+		ability = ABILITY.COMMANDER_TREE.ALLIES.SUPPLY_DROP,
+		
+	
+	},
+	
+	{
+		spawntype = "supply",
+		status = "ready",
+		sgroup = SGroup_CreateIfNotFound("sg_para_equipment"),
+		ability = ABILITY.COMMANDER_TREE.ALLIES.SUPPLY_DROP,
+		
+	
+	},
+
+
+}
+
+	g_para_counter = 1
+	g_player_cap_increased = 1
+
+--/////////////////////////////////////////////////
+--table of buildings to be collapsed dramatically
+
+
+t_collapsable_buildings = {
+
+	{
+		egroup = eg_lz4_building_1,
+		dest = mkr_wa_collapse_dest_2,
+
+	},
+	
+	{
+		egroup = eg_lz2_building_3,
+		dest = mkr_wa_collapse_dest_2,
+
+	},
+
+}
+
+
+--//////////////////////////////////////////////
+	
+	eg_temp_at = EGroup_CreateIfNotFound("eg_temp_at")
+	
+	sg_global_at = SGroup_CreateIfNotFound("sg_global_at")
+	sg_attacking_at = SGroup_CreateIfNotFound("sg_attacking_at")
+	t_at_filter = {SBP.CW.COMMANDOS_AT_57MM_SP}
+	Player_GetAll(player2, sg_global_at, eg_temp_at)
+	EGroup_Clear(eg_temp_at)
+	SGroup_Filter(sg_global_at, t_at_filter , FILTER_KEEP)
+
+	
+	g_retreated_tanks = 0
+	g_Building_place = false
+	sg_target_enemy_total= SGroup_CreateIfNotFound("sg_target_enemy_total")
+	
+	
+	
+--///////////////////////////////////////////////////////
+
+
+	
+	t_pain_train = {
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_pain_tank_1"),
+			sbp = SBP.CW.COMMANDOS_PIAT,
+			pos = mkr_wa_pain_generator,
+			dest = eg_pl_hq,
+			umbrella = SGroup_CreateIfNotFound("sg_pain_train"),
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_pain_tank_2"),
+			sbp = SBP.CW.COMMANDOS_PIAT,
+			pos = mkr_wa_pain_generator,
+			dest = eg_pl_hq,
+			umbrella = SGroup_CreateIfNotFound("sg_pain_train"),
+			
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_pain_tank_3"),
+			sbp = SBP.CW.COMMANDOS_PIAT,
+			pos = mkr_wa_pain_generator,
+			dest = eg_pl_hq,
+			umbrella = SGroup_CreateIfNotFound("sg_pain_train"),
+			
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_pain_tank_4"),
+			sbp = SBP.CW.COMMANDOS_PIAT,
+			pos = mkr_wa_pain_generator,
+			dest = eg_pl_hq,
+			umbrella = SGroup_CreateIfNotFound("sg_pain_train"),
+			
+		},
+		
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_pain_tank_5"),
+			sbp = SBP.CW.COMMANDOS_PIAT,
+			pos = mkr_wa_pain_generator,
+			dest = eg_pl_hq,
+			umbrella = SGroup_CreateIfNotFound("sg_pain_train"),
+			
+		},
+		
+	}
+	
+
+	
+
+end
+
+
+
+function OBJ_Clear_LZ_Kickoff()
+
+	Rule_AddInterval(Rule_Respawn_AT, 0.5)
+	Rule_AddInterval(Rule_LZ_Win_Check, 1)
+	Rule_AddInterval(Rule_AI_Player_Reactions, 30)
+	Rule_AddOneShot(Rule_HMG_Face_Attacker, 5)
+	Rule_AddInterval(Rule_Start_Tanks, 5)
+--	Rule_AddInterval(Rule_Tank_Repair, 5)
+
+	--Rule_AddInterval(Rule_Reinforce_Check, 5)
+	--Rule_AddInterval(Rule_Reinforce_Heal, 5)
+	Rule_AddDelayedInterval(Rule_Generic_Chatter, 60, 45)
+	Rule_AddDelayedInterval(Rule_Chatter_Dialogue, 180, 45)
+	
+	Util_AutoIntel(t_obj_clear_lz_chatter.intro_1)
+	Rule_AddInterval(Rule_Intro_Speech_Second, 3)
+	Rule_AddInterval(Rule_LZ1_Mortar_Speech_1, 5)
+
+	Rule_AddInterval(Rule_LZ1_AT_Speech, 5)
+	Rule_AddDelayedInterval(Rule_Speech_Voss, 300, 5)
+	Rule_AddDelayedInterval(Rule_LZ2_Flamer_Speech, 180, 5)
+	Rule_AddDelayedInterval(Rule_LZ2_Garisson_Speech, 180, 5)
+	Rule_AddDelayedInterval(Rule_LZ3_Armor_Contact_Speech, 300, 5)
+	Rule_AddDelayedInterval(Rule_LZ3_AT_In_Range_Speech, 300, 5)
+	Rule_AddDelayedInterval(Rule_LZ3_Garisson_Speech, 300, 5)
+	Rule_AddDelayedInterval(Rule_LZ4_Mortar_Speech, 500, 5)
+	Rule_AddDelayedInterval(Rule_LZ4_AT_Speech, 500, 5)
+	Rule_AddDelayedInterval(Rule_Reinforcement_Chatter, 200, 45)
+	Rule_AddInterval(Rule_HMG_Speech, 5)
+	Rule_AddDelayedInterval(Rule_Glider_Plans_Conversation, 60, 15)
+	Rule_AddDelayedInterval(Rule_Glider_Defence_Chatter, 180, 45)
+	Rule_AddInterval(Rule_AA_Increase_PopCap, 1)
+	Rule_AddInterval(Rule_HQ_Defeat, 1)
+	Rule_AddDelayedInterval(Rule_Sniper_OBJ_Start_Monitor, 2, 0.1)
+	Rule_AddInterval(Rule_Building_Collapse, 5)
+	
+	Rule_AddOneShot(Rule_Highlight_Builder, 0.5)
+	
+	Rule_AddInterval(Rule_AT_Warning, 1)
+	Rule_AddInterval(Rule_Flash_Veterancy, 0.5)
+	
+	Rule_AddInterval(Rule_Highlight_Point, 1)
+	Rule_AddOneShot(Rule_Imminent_Player_Death, 600)
+	
+	Player_GetAll(player2, sg_target_enemy_total)
+	g_enemy_units_initial = SGroup_Count(sg_target_enemy_total)
+end
+
+function Rule_Imminent_Player_Death()
+
+	Player_GetAll(player2, sg_target_enemy_total)
+	
+	if SGroup_Count(sg_target_enemy_total) == g_enemy_units_initial then
+		
+		Rule_AddInterval(Rule_Send_The_Pain, 5)
+
+	end
+end
+
+function Rule_Send_The_Pain()
+
+	
+	for k, this in pairs (t_pain_train) do
+		if SGroup_IsEmpty(this.sgroup) then
+			Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos, this.dest, 1, nil, true)
+			SGroup_AddGroup(this.umbrella, this.sgroup)
+			break 
+		end
+	end	
+
+end
+
+function Rule_Flash_Veterancy()
+
+
+	if Misc_IsEGroupSelected(eg_pl_hq, true) then
+
+		Flash_VetID = UI_FlashBinding("entity_veterancy_menu_button", true, BT_UI_Strong_CommandBtn)
+		Hint_VetID = HintPoint_AddToTaskbarBinding("entity_veterancy_menu_button", 1429123, true)
+		
+		Rule_Add(Rule_Remove_Veterancy_Flash)
+		Rule_RemoveMe()
+	end
+end
+
+function Rule_Remove_Veterancy_Flash()
+
+	if Misc_IsEGroupSelected(eg_pl_hq, true) == false then
+		HintPoint_Remove(Hint_VetID)
+		UI_StopFlashing(Flash_VetID)
+		Rule_RemoveMe()
+	end
+end
+
+function Rule_Highlight_Point()
+
+	if EGroup_IsOnScreen(player1, eg_point_1, ALL) then
+	
+	
+	
+		stratpointID =	HintPoint_Add(eg_point_1, true, 1429124)
+		Rule_AddInterval(Rule_Remove_Strat_Point_HP, 1)
+	
+		Rule_RemoveMe()
+		
+	end
+
+
+end
+
+function Rule_Remove_Strat_Point_HP()
+
+	if EGroup_IsCapturedByPlayer(eg_point_1, player1, ALL) then
+
+		HintPoint_Remove(stratpointID)
+		Rule_RemoveMe()
+	end
+end
+
+function Rule_AT_Warning()
+
+	for i = 1, SGroup_CountSpawned(sg_global_at) do
+		
+		SGroup_Clear(sg_attacking_at)
+		local squadID = SGroup_GetSpawnedSquadAt(sg_global_at, i)
+		
+	
+		if Squad_IsAttacking(squadID, 1) then
+	
+			SGroup_Add(sg_attacking_at, squadID)
+			g_AT_threatID = ThreatArrow_CreateGroup(sg_attacking_at)
+			Rule_AddOneShot(Rule_Remove_AT_Warning, 10)
+			Rule_RemoveMe()
+			return
+		end
+	end
+
+end
+
+
+
+function Rule_Remove_AT_Warning()
+
+
+	ThreatArrow_Remove(g_AT_threatID, sg_attacking_at)
+
+
+end
+
+function Rule_Highlight_Builder()
+
+	UI_SetBuildingPlacementCallback(callback_building_kampfgruppe)
+	g_BuilderHPID = HintPoint_Add(sg_builder, true, 1429102)
+	Rule_AddInterval(Rule_Builder_Selection, 0.5)
+	if Rule_Exists(Rule_Remove_Construction_HP) == false then
+		Rule_AddOneShot(Rule_Remove_Construction_HP, 60)
+	else
+		Rule_Remove(Rule_Remove_Construction_HP)
+		Rule_AddOneShot(Rule_Remove_Construction_HP, 60)
+	
+	end
+end
+
+function Rule_Remove_Construction_HP()
+
+	if g_Construct_HintID ~= nil then
+		HintPoint_Remove(g_Construct_HintID)
+	end
+	
+	
+	if g_Construct_FlashID ~= nil then
+	
+		UI_StopFlashing(g_Construct_FlashID)
+	end
+	
+	Rule_RemoveMe()
+end
+
+function Rule_Builder_Selection()
+	sg_all_builders = SGroup_CreateIfNotFound("sg_all_builders")
+	Player_GetAll(player1, sg_all_builders)
+	SGroup_Filter(sg_all_builders, SBP.ELITE.PANZERGRENADIER, FILTER_KEEP)
+
+	if Misc_IsSGroupSelected(sg_all_builders, ANY) then
+	
+		if g_Building_place == false then
+			g_Construct_FlashID = UI_FlashConstructionMenu("tp_construction_panzer_elite_basic", true, BT_UI_Strong_CommandBtn)
+			g_Construct_HintID = HintPoint_AddToConstructionMenu("tp_construction_panzer_elite_basic", 1429121, true)
+		end
+		HintPoint_Remove(g_BuilderHPID)
+		Rule_AddInterval(Rule_Build_Menu_Selected, 0.5)
+	
+		Rule_RemoveMe()
+		
+	end
+
+end
+
+function Rule_Build_Menu_Selected()
+	if g_Building_place == false then
+		if _ConstructionMenuStatus == "tp_construction_panzer_elite_basic" then
+			
+			g_KampfID = UI_FlashConstructionButton(EBP.ELITE.KAMPFGRUPPE, true, BT_UI_Strong_CommandBtn)
+			g_KampfHINTID = HintPoint_AddToConstructionButton(EBP.ELITE.KAMPFGRUPPE, 1429122, true)
+				
+			
+			Rule_AddInterval(Rule_Sappers_Deselected, 0.5)
+			
+			Rule_RemoveMe()
+			
+		elseif Misc_IsSGroupSelected(sg_all_builders, ANY) == false then
+			
+			Rule_RemoveMe()
+			
+			if g_KampfID ~= nil then
+				UI_StopFlashing(g_KampfID)
+			end
+			
+			if g_KampfHINTID ~= nil then
+				HintPoint_Remove(g_KampfHINTID)
+			end
+			HintPoint_Remove(g_BuilderHPID)
+			
+			Rule_Highlight_Builder()
+		end
+	else
+
+		Rule_RemoveMe()
+	
+	end
+
+end
+
+
+
+-- the howitzer is building
+function Rule_Sappers_Deselected()
+
+	if Misc_IsSGroupSelected(sg_all_builders, ANY) == false then
+		
+		UI_ClearBuildingPlacementCallback()
+		
+		Rule_Highlight_Builder()
+		
+		HintPoint_Remove(g_BuildingHPID)
+		Rule_RemoveMe()
+		
+	end
+
+
+end
+
+
+
+-- callback function, keeps the table that states which menu the player is in updated
+function _ConstructionMenuCallback(menu, bool)
+	if bool == true then
+		_ConstructionMenuStatus = menu
+	else
+		_ConstructionMenuStatus = nil
+	end
+end
+
+
+-- callback function deals with stages for building the AT gun
+function callback_building_kampfgruppe(ebp, phase)
+	
+	if ebp == EBP.ELITE.KAMPFGRUPPE then
+		
+		-- placing
+		if phase == CP_Selected then
+			
+			Camera_MoveToPosition(mkr_wa_kompanie, true, SLOW_CAMERA_PANNING)
+			
+			if g_BuildingHPID == nil then
+				g_BuildingHPID = HintPoint_Add(mkr_wa_kompanie,true,1429120)
+			end
+			
+			
+		-- rotating
+		elseif phase == CP_StartedPlacing then
+
+			
+		-- placed
+		elseif phase == CP_FinishedPlacing then
+			print("CP_FinishedPlacing")
+			HintPoint_Remove(g_BuildingHPID)
+			UI_ClearBuildingPlacementCallback()
+			g_Building_place = true
+			Rule_RemoveIfExist(Rule_Sappers_Deselected)
+			
+		end
+		
+	end		
+	
+end
+
+
+
+
+--///////////////////////////////////////////////
+
+function Rule_Intro_Speech_Second()
+
+	if Event_IsAnyRunning() == false then
+	
+		Util_AutoIntel(t_obj_clear_lz_chatter.intro_2)
+	
+		Rule_RemoveMe()
+	end
+
+
+end
+
+
+
+
+
+
+function Rule_LZ1_Setup_Weapons()
+
+
+	--get the team weapons to set up
+	for k, this in pairs (t_lz1_start) do
+		if SGroup_HasTeamWeapon(this.sgroup, true) then		
+			Cmd_InstantSetupTeamWeapon(this.sgroup)
+			
+		end
+	end
+
+
+end
+
+
+function Rule_AA_Increase_PopCap()
+	
+	if g_player_cap_increased < table.getn(t_aa_wpn_ID) then
+		for k, this in ipairs(t_aa_wpn_ID) do
+			
+	
+			if SyncWeapon_IsOwnedByPlayer(this.syncwpn, player1) and this.popcap == false then
+				
+				g_player_cap = g_player_cap +5
+				g_player_cap_increased = g_player_cap_increased+1
+				Player_SetPopCapOverride(player1, g_player_cap)
+				this.popcap = true
+				
+			end
+		end
+		
+	else
+	
+		Rule_RemoveMe()
+	
+	end
+end
+
+function Rule_LZ_Win_Check()
+	
+	local num_points_captured = 0
+	
+	--cycles through all the points that represent the landing zones
+	for k, this in ipairs(t_LZ_Points) do
+	
+		--is the point owned by the player?
+		if EGroup_IsCapturedByPlayer(this.Strat_Point, player1, true) and this.point_captured == false then
+				
+				--set a variable to this effect
+				this.point_captured = true
+				
+				--remove the map ping
+				Objective_RemoveUIElements(OBJ_Clear_LZ,OBJ_Clear_LZ.mapElementID[k])
+				
+				--this is to ensure that the paratroopers drop on the last point captured by the player.
+				g_target_drop_zone = this.Strat_Point
+				
+				
+				SGroup_AddGroup(sg_Garrissoned_Retreat,this.retreat)				
+				
+				if Rule_Exists(Rule_Retreat_Zone) == false then
+					Rule_AddInterval(Rule_Retreat_Zone, 5)
+					
+				end
+				if Rule_Exists(Rule_Retreat_Ungarrison_Zone, 10) == false then
+				
+					Rule_AddInterval(Rule_Retreat_Ungarrison_Zone, 10)
+				end
+						
+		--if the point is owned by the AI
+		elseif EGroup_IsCapturedByPlayer(this.Strat_Point, player2, true) and this.point_captured == true then
+			
+			--set a variable to this effect
+			this.point_captured = false
+		
+			--re-add the map ping
+			OBJ_Clear_LZ.mapElementID[k] = Objective_AddUIElements(OBJ_Clear_LZ, this.Strat_Point, true, false, false, 2)
+							
+		end
+	end
+	
+	--cycle through all the points
+	for k, this in pairs(t_LZ_Points) do
+	
+		if this.point_captured == true then
+			
+			--increase the number of points captured
+			num_points_captured = num_points_captured +1
+				
+				--if it equals the total number of points then the objective is complete			
+				if num_points_captured == table.getn(t_LZ_Points) then
+			
+					Util_AutoIntel(t_LZ_Points[4].speech)
+					Objective_Complete(OBJ_Clear_LZ)
+					
+					Rule_RemoveMe()
+				
+				elseif num_points_captured == 1 and g_speech_1_played == false then
+				
+					Util_AutoIntel(t_LZ_Points[1].speech)
+					g_speech_1_played = true
+					
+					table.insert(t_inf_unit_repository, t_force_5)
+					table.insert(t_inf_unit_repository, t_force_6)
+					table.insert(t_inf_unit_repository, t_force_11)
+					table.insert(t_inf_unit_repository, t_force_14)
+				
+				elseif num_points_captured == 2 and g_speech_2_played == false then
+				
+					Util_AutoIntel(t_LZ_Points[2].speech)
+					g_speech_2_played = true
+
+				
+				elseif num_points_captured == 3 and g_speech_3_played == false then
+				
+					Util_AutoIntel(t_LZ_Points[3].speech)
+					g_speech_3_played = true
+				
+				end
+		end
+	end
+		
+end
+
+function Rule_Retreat_Zone()
+
+
+	Cmd_Retreat(sg_Garrissoned_Retreat, mkr_wa_retreat_point, mkr_wa_retreat_point)
+
+end
+
+function Rule_Retreat_Ungarrison_Zone()
+
+
+	Cmd_UngarrisonSquad(sg_Garrissoned_Retreat)
+
+end
+
+function Rule_LZ1_Mortar_Speech_1()
+
+	if SGroup_IsEmpty(SGroup_FromName("sg_lz1_5")) and SGroup_IsEmpty(SGroup_FromName("sg_lz1_6")) then
+	
+		Rule_RemoveMe()
+
+	elseif Event_IsAnyRunning() == false and 
+	(SGroup_IsDoingAttack(SGroup_FromName("sg_lz1_5"), ANY, 5) or SGroup_IsDoingAttack(SGroup_FromName("sg_lz1_6"), ANY, 5))   then
+
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ1_warning_mortars)
+		Rule_AddDelayedInterval(Rule_LZ1_Mortar_Speech_2, 30, 5)
+		Rule_RemoveMe()
+	
+	
+	
+	end
+
+end
+
+
+function Rule_LZ1_Mortar_Speech_2()
+
+	if SGroup_IsEmpty(SGroup_FromName("sg_lz1_5")) and SGroup_IsEmpty(SGroup_FromName("sg_lz1_6")) then
+	
+		Rule_RemoveMe()
+
+	elseif Event_IsAnyRunning() == false and 
+	(SGroup_IsDoingAttack(SGroup_FromName("sg_lz1_5"), ANY, 5) or SGroup_IsDoingAttack(SGroup_FromName("sg_lz1_6"), ANY, 5))  then
+
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ1_advice_mortars)
+	
+		Rule_RemoveMe()
+		
+	
+	end
+
+end
+
+
+
+
+
+function Rule_LZ1_AT_Speech()
+
+	if SGroup_IsEmpty(SGroup_FromName("sg_lz1_8")) and SGroup_IsEmpty(SGroup_FromName("sg_lz4_4")) then
+	
+		Rule_RemoveMe()
+
+	elseif Event_IsAnyRunning() == false and 
+	(SGroup_IsDoingAttack(SGroup_FromName("sg_lz1_8"), ANY, 5) or SGroup_IsDoingAttack(SGroup_FromName("sg_lz4_4"), ANY, 5)) then
+
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ1_advice_AT)
+		Rule_AddDelayedInterval(Rule_Speech_Big_Guns, 60, 5)
+		Rule_RemoveMe()
+		
+	
+	end
+
+end
+
+
+function Rule_Speech_Voss()
+	
+	if Event_IsAnyRunning() == false and SGroup_IsUnderAttack(sg_player_squads, ANY, 1) == false then
+		
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ1_comment_voss)
+		Rule_RemoveMe()
+	end
+end
+
+
+
+function Rule_Speech_Big_Guns()
+
+	if Event_IsAnyRunning() == false and SGroup_IsUnderAttack(sg_player_squads, ANY, 1) == false then
+		
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ1_comment_big_guns)
+		Rule_RemoveMe()
+	end
+end
+
+
+function Rule_Speech_Staying()
+
+	if Event_IsAnyRunning() == false and SGroup_IsEmpty(SGroup_FromName("sg_lz1_7")) and SGroup_IsUnderAttack(sg_player_squads, ANY, 1) == false then
+	
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ1_comment_cover)
+		Rule_RemoveMe()
+	
+	end
+
+
+end
+
+
+function Rule_LZ2_Flamer_Speech()
+
+	if SGroup_IsEmpty(SGroup_FromName("sg_lz2_1")) and SGroup_IsEmpty(SGroup_FromName("sg_lz2_2")) and SGroup_IsEmpty(SGroup_FromName("sg_lz2_6")) and SGroup_IsEmpty(SGroup_FromName("sg_lz2_pat_1")) then
+	
+		Rule_RemoveMe()
+
+	elseif Event_IsAnyRunning() == false and (SGroup_IsDoingAttack(SGroup_FromName("sg_lz2_1"), ANY, 5) or SGroup_IsDoingAttack(SGroup_FromName("sg_lz2_2"), ANY, 5) 
+	or SGroup_IsDoingAttack(SGroup_FromName("sg_lz2_6"), ANY, 5) or SGroup_IsDoingAttack(SGroup_FromName("sg_lz2_pat_1"), ANY, 5))
+	  then
+	
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ2_comment_flamethrowers)
+		
+		Rule_RemoveMe()
+		
+	
+	end
+
+end
+
+
+function Rule_LZ2_Garisson_Speech()
+
+	if SGroup_IsEmpty(SGroup_FromName("sg_lz2_4"))then
+	
+		Rule_RemoveMe()
+
+	elseif Event_IsAnyRunning() == false and SGroup_IsDoingAttack(SGroup_FromName("sg_lz2_4"), ANY, 5)  then
+
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ2_comment_barracks)
+		Rule_AddDelayedInterval(Rule_LZ2_Garrison_Speech_Second_part, 10, 1)
+		
+		Rule_RemoveMe()
+		
+	
+	end
+
+end
+
+
+
+function Rule_LZ2_Garrison_Speech_Second_part()
+
+	if SGroup_IsEmpty(SGroup_FromName("sg_lz2_4"))then
+	
+		Rule_RemoveMe()
+
+	elseif Event_IsAnyRunning() == false and SGroup_IsDoingAttack(SGroup_FromName("sg_lz2_4"), ANY, 5)  then
+
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ2_comment_commandos)
+				
+		Rule_RemoveMe()
+		
+	
+	end
+
+
+end
+
+
+function Rule_LZ3_Armor_Contact_Speech()
+
+	if SGroup_IsEmpty(SGroup_FromName("sg_lz3_tank_1")) and SGroup_IsEmpty(SGroup_FromName("sg_lz3_tank_2")) and SGroup_IsEmpty(SGroup_FromName("sg_lz3_tank_3")) then
+	
+		Rule_RemoveMe()
+
+	elseif Event_IsAnyRunning() == false and (SGroup_IsDoingAttack(SGroup_FromName("sg_lz3_tank_1"), ANY, 5) 
+	or SGroup_IsDoingAttack(SGroup_FromName("sg_lz3_tank_2"), ANY, 5) or SGroup_IsDoingAttack(SGroup_FromName("sg_lz3_tank_3"), ANY, 5)) then
+
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ3_advice_armor)
+		Rule_AddInterval(Rule_Tetrarch_Advice, 15)
+		Rule_RemoveMe()
+		
+	
+	end
+
+end
+
+
+
+function Rule_LZ3_AT_In_Range_Speech()
+
+	if SGroup_IsEmpty(SGroup_FromName("sg_lz3_4")) and SGroup_IsEmpty(SGroup_FromName("sg_lz3_5")) and SGroup_IsEmpty(SGroup_FromName("sg_lz3_6")) then
+	
+		Rule_RemoveMe()
+
+	elseif Event_IsAnyRunning() == false and (SGroup_IsDoingAttack(SGroup_FromName("sg_lz3_4"), ANY, 5) 
+	or SGroup_IsDoingAttack(SGroup_FromName("sg_lz3_5"), ANY, 5) or SGroup_IsDoingAttack(SGroup_FromName("sg_lz3_6"), ANY, 5)) then
+
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ3_advice_AT)
+		
+		Rule_RemoveMe()
+		
+	
+	end
+
+end
+
+function Rule_LZ3_Garisson_Speech()
+
+	if SGroup_IsEmpty(SGroup_FromName("sg_lz3_2"))then
+	
+		Rule_RemoveMe()
+
+	elseif Event_IsAnyRunning() == false and SGroup_IsDoingAttack(SGroup_FromName("sg_lz3_2"), ANY, 5)  then
+
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ3_comment_cover)
+		
+		Rule_RemoveMe()
+		
+	
+	end
+
+end
+
+function Rule_LZ4_Mortar_Speech()
+
+	if SGroup_IsEmpty(SGroup_FromName("sg_lz4_5")) and SGroup_IsEmpty(SGroup_FromName("sg_lz4_6")) then
+	
+		Rule_RemoveMe()
+
+	elseif Event_IsAnyRunning() == false and (SGroup_IsDoingAttack(SGroup_FromName("sg_lz4_5"), ANY, 5) 
+	or SGroup_IsDoingAttack(SGroup_FromName("sg_lz4_6"), ANY, 5)) then
+
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ4_advice_mortar)
+		Rule_AddInterval(Rule_LZ4_Chatter, 45)
+		Rule_AddInterval(Rule_See_Glider_Chatter, 10)
+		Rule_RemoveMe()
+		
+	
+	end
+
+end
+
+function Rule_LZ4_AT_Speech()
+
+	if SGroup_IsEmpty(SGroup_FromName("sg_lz4_7")) and SGroup_IsEmpty(SGroup_FromName("sg_lz4_8")) then
+	
+		Rule_RemoveMe()
+
+	elseif Event_IsAnyRunning() == false and (SGroup_IsDoingAttack(SGroup_FromName("sg_lz4_7"), ANY, 5) 
+	or SGroup_IsDoingAttack(SGroup_FromName("sg_lz4_8"), ANY, 5)) then
+
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ4_advice_AT)
+		
+		Rule_RemoveMe()
+		
+	
+	end
+
+end
+
+
+function Rule_LZ4_Chatter()
+
+
+	if table.getn(t_obj_clear_lz_chatter.LZ4_chatter_asylum) >  0 and Event_IsAnyRunning() == false and SGroup_IsUnderAttack(sg_player_squads, ANY, 1) == false then
+					
+		i = World_GetRand(1, table.getn(t_obj_clear_lz_chatter.LZ4_chatter_asylum))
+	
+		Util_AutoAmbient(t_obj_clear_lz_chatter.LZ4_chatter_asylum[i])
+		table.remove(t_obj_clear_lz_chatter.LZ4_chatter_asylum, i)
+		
+		
+	elseif table.getn(t_obj_clear_lz_chatter.LZ4_chatter_asylum) <=  0 then
+	
+		Rule_RemoveMe()
+		
+	end
+
+
+end
+
+
+function Rule_See_Glider_Chatter()
+
+	if  Event_IsAnyRunning() == false and Player_CanSeeEGroup(player1, eg_lz1_hq, ALL)  then
+		Util_AutoAmbient(t_obj_clear_lz_chatter.mission_tactical_gliderhq)
+		Rule_RemoveMe()
+	end
+
+end
+
+
+
+function Rule_Chatter_Dialogue()
+
+	sg_player1_all_units = Player_GetSquads(player1)
+	if Event_IsAnyRunning()== false and SGroup_IsUnderAttack(sg_player1_all_units, ANY, 1) == false  then
+	
+		Util_AutoAmbient(t_obj_clear_lz_chatter.mission_comment_wonder_dialogue1)
+		Util_AutoAmbient(t_obj_clear_lz_chatter.mission_comment_wonder_dialogue2)
+		Util_AutoAmbient(t_obj_clear_lz_chatter.mission_comment_wonder_dialogue3)
+		
+		Rule_RemoveMe()
+		
+	end
+
+end
+
+
+
+function Rule_Chatter_Dialogue_Obj_Accomplished()
+
+	
+	if Event_IsAnyRunning()== false and SGroup_IsUnderAttack(sg_player_squads, ANY, 1) == false   then
+	
+		Util_AutoAmbient(t_obj_clear_lz_chatter.mission_accomplished_dialogue1)
+		Util_AutoAmbient(t_obj_clear_lz_chatter.mission_accomplished_dialogue5)
+
+
+		
+		Rule_RemoveMe()
+		
+	end
+
+end
+
+function Rule_Faster_Objective()
+
+	Rule_AddInterval(Rule_Pre_Counterattack, 4)
+	Rule_AddOneShot(Rule_Delay_OBJ_Counterattack_Start, 7)
+	Rule_RemoveMe()
+			
+end
+
+
+function Rule_Tetrarch_Advice()
+	local i = World_GetRand(1,3)
+
+	if Event_IsAnyRunning() == false and SGroup_IsEmpty(SGroup_FromName("sg_lz3_tanks")) == false then
+	
+		if i == 1 then
+			
+			Util_AutoAmbient(t_obj_clear_lz_chatter.mission_tactical_tetrarch_infantry)
+			Rule_RemoveMe()
+			
+		elseif i == 2 then
+		
+			Util_AutoAmbient(t_obj_clear_lz_chatter.mission_tactical_tetrarch)
+			Rule_RemoveMe()
+		
+		elseif i == 3 then
+		
+			Util_AutoAmbient(t_obj_clear_lz_chatter.mission_tactical_tetrarch_grenades)
+			Rule_RemoveMe()
+		
+		end
+	
+	end	
+
+end
+
+function Rule_Reinforcement_Chatter()
+
+
+	if table.getn(t_obj_clear_lz_chatter.mission_comment_recruit_children) >  0 and Event_IsAnyRunning() == false and SGroup_IsUnderAttack(sg_player_squads, ANY, 1) == false then
+					
+		i = World_GetRand(1, table.getn(t_obj_clear_lz_chatter.mission_comment_recruit_children))
+	
+		Util_AutoAmbient(t_obj_clear_lz_chatter.mission_comment_recruit_children[i])
+		table.remove(t_obj_clear_lz_chatter.mission_comment_recruit_children, i)
+		
+		
+	elseif table.getn(t_obj_clear_lz_chatter.mission_comment_recruit_children) <=  0 then
+	
+		Rule_RemoveMe()
+		
+	end
+
+
+end
+
+
+function Rule_HMG_Speech()
+
+	eg_HMG_Filter_buildings = EGroup_CreateIfNotFound("eg_HMG_Filter_buildings")
+	sg_HMG_Filter_squads = SGroup_CreateIfNotFound("sg_HMG_Filter_squads")
+
+	t_HMG_Filter = {SBP.CW.COMMANDOS_MG}
+	
+	Player_GetAll(player2, sg_HMG_Filter_squads, eg_HMG_Filter_buildings)
+	EGroup_Clear(eg_HMG_Filter_buildings)
+	SGroup_Filter(sg_HMG_Filter_squads, t_HMG_Filter, FILTER_KEEP)
+
+	if SGroup_IsEmpty(sg_HMG_Filter_squads) then
+	
+		Rule_RemoveMe()
+
+	elseif Event_IsAnyRunning() == false and SGroup_IsDoingAttack(sg_HMG_Filter_squads, ANY, 5) then
+
+		Util_AutoAmbient(t_obj_clear_lz_chatter.mission_tactical_HMG)
+		Rule_AddDelayedInterval(Rule_HMG_Speech_Advice, 15, 5)
+		
+		Rule_RemoveMe()
+		
+	
+	end
+
+end
+
+function Rule_HMG_Speech_Advice()
+
+	if Event_IsAnyRunning() == false and SGroup_IsUnderAttack(sg_player_squads, ANY, 1) == false then
+
+		Util_AutoAmbient(t_obj_clear_lz_chatter.mission_tactical_HMG_advice)
+		Rule_RemoveMe()
+		
+	end
+end
+
+function Rule_Glider_Plans_Conversation()
+
+
+	if EGroup_Count(eg_all_glider_hq) < 3 and Event_IsAnyRunning() == false then
+	
+		Util_AutoAmbient(t_obj_clear_lz_chatter.ambient_plans_dialogue1)
+		Util_AutoAmbient(t_obj_clear_lz_chatter.ambient_plans_dialogue2)
+		Util_AutoIntel(t_obj_clear_lz_chatter.ambient_plans_dialogue3)
+		Util_AutoIntel(t_obj_clear_lz_chatter.ambient_plans_dialogue6)
+		Util_AutoIntel(t_obj_clear_lz_chatter.ambient_plans_dialogue4)
+		Util_AutoIntel(t_obj_clear_lz_chatter.ambient_plans_dialogue5)
+		Util_AutoIntel(t_obj_clear_lz_chatter.ambient_plans_dialogue7)
+		Util_AutoIntel(t_obj_clear_lz_chatter.ambient_plans_dialogue8)
+	
+	
+		Rule_RemoveMe()
+	
+	end
+
+
+
+end
+
+
+
+function Rule_Glider_Defence_Chatter()
+
+	if table.getn(t_generic_british_glider) >  0 and Event_IsAnyRunning() == false then
+		if EGroup_IsEmpty( eg_all_glider_hq ) == false 	and EGroup_IsUnderAttack(eg_all_glider_hq, ANY, 1) then
+			
+			
+			i = World_GetRand(1, table.getn(t_generic_british_glider))
+		
+			Util_AutoAmbient(t_generic_british_glider[i])
+			table.remove(t_generic_british_glider, i)
+		
+		end
+	elseif table.getn(t_generic_british_glider) <=  0 then
+	
+		Rule_RemoveMe()
+		
+	end
+
+end
+
+function Rule_Chatter_Remove()
+
+	Rule_Remove(Rule_LZ4_Chatter)
+	Rule_Remove(Rule_Reinforcement_Chatter)
+
+end
+
+
+function Rule_AI_Player_Reactions()
+
+	--first check to see if the HQ is still in one piece to avoid spawning out of thin air.
+	if EGroup_GetAvgHealth(eg_lz1_hq) > 0 then
+		
+		--get all the AI player's in a group
+		SGroup_Clear(sg_enemy_squads)
+		SGroup_AddGroup(sg_enemy_squads, sg_player2_all_units)
+				
+		--get the player's units in a group
+		Player_GetAll(player1, sg_player_squads, eg_player_buildings)
+	
+		for i = 1, SGroup_CountSpawned(sg_enemy_squads) do
+	
+			--checks to see if any of the AI's units are being attacked
+			if SGroup_IsUnderAttack(sg_enemy_squads, false, 1) then
+			
+				SGroup_Clear(sg_under_attack)
+				SGroup_Add(sg_under_attack, SGroup_GetSpawnedSquadAt(sg_enemy_squads, i))
+				
+				--check to see which specific squad is being attacked.
+				if SGroup_IsUnderAttack(sg_under_attack, true, 1) then
+					
+					SGroup_Clear(sg_attacker)
+					
+					--what is attacking me?
+					SGroup_GetLastAttacker(sg_under_attack, sg_attacker)
+						
+						--is there a force ready to go help those being attacked?
+						if SGroup_IsEmpty(sg_inf_relief_force) == false and g_inf_relief_force_in_progress == false then
+			
+							--is it doing something?
+							if SGroup_IsIdle(sg_inf_relief_force, true) then
+								
+								for i = 1, SGroup_CountSpawned(sg_inf_relief_force) do
+									
+									local pos = Util_GetRandomPosition(SGroup_GetPosition(sg_under_attack), 25)
+								
+									g_inf_target_pos = pos
+									
+									_sg_temp_relief = SGroup_CreateIfNotFound("_sg_temp_relief")
+									SGroup_Clear(_sg_temp_relief)
+									SGroup_Add(_sg_temp_relief, SGroup_GetSpawnedSquadAt(sg_inf_relief_force,i))
+									Cmd_AttackMove(_sg_temp_relief, pos, nil, nil, 20)
+								end	
+									break
+							
+							else
+			
+								break
+						
+							end	
+						
+						elseif SGroup_IsEmpty(sg_inf_relief_force) and g_inf_relief_force_in_progress == false then
+							
+							
+							
+							--this is the target they will be attacking when spawned
+							g_inf_target_pos = SGroup_GetPosition(sg_under_attack)
+							
+							Rule_AddOneShot(Rule_Create_INF_Relief_Force, 1)
+							break
+						
+						end
+						
+				end
+			else
+		
+		
+			end
+		end
+	else
+			
+		Rule_RemoveMe()
+	end	
+end
+
+
+
+
+function Rule_Create_INF_Relief_Force()
+
+	--first check to see if the HQ is still in one piece to avoid spawning out of thin air.
+	if EGroup_GetAvgHealth(eg_lz1_hq) > 0 then
+		g_inf_relief_force_in_progress = true
+				
+		g_force_selected = World_GetRand(1, table.getn(t_inf_unit_repository))	
+
+		print("creating an attack force")
+		Rule_AddInterval(Rule_Spawn_Infantry_Relief, 10)
+		Rule_RemoveMe()
+			
+	else
+	
+		Rule_RemoveMe()
+	
+	end
+
+end
+
+
+
+function Rule_Spawn_Infantry_Relief()
+	
+	
+	local h = g_force_selected
+	--first check to see if the HQ is still in one piece to avoid spawning out of thin air.
+	if EGroup_GetAvgHealth(eg_lz1_hq) > 0 then
+	
+		local i = g_relief_infantry_iter 
+		if g_relief_infantry_iter <= table.getn(t_inf_unit_repository[h]) then
+					
+			local _sgroup = SGroup_CreateIfNotFound("_sgroup")
+			local pos = Util_GetRandomPosition(mkr_wa_relief_spawn, 15)
+			
+			Util_CreateSquads(player2, _sgroup, t_inf_unit_repository[h][i].sbp, pos)
+			SGroup_AddGroup(sg_inf_relief_force, _sgroup)
+			SGroup_AddGroup(sg_player2_all_units, _sgroup)
+			
+				if t_inf_unit_repository[h][i].upgrade ~= false then
+				
+					Cmd_Upgrade(_sgroup, t_inf_unit_repository[h][i].upgrade)
+				
+				end
+					
+		elseif g_relief_infantry_iter > table.getn(t_inf_unit_repository[h]) then
+			
+			g_relief_infantry_iter = 1
+			g_inf_relief_force_in_progress = false	
+			
+			--once all the units have been spawned send the force to its destination
+			
+			for i = 1, SGroup_CountSpawned(sg_inf_relief_force) do
+				
+				local pos = Util_GetRandomPosition(g_inf_target_pos, 25)
+				
+				_sg_temp_relief = SGroup_CreateIfNotFound("_sg_temp_relief")
+				 SGroup_Clear(_sg_temp_relief)
+				SGroup_Add(_sg_temp_relief, SGroup_GetSpawnedSquadAt(sg_inf_relief_force,i))
+				Cmd_AttackMove(_sg_temp_relief, pos, nil, nil, 20)
+			
+			end
+			
+			Rule_RemoveMe()
+			
+			
+		end
+		g_relief_infantry_iter = g_relief_infantry_iter+1
+	
+	else
+	
+		Rule_RemoveMe()
+
+	end
+end
+
+
+function Rule_HMG_Face_Attacker()
+
+	sg_HMG_squads = SGroup_CreateIfNotFound("sg_HMG_squads")
+	eg_HMG_buildings = EGroup_CreateIfNotFound("eg_HMG_buildings")
+	
+	
+	t_HMG = {SBP.CW.COMMANDOS_MG, SBP.CW.COMMANDOS_AT_57MM_SP}
+	
+	Player_GetAll(player2, sg_HMG_squads, eg_HMG_buildings)
+	EGroup_Clear(eg_HMG_buildings)
+	SGroup_Filter(sg_HMG_squads, t_HMG, FILTER_KEEP)
+	local size = SGroup_CountSpawned(sg_HMG_squads)
+	
+	for i = 1, size do
+	
+		SGroup_Add(SGroup_CreateIfNotFound("sgroup_HMG_AT_"..i), SGroup_GetSpawnedSquadAt(sg_HMG_squads, i))
+		ATGun_AddGroup(SGroup_FromName("sgroup_HMG_AT_"..i),player1)
+
+	end
+	
+end
+
+function Rule_Start_Tanks()
+
+	for a,b in pairs(t_lz3_tanks) do
+
+		if SGroup_GetAvgHealth(b.sgroup) <= 0.5 and b.status == "ready" then
+			
+			if g_retreated_tanks ~= 1 then
+			
+				Cmd_Move(b.sgroup, b.retreat_pos,false, true)
+			end
+			
+				g_retreated_tanks = g_retreated_tanks +1
+				
+			
+			if g_repair_speech == false and Event_IsAnyRunning() == false and SGroup_IsUnderAttack(sg_player_squads, ANY, 1) == false then
+			
+			
+				Util_AutoAmbient(t_obj_clear_lz_chatter.LZ3_advice_tanks)
+				g_repair_speech = true
+			
+			end
+			
+			b.status = "repair"
+	
+		else
+
+			for k, this in pairs(t_tank_check) do
+			
+				if Player_AreSquadsNearMarker(player1, this) then
+											
+					if SGroup_IsIdle(b.sgroup, ALL) and b.status == "ready" then
+		
+						local pos = Util_GetRandomPosition(this)
+						Cmd_AttackMove(b.sgroup, pos)
+						return
+					
+					end
+					
+			
+				elseif SGroup_IsIdle(b.sgroup, ALL) and b.status == "ready" and Prox_AreSquadsNearMarker(b.sgroup, mkr_wa_tank_repair, ANY) == false then
+										
+					Cmd_Move(b.sgroup, b.retreat_pos)
+					
+				end
+							
+			
+			end
+		end
+		
+
+		
+	end
+			
+
+end
+
+--[[
+function Rule_Tank_Repair()
+	
+	if SGroup_IsEmpty(t_lz3_sappers[1].sgroup) == false then
+
+		for k, this in pairs(t_lz3_tanks) do
+
+			if this.status == "repair" and Prox_AreSquadsNearMarker(this.sgroup, mkr_wa_tank_repair, ALL) then
+
+				if SGroup_IsInHoldEntity(t_lz3_sappers[1].sgroup, ANY) then
+		
+					Cmd_UngarrisonSquad(t_lz3_sappers[1].sgroup,mkr_wa_tank_repair)
+		
+				elseif SGroup_GetAvgHealth(this.sgroup) == 0.999 then
+				
+					
+					this.status = "ready"
+					Cmd_Garrison(t_lz3_sappers[1].sgroup,eg_lz3_building_4)
+		
+				elseif SGroup_GetAvgHealth(this.sgroup) < 1 and SGroup_IsIdle(t_lz3_sappers[1].sgroup, ANY) then
+				
+				
+					Cmd_Ability(t_lz3_sappers[1].sgroup,ABILITY.REPAIR,this.sgroup)
+		
+				
+		
+				end
+			end
+		end
+	
+	else
+	
+		Rule_RemoveMe()
+	end
+end
+]]
+
+--[[
+function Rule_Reinforce_Check()
+
+	local distance = 1000
+	
+	if EGroup_IsEmpty(eg_all_glider_hq) == false then
+		for k, this in pairs(t_player2_sgroups) do
+			
+			if SGroup_IsUnderAttack(this, ALL, 2)== false and SGroup_GetAvgLoadout(this) < 0.999 then
+	
+				if SGroup_HasTeamWeapon(this, ALL) then
+									
+					local sgroup = this
+					local pos = SGroup_GetPosition(this)
+	
+					
+					for i, j in pairs(t_glider_HQ) do
+					print(EGroup_IsEmpty(j.egroup))
+						if EGroup_IsEmpty(j.egroup) == false then
+							if Prox_MarkerSGroup(j.marker, this, PROX_SHORTEST) < distance then
+						
+								target_HQ = j.marker
+								distance = Prox_MarkerSGroup(j.marker, this, PROX_SHORTEST)
+								
+							end
+							
+
+							
+						end
+					end
+									
+						
+						table.insert(t_Reinforcing, {sgroup = sgroup, pos = pos, destination = target_HQ})
+						table.remove(t_player2_sgroups, k)
+							
+						Cmd_Move(this, Util_GetRandomPosition(target_HQ))
+						
+					
+						return
+					
+					
+				elseif SGroup_IsInHoldEntity(this, ALL) then
+								
+					local z = World_GetGameTime()
+					garrison = EGroup_CreateIfNotFound("eg_garrisoned_squad"..z)
+					EGroup_Add(garrison, SGroup_GetGarrisonedBuildingEntity(this))
+					local sgroup = this
+					local garrison_house = garrison
+	
+					for i, j in pairs(t_glider_HQ) do
+						if EGroup_IsEmpty(j.egroup) == false then
+							if Prox_MarkerSGroup(j.marker, this, PROX_SHORTEST) < distance then
+						
+								target_HQ = j.marker
+								distance = Prox_MarkerSGroup(j.marker, this, PROX_SHORTEST)
+								
+							end
+						end
+					end
+					
+					
+						table.insert(t_Reinforcing, {sgroup = sgroup, garrison_house = garrison, destination = target_HQ})
+						table.remove(t_player2_sgroups, k)
+						
+						Cmd_UngarrisonSquad(this)
+									
+						return
+					
+					
+				else
+					
+					local sgroup = this
+					local pos = SGroup_GetPosition(this)
+	
+					for i, j in pairs(t_glider_HQ) do
+						if EGroup_IsEmpty(j.egroup) == false then
+							if Prox_MarkerSGroup(j.marker, this, PROX_SHORTEST) < distance then
+						
+								target_HQ = j.marker
+								distance = Prox_MarkerSGroup(j.marker, this, PROX_SHORTEST)
+						
+							end
+						end
+					end
+				
+					
+						table.insert(t_Reinforcing, {sgroup = sgroup, pos = pos, destination = target_HQ})
+						table.remove(t_player2_sgroups, k)
+						 
+						return
+					
+				end
+			end
+		end
+
+	else
+	
+		Rule_Remove(Rule_Reinforce_Heal)
+		Rule_RemoveMe()
+	
+	end
+end
+
+]]
+
+--[[
+function Rule_Reinforce_Heal()
+	
+	for k, this in pairs(t_Reinforcing) do
+	
+		if Prox_AreSquadsNearMarker(this.sgroup, this.destination, ALL) and SGroup_GetAvgLoadout(this.sgroup) < 0.999 then
+			print("squad near destination and not at full health")
+			Cmd_InstantReinforceUnit(this.sgroup, 1)
+			return		
+				
+		
+		elseif Prox_AreSquadsNearMarker(this.sgroup, this.destination, ALL) and SGroup_GetAvgLoadout(this.sgroup) > 0.999 then
+			print("squad at destination and at full health")
+			if this.garrison_house == nil then
+				
+				Cmd_Move(this.sgroup, this.pos)
+				
+				print("table size after removing = ", table.getn(t_Reinforcing))
+				
+				table.insert(t_player2_sgroups, this.sgroup)
+				table.remove(this, k)
+				
+				return
+				
+			else
+				
+				Cmd_Garrison(this.sgroup, this.garrison_house)
+				
+				print("table size after removing = ", table.getn(t_Reinforcing))
+				
+				table.insert(t_player2_sgroups, this.sgroup)
+				table.remove(this, k)
+			
+				return
+			end
+		elseif Prox_AreSquadsNearMarker(this.sgroup, this.destination, ALL) == false and SGroup_IsInHoldEntity(this.sgroup, ALL) == false and SGroup_GetAvgLoadout(this.sgroup) < 0.999 then
+
+			
+			Cmd_Move(this.sgroup, this.destination)
+				
+		end
+	
+	end
+
+
+end
+]]
+function Rule_Generic_Chatter()
+
+	
+	if table.getn(t_generic_british_chatter) >  0 and Event_IsAnyRunning() == false then
+		if SGroup_IsEmpty( sg_player2_all_units ) == false 	and SGroup_IsDoingAttack(sg_player2_all_units, ANY, 1)  then
+			
+			
+			i = World_GetRand(1, table.getn(t_generic_british_chatter))
+		
+			Util_AutoAmbient(t_generic_british_chatter[i])
+			table.remove(t_generic_british_chatter, i)
+		
+		end
+	elseif table.getn(t_generic_british_chatter) <=  0 then
+	
+		Rule_RemoveMe()
+		
+	end
+	
+end
+
+
+function Rule_Pre_Counterattack()
+
+
+	for k, this in pairs(t_pre_counterattack) do
+	
+		if g_para_counter < table.getn(t_pre_counterattack) then
+			if this.status == "ready" then
+			
+				if this.spawntype == "para" then
+					local landpos = Util_GetRandomPosition(EGroup_GetPosition(g_target_drop_zone), 30)
+					
+					Util_Paradrop(player2, this.sgroup, this.sbp, landpos, this.num, this.loadout)
+					SGroup_AddGroup(sg_paratrooper_counterattack, this.sgroup)
+					
+					g_para_counter = g_para_counter +1
+					this.status = "done"
+					return
+				elseif this.spawntype == "supply" then
+				
+					local landpos = Util_GetRandomPosition(EGroup_GetPosition(g_target_drop_zone), 30)
+				
+					Cmd_Ability(player2, this.ability, landpos)
+					print("using ability")
+					
+					this.status = "done"
+					g_para_counter = g_para_counter +1
+					return
+				end
+			
+			
+			end
+		else
+			
+			Rule_AddOneShot(Rule_Add_Pre_Counter,5)
+			Rule_RemoveMe()
+			return
+		end
+	
+	
+	end
+	
+	
+end
+
+function Rule_Add_Pre_Counter()
+
+	for k, this in pairs(t_pre_counterattack) do
+	
+		if SGroup_IsEmpty(this.sgroup) == false and SGroup_ContainsSGroup(sg_paratrooper_counterattack, this.sgroup, ALL) == false then
+	
+	
+			SGroup_AddGroup(sg_paratrooper_counterattack, this.sgroup)
+			
+		end
+	
+	end
+
+	
+end
+
+function Rule_Delay_OBJ_Counterattack_Start()
+
+	Objective_Start(OBJ_Counterattack)
+		
+end
+
+-------------------------------------------------------------------------
+--Obj: Counterattack Paradrop
+-------------------------------------------------------------------------
+-- As soon as the landing zones have been reclaimed by the player the paratroopers will paradrop on the
+-- location of the last captured landing zone. If they are not wiped out at this point they will make their way to the 
+-- player's HQ
+-------------------------------------------------------------------------
+
+
+function Initialize_OBJ_Counterattack()
+
+	OBJ_Counterattack = {
+		
+		SetupUI = function() 
+
+		
+			
+		end,
+		
+		OnStart = function()
+			
+			Rule_AddOneShot(OBJ_Counterattack_Kickoff, 1)		
+			Util_AutoIntel(t_obj_counterattack.counterattack_start)
+			
+			OBJ_Counterattack.mapElementID = {}
+			OBJ_Counterattack.mapElementID[1] = Objective_AddUIElements(OBJ_Counterattack, g_target_drop_zone, true, 1429020, true, 2.5 )
+			Sound_PlayMusic("Music/SP/OMG/Motivation/OMG/THE_BLITZ_.bsc",2,0)
+			
+		end,
+		
+		OnComplete = function()
+			
+			
+			-- tell the player they did good
+			Rule_Remove(Rule_Final_Attack)
+			Util_AutoIntel(t_obj_counterattack.counterattack_congratulations)
+		
+			Rule_AddOneShot(Rule_Delayed_Closing_Nis, 6)
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			
+		end,
+		
+		Title = 1429020,
+		Description = 1429021,
+		TitleEnd = 1429022,
+		Type = OT_Primary,
+		
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_Counterattack)
+	-- Initialize Data
+	OBJ_Counterattack_Init()
+	
+end
+
+
+
+-------------------------------------------------------------------------
+-- Objective Clear Landing Zone 1 - Functions 
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Obj data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function OBJ_Counterattack_Init()
+
+
+
+
+		
+t_counterattack_unit_repository = {
+	
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_counter_attack_squad_1"),
+			name = "Commandos",
+			sbp =  SBP.CW.COMMANDOS_PARATROOPER_SP,
+			num = 1,
+			loadout = 8,
+		
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_counter_attack_squad_2"),
+			name = "Commandos",
+			sbp =  SBP.CW.COMMANDOS_PARATROOPER_SP,
+			num = 1,
+			loadout = 8,
+		
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_counter_attack_squad_3"),
+			name = "Commandos",
+			sbp =  SBP.CW.COMMANDOS_PARATROOPER_SP,
+			num = 1,
+			loadout = 8,
+		
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_counter_attack_squad_4"),
+			name = "Commandos",
+			sbp =  SBP.CW.COMMANDOS_PARATROOPER_SP,
+			num = 1,
+			loadout = 8,
+		
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_counter_attack_squad_5"),
+			name = "Commandos",
+			sbp =  SBP.CW.COMMANDOS_PARATROOPER_SP,
+			num = 1,
+			loadout = 8,
+		
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_counter_attack_squad_6"),
+			name = "Commandos",
+			sbp =  SBP.CW.COMMANDOS_PARATROOPER_SP,
+			num = 1,
+			loadout = 8,
+		
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_counter_attack_squad_7"),
+			name = "Commandos",
+			sbp =  SBP.CW.COMMANDOS_PARATROOPER_SP,
+			num = 1,
+			loadout = 8,
+		
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_counter_attack_squad_8"),
+			name = "Commandos",
+			sbp =  SBP.CW.COMMANDOS_PARATROOPER_SP,
+			num = 1,
+			loadout = 8,
+		
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_counter_attack_squad_9"),
+			name = "Commandos",
+			sbp =  SBP.CW.COMMANDOS_PARATROOPER_SP,
+			num = 1,
+			loadout = 8,
+		
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_counter_attack_squad_10"),
+			name = "Commandos",
+			sbp =  SBP.CW.COMMANDOS_PARATROOPER_SP,
+			num = 1,
+			loadout = 8,
+		
+		},
+		
+	}
+
+--	t_counter_attack_squad = SGroup_CreateTable("sg_counter_attack_squad%d", table.getn(t_counterattack_unit_repository))
+
+	--iterator used in the spawning of the counterattack force force
+	g_counterattack_force_iter = 1
+	
+	
+	t_counterattack_landing_A = Marker_GetTable("mkr_wa_para_counter_A_%d")
+	t_counterattack_landing_B = Marker_GetTable("mkr_wa_para_counter_B_%d")
+	t_counterattack_landing_C = Marker_GetTable("mkr_wa_para_counter_C_%d")
+	t_counterattack_landing_D = Marker_GetTable("mkr_wa_para_counter_D_%d")
+
+
+	t_potential_counterattack_landings = {
+		{
+			pos = mkr_wa_para_counter_A_1,
+			markertable = t_counterattack_landing_A,
+			presence_check = mkr_prox_lz1,
+			tetrarch_marker = mkr_wa_tetrarch_landing_1,
+		},
+		 
+		{
+			pos = mkr_wa_para_counter_B_1,
+			markertable = t_counterattack_landing_B,
+			presence_check = mkr_prox_lz2,
+			tetrarch_marker = mkr_wa_tetrarch_landing_2,			
+		},
+	
+		{
+			pos = mkr_wa_para_counter_C_1,
+			markertable = t_counterattack_landing_C, 
+			presence_check = mkr_prox_lz3,
+			tetrarch_marker = mkr_wa_tetrarch_landing_3,
+		},
+	
+		{
+			pos = mkr_wa_para_counter_D_1,
+			markertable = t_counterattack_landing_D, 
+			presence_check = mkr_prox_lz4,
+			tetrarch_marker = mkr_wa_tetrarch_landing_4,
+		},
+	}
+
+
+
+	
+	-- British chatter for this objective
+	
+	t_obj_counterattack = {}	
+	--[[
+	t_obj_counterattack.objective_complete = {
+	{ACTOR.CXP2.Henze, 1422380}, --"Radio contact with Arnhem has been reestablished, Hauptmann Berger!"
+	}
+	
+	t_obj_counterattack.objective_complete2 = {
+	{ACTOR.CXP2.Henze, 1422390}, --"Majorgerneral Voss is inbound from Arnhem mein Fuhrer."
+	}]]
+	
+	t_british_counter_chatter = {
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420580}}, --"We're coming for you bastards!"
+	
+		{{ACTOR.CXP2.GenericCommonwealth, 1420581}}, --"Move, move, move!"
+		
+		{{ACTOR.CXP2.GenericPanzerElite, 1422120}}, --"Kill all of those slimy airborne fucks! Shoot them out of the skies!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420582}}, --"Secure that supply drop!"
+	
+		{{ACTOR.CXP2.GenericCommonwealth, 1420583}}, --"Get on top of them men!"
+		
+		{{ACTOR.CXP2.Wolfgang, 1422100}}, --"The enemy is attempting to re-establish their positions."
+	
+		{{ACTOR.CXP2.GenericCommonwealth, 1420585}}, --"Defend our position!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420586}}, --"We're fucked, Germans are bloody everywhere!"
+		
+		{{ACTOR.CXP2.GenericPanzerElite, 1422110}}, --"We need support!! Medic!! Where are our fucking reinforcements! "
+	
+		{{ACTOR.CXP2.GenericCommonwealth, 1420587}}, --"Stay in formation!"
+	
+		{{ACTOR.CXP2.GenericCommonwealth, 1420588}}, --"Fuck! Kill those Huns!"
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1420589}}, --"Maintain your position!"
+	}
+
+
+
+
+
+	t_obj_counterattack.counterattack_start = {
+	{ACTOR.CXP2.Wolfgang, 1422090}, --"Another Paradrop!! Kamfgruppe at action stations!"
+	}
+	
+	
+
+		t_obj_counterattack.counterattack_congratulations = {
+	{ACTOR.CXP2.Wolfgang, 1422130}, --"Well executed! You've managed to levy their counter offensive. Kampfgruppe Lehr remains in control of Wolfheze!"
+	}
+	
+	g_jeep_counter_iter = 1
+
+	
+end
+
+
+
+
+
+
+
+function OBJ_Counterattack_Kickoff()
+	lowest_distance = 1000
+	for k, this in pairs(t_potential_counterattack_landings) do
+		local distance = World_DistancePointToPoint(EGroup_GetPosition(g_target_drop_zone), Marker_GetPosition(this.pos))
+	
+		if distance < lowest_distance then
+			
+			lowest_distance = distance
+			g_para_landing_zone = this.pos
+			t_landing_position = this.markertable
+			g_player_presence_check = this.presence_check
+			g_tetrarch_landing_position = this.tetrarch_marker			
+		
+		end
+
+	end
+	
+	g_counterattack_pos = EGroup_GetPosition(g_target_drop_zone)
+	Rule_AddInterval(Rule_Spawn_Paratroopers, 15)
+	Rule_AddInterval(Rule_Create_Counter_Main_Group, 1)
+	Rule_AddInterval(Rule_Para_CounterAttack, 5)
+	Rule_AddInterval(Rule_Generic_Counterattack_Chatter, 45)
+	Rule_AddInterval(Rule_Check_Player_Presence, 5)
+	Rule_AddInterval(Rule_Bright_Commandos, 5)
+	Rule_AddOneShot(Rule_Remove_Counter_OBJ_Ping, 30)
+	
+	
+	t_jeep_counterattack ={
+ 		
+ 		{
+ 			name = SGroup_CreateIfNotFound("sg_counter_jeep_1"),
+ 			sbp = SBP.CW.COMMANDOS_JEEP,
+ 			pos = mkr_wg_jeep_spawn_west,
+ 			dest = g_counterattack_pos,
+ 			num = 1,
+ 			loadout = 1,
+ 			attackmove = true,
+ 			pos_facing = mkr_wg_jeep_exit_left,
+ 			Upgrade = nil,
+ 					
+ 		},
+ 		
+ 		{
+ 			name = SGroup_CreateIfNotFound("sg_counter_jeep_2"),
+			sbp = SBP.CW.COMMANDOS_JEEP,
+ 			pos = mkr_wg_jeep_spawn_west,
+ 			dest = g_counterattack_pos,
+ 			num = 1,
+ 			loadout = 1,
+ 			attackmove = true,
+ 			pos_facing = mkr_wg_jeep_exit_left,
+ 			Upgrade = nil,
+ 					
+ 		},
+ 		
+ 		{
+ 			name = SGroup_CreateIfNotFound("sg_counter_jeep_3"),
+ 			sbp = SBP.CW.COMMANDOS_JEEP,
+ 			pos = mkr_wg_jeep_spawn_west,
+ 			dest = g_counterattack_pos,
+ 			num = 1,
+ 			loadout = 1,
+ 			attackmove = true,
+ 			pos_facing = mkr_wg_jeep_exit_left,
+ 			Upgrade = nil,
+ 					
+ 		},
+ 		
+ 		{
+ 			name = SGroup_CreateIfNotFound("sg_counter_jeep_4"),
+ 			sbp = SBP.CW.COMMANDOS_JEEP,
+ 			pos = mkr_wg_jeep_spawn_west,
+ 			dest = g_counterattack_pos,
+ 			num = 1,
+ 			loadout = 1,
+ 			attackmove = true,
+ 			pos_facing = mkr_wg_jeep_exit_left,
+ 			Upgrade = nil,
+ 					
+ 		},
+ 		
+ 	}
+ 	
+ 	
+ 	Rule_AddDelayedInterval(Rule_Create_Jeep_Attack, 45, 10)
+ 	Rule_AddOneShot(Rule_Tetrarch_Airdrop, 90)
+ 	
+ 	
+ 	t_jeep_tetrarch = {SBP.CW.COMMANDOS_JEEP, SBP.CW.TETRARCH}
+ 	eg_glider_midair_temp_tetrarch = EGroup_CreateIfNotFound("eg_glider_midair_temp_tetrarch")
+ 	sg_airborne_tetrarch = SGroup_CreateIfNotFound("sg_airborne_tetrarch")
+
+	
+end
+
+function Rule_Create_Jeep_Attack()
+ 
+ 
+ 	local i = g_jeep_counter_iter 
+ 	local this = t_jeep_counterattack[i]
+ 	
+ 	if g_jeep_counter_iter <= table.getn(t_jeep_counterattack) then
+ 		
+ 
+ 		Util_CreateSquads(player2, this.name, this.sbp,this.pos, this.dest, this.num, this.loadout, this.attackmove, this.pos_facing, this.upgrade)
+ 		SGroup_AddGroup(sg_paratrooper_counterattack, this.name)
+ 	
+ 	elseif g_jeep_counter_iter > table.getn(t_jeep_counterattack) then
+ 
+ 		Rule_RemoveMe()
+ 	
+ 	end
+ 	g_jeep_counter_iter = g_jeep_counter_iter+1
+ 
+   end
+
+ function Rule_Tetrarch_Airdrop()
+ 
+ 
+ 	Util_SpawnGlider(player2, EBP.CW.GLIDER_TETRARCH, mkr_wg_jeep_spawn_west, g_tetrarch_landing_position, sg_airborne_tetrarch)
+ 	Rule_AddOneShot(Rule_Airborn_Tetrarch_Attack, 10)
+ 	Rule_Add(Rule_Glider_Tetrarch_MidAir_Grab)
+ 
+ end
+ 
+ function Rule_Glider_Tetrarch_MidAir_Grab()
+ 
+ 	EGroup_Clear(eg_glider_midair_temp_tetrarch)
+ 	World_GetEntitiesNearMarker(player2, eg_glider_midair_temp_tetrarch, mkr_wg_plane_finder, OT_Player)
+ 	
+ 	local t_temp = {EBP.CW.GLIDER_TETRARCH} 	
+ 	EGroup_Filter(eg_glider_midair_temp_tetrarch,t_temp, FILTER_KEEP)
+ 	
+ 	if EGroup_Count(eg_glider_midair_temp_tetrarch) >= 1 then
+ 		EGroup_SetInvulnerable(eg_glider_midair_temp_tetrarch, true, 15)
+ 		Rule_RemoveMe()
+ 	
+ 	end
+ end
+ 
+ function Rule_Airborn_Tetrarch_Attack()
+ 
+ 	SGroup_AddGroup(sg_paratrooper_counterattack, sg_airborne_tetrarch)
+ 	Cmd_AttackMove(sg_airborne_tetrarch, g_counterattack_pos)
+ 
+ 
+ end
+
+function Rule_Remove_Counter_OBJ_Ping()
+
+	Objective_RemoveUIElements(OBJ_Counterattack, OBJ_Counterattack.mapElementID[1])
+	Rule_RemoveMe()
+end
+function Rule_Check_Player_Presence()
+
+	if Player_AreSquadsNearMarker(player1, g_player_presence_check) == false then
+
+		g_counterattack_pos = Marker_GetPosition(mkr_wa_player_base_dest)
+		Cmd_AttackMove(sg_paratrooper_counterattack, g_counterattack_pos, nil, nil, 40)
+		Rule_Remove(Rule_Bright_Commandos)
+		Rule_AddInterval(Rule_Bright_Commandos_HQ_Attack, 5)
+		Rule_RemoveMe()
+	end
+end
+
+function Rule_Spawn_Paratroopers()
+
+		
+	local i = g_counterattack_force_iter 
+	if g_counterattack_force_iter <= table.getn(t_counterattack_unit_repository) then
+			
+		local j = World_GetRand(1, table.getn(t_landing_position))
+		local landpos = Util_GetRandomPosition(Marker_GetPosition(t_landing_position[j]), 20)
+		
+		Util_Paradrop(player2, t_counterattack_unit_repository[i].sgroup,SBP.CW.COMMANDOS_PARATROOPER_SP, landpos, 1, 8)
+			
+		
+		Cmd_AttackMove(t_counterattack_unit_repository[i].sgroup, g_counterattack_pos, nil, nil, 40)
+		
+	elseif g_counterattack_force_iter > table.getn(t_counterattack_unit_repository) then
+						
+		Cmd_AttackMove(sg_paratrooper_counterattack, g_counterattack_pos, nil, nil, 40)
+		
+		Rule_AddInterval(Rule_Counterattack_Wincheck, 1)
+			
+		
+		Rule_AddDelayedInterval(Rule_Final_Attack, 5, 20)	
+		Rule_RemoveMe()
+		
+		
+	end
+	g_counterattack_force_iter = g_counterattack_force_iter+1
+	
+
+end
+
+function Rule_Para_CounterAttack()
+		
+	Cmd_AttackMove(sg_paratrooper_counterattack, g_counterattack_pos, nil, nil, 40)
+
+end
+
+function Rule_Final_Attack()
+
+	
+	local attackpos = Util_GetRandomPosition(mkr_wa_player_base_dest, 20)
+		
+	Cmd_AttackMove(sg_paratrooper_counterattack, attackpos, nil, nil, 40)
+
+
+end
+
+function Rule_Counterattack_Wincheck()
+
+	if SGroup_IsEmpty(sg_paratrooper_counterattack) then
+		
+		Rule_AddOneShot(Rule_Counterattack_Wincheck_Delay, 5)
+
+		Rule_RemoveMe()
+	end
+
+end
+
+function Rule_Counterattack_Wincheck_Delay()
+
+
+	Objective_Complete(OBJ_Counterattack)
+	
+	if g_sniper_medal_complete == false then
+	
+	
+		Objective_Fail(OBJ_Medal_Kill_Snipers)
+	
+	end
+
+
+end
+
+function Rule_Generic_Counterattack_Chatter()
+	
+		if table.getn(t_british_counter_chatter) >  0 and Event_IsAnyRunning() == false then
+			if SGroup_IsEmpty( sg_player2_all_units ) == false 	and SGroup_IsDoingAttack(sg_player2_all_units, ANY, 1) then
+				
+				
+				i = World_GetRand(1, table.getn(t_british_counter_chatter))
+			
+				Util_AutoAmbient(t_british_counter_chatter[i])
+				table.remove(t_british_counter_chatter, i)
+			
+			end
+		elseif table.getn(t_british_counter_chatter) <=  0 then
+		
+			Rule_RemoveMe()
+			
+		end
+end
+
+function Rule_Delayed_Closing_Nis()
+		
+	Game_FadeToBlack(FADE_IN, 3)
+	Rule_AddOneShot(Rule_Curtain_Lift, 5)
+	Rule_RemoveMe()
+end
+
+function Rule_Curtain_Lift()
+
+	Game_FadeToBlack(FADE_OUT, 1)
+	Util_StartNIS(NIS_CLOSING)
+	Rule_Add(Rule_Victory)
+
+end
+function Rule_Victory()
+
+	if Event_IsAnyRunning() == false then
+		
+		Game_EndSP(true, nil, true, false)
+		Rule_RemoveMe()
+		
+	end
+
+end
+
+
+function Rule_HQ_Defeat()
+
+	if EGroup_GetAvgHealth(eg_pl_hq) == 0 then
+	
+		if Objective_IsStarted(OBJ_Clear_LZ) and Objective_IsComplete(OBJ_Clear_LZ) == false then
+	
+			Objective_Fail(OBJ_Clear_LZ)
+			Rule_AddInterval(Rule_Defeat, 1)
+			Rule_RemoveMe()
+	
+		elseif Objective_IsStarted(OBJ_Counterattack) and Objective_IsComplete(OBJ_Counterattack) == false then
+			
+			Objective_Fail(OBJ_Counterattack)
+			Rule_AddInterval(Rule_Defeat, 1)
+			Rule_RemoveMe()
+		end
+	end
+
+end
+
+
+function Rule_Defeat()
+
+	if Event_IsAnyRunning() == false then
+		
+			Game_EndSP(false)
+		Rule_RemoveMe()
+		
+	end
+
+end
+-------------------------------------------------------------------------
+--Obj: Kill all the snipers
+-------------------------------------------------------------------------
+-- Medal opportunity. Hunt down and eliminate all the snipers that are on the map.
+-------------------------------------------------------------------------
+
+
+function Initialize_OBJ_Medal_Kill_Snipers()
+
+	OBJ_Medal_Kill_Snipers = {
+		
+		SetupUI = function() 
+
+		end,
+		
+		OnStart = function()
+			
+			Rule_AddOneShot(OBJ_Kill_Snipers_Kickoff, 5)		
+			
+		end,
+		
+		OnComplete = function()
+			
+			-- tell the player they did good
+
+
+			end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			
+		end,
+		
+		Title = 1429030,
+		Description = 1429031,
+		Type = OT_Medal,
+		MedalID = MEDALS.CXP2.WOLFHEZE_ATTACK,
+		
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_Medal_Kill_Snipers)
+	-- Initialize Data
+	OBJ_Medal_Kill_Snipers_Init()
+	
+end
+
+
+
+-------------------------------------------------------------------------
+-- Objective Clear Landing Zone 1 - Functions 
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Obj data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function OBJ_Medal_Kill_Snipers_Init()
+
+
+	--Medal Objective speech
+	t_obj_medal_kill_sniper = {}	
+	
+	t_obj_medal_kill_sniper.sniper_killer = {
+	{ACTOR.CXP2.Wolfgang, 1422200}, --"Snipers! I will personally reward the soldier that kills the most snipers with a Medal!"
+	}
+	
+	t_obj_medal_kill_sniper.sniper_killed = {
+	{ACTOR.CXP2.Wolfgang, 1422210}, --"Snipers…they're like rats; if there's one there's bound to be more about."
+	}
+	
+
+	t_obj_medal_kill_sniper.completed = {
+	{ACTOR.CXP2.Wolfgang, 1422270}, --"All snipers eliminated. Your medal awaits you!"
+	}
+	
+	t_obj_medal_kill_sniper_ambient = {
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1422230}}, --"Shhh soon nothing will hurt anymore."
+		
+		{{ACTOR.CXP2.GenericCommonwealth, 1422240}}, --"How many more of your men will I kill?"
+	
+		{{ACTOR.CXP2.GenericCommonwealth, 1422250}}, --"One shot, one kill."
+	
+		{{ACTOR.CXP2.GenericCommonwealth, 1422260}}, --"You are a prey and I am your hunter."
+		
+		{{ACTOR.CXP2.Wolfgang, 1422220}}, --"Watch yourselves men! Snipers can take out squads with fierce efficiency!"
+				
+	}
+
+	--these are the snipers that move about the level
+	sg_roaming_snipers = SGroup_CreateIfNotFound("sg_roaming_snipers")
+	
+	--all the snipers the player needs to kill are put in this master group
+	sg_medal_snipers = SGroup_CreateIfNotFound("sg_medal_snipers")
+	
+	
+	
+	g_sniper_kills = 0
+	
+	
+	t_sniper_patrol_points = Marker_GetTable("mkr_wa_sniper_pat_%d")
+	
+	g_sniper_medal_complete = false
+	
+end
+
+function OBJ_Medal_Kill_Snipers_Spawn()
+
+	--spawn the snipers for the medal objective.
+	for k, this in pairs (t_medal_snipers) do
+		
+		-- brw 06/12/2007 to prevent the mission from crashing during a counterattack mission
+		-- prevents the sniper from being spawned if the building does not exist.
+		if scartype(this.pos) ~= ST_EGROUP or EGroup_IsEmpty(this.pos) == false  then
+			
+			Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos)
+			Rule_AddSquadEvent(Rule_Sniper_Dead_Show_It, SGroup_GetSpawnedSquadAt(this.sgroup, 1), GE_SquadKilled)
+			this.lastpos = this.pos
+		else
+		
+			Util_CreateSquads(player2, this.sgroup, this.sbp, this.marker)
+			Rule_AddSquadEvent(Rule_Sniper_Dead_Show_It, SGroup_GetSpawnedSquadAt(this.sgroup, 1), GE_SquadKilled)
+			this.lastpos = this.marker
+		
+		end
+		
+		--add them all ainto a master group.
+		SGroup_AddGroup(sg_medal_snipers, this.sgroup)
+		
+
+	--	Cmd_Ability(this.sgroup, ABILITY.AXIS.CAMOUFLAGE)
+
+	end
+	
+	
+	
+	t_roaming_snipers = {
+
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_sniper_1"),
+			sbp = SBP.CW.COMMANDOS_SNIPER,
+			pos = Util_GetRandomPosition(mkr_wa_roaming_sniper_1, 15),
+			difficulty_threshold = GD_EASY,
+			lastpos = mkr_wa_roaming_sniper_1,
+						
+		},
+		
+		{
+			sgroup = SGroup_CreateIfNotFound("sg_sniper_2"),
+			sbp = SBP.CW.COMMANDOS_SNIPER,
+			pos = Util_GetRandomPosition(mkr_wa_roaming_sniper_2, 15),
+			difficulty_threshold = GD_EASY,
+			lastpos = mkr_wa_roaming_sniper_2,
+						
+		},
+	
+	
+	
+	}
+	
+	
+	--spawn the snipers for the medal objective.
+	for k, this in pairs (t_roaming_snipers) do
+		
+		Util_CreateSquads(player2, this.sgroup, this.sbp, this.pos)
+		Rule_AddSquadEvent(Rule_Sniper_Dead_Show_It, SGroup_GetSpawnedSquadAt(this.sgroup, 1), GE_SquadKilled)
+		
+		
+		--add them all ainto a master group.
+		SGroup_AddGroup(sg_medal_snipers, this.sgroup)
+		
+		SGroup_AddGroup(sg_roaming_snipers, this.sgroup)			
+	
+	--	Cmd_Ability(this.sgroup, ABILITY.AXIS.CAMOUFLAGE)
+
+	end
+
+	g_sniper_group_size = SGroup_Count(sg_medal_snipers)
+
+end
+
+function Rule_Sniper_Dead_Show_It()
+	
+	UI_CreateEventCue(CUE.NORMAL.icon, "General_alert", 1429033,1429033)
+	
+end
+
+function OBJ_Kill_Snipers_Kickoff()
+
+	Rule_AddInterval(Rule_Sniper_Patrol, 60)
+	Rule_AddInterval(Rule_Medal_Obj_Victory_Check, 1)
+	Rule_AddDelayedInterval(Rule_Sniper_Speech_Advice, 60, 45)
+	
+end
+
+
+
+function Rule_Sniper_Patrol()
+
+
+	if SGroup_IsEmpty(sg_roaming_snipers) == false then
+		
+		for k, this in pairs(t_roaming_snipers) do
+
+		
+			if SGroup_IsEmpty(this.sgroup) == false and SGroup_IsIdle(this.sgroup, ALL) then
+		
+				local i = World_GetRand(1, table.getn(t_sniper_patrol_points))
+				this.lastpos = SGroup_GetPosition(this.sgroup)
+				Cmd_AttackMove(this.sgroup, t_sniper_patrol_points[i])
+				
+		
+			end
+		end
+		
+		Rule_AddOneShot(Rule_Last_Pos_Sniper, 5)
+	else
+
+		Rule_RemoveMe()
+	
+	end
+end
+
+function Rule_Last_Pos_Sniper()
+
+	for k, this in pairs(t_roaming_snipers) do
+
+		if SGroup_IsEmpty(this.sgroup) == false then
+	
+			UI_CreateMinimapBlip(this.lastpos, 5, BT_ObjectiveMedal)
+	
+		end
+	end
+	
+	for k, this in pairs(t_medal_snipers) do
+
+		if SGroup_IsEmpty(this.sgroup) == false then
+	
+			UI_CreateMinimapBlip(this.lastpos, 5, BT_ObjectiveMedal)
+	
+		end
+	end
+
+end
+
+function Rule_Sniper_OBJ_Start_Monitor()
+--This function is just checking for interaction with snipers to see when to trigger the medal opportunity.
+
+	for k, this in pairs(t_medal_snipers) do
+	
+
+		if Stats_UnitSoldierKills(player2, SBP.CW.COMMANDOS_SNIPER) > g_sniper_kills then
+			
+			--has a sniper killed someone?
+			
+			Util_AutoIntel(t_obj_medal_kill_sniper.sniper_killer)
+			Objective_Start(OBJ_Medal_Kill_Snipers)
+			g_sniper_kills = g_sniper_kills+1						
+			Rule_AddDelayedInterval(Rule_Sniper_Chatter, 60, 1)
+			Rule_RemoveMe()
+			
+			break
+			
+		elseif SGroup_Count(sg_medal_snipers) < g_sniper_group_size  then
+			
+			--has a sniper been killed?			
+			Util_AutoIntel(t_obj_medal_kill_sniper.sniper_killed)
+			
+			
+			Objective_Start(OBJ_Medal_Kill_Snipers)
+			Rule_AddInterval(Rule_Sniper_Chatter, 1)
+			Rule_RemoveMe()
+			break
+		end
+	end
+
+end
+
+function Rule_Sniper_Chatter()
+
+	if Event_IsAnyRunning() == false and Stats_UnitSoldierKills(player2, SBP.CW.COMMANDOS_SNIPER) > g_sniper_kills then
+	
+		if table.getn(t_obj_medal_kill_sniper_ambient) >  0  then
+				
+				i = World_GetRand(1, table.getn(t_obj_medal_kill_sniper_ambient))
+			
+				Util_AutoAmbient(t_obj_medal_kill_sniper_ambient[i])
+				table.remove(t_obj_medal_kill_sniper_ambient, i)
+				g_sniper_kills = g_sniper_kills+1
+						
+		elseif table.getn(t_obj_medal_kill_sniper_ambient) <=  0 then
+		
+			Rule_RemoveMe()
+			
+		end
+	
+		
+
+
+	end
+end
+
+function Rule_Sniper_Speech_Advice()
+
+
+	if Event_IsAnyRunning() == false and Player_CanSeeSGroup(player1, sg_medal_snipers, ANY) then
+
+		Util_AutoAmbient(t_obj_clear_lz_chatter.mission_tactical_sniper)
+		Rule_RemoveMe()
+		
+	end
+
+end
+
+function Rule_Medal_Obj_Victory_Check()
+
+	if SGroup_IsEmpty(sg_medal_snipers) then
+
+		Util_AutoIntel(t_obj_medal_kill_sniper.completed)
+		Objective_Complete(OBJ_Medal_Kill_Snipers)
+		g_sniper_medal_complete = true
+		Rule_RemoveMe()
+	end
+end
+
+
+-------------------------------------------------------------------------
+-- Test Area
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+
+
+
+function Rule_Create_Counter_Main_Group()
+
+	
+	for k, this in pairs(t_counterattack_unit_repository) do
+	
+	
+		if SGroup_IsEmpty(this.sgroup) == false and SGroup_ContainsSGroup(sg_paratrooper_counterattack, this.sgroup, ALL) == false then
+
+
+			SGroup_AddGroup(sg_paratrooper_counterattack, this.sgroup)
+			
+		
+		end
+	end
+
+end
+
+
+
+function Rule_Bright_Commandos_HQ_Attack()
+
+
+	local sg_attacker = SGroup_CreateIfNotFound("sg_attacker")
+	EGroup_GetLastAttacker(eg_pl_hq, sg_attacker)
+	SGroup_Filter(sg_attacker,t_jeep_tetrarch, FILTER_REMOVE)
+
+	if SGroup_ContainsSGroup(sg_attacker, sg_paratrooper_counterattack, ANY) then
+
+		for k, this in pairs(t_counterattack_unit_repository) do
+			local rand = World_GetRand(1, 6)
+			
+			if  rand >= 4 then
+					
+				Cmd_Ability(this.sgroup,ABILITY.ALLIES.GRENADE, eg_pl_hq, eg_pl_hq, true)
+				
+					
+			end
+				
+		end
+	end
+end
+
+
+function Rule_Bright_Commandos()
+
+
+	for k, this in pairs(t_counterattack_unit_repository) do
+
+		if SGroup_IsUnderAttack(this.sgroup, false, 5) then
+		
+			sg_temp_attacker = SGroup_CreateIfNotFound("sg_temp_attacker")
+			SGroup_Clear(sg_temp_attacker)
+			SGroup_GetLastAttacker(this.sgroup, sg_temp_attacker)
+		
+			if World_GetRand(1, 6) == 4 then
+				
+				SGroup_Clear(SGroup_CreateIfNotFound("sg_grenade_target"..k))
+				
+				SGroup_AddGroup(SGroup_FromName("sg_grenade_target"..k), sg_temp_attacker)
+			
+				Cmd_Ability(this.sgroup,ABILITY.ALLIES.GRENADE, sg_temp_attacker, sg_temp_attacker, true)
+				
+				return
+			
+			end
+			
+		end
+	end
+end
+
+
+function Rule_Building_Collapse()
+
+
+	for k, this in pairs(t_collapsable_buildings) do
+
+		if EGroup_IsEmpty(this.egroup) == false and EGroup_IsHoldingAny(this.egroup) and Player_CanSeeEGroup(player1, this.egroup, ALL) and EGroup_IsUnderAttack(this.egroup, ANY, 1) 
+		and EGroup_IsOnScreen(player1, this.egroup, ALL, 0.8) then
+
+			Cmd_Ungarrison(this.egroup, this.dest)
+			g_targer_building = this.egroup
+			
+			table.remove(t_collapsable_buildings, k)
+			Rule_AddOneShot(Rule_Collapsing_Final, 4)
+			return
+		end
+
+
+	end
+
+end
+
+
+
+function Rule_Collapsing_Final()
+
+	EGroup_Kill(g_targer_building)
+
+
+end
+
+--/////////////////////////////////////////////////////////////////
+
+
+
+function Rule_Respawn_AT()
+	
+	local bolean_of_checking = true
+	
+	for k, this in pairs(t_lz_triggered) do
+		
+		if this.check == false then
+			bolean_of_checking = false
+			for j, that in pairs(t_lz_prox_checks[k]) do
+				
+				
+				if Player_AreSquadsNearMarker(player1, that) then
+				
+					
+					for h, thou in pairs(this.table_spawn) do
+									
+						
+						if thou.skip == true then
+							Util_CreateSquads(player2, thou.sgroup, thou.sbp, thou.pos, nil, 1, thou.count)		
+							SGroup_AddGroup(sg_player2_all_units, thou.sgroup)
+							SGroup_AddGroup(sg_global_at, thou.sgroup)
+							ATGun_AddGroup(thou.sgroup, player2)
+							table.insert(t_player2_sgroups, thou.sgroup)
+						end
+					
+					
+					end
+					
+					this.check = true
+				
+			
+				end
+		
+			end
+		
+		end
+
+	end
+	
+	
+	if bolean_of_checking == true then
+	
+		Rule_RemoveMe()
+	
+	end
+	
+end

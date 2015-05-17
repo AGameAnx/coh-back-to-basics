@@ -1,0 +1,4558 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+-- Caen Counter
+
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+import("ScarUtil.scar")
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ SETUP ]]
+
+-------------------------------------------------------------------------
+
+function OnGameSetup()
+	-- string numbers should reference dat files
+	-- "allies_commonwealth" "allies" "axis" "axis_panzer_elite"
+	player1 = Setup_Player(1, 1309100, "allies_commonwealth", 1)
+	player2 = Setup_Player(2, 1309101, "axis", 2)
+	player3 = Setup_Player(3, 1309102, "allies_commonwealth", 1)
+	player4 = Setup_Player(4, 1309081, "axis_panzer_elite", 2)
+	
+	-- AI slot (ensure that the AI is on the same team as the other Axis player by setting the second parameter
+--~  	player3 = Setup_Player(3, "$000000", "Axis Infantry Company", 2)
+end
+
+function OnGameRestore()
+	player1 = World_GetPlayerAt (1)
+	player2 = World_GetPlayerAt (2)
+	player3 = World_GetPlayerAt (3)
+	player4 = World_GetPlayerAt (4)
+	
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+end
+
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ ONINIT ]]
+
+-------------------------------------------------------------------------
+
+function OnInit()
+	
+	g_MissionSpeechPath="Caen\\sp2\\Mission8"
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	-- a constant that stores the mission number for use with
+	-- setting the global speech paths, tech tree setup, and 
+	-- the player's starting resources
+	MISSION_NUMBER = 0108
+	
+	--[[ PRESET GAME STATE ]]
+	AutoCinematic(true, 0)
+	Setup_MissionPreset(MISSION_NUMBER)
+	
+	--[[ PRESET COUNTER ATTACK ELEMENTS ]]
+	CaenCounter_CounterAttack()
+	
+	--[[ PRESET DEBUG CONDITIONS ]]
+	CaenCounter_Debug()
+	
+	--[[ REGISTER OBJECTIVES ]]
+	CaenCounter_ObjectiveRegister()
+	
+	--[[ MOD INITIAL STATS ]]
+	CaenCounter_ModifyStats()
+	
+	--[[ SET RESTRICTIONS ]]
+	CaenCounter_Restrictions()
+	
+	--[[ SET AI ]]
+	CaenCounter_CpuInit()
+	
+	--[[ SET DIFFICULTY ]]
+	CaenCounter_Difficulty()
+	
+	--[[ MISSION PRESETS ]]
+	CaenCounter_MissionPreset()
+	
+	--[[ GAME START CHECK ]]
+	Rule_Add(CaenCounter_MissionStart)
+
+end
+
+Scar_AddInit(OnInit)
+
+
+function CaenCounter_CounterAttack()
+
+	-- Check for enemy units left over from parent counterattack mission and delete any still lingering. NRiley (05/11/07)
+	local player2all_temp = SGroup_CreateIfNotFound ("player2all_temp")
+	Player_GetAll (player2, player2all_temp)
+	SGroup_DestroyAllSquads (player2all_temp)
+	
+	-- destroy the axis supply depot if it's still around
+	if eg_opel_prodFacs ~= nil and EGroup_IsEmpty(eg_opel_prodFacs[1]) == false then
+		EGroup_DestroyAllEntities(eg_opel_prodFacs[1])
+	end
+	
+	-- check if the bridges are destroyed
+	Bridges_CheckStatus()
+
+	-- repair the bridges if they are destroyed
+	if bridge1 == false then
+		EGroup_SetAvgHealth(eg_bridge1, 1.0)
+	end
+	if bridge2 == false then
+		EGroup_SetAvgHealth(eg_bridge2, 1.0)
+	end
+	if bridge3 == false then
+		EGroup_SetAvgHealth(eg_bridge3, 1.0)
+	end
+	if bridge4 == false then
+		EGroup_SetAvgHealth(eg_bridge4, 1.0)
+	end
+	
+	fg_darwin_dead = false
+	
+	-- Check to see if there are any HQs on the map from counterattack parent mission, and add them to this mission's SGroups. NRiley (05/11/07)
+	
+	-- Define local sgroups
+	local Command_HQ_temp = SGroup_CreateTable ("Command_HQ_temp%d", 3)
+	local p1All_temp = SGroup_CreateIfNotFound ("p1All_temp")
+	local egroup = EGroup_CreateIfNotFound ("egroup")
+	
+	-- Get the players' units into 3 temp groups
+
+	Player_GetAll (player1, p1All_temp, egroup)
+	
+	SGroup_AddGroup (Command_HQ_temp[1], p1All_temp)
+	SGroup_AddGroup (Command_HQ_temp[2], p1All_temp)
+	SGroup_AddGroup (Command_HQ_temp[3], p1All_temp)
+	
+	-- Filter them for the HQs
+	SGroup_Filter (Command_HQ_temp[1], SBP.CW.HQ, FILTER_KEEP)
+	SGroup_Filter (Command_HQ_temp[2], SBP.CW.INFANTRY_HQ, FILTER_KEEP)
+	SGroup_Filter (Command_HQ_temp[3], SBP.CW.ARMOUR_HQ, FILTER_KEEP)
+	
+	-- Define global Sgroups needed now
+	sg_player_buildings = SGroup_CreateIfNotFound("sg_player_buildings")
+	sg_player_hq = SGroup_CreateIfNotFound("sg_player_hq")
+	sg_player_soldier_hq = SGroup_CreateIfNotFound("sg_player_soldier_hq")
+	sg_player_armour_hq = SGroup_CreateIfNotFound("sg_player_armour_hq")
+	
+	
+	-- Add them
+	SGroup_AddGroup (sg_player_hq, Command_HQ_temp[1])
+	SGroup_AddGroup (sg_player_soldier_hq, Command_HQ_temp[2])
+	SGroup_AddGroup (sg_player_armour_hq, Command_HQ_temp[3])
+	
+	SGroup_AddGroup (sg_player_buildings, sg_player_hq)
+	SGroup_AddGroup (sg_player_buildings, sg_player_soldier_hq)
+	SGroup_AddGroup (sg_player_buildings, sg_player_armour_hq)
+	
+	-- despawn the mines on the map that are used for Caen Clear
+	if EGroup_IsEmpty(eg_caen_minesALL) == false then
+		EGroup_DeSpawn(eg_caen_minesALL)
+	end
+	
+	-- if the player has any tanks that are hull down, make them mobile again
+	Player_GetAll (player1)
+	
+	local IsTankHullDown = function(gid, idx, sid)
+		
+		if Squad_IsDoingAbility (sid, ABILITY.COMMANDER_TREE.CW.HULL_DOWN) then
+			SGroup_Single  (sg_temp, sid)
+			Cmd_Ability (sg_temp, ABILITY.COMMANDER_TREE.CW.HULL_DOWN, nil, nil, true)
+		end
+		
+	end
+	
+	SGroup_ForEach (sg_allsquads, IsTankHullDown) 
+	
+end
+
+function CaenCounter_Debug()
+	
+	-- looks for the command line option [-debug]
+	if Misc_IsCommandLineOptionSet("debug") then
+		
+		g_debug = true
+		
+		-- reveal FOW
+		
+	end
+	
+	-- set up bindings for NISes
+	Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS01)')]])")
+	Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS02)')]])")
+	
+end
+
+function CaenCounter_ObjectiveRegister()
+
+	--[[ *** MUST INITIALIZE THE OBJ TABLE BEFORE REGISTERING *** ]]
+	Initialize_OBJ_DestroyTiger()
+	Initialize_OBJ_DefendCaen()
+	Initialize_OBJ_NeutralizeKingTiger()
+	
+end
+
+function CaenCounter_ModifyStats()
+	
+	--[[ saved as example - deg
+	Player_SetDefaultSquadMoodMode(player1, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player2, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player3, MM_ForceTense)
+	
+	-- shorten vision ranges
+	Modify_PlayerSightRadius(player1, 0.75)
+
+	-- mod resource rates
+	t_player1_res_mods= {}
+	t_player1_res_mods[1] = Modify_PlayerResourceRate(player1, RT_Manpower, 2)
+	t_player1_res_mods[2] = Modify_PlayerResourceRate(player1, RT_Munition, 2)
+	t_player1_res_mods[3] = Modify_PlayerResourceRate(player1, RT_Fuel, 1)
+	
+	]]	
+	
+	--[[ RESOURCES ]]
+	Player_SetResource(player1, RT_Manpower, 600)
+	Player_SetResource(player1, RT_Munition, 300)
+	Player_SetResource(player1, RT_Fuel, 200)
+	
+end
+
+function CaenCounter_Restrictions()
+
+	--[[ UN/RESTRICT UPGRADES 
+	Cmd_InstantUpgrade(player1, UPG.ALLIES.STICKY_BOMB, ITEM_UNLOCKED)
+	]]
+	
+	--[[ RESOURCES 
+	Player_SetResource(player1, RT_Manpower, 600)
+	Player_SetResource(player1, RT_Munition, 600)
+	Player_SetResource(player1, RT_Fuel, 200)
+	]]
+	
+	-- UN/RESTRICT ABILITIES 
+	
+	-- Remove the Bombing Run ability from Caen A
+	Player_SetUpgradeAvailability(player1, UPG.SP.MARK_STRONGPOINT, ITEM_REMOVED)
+	Player_SetAbilityAvailability(player1, ABILITY.SP.CAEN_START_BOMBING_RUNS, ITEM_REMOVED)
+--~ 	Cmd_InstantUpgrade (player1, UPG.COMMANDER_TREE.CW.ENGINEERS_01)
+	
+	
+	-- UN/RESTRICT POP CAP
+	Player_SetPopCapOverride(player1, 100)
+
+	--[[ UN/RESTRICT UI 
+	UI_BindingSetEnabled("company_commander", false)
+	UI_BindingSetEnabled("squadcap", false)
+	]]
+	
+	--[[ UN/RESTRICT SBPS 
+	local sbps = {SBP.ALLIES_SHERMAN, SBP.ALLIES_CROCODILE, SBP.ALLIES_GREYHOUN, SBP.ALLIES_PERSHING }
+	for i = 1, table.getn(sbps) do
+		Player_SetSquadProductionAvailability(player1, sbps[i], ITEM_LOCKED)
+	end
+	]]
+end
+
+
+
+function CaenCounter_CpuInit()
+
+	--[[ left as an example
+	
+	-- set up Player3 AI  
+	Util_AI_Setup(player3, {Util_DifVar({10, 15, 20, 30}), 5}, player3, Game_GetSPDifficulty(), 7, Util_DifVar({1, 2, 3, 5}), 2, 3)
+	
+	-- Set up AI's resources
+	Player_SetResource(player3, RT_Manpower, 1000)
+	Player_SetResource(player3, RT_Munition, 100)
+	Player_SetResource(player3, RT_Fuel, 100)
+	
+	-- tell AI to go after strongest threat instead of the weakest
+	AI_DoString( player3, "s_personality.attack_prefer_threat = true" )
+	AI_DoString( player3, "s_personality.defend_prefer_threat = true" )
+
+	-- tell AI not to "defend" territories outside of the ring around its base
+	AI_EnableComponent(player3, false, COMPONENT_ForwardDefending)
+	
+	-- disable use of comapny commander menu and abilities
+	AI_DoString( player3, "s_commandtree_enabled = false" )
+	AI_DoString( player3, "s_playerabilities_enabled = false" )
+	
+	AI_EnableComponent(player3, false, COMPONENT_Attacking)
+	
+	]]
+
+end
+
+
+
+function CaenCounter_Difficulty()
+
+	-- get the difficulty
+	g_difficulty = Game_GetSPDifficulty()  -- set a global difficulty variable
+	print("********* DIFFICULTY: "..g_difficulty)
+	
+	-- set health bonus for player 1
+	Setup_Difficulty(player1, g_difficulty) -- pass the player and difficulty global variable into the Set Health function
+	Setup_Difficulty(player2, g_difficulty) -- do it for each player that you have defined
+	
+	t_difficulty = {
+		base_def_spawn 			= Util_DifVar( {2*60, 1.5*60, 1*60, 0.75*60} ),			-- amount of time required before spawning base defense soldiers
+		base_def_squad_num		= Util_DifVar( {1, 1, 2, 3} ),							-- number of squads to spawn for the base defense
+		sniper_vulnerability 	= Util_DifVar( {2.5, 2, 1.5, 1} ),						-- the vulnerability factor on the snipers
+		sniper_number			= Util_DifVar( {1, 2, 2, 3} ),							-- number of snipers to spawn
+		sniper_wpn_cooldown		= Util_DifVar( {2, 1.5, 1, 1} ),						-- weapon cooldown time for the snipers
+		stronghold_attack_num	= Util_DifVar( {1, 1, 2, 2} ),							-- number of squads to spawn from the guard tower to spawn and attack the player on alert
+		aa_def_sbps				= Util_DifVar( {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER, SBP.AXIS.STORMTROOPER, SBP.AXIS.KNIGHTSCROSS} ), -- types of squads to defend the AA Guns
+	}
+	
+end
+
+
+-------------------------------------------------------------------------
+
+-- MISSION Preset 
+
+-------------------------------------------------------------------------
+
+function CaenCounter_MissionPreset()
+
+	-- ********* The code below is for testing (spawns player's starting units) ******************************************************
+	
+	-- Player's starting units
+	sg_starting_units = SGroup_CreateIfNotFound("sg_starting_units")
+	sg_player_stuarts = SGroup_CreateIfNotFound("sg_player_stuarts")
+	sg_player_sappers = SGroup_CreateIfNotFound("sg_player_stuarts")
+	
+	-- map entry point
+	eg_entry_point = EGroup_CreateIfNotFound("eg_entry_point")
+	 
+	-- table for the player's starting units if continuing from Caen B
+	t_player = {}
+	t_player.squads = {
+		{
+			sgroup = sg_player_stuarts, 
+			sbp = SBP.CW.STUART, 
+			mkr = mkr_player_stuart1, 
+			num = 1,
+		},
+		{
+			sgroup = sg_player_stuarts, 
+			sbp = SBP.CW.STUART, 
+			mkr = mkr_player_stuart2, 
+			num = 1,
+		},
+		{
+			sgroup = sg_player_sappers, 
+			sbp = SBP.CW.SAPPER, 
+			mkr = mkr_player_infantry1, 
+			num = 1,
+		},
+		{
+			sgroup = sg_player_sappers, 
+			sbp = SBP.CW.SAPPER, 
+			mkr = mkr_player_infantry2, 
+			num = 1,
+		},
+		{
+			sgroup = sg_player_sappers, 
+			sbp = SBP.CW.SAPPER, 
+			mkr = mkr_player_infantry3, 
+			num = 1,
+		},
+	}
+	
+	
+	
+	
+	-- move the map entry point
+	EGroup_DestroyAllEntities(eg_entry_point)
+	Util_CreateEntities(player1, eg_entry_point, EBP.STRAT_POINT.ENTRY, mkr_offmap14, 1, mkr_tiger_spawn5c)
+	
+
+	
+	-- Spawn player HQ, Infantry HQ, and Armour HQ that is not mobile only if they don't already exist
+	if SGroup_Count (sg_player_hq) == 0 then 
+		Util_CreateSquads(player1, sg_player_hq, SBP.CW.HQ, mkr_player_hq) 
+		
+		-- spawn the player's starting units if this is not continuing from the previous mission
+		for k, this in pairs(t_player.squads) do
+			Util_CreateSquads(player1, this.sgroup, this.sbp, this.mkr, nil, this.num, nil, nil, nil, nil)
+			SGroup_AddGroup(sg_starting_units, this.sgroup)
+		end
+		
+		-- Upgrade the Sappers with PIATs
+		Cmd_InstantUpgrade(sg_player_sappers, UPG.CW.PIAT)
+	end
+	
+	if SGroup_Count (sg_player_soldier_hq) == 0 then 
+		Util_CreateSquads(player1, sg_player_soldier_hq, SBP.CW.INFANTRY_HQ, mkr_player_infantryhq) 
+	end
+	
+	if SGroup_Count (sg_player_armour_hq) == 0 then 
+		Util_CreateSquads(player1, sg_player_armour_hq, SBP.CW.ARMOUR_HQ, mkr_player_armourhq) 
+	end
+	
+	-- Add the created units to the win condition SGroup
+	SGroup_AddGroup (sg_player_buildings, sg_player_hq)
+	SGroup_AddGroup (sg_player_buildings, sg_player_soldier_hq)
+	SGroup_AddGroup (sg_player_buildings, sg_player_armour_hq)	
+	
+	-- Move camera to player's HQ
+	Camera_MoveToSGroup(sg_player_hq)
+
+	
+	-- ********* The code above is for testing (spawns player's starting units) ******************************************************
+	
+	-- Table of all of the strategic points on the map
+	t_points = {
+		eg_help_point,
+		eg_help_point2,
+		eg_chateau_point,
+		eg_center_point,
+		eg_caen_pt1,
+		eg_caen_pt2,
+		eg_caen_pt3,
+		eg_caen_pt4,
+		eg_caen_pt5,
+		eg_caen_pt6,
+		eg_caen_pt7,
+		eg_noMans_pt1,
+		eg_noMans_pt2,
+		eg_noMans_pt3,
+		eg_noMans_pt4,
+		eg_noMans_pt5,
+		eg_noMans_pt6
+	}
+	
+	--Give all of the territory to the Player
+	for i = 1, table.getn(t_points) do
+	
+		EGroup_InstantCaptureStrategicPoint(t_points[i], player1)
+		
+	end
+	
+	
+	-- Destroy the bunkers from Caen Assault if they still exist 
+	-- (in case the player loads the mission by itself and did not previously play Caen Assault)
+	if EGroup_IsEmpty(eg_recon_bunkersAll) == false then
+		EGroup_DestroyAllEntities(eg_recon_bunkersAll)
+	end
+	
+	
+	-- if areas of your script need to be kicked off early
+	DestroyTiger_Preset()
+	
+
+	-- Destroy barricades blocking Bridge4
+		-- Destroy stairs tank traps
+	if EGroup_IsEmpty(eg_germanbarricade_intheway) == false then
+		EGroup_DestroyAllEntities(eg_germanbarricade_intheway)
+	end
+	
+end
+
+
+
+
+
+-------------------------------------------------------------------------
+
+-- MISSION START 
+
+-------------------------------------------------------------------------
+
+function CaenCounter_MissionStart()
+
+	-- out of cinematic
+--~ 	AutoCinematic(false, 2)
+	
+--~ 	-- start the opening NIS
+--~ 	Util_StartNIS(EVENTS.NIS01)
+	Rule_RemoveMe()
+	Rule_Add(FirstSitrep)
+	
+	
+end
+
+function FirstSitrep()
+	if Event_IsAnyRunning() == false then
+		
+		
+		Objective_Start(OBJ_DestroyTiger, false)
+		
+		-- Add Ambient Speech Monitor
+		Rule_AddInterval (AmbientSpeech_Monitor, 75)
+		 
+		Rule_RemoveMe()
+		Rule_Add(CaenCounter_MissionStartNisOver)
+	end
+end
+
+
+function CaenCounter_MissionStartNisOver()
+	if Event_IsAnyRunning() == false then
+		
+		-- display title card
+		Game_SubTextFade( 1309171, 1309172,1309173, 1, 3, 1 )
+		
+		-- Play Speech
+		Util_StartIntel (EVENTS.OBJ_AllIsQuiet)
+		Util_StartAmbient (EVENTS.AMBI_BloodyRain)
+		
+		-- Show player where to deploy Command Posts
+		MapBlip_DeployBase = UI_CreateMinimapBlip (eg_caen_pt3, -1, BT_GeneralPing)
+		HPID_DeployBase = HintPoint_Add (eg_caen_pt3, true, 1379123)
+		
+		
+		Rule_AddDelayedInterval(DelayPlayOpeningNIS, 90, 1)
+		-- Delay Tiger Attack Objective
+		Rule_AddDelayedInterval (CaenCounter_CheckforEvents_DestroyTiger, 95, 1)
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+-- puts game in letterbox before it plays the opening NIS
+function DelayPlayOpeningNIS()
+	if Event_IsAnyRunning() == false then
+		-- start the opening NIS
+		Game_Letterbox(true, 2)
+		Rule_AddInterval(PlayOpeningNIS, 1)
+		Rule_RemoveMe()
+	end
+end
+
+-- plays the opening NIS
+function PlayOpeningNIS()
+	if Event_IsAnyRunning() == false then
+		-- start the opening NIS
+		Util_StartNIS(EVENTS.NIS01)
+		Rule_RemoveMe()
+	end
+end
+
+function CaenCounter_CheckforEvents_DestroyTiger()
+	if Event_IsAnyRunning() == false then
+--~ 		Rule_AddOneShot(CaenCounter_DelayDestroyTiger, 15)
+		Rule_Add(DisplayObjectiveTitle)
+		Rule_RemoveMe()
+	end
+end
+
+
+
+function CaenCounter_DelayDestroyTiger()
+	Objective_Start(OBJ_DestroyTiger)
+	Rule_Add(DisplayObjectiveTitle)
+end
+
+function DisplayObjectiveTitle()
+	if Event_IsAnyRunning() == false then
+		Rule_RemoveMe()
+		Obj_CreatePopup(OBJ_DestroyTiger.ID, OBJ_DestroyTiger.Title)
+		Sound_Play2D(SOUND_OBJ_ADDED)
+		
+		Rule_AddInterval(DestroyTiger_WinCheck, 5)
+		DestroyTiger_Kickoff()
+	end
+end
+
+----------------------------------------------------------------------------------
+-- Monitoring and Triggering Ambient Speech
+-- Called on mission start, monitors for all of the ambient events in the script
+-- and triggers them as necessary. NRiley (06/12/07)
+-- TODO: This has not been thoroughly playtested to ensure all events are triggered
+-- in every single occasion.
+----------------------------------------------------------------------------------
+
+function AmbientSpeech_Monitor()
+
+	if Objective_IsComplete(OBJ_DefendCaen) then
+		Rule_RemoveMe()
+
+	else
+
+		Player_GetAll (player1)
+		
+		-- If the player isn't attacking and it's earlier in the game (pre wave 2) then trigger some complaints about the rain...
+--~ 		if Event_IsAnyRunning() == false and SGroup_IsDoingAttack (sg_allsquads, ALL, 5) == false and Wave2Started == false then
+		if Event_IsAnyRunning() == false and SGroup_IsDoingAttack (sg_allsquads, ALL, 20) == false then
+			Util_StartAmbient (EVENTS.AMBI_ItsWet)
+		end
+		
+		-- If there is a crapload going on later in the mission, trigger panick speech events
+		if Wave4Started == true and Player_CanSeeSGroup (player2, sg_allsquads, ANY) and SGroup_IsUnderAttack (sg_allsquads, ANY, 15) then
+			Util_StartAmbient (EVENTS.AMBI_Panick1)
+--~ 			Util_StartAmbient (EVENTS.AMBI_Panick2)
+		end
+		
+		-- If the final wave has started and the enemy is close to the player's HQ then warn them
+		if Wave6Started == true and Player_CanSeeSGroup (player2, sg_player_hq, ANY) then
+			Util_StartIntel (EVENTS.OBJ_HQUnderAttack)
+		end
+	end
+end
+
+---------------------------------------------------------------------------
+-- Objective Destroy Tiger
+---------------------------------------------------------------------------
+-- A Tiger arrives and attacks the player's HQ. The player must destroy it.
+---------------------------------------------------------------------------
+function Initialize_OBJ_DestroyTiger()
+
+	OBJ_DestroyTiger = {
+		
+		SetupUI = function() 
+			-- mark a point or position
+			
+		end,
+		
+		OnStart = function()
+		Sound_PlayMusic("Music/SP/Caen/preparation/coh_waiting_game.bsc",0,0)
+			
+			-- announce the goal
+--~ 			Util_StartIntel (EVENTS.TAC_Movement)
+			
+			-- win/lose check
+--~ 			Rule_AddInterval(DestroyTiger_WinCheck, 5)
+			
+			-- start related action
+--~ 			DestroyTiger_Kickoff()
+			
+			
+		end,
+		
+		OnComplete = function()
+			
+			-- tell the player they did good
+			UI_DeleteMinimapBlip (MapBlip_DeployBase)
+			HintPoint_Remove (HPID_DeployBase)
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			if Rule_Exists(Caen_GameOver_Lose) == false then
+				Rule_AddDelayedInterval(Caen_GameOver_Lose, 5, 1)
+			end
+			
+		end,
+		
+		Title = 1379100,
+		Description = 1379110,
+		TitleEnd = 1379141,
+		Type = OT_Primary,
+		
+		SitRep = {
+			Movie = "CXP1_SR_08-01",         
+			Force = true,
+			SpeechTiming =
+			{
+				{ 1,	ACTOR.CXP1.Cutting, 1370500 },	-- Major, Caen is in 3rd Battalion's hands.
+				{ 3,	ACTOR.CXP1.Cutting, 1370501 },	-- Charlie and Baker company are organizing defenses along our flanks.
+				{ 7,	ACTOR.CXP1.Cutting, 1370502 },	-- No major contacts have been reported south of Caen either.
+				{ 10.5,	ACTOR.CXP1.Cutting, 1370504 },	-- Division reports we can expect the weather to worsen before morning.
+				{ 14,	ACTOR.CXP1.Blackmore, 1370503 },	-- Have the commanders establish a defensive front and await further orders.
+				{ 18,	ACTOR.CXP1.Blackmore, 1370510 },	-- Deploy the HQ and Command Posts near the Cathedral and fortify all the major roads leading into Caen.
+				{ 25.7,	ACTOR.CXP1.Blackmore, 1370520 },	-- With this rain we'll be hard pressed to spot a counter attack before it's too late.
+			},
+		},
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_DestroyTiger)
+	-- Initialize Data
+	DestroyTiger_Init()
+	
+end
+
+-------------------------------------------------------------------------
+-- Objective: Destroy Tiger - Functions 
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Obj data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function DestroyTiger_Init()
+
+	-- define sgroups, egroups, etc associated with this obj
+	
+	sg_tiger = SGroup_CreateIfNotFound("sg_tiger") -- Sgroup for the Tiger
+	sg_dt_support1 = SGroup_CreateIfNotFound("sg_dt_support_inf1")
+	sg_dt_support2 = SGroup_CreateIfNotFound("sg_dt_support_inf2")
+	sg_dt_support3 = SGroup_CreateIfNotFound("sg_dt_support_inf3")
+	sg_dt_support4 = SGroup_CreateIfNotFound("sg_dt_support_inf4")
+	sg_dt_tiger = SGroup_CreateIfNotFound("sg_dt_tiger")
+	sg_dt_lightning = SGroup_CreateIfNotFound("sg_dt_lightning")
+	sg_attacker = SGroup_CreateIfNotFound("sg_attacker")
+	
+	eg_nearby_mines = EGroup_CreateIfNotFound("eg_nearby_mines")
+	eg_garrison = EGroup_CreateIfNotFound("eg_garrison")
+	eg_temp = EGroup_CreateIfNotFound("eg_temp")
+	
+	
+    t_obj_title = {
+		fg_ax_all_dead 			= false,			-- flag to indicate that all the axis units are dead
+		fg_ax_all_retreated 	= false,			-- flag to check whether all the axis units have retreated
+	}	
+	
+	-- this is a table that organizes the data for the support infantry of the tiger
+	t_dt_ax_inf = {
+		{
+			sbp 			= SBP.AXIS.PIONEER,				-- sbp
+			upgrade 		= UPG.AXIS.PIONEER_MINESWEEPER,	-- the upgrade for the sgroup when they are created
+			offset			= OFFSET_BACK,					-- their offset position in relation to the tank
+			offset_dist 	= 6,							-- the distance from the tank that they should try to maintain
+			fg_mine_team	= true,							-- various flags, i.e. roles that this squad will fill
+			b_inf			= true,							-- boolean to tell the spawner whether or not this is infantry
+			sgroup          = sg_dt_support1
+		},
+		{
+			sbp 			= SBP.ELITE.PANZERGRENADIER,
+			upgrade 		= UPG.ELITE.G43,
+			offset  		= OFFSET_BACK_RIGHT,
+			offset_dist 	= 8,
+			b_inf			= true,
+			sgroup          = sg_dt_support2
+		},
+		{
+			sbp 			= SBP.ELITE.PANZERGRENADIER,
+			upgrade 		= UPG.ELITE.REPAIRE_UPGRADE,
+			offset			= OFFSET_BACK,
+			offset_dist 	= 8,
+			fg_repair_team 	= true,
+			b_inf			= true,
+			sgroup          = sg_dt_support3
+		},
+		{
+			sbp 			= SBP.ELITE.PANZERGRENADIER,
+			upgrade 		= UPG.ELITE.REPAIRE_UPGRADE,
+			offset			= OFFSET_BACK_LEFT,
+			offset_dist 	= 8,
+			fg_repair_team 	= true,
+			b_inf			= true,	
+			sgroup          = sg_dt_support4
+		},
+		{
+			sbp 			= SBP.ELITE.PANZERGRENADIER,
+			upgrade 		= UPG.ELITE.G43,
+			offset			= OFFSET_BACK_LEFT,
+			offset_dist 	= 8,
+			b_inf			= true,	
+			sgroup          = sg_dt_support4
+		},
+	}
+	
+	-- Table to track all infantry
+	tsg_support_inf = SGroup_CreateTable("sg_support_inf%d", table.getn(t_dt_ax_inf))
+	
+--~ 	-- add sgroups to the table that will track all the infantry
+--~ 	for k, this in pairs(t_dt_ax_inf) do
+--~ 		print(">>>>>>>>>> "..k)
+--~ 		this.sgroup = tsg_support_inf[k]
+--~ 		this.loadout = 1
+--~ 		
+--~ 		DT_SpawnSupportInfantry(this)
+--~ 		
+--~ 	end
+	
+
+	-- this is the overall objective table that controls the various data related to the objective
+    t_delay_tiger = {
+		sg_tiger				= sg_dt_tiger, 				-- the main objective, the sgroup with the tiger.
+		mod_tiger_speed			= false,					-- the speed modifier for the tiger.
+		tiger_speed_reduction	= 0.5,						-- the modifier by which the tiger's speed will be reduced.
+		sg_repair				= nil, 						-- engineers that are used to repair the tiger.
+		--fg_mine_state			= false,					-- a variable to track whether the Tiger is checking for mines
+		fg_behavior_state		= "default",				-- the name of the current state to execute
+		timer_defuse_mines		= "dt_timer_defuse_mines",	-- a timer prevents the code from moving the infantry around while checking for mines
+		timer_defuse_amount		= 10,						-- amount of time to populate the defuse timer
+		sg_target				= sg_attacker,				-- the group that will contain the target of the last attacker on the tiger or any squads
+		fg_repair_available		= true,						-- a flag to detect whether or not a repair team is available
+		fg_backup_spawned 		= false,					-- flag to detect whether backup has been spawned
+		timer_tiger_time_limit	= 3
+	}
+	
+	
+	-- set up some extra variables so that we can easily access the squads that are the repair team
+	-- and the mine sweeping team
+	t_delay_tiger.sg_repair = t_dt_ax_inf[3].sgroup
+	t_delay_tiger.sg_minesweeper = t_dt_ax_inf[1].sgroup
+	
+	
+	-- this table manages the different states that the Tiger and infantry can perform
+	-- and the priority of those states.  Basically it helps separate the loop from becoming a 
+	-- giant "if then" statement and changes the behavior of the group as whole as the needs change
+	-- for the tiger
+	-- *** NOTE: PRIORITY IS NOT BEING USED AT THE MOMENT! ****
+	t_dt_state = {
+		{	-- PURPOSE: the default state that the tiger group will always follow
+			state		= "default",								-- the name of the state
+			ExecSupport	= function() DT_InfBehaviorDefault() end,	-- the function that will be executed for the infantry
+			ExecTiger	= function() DT_TigerBehaviorDefault() end,	-- the funciton that will be executed for the Tiger
+			priority 	= 1											-- a value from 1-10 (low to high) that indicates the importance of this state over others
+		},
+		
+		{	-- PURPOSE: the state for when then tiger needs to be repaired
+			state		= "repair",									-- the name of the state
+			ExecSupport	= function() DT_InfBehaviorRepair() end,	-- the function that will be executed for the infantry
+			ExecTiger	= function() DT_TigerBehaviorRepair() end,	-- the funciton that will be executed for the Tiger
+			priority 	= 8											-- a value from 1-10 that indicates the importance of this state over others
+		},
+		
+		{	-- PURPOSE: the state for when the tiger group discovers some mines that need clearing
+			state		= "clear_mines",							-- the name of the state
+			ExecSupport	= function() DT_InfBehaviorClearMines() end,	-- the function that will be executed for the infantry
+			ExecTiger	= function() DT_TigerBehaviorClearMines() end,	-- the funciton that will be executed for the Tiger
+			priority 	= 5											-- a value from 1-10 that indicates the importance of this state over others
+		},
+
+		{ 	-- PURPOSE: thes state that manages when the tiger is under attack
+			state		= "under_attack",							-- the name of the state
+			ExecSupport	= function() DT_InfBehaviorUnderAttack() end,	-- the function that will be executed for the infantry
+			ExecTiger	= function() DT_TigerBehaviorUnderAttack() end,	-- the funciton that will be executed for the Tiger
+			priority 	= 10											-- a value from 1-10 that indicates the importance of this state over others
+		},
+	
+	}	
+	
+	
+--~ 	-- Spawn the Tiger
+--~ 	Util_CreateSquads(player2, t_delay_tiger.sg_tiger, SBP.AXIS.TIGER, mkr_offmap10)
+--~ 	t_delay_tiger.mod_tiger_speed = Modify_UnitSpeed(t_delay_tiger.sg_tiger, t_delay_tiger.tiger_speed_reduction)
+--~ 	Modify_Vulnerability(t_delay_tiger.sg_tiger, 0.7)
+	
+end
+
+
+
+-- preset any units or events needed before the kickoff, but you do not
+-- want them to occur at the outset of the map.
+-- Example: Often units are needed to exist before the objective start (because they start the objective)
+-- then spawn those units here when they need to be spawned
+function DestroyTiger_Preset()
+	
+
+	
+	-- start enemy behavior
+	-- FOW_RevealSGroupOnly( t_delay_tiger.sg_tiger, -1 ) -- Reveal FOW on the Tiger
+	
+	-- set up intel event tables
+	t_destroy_tiger = {}
+
+end
+
+
+-- This function flashes lightning and all Axis vehicles are temporarily revealed
+function DestroyTiger_Lightning()
+	Player_GetAll(player2, sg_dt_lightning)
+--~ 	SGroup_Filter(sg_dt_lightning, {SBP.AXIS.TIGER, SBP.ELITE.PANZER_SUPPORT, SBP.AXIS.STUG, SBP.AXIS.PANZER, SBP.AXIS.PANTHER, SBP.AXIS.OSTWIND, 
+--~ 		SBP.ELITE.HETZER, SBP.ELITE.HUMMEL, SBP.ELITE.JAGDPANTHER, SBP.ELITE.WIRBLEWIND, SBP.ELITE.JAGDPANTHER, SBP.AXIS.KING_TIGER, 
+--~ 		SBP.ELITE.HALFTRACK_250, SBP.ELITE.ARMOURCAR_222, SBP.ELITE.MARDER,}, FILTER_KEEP)
+	
+	-- flash lightning
+	Game_TriggerLightning( )
+	
+	FOW_RevealSGroupOnly(sg_dt_lightning, 5)
+	
+	-- individual blips for each tank
+	local Blip = function(sgroupID, itemID, squadID)
+		local pos = Squad_GetPosition(squadID)
+		UI_CreateMinimapBlip(pos, 5, BT_CombatPing)
+	end
+	
+	SGroup_ForEach(sg_dt_lightning, Blip)
+	
+end
+
+
+
+
+-- the function manages the spawning of the support squads that will appear with the tiger
+function DT_SpawnSupportInfantry(t_spawn)
+		
+	Util_CreateSquads(player2, t_spawn.sgroup, t_spawn.sbp, mkr_offmap10)
+	
+	if t_spawn.upgrade ~= nil and t_spawn.upgrade ~= false then 
+		Cmd_InstantUpgrade(t_spawn.sgroup, t_spawn.upgrade)
+	end
+end
+
+
+
+function DestroyTiger_WinCheck()
+	
+	-- reassign any new HQ's to sgroups
+	Player_GetAll(player1)	
+	
+	if SGroup_IsEmpty(sg_player_hq) then
+		SGroup_Duplicate(sg_allsquads, sg_player_hq)
+		SGroup_Filter(sg_player_hq, {SBP.CW.HQ, SBP.CW.HQ_REINFORCEMENT}, FILTER_KEEP)
+	end
+	
+	if SGroup_IsEmpty(sg_player_soldier_hq) then
+		SGroup_Duplicate(sg_allsquads, sg_player_soldier_hq)
+		SGroup_Filter(sg_player_soldier_hq, SBP.CW.INFANTRY_HQ, FILTER_KEEP)
+	end
+	
+	if SGroup_IsEmpty(sg_player_armour_hq) then
+		SGroup_Duplicate(sg_allsquads, sg_player_armour_hq)
+		SGroup_Filter(sg_player_armour_hq, SBP.CW.ARMOUR_HQ, FILTER_KEEP)
+	end
+	
+	SGroup_AddGroup(sg_player_buildings, sg_player_hq)
+	SGroup_AddGroup(sg_player_buildings, sg_player_soldier_hq)
+	SGroup_AddGroup(sg_player_buildings, sg_player_armour_hq)
+
+
+	-- one of them must be set to true before the player can win or lose the objective
+	if SGroup_IsEmpty(t_delay_tiger.sg_tiger) then
+		
+		-- the player wins if the Tiger is destroyed
+		Objective_Complete(OBJ_DestroyTiger)
+		
+		
+		for k, this in pairs(t_dt_ax_inf) do 
+				-- if in a building, ungarrison and retreat
+				if SGroup_IsInHoldEntity(this.sgroup, ANY) then
+					Cmd_UngarrisonSquad(this.sgroup)
+					Cmd_Retreat(this.sgroup, mkr_offmap10, mkr_offmap10, true)
+				else
+					-- otherwise just retreat
+					Cmd_Retreat(this.sgroup, mkr_offmap10, mkr_offmap10)
+				end
+		end	
+		
+		Objective_Start(OBJ_DefendCaen)
+		
+		Rule_RemoveMe()
+		
+		
+	elseif SGroup_IsEmpty(sg_player_buildings) then
+		
+		-- the player loses if their HQ is destroyed
+		Objective_Fail(OBJ_DestroyTiger)
+		
+		Rule_RemoveMe()
+		
+	end
+	
+end
+
+function CanPlayerSeeTiger()
+
+	if Player_CanSeeSGroup (player1, t_delay_tiger.sg_tiger, ANY) then
+		Util_StartIntel (EVENTS.OBJ_TigerEngaged)
+		Objective_UpdateText (OBJ_DestroyTiger, 1379102, 1379112, true)
+		Objective_RemovePing(OBJ_DestroyTiger, OBJ_DestroyTiger.TacMapPing)
+		Rule_RemoveMe()
+	end
+
+end
+
+-- start the related action
+function DestroyTiger_Kickoff()
+	-- announce the enemy
+	Util_StartIntel (EVENTS.TAC_Movement)
+	
+	-- add the minimap blip
+	OBJ_DestroyTiger.TacMapPing = Objective_AddPing(OBJ_DestroyTiger, mkr_offmap10, 10)
+	
+	-- action that starts with the Obj being granted
+	-- Spawn the Tiger
+	Util_CreateSquads(player2, t_delay_tiger.sg_tiger, SBP.AXIS.TIGER, mkr_offmap10)
+	t_delay_tiger.mod_tiger_speed = Modify_UnitSpeed(t_delay_tiger.sg_tiger, t_delay_tiger.tiger_speed_reduction)
+	Modify_Vulnerability(t_delay_tiger.sg_tiger, 0.7)
+	
+	-- add sgroups to the table that will track all the infantry
+	for k, this in pairs(t_dt_ax_inf) do
+		print(">>>>>>>>>> "..k)
+		this.sgroup = tsg_support_inf[k]
+		this.loadout = 1
+		
+		DT_SpawnSupportInfantry(this)
+		
+	end
+	
+	Rule_AddInterval(DT_CheckStateAndPriority, 1)
+	Rule_AddInterval(DT_ExecuteState, 3)
+	Rule_AddInterval(DestroyTiger_Lightning, 35)   -- Periodically flash lightning to reveal the tanks on the field
+	Timer_Start(t_delay_tiger.timer_tiger_time_limit, 360)
+	Rule_AddInterval (CanPlayerSeeTiger, 2) -- Monitor to see if the player can see the tiger yet. If they can, update the objective title
+	
+	Rule_AddInterval(Bridges_CheckStatus, 10)	-- Periodically check the state of the bridges
+	Rule_AddInterval(CheckPlayerCampingIsland, 10)	-- Periodically check if the player is camping the island
+end
+
+
+
+
+
+
+---------------------------------------------------------------------
+-- DESTROY TIGER BEHAVIORS
+-- these set of functions control the various actions
+-- of the Tiger to tell him what to do depending on the various situation
+---------------------------------------------------------------------
+
+-- this is the rule that will continually run depending on the state of the tiger
+-- consider it similar to the SIM for the game.  It just executes at every frame,
+-- but knows nothing about the state of the tiger
+function DT_ExecuteState()
+	
+	if SGroup_IsEmpty(t_delay_tiger.sg_tiger) then
+		Rule_RemoveMe()
+	elseif Timer_GetRemaining(t_delay_tiger.timer_tiger_time_limit) == 0 then
+		-- time is up, so the Tiger should attack the player and not be delayed any longer
+		if SGroup_IsEmpty(sg_player_hq) == false then
+			Cmd_AttackMove(t_delay_tiger.sg_tiger, sg_player_hq)
+		elseif SGroup_IsEmpty(sg_player_soldier_hq) == false then
+			Cmd_AttackMove(t_delay_tiger.sg_tiger, sg_player_soldier_hq)
+		elseif SGroup_IsEmpty(sg_player_armour_hq) == false then
+			Cmd_AttackMove(t_delay_tiger.sg_tiger, sg_player_armour_hq)
+		end
+	else
+		for k, this in pairs(t_dt_state) do 
+			if this.state == t_delay_tiger.fg_behavior_state then
+				print("Current Tiger Behavior >>> "..this.state)
+				-- run the appropriate functions
+				this.ExecTiger()
+				this.ExecSupport()
+				break
+			end
+		end
+	end
+end
+
+-- this is a test that checks the state of the Tiger group 
+-- and the priority of their actions, then sets the correct state
+-- for the group which tells them what action to take.
+-- *** PRIORITY IS DETERMINED BY THE HIGHEST "IF" STATEMENT, ***
+-- i.e. whatever returns true first is what gets executed first.
+-- *** TODO, implement the priority values.
+function DT_CheckStateAndPriority()
+	
+	local sg_tiger = t_delay_tiger.sg_tiger	
+	
+	if SGroup_IsEmpty(sg_tiger) then
+		Rule_RemoveMe()
+	else
+		
+		-- determine if the tiger or any of the infantry are under attack
+		--- *************
+		SGroup_Clear(t_delay_tiger.sg_target)
+		if SGroup_IsEmpty(sg_tiger) == false 
+		and SGroup_IsUnderAttack(sg_tiger, ANY, 5) then
+			SGroup_GetLastAttacker(sg_tiger, t_delay_tiger.sg_target)
+		end
+		
+		local num_dead = 0
+		for k, this in pairs(t_dt_ax_inf) do
+			-- check which of the infantry are alive
+			if SGroup_IsEmpty(this.sgroup) == false then
+				-- if they are alive, see if they have been attacked recently
+				if SGroup_IsUnderAttack(this.sgroup, ANY, 5) then
+					SGroup_GetLastAttacker(this.sgroup, t_delay_tiger.sg_target)
+				end
+			else
+				-- mark the infantry as dead
+				num_dead = num_dead + 1
+			end
+		end
+		--- *************
+		
+		
+
+		-- the check to determine the behavior
+		-- **************
+	--~ 	if SGroup_GetAvgHealth(sg_tiger) <= 0.999 and t_delay_tiger.fg_repair_available ~= false then
+	--~ 		t_delay_tiger.fg_behavior_state = "repair"
+		if SGroup_IsEmpty(sg_tiger) == false and SGroup_IsEmpty(t_delay_tiger.sg_target) == false and Prox_SGroupSGroup(sg_tiger, t_delay_tiger.sg_target, PROX_CENTER) <= 40 then
+			t_delay_tiger.fg_behavior_state = "under_attack"
+		elseif DT_AreMinesNearTiger() then
+			t_delay_tiger.fg_behavior_state = "clear_mines"
+		else
+			-- when going back to the default state, indicate that the mines have NOT
+			-- been found
+			t_delay_tiger.fg_mines_found = false
+			t_delay_tiger.fg_behavior_state = "default"
+		end
+		-- **************
+	
+	end
+end
+
+
+
+
+
+-----------------------------------------------------------------------
+-- DEFAULT BEHAVIORS
+-----------------------------------------------------------------------
+-- this function manages the default behavior for the tiger (which is finding
+-- a path towards the player's base).
+function DT_TigerBehaviorDefault()
+		
+	-- first check if the tiger is moving	
+	if SGroup_IsEmpty(t_delay_tiger.sg_tiger) == false
+	and SGroup_IsUnderAttack(t_delay_tiger.sg_tiger, ANY, 5) == false then
+	
+		if SGroup_IsEmpty(sg_player_hq) == false then
+			Cmd_AttackMove(t_delay_tiger.sg_tiger, sg_player_hq)
+		elseif SGroup_IsEmpty(sg_player_soldier_hq) == false then
+			Cmd_AttackMove(t_delay_tiger.sg_tiger, sg_player_soldier_hq)
+		elseif SGroup_IsEmpty(sg_player_armour_hq) == false then
+			Cmd_AttackMove(t_delay_tiger.sg_tiger, sg_player_armour_hq)
+		end
+	end
+		
+
+end
+
+
+-- this function manages the default behavior for the infantry -- follow and protect the tiger
+function DT_InfBehaviorDefault()
+
+	local sg_temp = SGroup_CreateIfNotFound("sg_temp")
+	
+	for k, this in pairs(t_dt_ax_inf) do 
+		
+		-- check if the squad is under attack, or dead
+		if SGroup_IsEmpty(this.sgroup) == false and SGroup_IsEmpty(t_delay_tiger.sg_tiger) == false then
+			
+			-- if the tiger is under attack, attack move towards the attacker
+			if SGroup_IsUnderAttack(t_delay_tiger.sg_tiger, ANY, 10) then
+				SGroup_Clear(sg_temp)
+				SGroup_GetLastAttacker(t_delay_tiger.sg_tiger, sg_temp)
+				if SGroup_IsEmpty(sg_temp) == false then
+					Cmd_AttackMove(this.sgroup, Util_GetPosition(sg_temp))
+				end
+			-- if the infantry are under attack, fight back
+			elseif SGroup_IsUnderAttack(this.sgroup, ANY, 10) then
+				SGroup_Clear(sg_temp)
+				SGroup_GetLastAttacker(this.sgroup, sg_temp)
+				if SGroup_IsEmpty(sg_temp) == false then
+					Cmd_AttackMove(this.sgroup, Util_GetPosition(sg_temp))
+				end
+			
+			-- if they are not under attack, keep moving
+			elseif SGroup_IsUnderAttack(this.sgroup, ANY, 10) == false then
+				if SGroup_IsInHoldEntity(this.sgroup, ANY) then
+					Cmd_SGroupToUngarrison(this.sgroup)
+				elseif SGroup_IsMoving(this.sgroup, ANY) == false then
+					-- otherwise just pick the default position guarding the tiger
+					Cmd_Stop(this.sgroup)
+					Cmd_Move(this.sgroup, t_delay_tiger.sg_tiger, nil, nil, nil, this.offset, this.offset_dist)
+				end
+			
+			end
+			
+		end
+	end
+
+end
+
+
+
+
+
+
+
+-----------------------------------------------------------------------
+-- REPAIR BEHAVIORS
+-----------------------------------------------------------------------
+-- this behavior manages the behavior for the tiger when he is being repaired
+function DT_TigerBehaviorRepair()
+
+	local sgroup = t_delay_tiger.sg_tiger               -- sgroup for the Tiger
+	local sgroup_repair_team = t_delay_tiger.sg_repair  -- sgroup for the repair team
+	
+	if SGroup_IsEmpty(sgroup) == false and SGroup_IsEmpty(sgroup_repair_team) == false then
+	
+		-- if the tiger is within range of the repair team, stop (unless under attack)
+		if SGroup_IsMoving(sgroup, ANY)
+		and Prox_SGroupSGroup(sgroup, sgroup_repair_team, PROX_CENTER) <= 15 
+		and SGroup_IsUnderAttack(sgroup, ANY, 6) == false then
+			Cmd_Stop(sgroup)
+			
+		-- else move the tiger within range of the repair team
+		elseif SGroup_IsMoving(sgroup, ANY) == false 
+		and Prox_SGroupSGroup(sgroup, sgroup_repair_team, PROX_CENTER) > 15 then
+			Cmd_Move(sgroup, sgroup_repair_team)
+		end
+	end
+
+end
+
+
+-- this manages the behavior of the support squads when the tiger is under repair
+function DT_InfBehaviorRepair()
+
+	for k, this in pairs(t_dt_ax_inf) do 
+	
+		-- check to see if they are in a building
+		if SGroup_IsEmpty(this.sgroup) == false
+		and this.fg_repair_team ~= true then
+			
+			-- order the infantry to get into nearby buildings 
+			-- *** TODO: must fix for vehicles ***
+			if SGroup_IsInHoldEntity(this.sgroup, ANY) == false 
+			and SGroup_IsUnderAttack(t_delay_tiger.sg_tiger, ANY, 5) == false then
+				print("Ordering Squads into a building")
+				Cmd_GarrisonNearbyBuildings(this.sgroup, 10)
+			end
+		
+		-- check the flag for the repair team that should do the repairing
+		elseif this.fg_repair_team == true then
+			print("Repair Team: Do the following...")
+			
+			-- respawn the repair team if they are dead
+			if SGroup_IsEmpty(this.sgroup) then
+				
+				-- however, only respawn them if the Axis Tiger still lives
+				if SGroup_IsEmpty(t_delay_tiger.sg_tiger) == false then
+					DT_SpawnSupportInfantry(this)
+				else
+					t_delay_tiger.fg_repair_available = false
+				end
+		
+			-- if the squads happen to be garrisoned in a building, then order them out of the building
+			elseif SGroup_IsInHoldEntity(this.sgroup, ANY) then
+				print(" Repair Team >>> Out of Building")
+				Cmd_SGroupToUngarrison(this.sgroup)
+	
+			-- otherwise check to see if they are repairing, and if not, then get them to do it
+			elseif Squad_GetActiveCommand(SGroup_GetSpawnedSquadAt(this.sgroup, 1)) ~= SQUADSTATEID_Ability then
+				if SGroup_IsUnderAttack(t_delay_tiger.sg_tiger, ANY, 5) == false then
+					Cmd_Stop(t_delay_tiger.sg_tiger)  -- Tiger stops to get repaired only if not under attack
+				end
+				
+				Cmd_Ability(this.sgroup, ABILITY.REPAIR, t_delay_tiger.sg_tiger)
+			end
+		end
+	
+	end
+
+end
+
+
+
+
+
+
+
+-----------------------------------------------------------------------
+-- CLEARING MINE BEHAVIORS
+-----------------------------------------------------------------------
+-- this function checks to see whether mines are near the target or not
+
+function DT_AreMinesNearTiger()
+	
+	-- checks if there are mines near the target
+	EGroup_Clear(eg_temp)
+	SGroup_CheckForMines(player1, t_delay_tiger.sg_tiger, eg_temp, 30)
+	EGroup_RemoveGroup(eg_temp, eg_nearby_mines)
+	
+	-- this will add a special event to the mine that will mark it as 
+	-- detonated (by any of the team members) to indicate to the tiger
+	-- if a path should not be taken (generally because the mine sweeping
+	-- team is dead
+	if EGroup_IsEmpty(eg_temp) == false then
+		Rule_AddEGroupEvent(DT_MineDetonated, eg_temp, GE_EntityKilled)
+		EGroup_AddEGroup(eg_nearby_mines, eg_temp)
+	end
+	
+	-- this checks to see if a mine has detonated near one of the team members
+	if t_delay_tiger.fg_mine_detonated == true then
+		return true
+	end
+	
+	-- finally check if the player can actually see the mines that are near him.
+	-- if so (as this can only be done with engineers with minesweepers), then
+	-- indicate that the mines have been found!
+	if EGroup_IsEmpty(eg_nearby_mines) == false
+	and Player_CanSeeEGroup(player2, eg_nearby_mines, ANY) then
+		return true
+	end
+
+	-- default
+	return false
+	
+end
+
+-- the event function that is called when a mines is detonated
+function DT_MineDetonated()
+
+	t_delay_tiger.fg_mine_detonated = true
+
+end
+
+-- the behavior of the tiger when the support squads are clearing the mines
+function DT_TigerBehaviorClearMines()
+	
+	-- this runs the first time that mines are discovered
+	if t_delay_tiger.fg_mines_found ~= true then
+		-- assume, for now, that the mines are probably in front of the Tiger
+		Cmd_Stop(t_delay_tiger.sg_tiger)
+		Cmd_Move(t_delay_tiger.sg_tiger, t_delay_tiger.sg_tiger, nil, nil, nil, 4, 5)
+		t_delay_tiger.fg_mines_found = true
+	end
+	
+end
+
+-- the behavior for the repair teams to clear the mines
+function DT_InfBehaviorClearMines()
+	
+	
+	for k, this in pairs(t_dt_ax_inf) do 
+		
+		-- if the support squad can't do anything about the mines, then move into a 
+		-- nearby building or stay put.
+		if this.fg_mine_team ~= true then
+			if SGroup_IsEmpty(this.sgroup) == false 
+			and SGroup_IsInHoldEntity(this.sgroup, ANY) == false then
+				print("Ordering Squads into a building")
+				Cmd_GarrisonNearbyBuildings(this.sgroup, 15)
+			end
+		
+		-- otherwise
+		else
+			
+			-- if the minesweeper team is dead then...
+			if SGroup_IsEmpty(this.sgroup) then
+				-- check to see if a mine has been detonated in this area
+				if t_delay_tiger.fg_mine_detonated == true 
+				or Player_CanSeeEGroup(player2, eg_nearby_mines, ANY) then
+					t_delay_tiger.fg_mine_detonated = false
+				end
+			else
+				-- order the minesweeper team out of the building if occupying one
+				if SGroup_IsInHoldEntity(this.sgroup, ANY) then
+					Cmd_SGroupToUngarrison(this.sgroup)
+					
+				-- order the minesweeper team to go to the mines and defuse them if necessary
+				-- the timer prevents the minesweepers from continually moving which disrupts their
+				-- abilities to defuse mines
+				elseif (Timer_Exists(t_delay_tiger.timer_defuse_mines) == false or Timer_GetRemaining(t_delay_tiger.timer_defuse_mines) <= 0)
+				and Squad_GetActiveCommand(SGroup_GetSpawnedSquadAt(this.sgroup, 1)) ~= SQUADSTATEID_DefuseMine then
+					
+					-- force the minesweepers to move directly to one of the mines in case they are 
+					-- too far apart, otherwise, they would normally just split the distance.
+					EGroup_Clear(eg_temp)
+					if EGroup_IsEmpty(eg_nearby_mines) == false then
+						EGroup_Add(eg_temp, EGroup_GetSpawnedEntityAt(eg_nearby_mines, 1))
+						Cmd_Move(this.sgroup, eg_temp)
+					end
+					
+					-- reset the detonated flag, to indicate that the minesweepers are taking care of the problem
+					t_delay_tiger.fg_mine_detonated = false
+					Timer_Start(t_delay_tiger.timer_defuse_mines, t_delay_tiger.timer_defuse_amount)
+				end
+			end
+		end
+	end
+	
+end
+
+
+
+
+-----------------------------------------------------------------------
+-- UNDER ATTACK BEHAVIORS
+-----------------------------------------------------------------------
+
+-- the behavior of the tiger if he is under attack.
+function DT_TigerBehaviorUnderAttack()
+
+	local sgroup = t_delay_tiger.sg_tiger
+	
+	if SGroup_IsDoingAttack(sgroup, ANY, 6) == false and SGroup_IsUnderAttack(sgroup, ANY, 6) == false then
+		if SGroup_IsEmpty(t_delay_tiger.sg_target) == false then
+			Cmd_AttackMove(sgroup, t_delay_tiger.sg_target)
+		end
+	end
+
+end
+
+-- the behavior of the infantry if they are under attack.
+function DT_InfBehaviorUnderAttack()
+
+	for k, this in pairs(t_dt_ax_inf) do
+	
+		if SGroup_IsDoingAttack(this.sgroup, ANY, 3) == false and SGroup_IsUnderAttack(this.sgroup, ANY, 3) == false then
+			if SGroup_IsEmpty(t_delay_tiger.sg_target) == false then
+				Cmd_AttackMove(this.sgroup, t_delay_tiger.sg_target)
+			end
+		end
+	end
+
+end
+
+
+function SGroup_CheckForMines(player, sgroup, egroup, distance)
+	
+	Player_GetAllEntitiesNearMarker(player, egroup, SGroup_GetPosition(sgroup), distance)
+	EGroup_Filter(egroup, EBP.ALLIES.MINES, FILTER_KEEP)
+
+end
+
+
+
+
+
+function Cmd_SGroupToUngarrison(sgroup)
+
+	local _eg_garrison = EGroup_CreateIfNotFound("_eg_garrison")
+	
+	EGroup_Clear(_eg_garrison)
+	EGroup_Add(_eg_garrison, SGroup_GetGarrisonedBuildingEntity(sgroup))
+	Cmd_UngarrisonSquad(sgroup, EGroup_GetPosition(_eg_garrison))
+	
+	EGroup_Destroy(_eg_garrison)
+
+end
+
+
+
+
+function Cmd_GarrisonNearbyBuildings(sgroupid, radius)
+
+	-- check if the sgroup is empty or not
+	if ( SGroup_CountSpawned( sgroupid ) == 0 ) then
+		
+		print("*** WARNING in Util_FallBackToGarrisonBuilding: SGroup is empty ***")
+		
+	else
+		-- get the first squad of the sgroup 
+		local squad = SGroup_GetSpawnedSquadAt( sgroupid, 1 )
+		
+		-- get the sgroup owner player
+		local player = Util_GetPlayerOwner( sgroupid )
+		
+		-- get sgroup centre position
+		local centre = SGroup_GetPosition( sgroupid )
+		
+		-- find all loadable buildings within the radius
+		local eg = EGroup_CreateIfNotFound( "eg" )
+		World_GetEntitiesNearPoint( player, eg, centre, radius, OT_Neutral )
+		World_GetEntitiesNearPoint( player, eg, centre, radius, OT_Ally )
+		
+		--print( "Entities found: "..EGroup_Count( eg ) )
+		
+		local building = nil
+		
+		local CheckEntity = function( groupid, itemindex, itemid )
+			
+			-- skip entities that are not loadable
+			if ( Entity_CanLoadSquad( itemid, squad, true, false ) == false ) then
+				--print( "Entity cannot load squad. Next!" )
+				return false
+			end
+			
+			local sg = SGroup_CreateIfNotFound( "temp" )
+			
+--~ 			-- find the number of enemies near the building
+--~ 			local numEnemies = World_GetSquadsNearPoint( player, sg, Entity_GetPosition( itemid ), radius, OT_Enemy )
+--~ 			
+--~ 			SGroup_Destroy( "temp" )		
+			
+			-- If the building doesn't have enemy near it, then the squad is save to load
+			if ( numEnemies == nil ) then
+				
+				-- print( "No enemy found nearby. Garrisoning..." )
+				
+				-- save the building EntityID
+				building = itemid 
+				
+				eg_building = EGroup_CreateIfNotFound( "eg_building" )
+				EGroup_Add( eg_building, itemid )
+				
+				-- make sure the squad is not pinned right now
+				SGroup_SetSuppression( sgroupid, 0 )
+				
+				-- garrison this building here
+				Cmd_Garrison( sgroupid, eg_building, false )
+				
+				EGroup_Destroy( eg_building )
+				
+				-- do not continue the for loop
+				return true
+			end
+			
+			-- print( "Enemy nearby the building. Next!" )
+			
+			return false
+		end
+		
+		EGroup_ForEach( eg, CheckEntity )
+		
+		EGroup_Destroy( eg )
+		
+		return building
+		
+	end
+	
+end
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- OBJECTIVE: Defend Caen 
+-------------------------------------------------------------------------
+-- The player must hold on to a minimum number of sectors while waves of tanks arrive to try to take them. 
+-- If the player loses too many sectors a countdown timer starts indicating how much time they have left 
+-- to take back the minimum number of sectors.
+-------------------------------------------------------------------------
+function Initialize_OBJ_DefendCaen()
+
+	OBJ_DefendCaen = {
+		
+		SetupUI = function() 
+			-- mark a point or position
+			OBJ_DefendCaen.CathedralHelpPointID = Objective_AddUIElements (OBJ_DefendCaen, eg_caen_cathedralVP, true, 1379120, true, 2)
+			OBJ_DefendCaen.CrossroadsHelpPointID = Objective_AddUIElements (OBJ_DefendCaen, eg_caen_crossroadsVP, true, 1379121, true, 2)
+			OBJ_DefendCaen.CourtyardHelpPointID = Objective_AddUIElements (OBJ_DefendCaen, eg_noMans_pt3, true, 1379122, true, 2)
+			
+		end,
+		
+		OnStart = function()
+			
+			Sound_PlayMusic("Music/SP/Caen/caen_genericplaylist.bsc",3,5)
+			-- announce the goal
+			
+			-- win/lose check
+			Rule_AddInterval(DefendCaen_WinCheck, 5)
+			
+			-- Randomly determine which group of Hummels to use in wave 4
+			hummel_group = World_GetRand(1, 2)
+			
+			if hummel_group == 1 then 
+				t_dc_support.hummel = {
+					{sgroup = sg_hummel[1], 	src = mkr_offmap10, 	dest = mkr_hummel1a},
+					{sgroup = sg_hummel[2], 	src = mkr_offmap9, 		dest = mkr_hummel2a},
+				}
+			else
+				t_dc_support.hummel = {
+					{sgroup = sg_hummel[1], 	src = mkr_offmap2,		dest = mkr_hummel1b},
+					{sgroup = sg_hummel[2], 	src = mkr_offmap8,		dest = mkr_hummel2b},
+				}
+			end
+			
+			-- start related action
+			DefendCaen_Kickoff()
+			
+			
+		end,
+		
+		OnComplete = function()
+			
+			-- tell the player they did good
+			Rule_Remove (AmbientSpeech_Monitor)
+			-- Should change lighting to morning
+			Util_StartIntel (EVENTS.OBJ_AllClear)
+			
+			Rule_AddInterval(Caen_DelayFinalNIS, 1)
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			if Rule_Exists(Caen_GameOver_Lose) == false then
+				Rule_AddDelayedInterval(Caen_GameOver_Lose, 5, 1)
+			end
+			
+		end,
+		
+		Title = 1379101,
+		Description = 1379111,
+		TitleEnd = 1379140,
+		Type = OT_Primary,
+		
+		SitRep = {
+			Movie = "CXP1_SR_08-02",         
+			Force = true,
+			SpeechTiming =
+			{
+				{ 1,	ACTOR.CXP1.Cutting, 1370830 },	-- Major.  We have a sizeable counter-attack on our hands.
+				{ 3.5,	ACTOR.CXP1.Cutting, 1370840 },	-- SS Panzers supported by infantry should be expect from these directions.
+				{ 8.7,	ACTOR.CXP1.Cutting, 1370850 },	-- The main body will most likely approach from here, however we can expect flanking attacks from all these directions.
+				{ 15.5,	ACTOR.CXP1.Blackmore, 1370860 },	-- We need to hold onto Caen at all costs.  
+				{ 18.7,	ACTOR.CXP1.Blackmore, 1370870 },	-- Order 3rd Battalion to hold these points at all costs.
+				{ 23,	ACTOR.CXP1.Blackmore, 1370880 },	-- Have platoon level commanders establish defensive lines around the ground they control.
+				{ 28.2,	ACTOR.CXP1.Blackmore, 1370890 },	-- Make sure they have quick reaction forces ready to respond to areas needing support.
+				{ 33.5,	ACTOR.CXP1.Blackmore, 1370900 },	-- We need only hold out until morning. God Speed.
+			},
+		},
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_DefendCaen)
+	-- Initialize Data
+	DefendCaen_Init()
+	
+end
+
+
+
+-------------------------------------------------------------------------
+-- Objective: Defend Caen - Functions 
+-------------------------------------------------------------------------
+
+-- 'Init()' is used to initialize the Obj data
+-- anything that needs to be there for the Obj to work
+-- does not need to be called at 'OnInit()'
+function DefendCaen_Init()
+
+	-- flag to indicate when the king tiger is retreating during the final attack
+	fg_king_tiger_retreating = false
+	fg_wave2_spawn_complete = false
+	fg_wave3_spawn_complete = false
+	fg_wave4_spawn_complete = false
+	fg_wave5_spawn_complete = false
+	fg_wave6_spawn_complete = false
+	
+	-- timers
+	timer_tiger = 2
+	timer_infantry = 4
+	
+	-- define sgroups, egroups, etc associated with this obj
+	sg_starting_units = SGroup_CreateIfNotFound("sg_starting_units")
+	sg_CathedralCapture = SGroup_CreateIfNotFound("sg_CathedralCapture")
+	sg_CourtyardCapture = SGroup_CreateIfNotFound("sg_CourtyardCapture")
+	sg_CrossroadsCapture = SGroup_CreateIfNotFound("sg_CrossroadsCapture")
+	
+	-- Hummel related
+	sg_hummel = SGroup_CreateTable("sg_hummel%d", 2)
+	
+	-- sgroups for wave 1 tanks
+	sg_wave1_p1_vehicles = SGroup_CreateIfNotFound("sg_wave1_p1_vehicles")
+	sg_wave1_p2_vehicles = SGroup_CreateIfNotFound("sg_wave1_p2_vehicles")
+	sg_wave1_p3_vehicles = SGroup_CreateIfNotFound("sg_wave1_p3_vehicles")
+	sg_wave1_p4_vehicles = SGroup_CreateIfNotFound("sg_wave1_p4_vehicles")
+	sg_wave1_p5_vehicles = SGroup_CreateIfNotFound("sg_wave1_p5_vehicles")
+	sg_wave1_p6_vehicles = SGroup_CreateIfNotFound("sg_wave1_p6_vehicles")
+	sg_wave1_vehicles = SGroup_CreateIfNotFound("sg_wave1_vehicles")
+	
+	-- sgroups for wave 2 tanks
+	sg_wave2_p1_tank1 = SGroup_CreateIfNotFound("sg_wave2_p1_tank1")
+	sg_wave2_p1_tank2 = SGroup_CreateIfNotFound("sg_wave2_p1_tank2")
+	sg_wave2_p2_tank1 = SGroup_CreateIfNotFound("sg_wave2_p2_tank1")
+	sg_wave2_p2_tank2 = SGroup_CreateIfNotFound("sg_wave2_p2_tank2")
+	sg_wave2_p3_tank1 = SGroup_CreateIfNotFound("sg_wave2_p3_tank1")
+	sg_wave2_tanks = SGroup_CreateIfNotFound("sg_wave2_tanks")
+	
+	-- sgroups for wave 3 tanks
+	sg_wave3_p1_tank1 = SGroup_CreateIfNotFound("sg_wave3_p1_tank1")
+	sg_wave3_p1_tank2 = SGroup_CreateIfNotFound("sg_wave3_p1_tank2")
+	sg_wave3_p1_tank3 = SGroup_CreateIfNotFound("sg_wave3_p1_tank3")
+	sg_wave3_p2_tank1 = SGroup_CreateIfNotFound("sg_wave3_p2_tank1")
+	sg_wave3_p2_tank2 = SGroup_CreateIfNotFound("sg_wave3_p2_tank2")
+	sg_wave3_tanks = SGroup_CreateIfNotFound("sg_wave3_tanks")
+	
+	-- sgroups for wave 4 tanks
+	sg_wave4_p1_tank1 = SGroup_CreateIfNotFound("sg_wave4_p1_tank1")
+	sg_wave4_p1_tank2 = SGroup_CreateIfNotFound("sg_wave4_p1_tank2")
+	sg_wave4_p1_tank3 = SGroup_CreateIfNotFound("sg_wave4_p1_tank3")
+	sg_wave4_p2_tank1 = SGroup_CreateIfNotFound("sg_wave4_p2_tank1")
+	sg_wave4_p2_tank2 = SGroup_CreateIfNotFound("sg_wave4_p2_tank2")
+	sg_wave4_p2_tank3 = SGroup_CreateIfNotFound("sg_wave4_p2_tank3")
+	sg_wave4_tanks = SGroup_CreateIfNotFound("sg_wave4_tanks")
+	
+	-- sgroups for the tanks that guard the hummels in wave 4
+	sg_wave4_guards1 = SGroup_CreateIfNotFound("sg_wave4_guards1")
+	sg_wave4_guards2 = SGroup_CreateIfNotFound("sg_wave4_guards2")
+	sg_wave4_guards3 = SGroup_CreateIfNotFound("sg_wave4_guards3")
+	sg_wave4_guards4 = SGroup_CreateIfNotFound("sg_wave4_guards4")
+	
+	-- sgroups for wave 5 tanks
+	sg_wave5_p1_tank1 = SGroup_CreateIfNotFound("sg_wave5_p1_tank1")
+	sg_wave5_p1_tank2 = SGroup_CreateIfNotFound("sg_wave5_p1_tank2")
+	sg_wave5_p1_tank3 = SGroup_CreateIfNotFound("sg_wave5_p1_tank3")
+	sg_wave5_p2_tank1 = SGroup_CreateIfNotFound("sg_wave5_p2_tank1")
+	sg_wave5_p2_tank2 = SGroup_CreateIfNotFound("sg_wave5_p2_tank2")
+	sg_wave5_p2_tank3 = SGroup_CreateIfNotFound("sg_wave5_p2_tank3")
+	sg_wave5_tanks = SGroup_CreateIfNotFound("sg_wave5_tanks")
+	
+	-- sgroups for wave 6 tanks
+	sg_wave6_p1_tank1 = SGroup_CreateIfNotFound("sg_wave6_p1_tank1")
+	sg_wave6_p2_tank1 = SGroup_CreateIfNotFound("sg_wave6_p2_tank1")
+	sg_wave6_p2_tank2 = SGroup_CreateIfNotFound("sg_wave6_p2_tank2")
+	sg_wave6_p3_tank1 = SGroup_CreateIfNotFound("sg_wave6_p3_tank1")
+	sg_wave6_p4_tank1 = SGroup_CreateIfNotFound("sg_wave6_p4_tank1")
+	sg_wave6_p5_tank1 = SGroup_CreateIfNotFound("sg_wave6_p5_tank1")
+	sg_wave6_p6_tank1 = SGroup_CreateIfNotFound("sg_wave6_p6_tank1")
+	sg_wave6_p7_tank1 = SGroup_CreateIfNotFound("sg_wave6_p7_tank1")
+	sg_wave6_p8_tank1 = SGroup_CreateIfNotFound("sg_wave6_p8_tank1")
+	sg_wave6_p9_tank1 = SGroup_CreateIfNotFound("sg_wave6_p9_tank1")
+	sg_wave6_tanks = SGroup_CreateIfNotFound("sg_wave6_tanks")
+	
+	-- SGroup for the general tank manager function
+	sg_DC_TankMonitor = SGroup_CreateIfNotFound("sg_DC_TankMonitor")
+	
+	-- SGroup for the capture squads
+	sg_CaptureSquads_p2All = SGroup_CreateIfNotFound("sg_CaptureSquads_p2All")
+	sg_CaptureSquad1 = SGroup_CreateIfNotFound("sg_CaptureSquad1")
+	sg_CaptureSquad2 = SGroup_CreateIfNotFound("sg_CaptureSquad2")
+	sg_CaptureSquad3 = SGroup_CreateIfNotFound("sg_CaptureSquad3")
+	sg_CaptureSquad4 = SGroup_CreateIfNotFound("sg_CaptureSquad4")
+	sg_CaptureSquads_wave2_p1 = SGroup_CreateIfNotFound("sg_CaptureSquads_wave2_p1")
+	sg_CaptureSquads_wave2_p2 = SGroup_CreateIfNotFound("sg_CaptureSquads_wave2_p2")
+	sg_CaptureSquads_wave3_p1 = SGroup_CreateIfNotFound("sg_CaptureSquads_wave3_p1")
+	sg_CaptureSquads_wave4_p1 = SGroup_CreateIfNotFound("sg_CaptureSquads_wave4_p1")
+	
+	
+	-- Variables
+	fg_timer_started = false    -- Whether the territory timer has been started
+	g_VPCount = 3				-- How many VPs the player controls
+	
+	fg_wave1_done = false       -- Whether wave 1 has completed
+	fg_wave2_done = false		-- Whether wave 2 has completed
+	fg_wave3_done = false		-- Whether wave 3 has completed
+	fg_wave4_done = false		-- Whether wave 4 has completed
+	fg_wave5_done = false		-- Whether wave 5 has completed
+	fg_wave6_done = false		-- Whether wave 6 has completed
+	fg_tiger_is_active = false  -- Whether a King Tiger is already on the map
+	print("TIGER IS ACTIVE SET TO FALSE ***************************************************************")
+	print(fg_tiger_is_active)
+	fg_first_ambush = false     -- Whether the first Tiger Ambush has occurred already
+	fg_second_ambush = false     -- Whether the second Tiger Ambush has occurred already
+	fg_first_lurk = false     -- Whether the first Tiger lurk has occurred already
+	fg_second_lurk = false     -- Whether the first Tiger lurk has occurred already
+	fg_player_camping_island = false	-- Whether the player has destroyed the bridges and is camping the island
+	fg_player_hq_camping_island = false	-- player has destroyed the bridges and hq is on the island
+	fg_player_soldier_hq_camping_island = false	-- player has destroyed the bridges and soldier hq is on the island
+	fg_player_armour_hq_camping_island = false	-- player has destroyed the bridges and armour hq is on the island
+
+	-- egroups for any emplacements the player may have within the barrage areas
+	eg_area_1a = EGroup_CreateIfNotFound("eg_area_1a")
+	eg_area_1b = EGroup_CreateIfNotFound("eg_area_1b")
+	eg_area_1c = EGroup_CreateIfNotFound("eg_area_1c")
+	eg_area_1d = EGroup_CreateIfNotFound("eg_area_1d")
+	
+	-- King Tiger related
+	sg_king_tiger = SGroup_CreateIfNotFound("sg_king_tiger")
+	tiger_despawn = false
+	tiger_threat_id = ThreatArrow_CreateGroup(sg_king_tiger)
+	tiger_last_time_triggered = -500
+	
+	-- Timer IDs
+	Wave1Timer = 1
+	Wave2Timer = 2
+	Wave3Timer = 3
+	Wave4Timer = 4
+	Wave5Timer = 5
+	Wave6Timer = 6
+	
+	-- Variables to keep track of VPs
+	g_CathedralLost = false
+	g_CrossroadsLost = false
+	g_CourtyardLost = false
+	
+    t_obj_title = {
+		fg_ax_all_dead 			= false,			-- flag to indicate that all the axis units are dead
+		fg_ax_all_retreated 	= false,			-- flag to check whether all the axis units have retreated
+	}	
+	
+		-- table containing hummels
+	t_dc_support = {}
+	
+	-- Table of commonwealth infantry for targeting waves
+	t_CommonwealthInfantry = {SBP.CW.CAPTAIN, SBP.CW.SAPPER, SBP.CW.TOMMIES, SBP.CW.LIEUTENANT, SBP.CW.COMMANDOS, SBP.CW.COMMANDOS_PIAT, SBP.CW.COMMANDOS_MG, SBP.CW.COMMANDOS_MORTAR,}
+	
+	-- Table of commonwealth Tanks for targeting waves
+	t_CommonwealthTanks = {SBP.CW.CHURCHILL, SBP.CW.CHURCHILL_AVRE, SBP.CW.CHURCHILL_CROC, SBP.CW.COMMAND_CROMWELL, SBP.CW.CROMWELL, SBP.CW.FIREFLY,}
+	
+	-- Table of CW emplacements for targeting waves
+	t_CommonwealthEmplacements = {EBP.CW.ANTITANK_NEST, EBP.CW.HOWITZER_NEST, EBP.CW.MG_NEST, EBP.CW.MORTAR_NEST,}
+
+	-- Table of victory points
+	t_VictoryPoints = {eg_caen_cathedralVP, eg_caen_crossroadsVP, eg_noMans_pt3,}
+	
+	-- Table for the squads that capture territory, the target of each will be a randomly determined victory point
+	t_capture_squads = {
+		{
+			sbp 			= SBP.AXIS.PIONEER,				-- sbp
+			upgrade 		= UPG.AXIS.PIONEER_MINESWEEPER,	-- the upgrade for the sgroup when they are created
+			offset			= OFFSET_BACK,					-- their offset position in relation to the tank
+			offset_dist 	= 6,							-- the distance from the tank that they should try to maintain
+			fg_mine_team	= true,							-- various flags, i.e. roles that this squad will fill
+			b_inf			= true,							-- boolean to tell the spawner whether or not this is infantry
+			sgroup          = sg_CaptureSquad1
+		},
+		{
+			sbp 			= SBP.ELITE.PANZERGRENADIER,
+			upgrade 		= nil,
+			offset			= OFFSET_BACK_LEFT,
+			offset_dist 	= 8,
+			b_inf			= true,
+			sgroup          = sg_CaptureSquad2
+		},
+		{
+			sbp 			= SBP.ELITE.PANZERGRENADIER,
+			upgrade 		= nil,
+			offset			= OFFSET_BACK_RIGHT,
+			offset_dist 	= 8,
+			b_inf			= true,
+			sgroup          = sg_CaptureSquad3
+		},
+--~ 		{
+--~ 			sbp 			= SBP.ELITE.PANZERGRENADIER,
+--~ 			upgrade 		= UPG.ELITE.PANZERJAGER,
+--~ 			offset			= OFFSET_FRONT,
+--~ 			offset_dist 	= 8,
+--~ 			b_inf			= true,
+--~ 			sgroup          = sg_CaptureSquad4
+--~ 		},
+			
+	}
+
+	-- sgroup for anything attacking the tanks
+	sg_tankAttacker = SGroup_CreateIfNotFound("sg_tankAttacker")
+
+	-- table for all of the paths the tanks can take
+	t_paths = {
+		path1 = ("wave1_path1"),
+		path2 = ("wave1_path2"),
+		path3 = ("wave1_path3"),
+		path4 = ("wave1_path4"),
+		path5 = ("wave1_path5"),
+		path6 = ("wave1_path6"),
+		path7 = ("wave1_path7"),
+		path8 = ("wave1_path8"),
+		path9 = ("wave1_path9"),
+		wave2_path1 = ("wave2_path1"),
+		wave2_path2 = ("wave2_path2"),
+		wave2_path3 = ("wave2_path3"),
+		wave3_path1 = ("wave3_path1"),
+		wave3_path2 = ("wave3_path2"),
+		wave3_path3 = ("wave3_path3"),
+	}
+	
+	-- hack - deg
+	eg_caen_cathedralVP = EGroup_CreateIfNotFound("eg_caen_cathedralVP")
+	eg_caen_crossroadsVP = EGroup_CreateIfNotFound("eg_caen_crossroadsVP")
+	if EGroup_IsEmpty(eg_caen_pt3) == false then EGroup_AddEGroup(eg_caen_cathedralVP, eg_caen_pt3) end
+	if EGroup_IsEmpty(eg_caen_pt4) == false then EGroup_AddEGroup(eg_caen_crossroadsVP, eg_caen_pt4) end
+	
+	-- table for the tank waves
+	t_defend = {
+		wave1 = {
+			-- tanks on path 1
+			{
+				sgroup = sg_wave1_p1_vehicles,              	-- The tank's sgroup
+				sbp = SBP.ELITE.ARMOURCAR_221, 			 		-- Squad Blueprint
+				spawn = mkr_offmap10, 						 	-- spawn marker
+				num = 1,									 	-- number of tanks to spawn
+				path = t_paths.path1,                        	-- the name of the path it will follow
+				end_marker = mkr_path1_end,                  	-- marker that marks the end of the path
+				fg_follow_path = false,                      	-- flag indicating whether the tank is currently following its path
+				fg_abandon_path = false,                     	-- flag for if the tank has completed its path
+			},
+			{
+				sgroup = sg_wave1_p2_vehicles,              	-- The tank's sgroup
+				sbp = SBP.ELITE.ARMOURCAR_221, 			 		-- Squad Blueprint
+				spawn = mkr_offmap11, 						 	-- spawn marker
+				num = 1,									 	-- number of tanks to spawn
+				path = t_paths.path7,                        	-- the name of the path it will follow
+				end_marker = mkr_path7_end,                  	-- marker that marks the end of the path
+				fg_follow_path = false,                      	-- flag indicating whether the tank is currently following its path
+				fg_abandon_path = false,                     	-- flag for if the tank has completed its path
+			},
+			
+			-- tanks on path 2
+			{
+				sgroup = sg_wave1_p3_vehicles, 
+				sbp = SBP.ELITE.ARMOURCAR_221, 
+				spawn = mkr_offmap10, 
+				num = 1,
+				path = t_paths.path2,
+				end_marker = mkr_path2_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+			},
+			{
+				sgroup = sg_wave1_p4_vehicles, 
+				sbp = SBP.ELITE.ARMOURCAR_221, 
+				spawn = mkr_offmap1, 
+				num = 1,
+				path = t_paths.wave2_path2,
+				end_marker = mkr_wave2_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+			},
+			
+			
+			-- tanks on path 3
+			{
+				sgroup = sg_wave1_p5_vehicles, 
+				sbp = SBP.ELITE.WIRBLEWIND, 
+				spawn = mkr_offmap9, 
+				num = 1,
+				path = t_paths.path3,
+				end_marker = mkr_path3_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+			},
+			{
+				sgroup = sg_wave1_p6_vehicles, 
+				sbp = SBP.ELITE.WIRBLEWIND, 
+				spawn = mkr_offmap10, 
+				num = 1,
+				path = t_paths.path1,
+				end_marker = mkr_path1_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+			},
+		},
+		
+		wave2 = {
+			-- tanks on path 1 - diversion
+			{
+				sgroup = sg_wave2_p1_tank1,             
+				sbp = SBP.ELITE.HETZER,	  	
+				spawn = mkr_offmap10, 					
+				num = 1,								
+				path = t_paths.path1,                       
+				end_marker = mkr_path1_end,                  
+				fg_follow_path = false,                      
+				fg_abandon_path = false, 
+				target_point = eg_caen_cathedralVP,
+				fg_camping_point = false,
+			},
+			{
+				sgroup = sg_wave2_p1_tank2,             
+				sbp = SBP.AXIS.PANZER,	  	
+				spawn = mkr_offmap10, 					
+				num = 1,								
+				path = t_paths.path1,                       
+				end_marker = mkr_path1_end,                  
+				fg_follow_path = false,                      
+				fg_abandon_path = false, 
+				target_point = eg_caen_cathedralVP,
+				fg_camping_point = false,
+			},
+			
+			-- tanks attacking the courtyard
+			-- tanks on path 1
+			{
+				sgroup = sg_wave2_p2_tank1, 
+				sbp = SBP.ELITE.PANZER_SUPPORT, 
+				spawn = mkr_offmap10, 
+				num = 1,
+				path = t_paths.wave2_path1,
+				end_marker = mkr_wave2_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_noMans_pt3,
+				fg_camping_point = false,
+			},
+			-- tanks on path 2
+			{
+				sgroup = sg_wave2_p2_tank2, 
+				sbp = SBP.AXIS.PANZER, 
+				spawn = mkr_offmap1, 
+				num = 1,
+				path = t_paths.wave2_path2,
+				end_marker = mkr_wave2_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_noMans_pt3,
+				fg_camping_point = false,
+			},
+			
+			-- tanks on path 3
+			{
+				sgroup = sg_wave2_p3_tank1, 
+				sbp = SBP.ELITE.HETZER, 
+				spawn = mkr_offmap2, 
+				num = 1,
+				path = t_paths.wave2_path3,
+				end_marker = mkr_wave2_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_noMans_pt3,
+				fg_camping_point = false,
+			},
+		},
+		
+		wave3 = {
+			-- tanks attacking courtyard - diversion
+			{
+				sgroup = sg_wave3_p2_tank1,             
+				sbp = SBP.ELITE.HALFTRACK_SNIPER,	  	
+				spawn = mkr_offmap10, 					
+				num = 1,								
+				path = t_paths.wave2_path1,                       
+				end_marker = mkr_wave2_end,                  
+				fg_follow_path = false,                      
+				fg_abandon_path = false, 
+				target_point = eg_noMans_pt3,
+				fg_camping_point = false,
+			},
+			{
+				sgroup = sg_wave3_p2_tank2,             
+				sbp = SBP.AXIS.PANZER,	  	
+				spawn = mkr_offmap1, 					
+				num = 1,								
+				path = t_paths.wave2_path2,                       
+				end_marker = mkr_wave2_end,                  
+				fg_follow_path = false,                      
+				fg_abandon_path = false, 
+				target_point = eg_noMans_pt3,
+				fg_camping_point = false,
+			},
+			
+			-- tanks attacking the crossroads - main attack
+			-- tanks on path 1
+			{
+				sgroup = sg_wave3_p1_tank1, 
+				sbp = SBP.ELITE.PANZER_SUPPORT, 
+				spawn = mkr_offmap11, 
+				num = 1,
+				path = t_paths.wave3_path1,
+				end_marker = mkr_wave3_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_crossroadsVP,
+				fg_camping_point = false,
+			},
+			-- tanks on path 2
+			{
+				sgroup = sg_wave3_p1_tank2, 
+				sbp = SBP.AXIS.PANZER, 
+				spawn = mkr_offmap11, 
+				num = 1,
+				path = t_paths.wave3_path2,
+				end_marker = mkr_wave3_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_crossroadsVP,
+				fg_camping_point = false,
+			},
+			
+			-- tanks on path 3
+			{
+				sgroup = sg_wave3_p1_tank3, 
+				sbp = SBP.ELITE.ARMOURCAR_222, 
+				spawn = mkr_offmap10, 
+				num = 1,
+				path = t_paths.wave3_path3,
+				end_marker = mkr_wave3_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_crossroadsVP,
+				fg_camping_point = false,
+			},
+		},
+		
+		wave4 = {
+			-- tanks attacking courtyard
+			{
+				sgroup = sg_wave4_p2_tank1,             
+				sbp = SBP.AXIS.TIGER,	  	
+				spawn = mkr_offmap10, 					
+				num = 1,								
+				path = t_paths.wave2_path1,                       
+				end_marker = mkr_wave2_end,                  
+				fg_follow_path = false,                      
+				fg_abandon_path = false, 
+				target_point = eg_noMans_pt3,
+				fg_camping_point = false,
+			},
+			{
+				sgroup = sg_wave4_p2_tank2,             
+				sbp = SBP.AXIS.PANZER,	  	
+				spawn = mkr_offmap1, 					
+				num = 1,								
+				path = t_paths.wave2_path2,                       
+				end_marker = mkr_wave2_end,                  
+				fg_follow_path = false,                      
+				fg_abandon_path = false, 
+				target_point = eg_noMans_pt3,
+				fg_camping_point = false,
+			},
+			
+			-- tanks attacking the crossroads
+			-- tanks on path 1
+			{
+				sgroup = sg_wave4_p1_tank1, 
+				sbp = SBP.ELITE.PANZER_SUPPORT, 
+				spawn = mkr_offmap11, 
+				num = 1,
+				path = t_paths.wave3_path1,
+				end_marker = mkr_wave3_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_crossroadsVP,
+				fg_camping_point = false,
+			},
+			-- tanks on path 2
+			{
+				sgroup = sg_wave4_p1_tank2, 
+				sbp = SBP.AXIS.PANZER, 
+				spawn = mkr_offmap10, 
+				num = 1,
+				path = t_paths.wave3_path3,
+				end_marker = mkr_wave3_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_crossroadsVP,
+				fg_camping_point = false,
+			},
+			
+		},
+		
+		wave5 = {
+			-- tanks attacking courtyard
+			{
+				sgroup = sg_wave5_p2_tank1,             
+				sbp = SBP.ELITE.HETZER,	  	
+				spawn = mkr_offmap10, 					
+				num = 1,								
+				path = t_paths.wave2_path1,                       
+				end_marker = mkr_wave2_end,                  
+				fg_follow_path = false,                      
+				fg_abandon_path = false, 
+				target_point = eg_noMans_pt3,
+				fg_camping_point = false,
+			},
+			{
+				sgroup = sg_wave5_p2_tank2,             
+				sbp = SBP.AXIS.TIGER,	  	
+				spawn = mkr_offmap1, 					
+				num = 1,								
+				path = t_paths.wave2_path2,                       
+				end_marker = mkr_wave2_end,                  
+				fg_follow_path = false,                      
+				fg_abandon_path = false, 
+				target_point = eg_noMans_pt3,
+				fg_camping_point = false,
+			},
+			{
+				sgroup = sg_wave5_p2_tank3,             
+				sbp = SBP.AXIS.PANTHER,	  	
+				spawn = mkr_offmap2, 					
+				num = 1,								
+				path = t_paths.wave2_path3,                       
+				end_marker = mkr_wave2_end,                  
+				fg_follow_path = false,                      
+				fg_abandon_path = false, 
+				target_point = eg_noMans_pt3,
+				fg_camping_point = false,
+			},
+			
+			-- tanks attacking the crossroads
+			-- tanks on path 1
+			{
+				sgroup = sg_wave5_p1_tank1, 
+				sbp = SBP.ELITE.PANZER_SUPPORT, 
+				spawn = mkr_offmap11, 
+				num = 1,
+				path = t_paths.wave3_path1,
+				end_marker = mkr_wave3_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_crossroadsVP,
+				fg_camping_point = false,
+			},
+			-- tanks on path 2
+			{
+				sgroup = sg_wave5_p1_tank2, 
+				sbp = SBP.AXIS.PANZER, 
+				spawn = mkr_offmap10, 
+				num = 1,
+				path = t_paths.wave3_path3,
+				end_marker = mkr_wave3_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_crossroadsVP,
+				fg_camping_point = false,
+			},
+			-- tanks on path 3
+			{
+				sgroup = sg_wave5_p1_tank3, 
+				sbp = SBP.AXIS.TIGER, 
+				spawn = mkr_offmap10, 
+				num = 1,
+				path = t_paths.wave3_path3,
+				end_marker = mkr_wave3_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_crossroadsVP,
+				fg_camping_point = false,
+			},
+			
+		},
+		
+		wave6 = {
+			
+			-- tanks on path 6
+			{
+				sgroup = sg_wave6_p6_tank1, 
+				sbp = SBP.AXIS.PANZER, 
+				spawn = mkr_offmap11, 
+				num = 1,
+				path = t_paths.path6,
+				end_marker = mkr_path6_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_cathedralVP,
+				fg_camping_point = false,
+			},
+			
+			-- tanks on path 8
+			{
+				sgroup = sg_wave6_p8_tank1, 
+				sbp = SBP.AXIS.TIGER, 
+				spawn = mkr_offmap12, 
+				num = 1,
+				path = t_paths.path8,
+				end_marker = mkr_path8_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_cathedralVP,
+				fg_camping_point = false,
+			},
+			
+			-- tanks on path 9
+			{
+				sgroup = sg_wave6_p9_tank1, 
+				sbp = SBP.ELITE.JAGDPANTHER, 
+				spawn = mkr_offmap10, 
+				num = 1,
+				path = t_paths.path1,  
+				end_marker = mkr_path1_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_crossroadsVP,
+				fg_camping_point = false,
+			},
+			
+			-- tanks on path 1
+			{
+				sgroup = sg_wave6_p1_tank1,             
+				sbp = SBP.ELITE.JAGDPANTHER,	  	
+				spawn = mkr_offmap11, 					
+				num = 1,								
+				path = t_paths.wave3_path1,                     
+				end_marker = mkr_wave3_end,                  
+				fg_follow_path = false,                      
+				fg_abandon_path = false,  
+				target_point = eg_caen_crossroadsVP,
+				fg_camping_point = false,
+			},
+			
+			-- tanks on path 7
+			{
+				sgroup = sg_wave6_p7_tank1, 
+				sbp = SBP.AXIS.PANTHER, 
+				spawn = mkr_offmap11, 
+				num = 1,
+				path = t_paths.path7,
+				end_marker = mkr_path7_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_crossroadsVP,
+				fg_camping_point = false,
+			},
+			
+			-- tanks on path 2
+			{
+				sgroup = sg_wave6_p2_tank1, 
+				sbp = SBP.AXIS.TIGER, 
+				spawn = mkr_offmap9, 
+				num = 1,
+				path = t_paths.path2,
+				end_marker = mkr_path2_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_crossroadsVP,
+				fg_camping_point = false,
+			},
+			
+			-- tanks on path 3
+			{
+				sgroup = sg_wave6_p3_tank1, 
+				sbp = SBP.AXIS.PANTHER, 
+				spawn = mkr_offmap9, 
+				num = 1,
+				path = t_paths.path3,
+				end_marker = mkr_path3_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_crossroadsVP,
+				fg_camping_point = false,
+			},
+			
+			-- tanks on path 4
+			{
+				sgroup = sg_wave6_p4_tank1, 
+				sbp = SBP.ELITE.WIRBLEWIND, 
+				spawn = mkr_offmap2, 
+				num = 1,
+				path = t_paths.path4,
+				end_marker = mkr_path4_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_courtyardVP,
+				fg_camping_point = false,
+			},
+			
+			-- tanks on path 5
+			{
+				sgroup = sg_wave6_p5_tank1, 
+				sbp = SBP.ELITE.PANZER_SUPPORT, 
+				spawn = mkr_offmap8, 
+				num = 1,
+				path = t_paths.path5,
+				end_marker = mkr_path5_end,
+				fg_follow_path = false,
+				fg_abandon_path = false,
+				target_point = eg_caen_courtyardVP,
+				fg_camping_point = false,
+			},
+		
+			-- tanks on path 2
+			{
+				sgroup = sg_wave6_p2_tank2,             
+--~ 				sbp = SBP.AXIS.KING_TIGER,	  	
+				sbp = SBP.ELITE.KING_TIGER_ARNHEM,	  	
+				spawn = mkr_offmap10, 					
+				num = 1,								
+				path = t_paths.path1,                       
+				end_marker = mkr_path1_end,                  
+				fg_follow_path = false,                      
+				fg_abandon_path = false,
+				target_point = eg_caen_cathedralVP,
+				fg_camping_point = false,				
+			},
+		},
+	}
+	
+
+	
+	-- table for the King Tiger
+	t_tiger_ambushes = {}
+	t_tiger_ambushes[1] = {
+		mkr = mkr_tiger_ambush1,
+		spawn = {mkr_tiger_spawn1a, mkr_tiger_spawn1b, mkr_tiger_spawn1c},
+		despawn = mkr_offmap11,
+		time_triggered = -500,
+	}
+	t_tiger_ambushes[2] = {
+		mkr = mkr_tiger_ambush2,
+		spawn = {mkr_tiger_spawn2a, mkr_tiger_spawn2b, mkr_tiger_spawn2c},
+		despawn = mkr_offmap9,
+		time_triggered = -500,
+	}
+	t_tiger_ambushes[3] = {
+		mkr = mkr_tiger_ambush3,
+		spawn = {mkr_tiger_spawn3a, mkr_tiger_spawn3b, mkr_tiger_spawn3c},
+		despawn = mkr_offmap8,
+		time_triggered = -500,
+	}
+	t_tiger_ambushes[4] = {
+		mkr = mkr_tiger_ambush4,
+		spawn = {mkr_tiger_spawn4a, mkr_tiger_spawn4b, mkr_tiger_spawn4c},
+		despawn = mkr_offmap2,
+		time_triggered = -500,
+	}
+	t_tiger_ambushes[5] = {
+		mkr = mkr_tiger_ambush5,
+		spawn = {mkr_tiger_spawn5a, mkr_tiger_spawn5b, mkr_tiger_spawn5c},
+		despawn = mkr_offmap9,
+		time_triggered = -500,
+	}
+	t_tiger_ambushes[6] = {
+		mkr = mkr_tiger_ambush6,
+		spawn = {mkr_tiger_spawn6a, mkr_tiger_spawn6b, mkr_tiger_spawn6c},
+		despawn = mkr_offmap9,
+		time_triggered = -500,
+	}
+	t_tiger_ambushes[7] = {
+		mkr = mkr_tiger_ambush7,
+		spawn = {mkr_tiger_spawn7a, mkr_tiger_spawn7b, mkr_tiger_spawn7c},
+		despawn = mkr_offmap9,
+		time_triggered = -500,
+	}
+	
+	-- table for the tiger's lurking behavior
+	t_tiger_lurk = {}
+	t_tiger_lurk[1] = {
+		mkr = mkr_tiger_lurk1,
+		path = ("tiger_lurk_path1"),
+		spawn = mkr_tiger_lurk_spawn1,
+		despawn = mkr_tiger_despawn1,
+	}
+	t_tiger_lurk[2] = {
+		mkr = mkr_tiger_lurk2,
+		path = ("tiger_lurk_path2"),
+		spawn = mkr_tiger_lurk_spawn2,
+		despawn = mkr_tiger_despawn2,
+	}
+	t_tiger_lurk[3] = {
+		mkr = mkr_tiger_lurk3,
+		path = ("tiger_lurk_path3"),
+		spawn = mkr_tiger_lurk_spawn3,
+		despawn = mkr_tiger_despawn3,
+	}
+	t_tiger_lurk[4] = {
+		mkr = mkr_tiger_lurk4,
+		path = ("tiger_lurk_path4"),
+		spawn = mkr_tiger_lurk_spawn4,
+		despawn = mkr_tiger_despawn4,
+	}
+end
+
+
+
+-- preset any units or events needed before the kickoff, but you do not
+-- want them to occur at the outset of the map.
+-- Example: Often units are needed to exist before the objective start (because they start the objective)
+-- then spawn those units here when they need to be spawned
+function DefendCaen_Preset()
+
+	
+end
+
+-- example of how to finish an Obj
+function DefendCaen_WinCheck()
+	
+	
+	local sg_all_axis_tanks = SGroup_CreateIfNotFound("sg_all_axis_tanks")
+	
+	-- reassign any new HQ's to sgroups
+	Player_GetAll(player1)	
+	
+	if SGroup_IsEmpty(sg_player_hq) then
+		SGroup_Duplicate(sg_allsquads, sg_player_hq)
+		SGroup_Filter(sg_player_hq, {SBP.CW.HQ, SBP.CW.HQ_REINFORCEMENT}, FILTER_KEEP)
+	end
+	
+	if SGroup_IsEmpty(sg_player_soldier_hq) then
+		SGroup_Duplicate(sg_allsquads, sg_player_soldier_hq)
+		SGroup_Filter(sg_player_soldier_hq, SBP.CW.INFANTRY_HQ, FILTER_KEEP)
+	end
+	
+	if SGroup_IsEmpty(sg_player_armour_hq) then
+		SGroup_Duplicate(sg_allsquads, sg_player_armour_hq)
+		SGroup_Filter(sg_player_armour_hq, SBP.CW.ARMOUR_HQ, FILTER_KEEP)
+	end
+	
+	SGroup_AddGroup (sg_player_buildings, sg_player_hq)
+	SGroup_AddGroup (sg_player_buildings, sg_player_soldier_hq)
+	SGroup_AddGroup (sg_player_buildings, sg_player_armour_hq)
+
+	
+	if Objective_IsTimerSet(OBJ_DefendCaen) and Objective_GetTimerSeconds(OBJ_DefendCaen) <= 0 then
+		-- if the player has run out of time to recapture enough territory
+		-- the player has just failed
+		Objective_Fail(OBJ_DefendCaen)
+		
+		Rule_RemoveMe()
+	
+--~ 	elseif SGroup_IsEmpty(sg_player_buildings) then
+--~ 		
+--~ 		-- the player has just failed because they have no more hqs
+--~ 		Objective_Fail(OBJ_DefendCaen)
+--~ 		
+--~ 		Rule_RemoveMe()
+	
+	elseif g_VPCount == 0 then
+		
+		-- Player has lost all VPs
+		-- the player has just failed
+		Objective_Fail(OBJ_DefendCaen)
+		
+		Rule_RemoveMe()
+		
+	
+	-- one of them must be set to true before the player can win or lose the objective
+	elseif fg_wave6_done == true then
+		-- show the final NIS
+		Objective_Complete(OBJ_DefendCaen)
+		Rule_RemoveMe()
+		
+		Player_GetAll(player2)
+		Cmd_Retreat(sg_allsquads)
+	end	
+end
+
+
+
+
+-- start the related action
+function DefendCaen_Kickoff()
+	
+	-- hack - deg
+	eg_caen_cathedralVP = EGroup_CreateIfNotFound("eg_caen_cathedralVP")
+	eg_caen_crossroadsVP = EGroup_CreateIfNotFound("eg_caen_crossroadsVP")
+	if EGroup_IsEmpty(eg_caen_pt3) == false then EGroup_AddEGroup(eg_caen_cathedralVP, eg_caen_pt3) end
+	if EGroup_IsEmpty(eg_caen_pt4) == false then EGroup_AddEGroup(eg_caen_crossroadsVP, eg_caen_pt4) end
+
+	-- action that starts with the Obj being granted
+	Rule_AddInterval(DC_MinimumTerritory, 5)   	-- Keeps checking if the player has the minimum amount of territory
+	
+	Rule_AddOneShot(DefendCaen_Wave1, 150)     	-- Triggers Wave 1 after 2 minutes
+	
+	Rule_AddDelayedInterval(TigerAmbush, 80, 3)	-- start checking for the tiger ambush
+	
+	Util_StartIntel (EVENTS.OBJ_PostSitRep) -- Blackmore's post-sit-rep speech
+	
+	-- increase range of Hummels
+	Modify_AbilityMaxCastRange(player2, ABILITY.ELITE.HOWITZER_BARRAGE, 10)
+end
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- Wave 1 Functions 
+-------------------------------------------------------------------------
+
+
+-- The first wave at 2:00
+function DefendCaen_Wave1()
+	
+	-- if it's time for the wave to trigger
+
+	print("WAVE 1 BEGINS HERE")
+	Rule_RemoveMe()
+	
+	-- Pop smoke at spawn locations
+	SmokeEntrance_Do (mkr_offmap9)
+	print ("smoke")
+	SmokeEntrance_Do (mkr_offmap10)
+	print ("smoke")
+	
+	-- Watch for vehicles
+	Rule_AddInterval (HasPlayerSpottedWave1, 2)
+	
+	-- Spawn the vehicles for wave 1
+--~ 	for k, this in pairs(t_defend.wave1) do
+--~ 		Util_CreateSquads(player2, this.sgroup, this.sbp, this.spawn, this.nextpos, this.num, nil, nil, nil, nil)
+--~ 		SGroup_AddGroup(sg_wave1_vehicles, this.sgroup)
+--~ 	end
+	
+	wave1_count = 1
+	
+	-- spawn the vehicles for wave 1
+	Rule_AddInterval(SpawnWave1, 15)
+--~ 	wave1_spawncomplete = true
+	
+	-- Start the vehicle behavior
+	Rule_AddInterval(Wave1_VehicleManager, 3)
+	
+	if Rule_Exists(DC_TankMonitor) == false then
+		Rule_AddDelayedInterval(DC_TankMonitor, 15, 3)
+	end
+	
+	-- Start the wave timer that will be an alternate trigger for the next wave
+	Timer_Start (Wave1Timer, 120)
+	
+end
+
+function HasPlayerSpottedWave1()
+
+	if Player_CanSeeSGroup (player1, sg_wave1_vehicles, ANY) then
+		-- anounce the arrival of the recon forces
+		Util_StartIntel (EVENTS.TAC_LightVehicleWaves)
+		Rule_RemoveMe()
+	end
+
+end
+
+
+-- spawns the first wave of vehicles
+function SpawnWave1()
+	if wave1_count > table.getn(t_defend.wave1) then 
+		Rule_RemoveMe()
+		wave1_spawncomplete = true
+		
+	else
+		Util_CreateSquads(player2, t_defend.wave1[wave1_count].sgroup, t_defend.wave1[wave1_count].sbp, t_defend.wave1[wave1_count].spawn, t_defend.wave1[wave1_count].nextpos, t_defend.wave1[wave1_count].num, nil, nil, nil, nil)
+		SGroup_AddGroup(sg_wave1_vehicles, t_defend.wave1[wave1_count].sgroup)
+		wave1_count = wave1_count + 1
+	end
+end
+
+
+-----------------------------------------------------------------------
+-- Wave 1 Vehicle Manager	
+-----------------------------------------------------------------------
+
+function Wave1_VehicleManager()
+	local sgroup2 = sg_tankAttacker
+	
+	
+	if (SGroup_IsEmpty(sg_wave1_vehicles) and wave1_spawncomplete == true) then
+		Rule_RemoveMe()
+		
+		
+		print ("Wave 1 complete")
+		
+		if fg_wave1_done == false then
+			-- Trigger the Tiger lurking behavior
+			Rule_AddDelayedInterval(TigerLurk, 30, 5)
+			-- Trigger Wave 2 after a 2 minute cooldown
+			Rule_AddOneShot(DefendCaen_Wave2, 210)
+		end
+		
+		-- the wave is complete
+		fg_wave1_done = true
+		
+		
+	-- if the timer runs out, trigger the next wave
+	elseif	Timer_GetRemaining (Wave1Timer) == 0 then
+		
+			
+		print ("Wave 1 complete")
+		
+		if fg_wave1_done == false then
+			-- Trigger the Tiger lurking behavior
+			Rule_AddDelayedInterval(TigerLurk, 30, 5)
+			-- Trigger Wave 2 after a 2 minute cooldown
+			Rule_AddOneShot(DefendCaen_Wave2, 120)
+		end
+		
+		-- the wave is complete
+		fg_wave1_done = true
+	end
+	
+	
+	
+--~ 	for k, this in pairs(t_defend.wave1) do
+		
+--~ 		-- if all of the wave's vehicles are dead or the wave time has elapsed, flag the wave as done
+--~ 		if (SGroup_IsEmpty(sg_wave1_vehicles) and wave1_spawncomplete == true) or Timer_GetRemaining (Wave1Timer) == 0 then
+--~ 			Rule_RemoveMe()
+--~ 			-- the wave is complete
+--~ 			fg_wave1_done = true
+--~ 			
+--~ 			print ("Wave 1 complete")
+--~ 			
+--~ 			-- Trigger the Tiger lurking behavior
+--~ 			Rule_AddDelayedInterval(TigerLurk, 30, 5)
+--~ 			
+--~ 			-- Trigger Wave 2 after a 2 minute cooldown
+--~ 			Rule_AddOneShot(DefendCaen_Wave2, 120)
+--~ 			break			
+		
+		-- if the tank is low on health, tell it to retreat
+--~ 		if SGroup_GetAvgHealth(this.sgroup) < .4 then
+--~ 			Cmd_Move(this.sgroup, this.spawn, NO_QUEUE, this.spawn, NIL_FACE, NIL_OFFSET, NIL_DIST, NIL_COVER)
+--~ 			this.fg_follow_path = false
+--~ 		
+--~ 		-- if the tank is under attack, tell the tank to try to flank the attacker
+--~ 		elseif SGroup_IsUnderAttack(this.sgroup, ANY, 10) and SGroup_IsMoving(this.sgroup, false) == false then
+--~ 			SGroup_GetLastAttacker(this.sgroup, sgroup2)
+--~ 			if SGroup_IsEmpty(sgroup2) == false then
+--~ 				Cmd_Move(this.sgroup, sgroup2, NO_QUEUE, NIL_DEST, NIL_FACE, OFFSET_RIGHT, World_GetRand(15, 20))
+--~ 				this.fg_follow_path = false
+--~ 			end
+--~ 		
+--~ 		-- if the tank is at the end of its path, tell it to attack the largest group of infantry
+--~ 		elseif Prox_AreSquadsNearMarker(this.sgroup, this.end_marker, ALL) or this.fg_abandon_path == true then
+--~ 			if SGroup_IsEmpty(sg_player_hq) == false then
+--~ 			local position = Player_GetSquadConcentration (player1, nil, t_CommonwealthInfantry)
+--~ 				if position ~= nil then
+--~ 					Cmd_AttackMove(this.sgroup, position)
+--~ 				else
+--~ 					Cmd_AttackMove(this.sgroup, sg_player_hq)
+--~ 				end
+--~ 			end
+--~ 			
+--~ 			this.fg_abandon_path = true
+--~ 			
+--~ 		
+--~ 		-- if the tank is not busy doing anything else and hasn't finished the path yet, continue to move along the path
+--~ 		elseif this.fg_follow_path == false and this.fg_abandon_path == false and SGroup_IsMoving(this.sgroup, false) == false then
+--~ 			Cmd_SquadPath(this.sgroup, this.path, true, 0, true, 10)
+--~ 			this.fg_follow_path = true
+--~ 		end
+--~ 	end
+end
+
+
+
+-------------------------------------------------------------------------
+-- Wave 2 Functions 
+-------------------------------------------------------------------------
+
+
+function DefendCaen_Wave2()
+	
+	print("WAVE 2 BEGINS HERE")
+	Rule_AddInterval (HasPlayerSpottedWave2, 2)
+	
+	-- Spawn the tanks
+	wave2_count = 1
+	Rule_AddInterval(DC_SpawnWave2Tanks, 15)
+	
+	-- spawn wave 2 infantry
+	Rule_AddInterval(Wave2_SpawnInfantry, 3)
+	
+	-- start rule for infantry speech
+	Rule_AddInterval(HasPlayerSpottedWave2Infantry, 3)
+	
+	
+	Rule_AddDelayedInterval(Wave2_CheckDone, 10, 3)
+	
+	
+	-- Start the tank behavior
+	if Rule_Exists(DC_TankMonitor) == false then
+		Rule_AddDelayedInterval(DC_TankMonitor, 15, 3)
+	end
+	
+	
+end
+
+-- This function staggers the spawning of the tanks for the 2nd wave
+function DC_SpawnWave2Tanks()
+
+	if wave2_count > table.getn(t_defend.wave2) then
+		fg_wave2_spawn_complete = true
+		Rule_RemoveMe()
+	else
+		-- Spawn the tanks
+		Util_CreateSquads(player2, t_defend.wave2[wave2_count].sgroup, t_defend.wave2[wave2_count].sbp, t_defend.wave2[wave2_count].spawn, t_defend.wave2[wave2_count].nextpos, t_defend.wave2[wave2_count].num)
+		SGroup_AddGroup(sg_wave2_tanks, t_defend.wave2[wave2_count].sgroup)
+		wave2_count = wave2_count + 1
+	end
+end
+
+-- spawns the infantry for the 2nd wave
+function Wave2_SpawnInfantry()
+	if fg_wave2_spawn_complete == true then
+		Spawn_CaptureSquads(2)
+		Rule_RemoveMe()
+		
+		-- now that the capture squads are spawned, flag them as alive
+		fg_infantry_all_dead = false
+		
+		-- Start infantry capture squads behavior (start capping points, check for death, etc...)
+		if Rule_Exists(DC_MonitorCaptureSquads) == false then
+			Rule_AddInterval(DC_MonitorCaptureSquads, 5)
+		end
+	end
+end
+
+
+
+
+function HasPlayerSpottedWave2()
+
+	if Player_CanSeeSGroup (player1, sg_wave2_tanks, ANY) and fg_wave2_spawn_complete == true then
+		-- anounce the arrival of the tank forces
+		Util_StartIntel(EVENTS.TAC_TankWaves)
+		Wave2Started = true
+		-- Start the wave timer that will be an alternate trigger for the next wave
+		Timer_Start (Wave2Timer, 300)
+		Rule_RemoveMe()
+	end
+
+end
+
+
+function HasPlayerSpottedWave2Infantry()
+
+	if Player_CanSeeSGroup (player1, sg_CaptureSquads_p2All, ANY) then
+		-- announce the arrival of the infantry forces
+		Util_StartIntel (EVENTS.TAC_InfantryWaves)
+		Rule_RemoveMe()
+	end
+end
+
+-----------------------------------------------------------------------
+-- Wave 2 Check if complete	
+-----------------------------------------------------------------------
+
+function Wave2_CheckDone()
+	local sgroup2 = sg_tankAttacker
+	
+	-- if all of the wave's tanks are dead, flag the wave as done
+	if (SGroup_IsEmpty(sg_wave2_tanks) and fg_wave2_spawn_complete == true) then
+		
+		Rule_RemoveMe()
+		
+		-- the wave is complete
+		fg_wave2_done = true
+		
+		 -- Triggers Wave 3
+		if Rule_Exists(DefendCaen_Wave3) == false then 
+			Rule_AddOneShot(DefendCaen_Wave3, 130) 
+		end 
+		
+		-- Trigger the Tiger lurking behavior
+		if Rule_Exists(TigerLurk) == false then
+			Rule_AddDelayedInterval(TigerLurk, 30, 5)
+		end
+		
+	-- If the timer runs out, then flag the wave as done, but activate a general tank manager to keep track of remaining vehicles	
+	elseif Timer_GetRemaining(Wave2Timer) == 0 and fg_wave2_spawn_complete == true then
+		
+		Rule_RemoveMe()
+		
+		-- the wave is complete
+		fg_wave2_done = true
+		
+		
+		-- Trigger Wave 3
+		Rule_AddOneShot(DefendCaen_Wave3, 100) 
+		
+		-- Trigger the Tiger lurking behavior
+		if Rule_Exists(TigerLurk) == false then 
+			Rule_AddDelayedInterval(TigerLurk, 30, 5) 
+		end
+		
+	end
+end
+
+
+-------------------------------------------------------------------------
+-- Wave 3 Functions 
+-------------------------------------------------------------------------
+
+
+function DefendCaen_Wave3()
+	
+	print("WAVE 3 BEGINS HERE")
+
+	-- Watch to see if infantry spotted
+	Rule_AddInterval(HasPlayerSpottedWave2Infantry, 3)
+	
+	-- Watch to see if tanks spotted
+	Rule_AddInterval (HasPlayerSpottedWave3, 2)
+	
+	-- Spawn the tanks
+	wave3_count = 1
+	Rule_AddInterval(DC_SpawnWave3Tanks, 30)
+	
+	-- Start the tank behavior
+	if Rule_Exists(DC_TankMonitor) == false then
+		Rule_AddDelayedInterval(DC_TankMonitor, 30, 3)
+	end
+	
+	-- Spawn infantry
+	Spawn_CaptureSquads(3)
+
+	-- now that the capture squads are spawned, flag them as alive
+	fg_infantry_all_dead = false
+	
+	-- Start infantry capture squads behavior (start capping points, check for death, etc...)
+	if Rule_Exists(DC_MonitorCaptureSquads) == false then
+		Rule_AddInterval(DC_MonitorCaptureSquads, 5)
+	end
+	
+	-- start checking to trigger the next wave
+	Rule_AddInterval(DelayWave4, 10)
+
+end
+
+
+
+function HasPlayerSpottedWave3()
+
+	if Player_CanSeeSGroup (player1, sg_wave3_tanks, ANY)  and fg_wave3_spawn_complete == true then
+		-- anounce the arrival of the infantry forces
+		Util_StartIntel (EVENTS.TAC_InfantryWaves)
+		-- Start the wave timer that will be an alternate trigger for the next wave
+		Timer_Start (Wave3Timer, 120)
+		Rule_RemoveMe()
+	end
+
+end
+
+
+
+-- This function staggers the spawning of the tanks for the 3rd wave
+function DC_SpawnWave3Tanks()
+
+	if wave3_count > table.getn(t_defend.wave3) then
+		fg_wave3_spawn_complete = true
+		Rule_RemoveMe()
+	else
+		-- Spawn the tanks
+		Util_CreateSquads(player2, t_defend.wave3[wave3_count].sgroup, t_defend.wave3[wave3_count].sbp, t_defend.wave3[wave3_count].spawn, t_defend.wave3[wave3_count].nextpos, t_defend.wave3[wave3_count].num)
+		SGroup_AddGroup(sg_wave3_tanks, t_defend.wave3[wave3_count].sgroup)
+		wave3_count = wave3_count + 1
+	end
+end
+
+
+
+
+-- checks if the infantry are dead or timer elapsed before starting wave 4
+function DelayWave4()
+	if fg_infantry_all_dead == true or Timer_GetRemaining (Wave3Timer) == 0 then
+		Rule_RemoveMe()
+		fg_wave3_done = true
+		-- start the next wave
+		Rule_AddOneShot(DefendCaen_Wave4, 220)
+		
+		-- Trigger the Tiger lurking behavior
+		if Rule_Exists(TigerLurk) == false then
+			Rule_AddDelayedInterval(TigerLurk, 30, 5)
+		end
+	end
+end
+
+
+-------------------------------------------------------------------------
+-- Wave 4 Functions 
+-------------------------------------------------------------------------
+
+
+function DefendCaen_Wave4()
+
+	
+	-- if it's time for the wave to trigger
+	if fg_wave3_done == true then
+		
+		Rule_RemoveMe()
+		
+		print("WAVE 4 BEGINS HERE")
+		
+		Wave4Started = true
+		Rule_AddInterval (HasPlayerSpottedWave4, 2)
+		
+		-- find any emplacements the player has within the barrage areas
+		--Player_GetAllEntitiesNearMarker(player1, eg_area_1a, mkr_barrage1a)
+		--Player_GetAllEntitiesNearMarker(player1, eg_area_1b, mkr_barrage1b)
+		--Player_GetAllEntitiesNearMarker(player1, eg_area_1c, mkr_barrage1c)
+		--Player_GetAllEntitiesNearMarker(player1, eg_area_1d, mkr_barrage1d)
+		--EGroup_Filter(eg_area_1a, {EBP.CW.ANTITANK_NEST, EBP.CW.HOWITZER_NEST, EBP.CW.MG_NEST, EBP.CW.MORTAR_NEST, EBP.CW.SLITTRENCH_NEST}, FILTER_KEEP) 
+		--EGroup_Filter(eg_area_1b, {EBP.CW.ANTITANK_NEST, EBP.CW.HOWITZER_NEST, EBP.CW.MG_NEST, EBP.CW.MORTAR_NEST, EBP.CW.SLITTRENCH_NEST}, FILTER_KEEP) 
+		--EGroup_Filter(eg_area_1c, {EBP.CW.ANTITANK_NEST, EBP.CW.HOWITZER_NEST, EBP.CW.MG_NEST, EBP.CW.MORTAR_NEST, EBP.CW.SLITTRENCH_NEST}, FILTER_KEEP) 
+		--EGroup_Filter(eg_area_1d, {EBP.CW.ANTITANK_NEST, EBP.CW.HOWITZER_NEST, EBP.CW.MG_NEST, EBP.CW.MORTAR_NEST, EBP.CW.SLITTRENCH_NEST}, FILTER_KEEP) 
+		
+		-- start the barrage
+		Rule_AddIntervalEx(DC_wave4_barrage, 5, 14)
+		Util_StartIntel(EVENTS.TAC_ArtyWaves)
+		
+		-- Hummels Arrive
+		Rule_AddInterval(HummelsArrive, 11)
+		
+		-- set the appropriate guards for the hummels (two seperate groups for the different hummel groups, could be either one)
+		if hummel_group == 1 then
+		
+			t_wave4_guards = {
+				-- tanks that guard the hummels
+				{
+					sgroup = sg_wave4_guards1,             
+					sbp = SBP.AXIS.PANZER,	  	
+					spawn = mkr_offmap10, 					
+					num = 1,
+					hummel_sgroup = sg_hummel[1],
+					offset = OFFSET_LEFT,
+				},
+				{
+					sgroup = sg_wave4_guards2,             
+					sbp = SBP.ELITE.WIRBLEWIND,	  	
+					spawn = mkr_offmap10, 					
+					num = 1,
+					hummel_sgroup = sg_hummel[1],
+					offset = OFFSET_RIGHT,                  
+				},
+				{
+					sgroup = sg_wave4_guards3, 
+					sbp = SBP.AXIS.PANZER, 
+					spawn = mkr_offmap9, 
+					num = 1,
+					hummel_sgroup = sg_hummel[2],
+					offset = OFFSET_LEFT,
+				},
+				{
+					sgroup = sg_wave4_guards4, 
+					sbp = SBP.ELITE.WIRBLEWIND, 
+					spawn = mkr_offmap9, 
+					num = 1,
+					hummel_sgroup = sg_hummel[2],
+					offset = OFFSET_RIGHT,
+				},
+			}
+			
+--~ 			-- set the tanks for wave 4
+--~ 			t_defend.wave4 = {
+--~ 				{
+--~ 					-- tank on path 6
+--~ 					sgroup = sg_wave4_p6_tank1, 
+--~ 					sbp = SBP.AXIS.TIGER, 
+--~ 					spawn = mkr_offmap11, 
+--~ 					num = 1,
+--~ 					path = t_paths.path6,
+--~ 					end_marker = mkr_path6_end,
+--~ 					fg_follow_path = false,
+--~ 					fg_abandon_path = false,
+--~ 				},
+--~ 				{
+--~ 					-- tank on path 7
+--~ 					sgroup = sg_wave4_p7_tank1, 
+--~ 					sbp = SBP.AXIS.PANZER, 
+--~ 					spawn = mkr_offmap11, 
+--~ 					num = 1,
+--~ 					path = t_paths.path7,
+--~ 					end_marker = mkr_path7_end,
+--~ 					fg_follow_path = false,
+--~ 					fg_abandon_path = false,
+--~ 				},
+--~ 				{
+--~ 					-- tank on path 8
+--~ 					sgroup = sg_wave4_p8_tank1, 
+--~ 					sbp = SBP.ELITE.PANZER_SUPPORT, 
+--~ 					spawn = mkr_offmap12, 
+--~ 					num = 1,
+--~ 					path = t_paths.path8,
+--~ 					end_marker = mkr_path8_end,
+--~ 					fg_follow_path = false,
+--~ 					fg_abandon_path = false,
+--~ 				},
+--~ 			}
+			
+		else
+			t_wave4_guards = {
+				-- tanks that guard the hummels
+				{
+					sgroup = sg_wave4_guards1,             
+					sbp = SBP.AXIS.PANZER,	  	
+					spawn = mkr_offmap2, 					
+					num = 1,								
+					hummel_sgroup = sg_hummel[1],
+					offset = OFFSET_LEFT,
+				},
+				{
+					sgroup = sg_wave4_guards2,             
+					sbp = SBP.ELITE.WIRBLEWIND,	  	
+					spawn = mkr_offmap2, 					
+					num = 1,								
+					hummel_sgroup = sg_hummel[1],
+					offset = OFFSET_RIGHT,
+				},
+				{
+					sgroup = sg_wave4_guards3, 
+					sbp = SBP.AXIS.PANZER, 
+					spawn = mkr_offmap8, 
+					num = 1,
+					hummel_sgroup = sg_hummel[2],
+					offset = OFFSET_LEFT,
+				},
+				{
+					sgroup = sg_wave4_guards4, 
+					sbp = SBP.ELITE.WIRBLEWIND, 
+					spawn = mkr_offmap8, 
+					num = 1,
+					hummel_sgroup = sg_hummel[2],
+					offset = OFFSET_RIGHT,
+				},
+			}
+			
+--~ 			-- set the tanks for wave 4
+--~ 			t_wave4_guards = {
+--~ 				{
+--~ 					-- tank on path 3
+--~ 					sgroup = sg_wave4_p3_tank1, 
+--~ 					sbp = SBP.AXIS.TIGER, 
+--~ 					spawn = mkr_offmap9, 
+--~ 					num = 1,
+--~ 					path = t_paths.path3,
+--~ 					end_marker = mkr_path3_end,
+--~ 					fg_follow_path = false,
+--~ 					fg_abandon_path = false,
+--~ 				},
+--~ 				{
+--~ 					-- tank on path 4
+--~ 					sgroup = sg_wave4_p4_tank1, 
+--~ 					sbp = SBP.AXIS.PANZER, 
+--~ 					spawn = mkr_offmap2, 
+--~ 					num = 1,
+--~ 					path = t_paths.path4,
+--~ 					end_marker = mkr_path4_end,
+--~ 					fg_follow_path = false,
+--~ 					fg_abandon_path = false,
+--~ 				},
+--~ 				{
+--~ 					-- tank on path 5
+--~ 					sgroup = sg_wave4_p5_tank1, 
+--~ 					sbp = SBP.ELITE.PANZER_SUPPORT, 
+--~ 					spawn = mkr_offmap8, 
+--~ 					num = 1,
+--~ 					path = t_paths.path5,
+--~ 					end_marker = mkr_path5_end,
+--~ 					fg_follow_path = false,
+--~ 					fg_abandon_path = false,
+--~ 				},
+--~ 			}
+			
+		end
+		
+		-- Start the wave timer that will be an alternate trigger for the next wave
+		Timer_Start (Wave4Timer, 280) -- 5 minutes
+		
+	end
+end
+
+-- This function handles the bombardment of the map
+function DC_wave4_barrage()
+	Cmd_Ability(player2, ABILITY.SP.SINGLE_HOWITZER, Util_GetRandomPosition(mkr_barrage1a))
+	Cmd_Ability(player2, ABILITY.SP.SINGLE_HOWITZER, Util_GetRandomPosition(mkr_barrage1b))
+	Cmd_Ability(player2, ABILITY.SP.SINGLE_HOWITZER, Util_GetRandomPosition(mkr_barrage1c))
+	Cmd_Ability(player2, ABILITY.SP.SINGLE_HOWITZER, Util_GetRandomPosition(mkr_barrage1d))
+	
+	-- bombard any emplacements the player has within the barrage areas
+	--if EGroup_IsEmpty(eg_area_1a) == false then
+	--	local entity = EGroup_GetRandomSpawnedEntity(eg_area_1a)
+	--	local pos = Util_GetPosition(entity)
+	--	Cmd_Ability(player2, ABILITY.SP.SINGLE_HOWITZER, pos)
+	--end
+	
+	--if EGroup_IsEmpty(eg_area_1b) == false then
+	--	local entity = EGroup_GetRandomSpawnedEntity(eg_area_1b)
+	--	local pos = Util_GetPosition(entity)
+	--	Cmd_Ability(player2, ABILITY.SP.SINGLE_HOWITZER, pos)
+	--end
+	
+	--if EGroup_IsEmpty(eg_area_1c) == false then
+	--	local entity = EGroup_GetRandomSpawnedEntity(eg_area_1c)
+	--	local pos = Util_GetPosition(entity)
+	--	Cmd_Ability(player2, ABILITY.SP.SINGLE_HOWITZER, pos)
+	--end
+	
+	--if EGroup_IsEmpty(eg_area_1c) == false then
+	--	local entity = EGroup_GetRandomSpawnedEntity(eg_area_1c)
+	--	local pos = Util_GetPosition(entity)
+	--	Cmd_Ability(player2, ABILITY.SP.SINGLE_HOWITZER, pos)
+	--end
+	
+	Rule_ChangeInterval(DC_wave4_barrage, World_GetRand(1, 5))
+end
+
+
+-- This function staggers the spawning of the tanks for the 2nd wave
+function DC_SpawnWave4Tanks()
+
+	if wave4_count > table.getn(t_defend.wave4) then
+		fg_wave4_spawn_complete = true
+		Rule_RemoveMe()
+	else
+		Util_CreateSquads(player2, t_defend.wave4[wave4_count].sgroup, t_defend.wave4[wave4_count].sbp, t_defend.wave4[wave4_count].spawn, t_defend.wave4[wave4_count].nextpos, t_defend.wave4[wave4_count].num)
+		SGroup_AddGroup(sg_wave4_tanks, t_defend.wave4[wave4_count].sgroup)
+		wave4_count = wave4_count + 1
+	end
+end
+
+
+
+function HasPlayerSpottedWave4()
+
+	if Player_CanSeeSGroup (player1, sg_wave4_tanks, ANY) then
+		-- anounce the arrival of the tank forces
+		Util_StartIntel(EVENTS.TAC_TigerWaves)
+		Rule_RemoveMe()
+	end
+
+end
+
+
+
+-----------------------------------------------------------------------
+-- Wave 4 Tank Managers	
+-----------------------------------------------------------------------
+
+-- manages the tanks that guard the Hummels
+function Wave4_GuardManager()
+	local sgroup2 = sg_tankAttacker		-- sgroup for the enemy attacking the tanks
+	local count = 0      				-- how many of the tanks guarding the hummels are dead
+	local target = false
+	
+	for k, this in pairs(t_wave4_guards) do
+		
+		-- if all of the guards are dead then flag them as dead, checking count > 4 is for checking that they've finished spawning
+		if SGroup_IsEmpty(this.sgroup) then
+			count = count + 1
+			print(count.." - "..SGroup_GetName(this.sgroup))
+			
+			-- if all of them are dead, remove the rule
+			if count >= 4 then
+				Rule_RemoveMe()				
+			end
+			
+		-- if the Hummel it was protecting is dead, tell it to attack
+		elseif SGroup_IsEmpty(this.hummel_sgroup) == true then
+--~ 			Cmd_Move(this.sgroup, this.spawn, NO_QUEUE, this.spawn, NIL_FACE, NIL_OFFSET, NIL_DIST, NIL_COVER)
+
+			if SGroup_IsEmpty(this.sgroup) == false then
+			
+				if SGroup_IsEmpty(sg_player_armour_hq) == false then
+					target = sg_player_armour_hq
+				elseif SGroup_IsEmpty(sg_player_soldier_hq) == false then
+					target = sg_player_soldier_hq
+				elseif SGroup_IsEmpty(sg_player_soldier_hq) == false then
+					target = sg_player_armour_hq
+				end
+				
+				if target ~= false and SGroup_IsEmpty(target) == false then
+					Cmd_AttackMove(this.sgroup, target) 
+				end
+			end
+			
+		-- if the tank is not busy doing anything else, move alongside the Hummel
+		elseif SGroup_IsMoving(this.sgroup, false) == false and SGroup_IsUnderAttack(this.sgroup, false, 8) == false then
+			Cmd_Move(this.sgroup, SGroup_GetPosition(this.hummel_sgroup), false, nil, nil, this.offset, 10)
+		end
+	end
+end
+
+
+-- this function controls the behavior of the tanks
+function Wave4_CheckDone()
+	local sgroup2 = sg_tankAttacker
+	
+	-- if all of the wave's tanks are dead, flag the wave as done
+	if (SGroup_IsEmpty(sg_wave4_tanks) and fg_wave4_spawn_complete == true) or Timer_GetRemaining (Wave4Timer) == 0 then
+		Rule_RemoveMe()
+		-- the wave is complete
+		fg_wave4_done = true
+		Rule_AddOneShot(DefendCaen_Wave5, 100)      -- Triggers Wave 5
+		
+		-- Trigger the Tiger lurking behavior
+		if Rule_Exists(TigerLurk) == false then
+			Rule_AddDelayedInterval(TigerLurk, 30, 5)
+		end
+	
+	end
+end
+
+-------------------------------------------------------------------------
+
+-- Wave 5 Functions 
+
+-------------------------------------------------------------------------
+
+
+function DefendCaen_Wave5()
+	
+	Rule_RemoveMe()
+	
+	print("WAVE 5 BEGINS HERE")
+	
+	-- Spawn the tanks
+	wave5_count = 1
+	Rule_AddInterval(DC_SpawnWave5Tanks, 20)
+	
+	-- Start the tank behavior
+	if Rule_Exists(DC_TankMonitor) == false then
+		Rule_AddDelayedInterval(DC_TankMonitor, 35, 3)
+	end
+	
+	-- Spawn infantry
+	Spawn_CaptureSquads(3)
+	Spawn_CaptureSquads(5)
+
+	-- now that the capture squads are spawned, flag them as alive
+	fg_infantry_all_dead = false
+	
+	-- Start infantry capture squads behavior (start capping points, check for death, etc...)
+	if Rule_Exists(DC_MonitorCaptureSquads) == false then
+		Rule_AddInterval(DC_MonitorCaptureSquads, 5)
+	end
+	
+	-- Check if player can see wave
+	Rule_AddInterval (HasPlayerSpottedWave5, 2)
+	
+	-- start checking if the wave is done and start wave 6
+	Rule_AddInterval(DC_wave6_start, 10)
+	
+	-- Start infantry capture squads behavior (start capping points, check for death, etc...)
+	if Rule_Exists(DC_MonitorCaptureSquads) == false then
+		Rule_AddInterval(DC_MonitorCaptureSquads, 5)
+	end
+	
+	-- Add the timer as an alternate trigger for the next wave
+	Timer_Start (Wave5Timer, 180)
+	
+end
+
+
+function HasPlayerSpottedWave5()
+
+	if Player_CanSeeSGroup (player1, sg_CaptureSquads_p2All, ANY) then
+		-- anounce the arrival of the infantry forces
+		Util_StartIntel(EVENTS.TAC_InfantryWaves)
+		Rule_RemoveMe()
+	end
+
+end
+
+
+-- This function staggers the spawning of the tanks for the 2nd wave
+function DC_SpawnWave5Tanks()
+
+	if wave5_count > table.getn(t_defend.wave5) then
+		fg_wave5_spawn_complete = true
+		Rule_RemoveMe()
+	else
+		Util_CreateSquads(player2, t_defend.wave5[wave5_count].sgroup, t_defend.wave5[wave5_count].sbp, t_defend.wave5[wave5_count].spawn, t_defend.wave5[wave5_count].nextpos, t_defend.wave5[wave5_count].num)
+		SGroup_AddGroup(sg_wave5_tanks, t_defend.wave5[wave5_count].sgroup)
+		wave5_count = wave5_count + 1
+	end
+end
+
+
+
+-------------------------------------------------------------
+
+-- Wave 6 functions
+
+-------------------------------------------------------------
+
+function DC_wave6_start()
+	if fg_infantry_all_dead == true or Timer_GetRemaining (Wave5Timer) == 0 then
+		Rule_RemoveMe()
+		
+		fg_wave5_done = true
+		Util_StartIntel (EVENTS.OBJ_FinalWave)
+		
+		-- start the wave 6 barrage
+		Rule_AddDelayedIntervalEx(DC_wave6_barrage, 30, 5, 14)
+		Rule_AddOneShot(DelayWave6BarrageText, 35)
+		
+		-- start checking if the barrage is done
+		Rule_AddDelayedInterval(DelayWave6, 30, 5)
+	end
+end
+
+-- displays the warning of the artillery barrage for wave 6
+function DelayWave6BarrageText()
+	Util_StartIntel (EVENTS.TAC_ArtyWaves)
+end
+
+-- function that handles the barrage for wave 6
+function DC_wave6_barrage()
+	Cmd_Ability(player2, ABILITY.SP.SINGLE_HOWITZER, Util_GetRandomPosition(mkr_barrage2a))
+	Cmd_Ability(player2, ABILITY.SP.SINGLE_HOWITZER, Util_GetRandomPosition(mkr_barrage2b))
+	Cmd_Ability(player2, ABILITY.SP.SINGLE_HOWITZER, Util_GetRandomPosition(mkr_barrage2c))
+	Cmd_Ability(player2, ABILITY.SP.SINGLE_HOWITZER, Util_GetRandomPosition(mkr_barrage2d))
+	
+	Rule_ChangeInterval(DC_wave6_barrage, World_GetRand(1, 5))
+end
+
+
+
+-- checks if the barrage is done before starting wave 6
+function DelayWave6()
+	if Rule_Exists(DC_wave6_barrage) == false then
+		Rule_RemoveMe()
+		
+		-- start the next wave
+		DefendCaen_Wave6()
+	end
+end	
+
+
+
+function DefendCaen_Wave6()
+
+	wave6_count = 1
+	
+	Wave6Started = true
+	
+	-- if the bridges ar eout, change some of the tank attack paths
+	if bridge4 == false then
+		t_defend.wave6[2].path = t_paths.wave3_path3
+		t_defend.wave6[2].spawn = mkr_offmap10
+		t_defend.wave6[2].end_marker = mkr_wave3_end 
+	end
+	
+	if bridge1 == false and bridge2 == false and bridge3 == false then
+		t_defend.wave6[2].path = t_paths.wave3_path3
+		t_defend.wave6[2].spawn = mkr_offmap10
+		t_defend.wave6[2].end_marker = mkr_wave3_end
+		
+		t_defend.wave6[1].path = t_paths.path1
+		t_defend.wave6[1].spawn = mkr_offmap10 
+		t_defend.wave6[1].end_marker = mkr_path1_end 
+	end
+	
+	-- spawn the tanks
+	Rule_AddInterval(DC_SpawnWave6Tanks, 20)
+	
+	-- Start the tank behavior
+	if Rule_Exists(DC_TankMonitor) == false then
+		Rule_AddDelayedInterval(DC_TankMonitor, 35, 3)
+	end
+	
+	-- Can the player see the wave?
+	Rule_AddInterval (HasPlayerSpottedWave6, 2)
+	
+	
+	Rule_AddDelayedInterval(Wave6_CheckDone, 10, 3)
+	--Util_AutoIntel(t_defend_caen.event_wave6)
+	
+	-- Add the timer as an alternate trigger for the next wave
+	Timer_Start (Wave6Timer, 600) -- 10 minutes
+	
+end		
+
+function HasPlayerSpottedWave6()
+
+	if Player_CanSeeSGroup (player1, sg_wave6_tanks, ANY) then
+		-- anounce the arrival of the tiger forces
+		Util_StartIntel(EVENTS.TAC_TigerWaves)
+		Rule_RemoveMe()
+	end
+
+end
+	
+-------------------------------------------------------------
+
+-- Wave 6 Tank Manager
+
+-------------------------------------------------------------
+
+
+-- This function staggers the spawning of the tanks for the 6th wave
+function DC_SpawnWave6Tanks()
+
+	if wave6_count > 10 then
+		Wave6_spawncomplete = true
+		Rule_RemoveMe()
+	else
+		-- Spawn the tanks
+		Util_CreateSquads(player2, t_defend.wave6[wave6_count].sgroup, t_defend.wave6[wave6_count].sbp, t_defend.wave6[wave6_count].spawn, t_defend.wave6[wave6_count].nextpos, t_defend.wave6[wave6_count].num)
+		SGroup_AddGroup(sg_wave6_tanks, t_defend.wave6[wave6_count].sgroup)
+		
+		-- if we are spawning the King Tiger, change its stats
+--~ 		if t_defend.wave6[wave6_count].sbp == SBP.AXIS.KING_TIGER then
+		if t_defend.wave6[wave6_count].sbp == SBP.ELITE.KING_TIGER_ARNHEM then
+--~ 			Modify_WeaponAccuracy(t_defend.wave6[wave6_count].sgroup, "hardpoint_01", 0.75)
+--~ 			Modify_WeaponDamage(t_defend.wave6[wave6_count].sgroup, "hardpoint_01", 4)
+			Modify_Vulnerability(t_defend.wave6[wave6_count].sgroup, 0.6)
+			Rule_AddInterval(HasPlayerSpottedKingTiger, 3)
+		end
+		
+		wave6_count = wave6_count + 1
+		
+	end
+end
+
+
+
+-- this function controls the behavior of the tanks
+function Wave6_CheckDone()
+	local sgroup2 = sg_tankAttacker
+	
+	-- if all of the wave's tanks are dead, flag the wave as done
+	if SGroup_IsEmpty(sg_wave6_tanks) and Wave6_spawncomplete == true then
+		Rule_RemoveMe()
+		-- the wave is complete
+		fg_wave6_done = true
+		
+	elseif Timer_GetRemaining (Wave6Timer) == 0 then
+
+		fg_wave6_done = true
+	
+	end
+end
+
+
+
+
+-------------------------------------------------------------
+
+-- Defend Caen Tank Monitor function
+
+-- If the wave has finished but the tanks are still around
+
+-------------------------------------------------------------
+
+function DC_TankMonitor()
+
+	local sgroup2 = sg_tankAttacker
+
+	for n, wave in pairs(t_defend) do
+	
+		for k, this in pairs(wave) do
+				
+			-- if the tank is low on health, tell it to retreat
+			if SGroup_CountSpawned( this.sgroup ) > 0 then
+				if SGroup_GetAvgHealth(this.sgroup) < .3 then
+					Cmd_Move(this.sgroup, this.spawn, NO_QUEUE, this.spawn, NIL_FACE, NIL_OFFSET, NIL_DIST, NIL_COVER)
+					this.fg_follow_path = false
+				
+				-- if the tank is under attack, tell the tank to try to flank the attacker
+				elseif SGroup_IsUnderAttack(this.sgroup, ANY, 10) and SGroup_IsMoving(this.sgroup, ALL) == false then
+					SGroup_GetLastAttacker(this.sgroup, sgroup2)
+					if SGroup_CountSpawned(sgroup2) > 0 then
+	--~ 					Cmd_Move(this.sgroup, sgroup2, NO_QUEUE, NIL_DEST, NIL_FACE, OFFSET_RIGHT, World_GetRand(15, 20))
+						Cmd_AttackMove(this.sgroup, Util_GetPosition(sgroup2))
+						this.fg_follow_path = false
+						this.fg_camping_point = false
+					end
+				
+				-- if the tank is at the end of its path, start the wave-end timer and tell it to attack the player's hq
+				elseif Prox_AreSquadsNearMarker(this.sgroup, this.end_marker, ALL) or this.fg_abandon_path == true then
+					
+					-- check if the player is camping the island by destroying the bridges
+					if fg_player_camping_island == false then
+					
+						if SGroup_IsEmpty(sg_player_armour_hq) == false and fg_player_armour_hq_camping_island == false then
+							Cmd_AttackMove(this.sgroup, sg_player_armour_hq)
+						elseif SGroup_IsEmpty(sg_player_soldier_hq) == false and fg_player_soldier_hq_camping_island == false then
+							Cmd_AttackMove(this.sgroup, sg_player_soldier_hq)
+						elseif SGroup_IsEmpty(sg_player_hq) == false and fg_player_hq_camping_island == false then
+							Cmd_AttackMove(this.sgroup, sg_player_hq)
+						elseif this.fg_camping_point == false then		
+							-- camp the tanks' appropriate objective point
+							if this.target_point ~= nil then
+								Cmd_AttackMove(this.sgroup, Util_GetOffsetPosition(this.target_point, World_GetRand(0, 7), World_GetRand(10, 20)))
+							end
+							this.fg_camping_point = true
+						end
+						
+						this.fg_abandon_path = true
+					
+					-- tell tank to camp its respective objective
+					elseif this.fg_camping_point == false then					
+						if this.target_point ~= nil then
+							Cmd_AttackMove(this.sgroup, Util_GetOffsetPosition(this.target_point, World_GetRand(0, 7), World_GetRand(10, 20)))
+						end
+						this.fg_camping_point = true
+					end
+					
+					
+					
+				-- if the tank is not busy doing anything else and hasn't finished the path yet, continue to move along the path
+				elseif this.fg_follow_path == false and this.fg_abandon_path == false and SGroup_IsMoving(this.sgroup, false) == false then
+					Cmd_SquadPath(this.sgroup, this.path, true, 0, true, 10)
+					this.fg_follow_path = true
+				end
+			end
+		end
+	end
+end
+
+-------------------------------------------------------------
+
+-- Defend Caen Infantry Capture Squad functions
+
+-------------------------------------------------------------
+
+
+-- Function to spawn infantry from the table to attack one of 3 positions as main objectives
+function Spawn_CaptureSquads(num)
+
+	-- Get the random capture target
+	local choices = {}
+	local sgroup2 = sg_CaptureSquads_p2All
+	waveid = num
+	
+	if waveid == 2 then
+		choices[1] = mkr_offmap2
+		choices[2] = mkr_offmap6
+		choices[3] = mkr_offmap8
+		choices[4] = mkr_offmap5	
+		sgroup2 = sg_CaptureSquads_wave2_p1
+	
+	elseif waveid == 3 then
+		choices[1] = mkr_offmap11
+		choices[2] = mkr_offmap10
+		choices[3] = mkr_offmap9
+		sgroup2 = sg_CaptureSquads_wave3_p1	
+		
+	else
+		choices[1] = mkr_offmap8
+		choices[2] = mkr_offmap14
+		choices[3] = mkr_offmap11
+		choices[4] = mkr_offmap5
+		sgroup2 = sg_CaptureSquads_wave4_p1
+	end
+	
+	local rand = World_GetRand(1, table.getn(choices))
+	
+	for k, this in pairs (t_capture_squads) do
+		this.sgroup = sgroup2
+		Util_CreateSquads(player2, this.sgroup, this.sbp, choices[rand])
+		
+		if this.upgrade ~= nil then
+			Cmd_InstantUpgrade(this.sgroup, this.upgrade)
+		end
+		
+		SGroup_AddGroup(sg_CaptureSquads_p2All, this.sgroup)
+	
+	end
+
+	
+	if WaveID == 5 then
+		
+		-- Run the spawn a second time
+		for k, this in pairs (t_capture_squads) do
+			Util_CreateSquads(player2, this.sgroup, this.sbp, choices[rand])
+			
+			if this.upgrade ~= nil then
+				Cmd_InstantUpgrade(this.sgroup, this.upgrade)
+			end
+			
+
+			SGroup_AddGroup(sg_CaptureSquads_p2All, sgroup)
+	
+		end
+		
+	end
+end
+
+-- Runs behavior functions for all groups of infantry
+function DC_MonitorCaptureSquads()
+	
+	-- Check for deaths and remove the rule if all capturing squads are dead
+	if SGroup_Count (sg_CaptureSquads_p2All) == 0 then 
+		fg_infantry_all_dead = true
+		Rule_RemoveMe()
+	else 
+		fg_infantry_all_dead = false
+	end
+	
+	-- Table of all of the strategic points on the map
+	local t_capturable_points = {
+		eg_help_point,
+		eg_help_point2,
+		eg_chateau_point,
+		eg_center_point,
+		eg_caen_pt1,
+		eg_caen_pt2,
+		eg_caen_pt3,
+		eg_caen_pt4,
+		eg_caen_pt5,
+		eg_caen_pt6,
+		eg_caen_pt7,
+		eg_noMans_pt1,
+		eg_noMans_pt2,
+		eg_noMans_pt3,
+		eg_noMans_pt4,
+		eg_noMans_pt5,
+		eg_noMans_pt6,
+		eg_caen_cathedralVP, 
+		eg_caen_crossroadsVP, 
+		eg_noMans_pt3,
+	}
+	
+	local t_capture_squad_groups = {
+		sg_CaptureSquads_wave2_p1,
+		sg_CaptureSquads_wave2_p2, 
+		sg_CaptureSquads_wave3_p1, 
+		sg_CaptureSquads_wave4_p1, 
+	}
+	
+	
+	-- filter out the points that the enemy has already taken so that they only chase after player controlled points
+	for n = table.getn(t_capturable_points), 1, -1  do
+		if EGroup_IsCapturedByPlayer(t_capturable_points[n], player2, ANY) then
+			table.remove(t_capturable_points, n)
+		end
+	end
+	
+	-- filter out the squads that are empty
+	for n = table.getn(t_capture_squad_groups), 1, -1  do
+		if SGroup_IsEmpty(t_capture_squad_groups[n]) then
+			table.remove(t_capture_squad_groups, n)
+		end
+	end
+	
+	for n = 1, table.getn(t_capture_squad_groups) do
+		
+		-- If the squad isn't dead and is idle, then issue orders to cap the closest VP
+		if SGroup_IsIdle (t_capture_squad_groups[n], ALL) == true and table.getn(t_capturable_points) > 0 then
+			Cmd_AttackMoveThenCapture (t_capture_squad_groups[n], World_GetClosest (t_capture_squad_groups[n], t_capturable_points))
+		end
+	end
+end
+
+
+
+-------------------------------------------------------------------------
+-- Minimum Territory Timer Functions 
+-------------------------------------------------------------------------
+
+-- Checks if the player has the minimum amount of territory,
+-- or if the enemy is close to the 3 Victory Points
+function DC_MinimumTerritory()
+	
+	-- Is the enemy near the Cathedral?
+	local egroup1 = eg_caen_cathedralVP
+	if Prox_ArePlayersNearMarker (player2, EGroup_GetPosition (egroup1), ANY, 50) and Rule_Exists (Cathedral_lostcheck) == false then
+		
+		Util_StartIntel (EVENTS.OBJ_Cathedral_UnderAttack)
+		EventCue_Create (CUE.ATTACKED, 1379130, 1379130, egroup1)
+		Player_GetAllSquadsNearMarker (player2, sg_CathedralCapture, EGroup_GetPosition (egroup1), 50)
+		Rule_AddInterval (Cathedral_lostcheck, 1)
+		
+	end
+	
+	-- Crossroads?
+	local egroup2 = eg_caen_crossroadsVP
+	if Prox_ArePlayersNearMarker (player2, EGroup_GetPosition (egroup2), ANY, 50) and Rule_Exists (Crossroads_lostcheck) == false then
+		
+		Util_StartIntel (EVENTS.OBJ_Crossroads_UnderAttack)
+		EventCue_Create (CUE.ATTACKED, 1379131, 1379131, egroup2)
+		Player_GetAllSquadsNearMarker (player2, sg_CrossroadsCapture, EGroup_GetPosition (egroup2), 50)
+		Rule_AddInterval (Crossroads_lostcheck, 1)
+		
+	end
+	
+	-- Courtyard (with statue, in no-mans-land)?
+	local egroup3 = eg_noMans_pt3
+	if Prox_ArePlayersNearMarker (player2, EGroup_GetPosition (egroup3), ANY, 50) and Rule_Exists (Courtyard_lostcheck) == false then
+		
+		Util_StartIntel (EVENTS.OBJ_Courtyard_UnderAttack)
+		EventCue_Create (CUE.ATTACKED, 1379132, 1379132, egroup3)
+		Player_GetAllSquadsNearMarker (player2, sg_CourtyardCapture, EGroup_GetPosition (egroup3), 50)
+		Rule_AddInterval (Courtyard_lostcheck, 1)
+		
+	end	
+	
+--~ 	if Player_GetNumStrategicPoints(player1) < 7 then
+--~ 		fg_minimum_territory = false
+--~ 		DC_TerritoryTimer()
+--~ 	else
+--~ 		-- the player has the minimum territory necessary
+--~ 		fg_minimum_territory = true
+--~ 		DC_TerritoryTimer()
+--~ 	end
+end
+
+-- Check if any of the 3 VPs are being captured or lost
+function Cathedral_lostcheck()
+	
+	-- If the Cathedral is captured, then set the UI elements to "recapture" and show a counter of VPs remaining
+	if EGroup_IsCapturedByPlayer (eg_caen_cathedralVP, player2, ANY) and g_CathedralLost == false then
+		Objective_RemoveUIElements (OBJ_DefendCaen, OBJ_DefendCaen.CathedralHelpPointID)
+		OBJ_DefendCaen.CathedralHelpPointID = Objective_AddUIElements (OBJ_DefendCaen, eg_caen_cathedralVP, true, 1379124, true, 2)
+		g_VPCount = g_VPCount - 1
+		Objective_SetCounter (OBJ_DefendCaen, g_VPCount, 3)
+		g_CathedralLost = true
+	elseif g_CathedralLost == true and EGroup_IsCapturedByPlayer (eg_caen_cathedralVP, player1, ANY) then
+		Objective_RemoveUIElements (OBJ_DefendCaen, OBJ_DefendCaen.CathedralHelpPointID)
+		OBJ_DefendCaen.CathedralHelpPointID = Objective_AddUIElements (OBJ_DefendCaen, eg_caen_cathedralVP, true, 1379120, true, 2)
+		g_VPCount = g_VPCount + 1
+		Objective_SetCounter (OBJ_DefendCaen, g_VPCount, 3)
+		g_CathedralLost = false
+	end
+
+end
+	
+function Crossroads_lostcheck()
+
+	-- If the Crossroads is captured, then set the UI elements to "recapture" and show a counter of VPs remaining
+	if EGroup_IsCapturedByPlayer (eg_caen_crossroadsVP, player2, ANY) and g_CrossroadsLost == false then
+		Objective_RemoveUIElements (OBJ_DefendCaen, OBJ_DefendCaen.CrossroadsHelpPointID)
+		OBJ_DefendCaen.CrossroadsHelpPointID = Objective_AddUIElements (OBJ_DefendCaen, eg_caen_crossroadsVP, true, 1379125, true, 2)
+		g_VPCount = g_VPCount - 1
+		Objective_SetCounter (OBJ_DefendCaen, g_VPCount, 3)
+		g_CrossroadsLost = true
+	-- If it's recaptured then redo the UI elements back to the "defend" again
+	elseif g_CrossroadsLost == true and EGroup_IsCapturedByPlayer (eg_caen_crossroadsVP, player1, ANY) then
+		Objective_RemoveUIElements (OBJ_DefendCaen, OBJ_DefendCaen.CrossroadsHelpPointID)
+		OBJ_DefendCaen.CrossroadsHelpPointID = Objective_AddUIElements (OBJ_DefendCaen, eg_caen_crossroadsVP, true, 1379121, true, 2)
+		g_VPCount = g_VPCount + 1
+		Objective_SetCounter (OBJ_DefendCaen, g_VPCount, 3)
+		g_CrossroadsLost = false
+	end
+	
+end
+
+function Courtyard_lostcheck()
+
+	-- If the Courtyard (in no man's land) is captured, then set the UI elements to "recapture" and show a counter of VPs remaining
+	if EGroup_IsCapturedByPlayer (eg_noMans_pt3, player2, ANY) and g_CourtyardLost == false then
+		Objective_RemoveUIElements (OBJ_DefendCaen, OBJ_DefendCaen.CourtyardHelpPointID)
+		OBJ_DefendCaen.CourtyardHelpPointID = Objective_AddUIElements (OBJ_DefendCaen, eg_noMans_pt3, true, 1379126, true, 2)
+		g_VPCount = g_VPCount - 1
+		Objective_SetCounter (OBJ_DefendCaen, g_VPCount, 3)
+		g_CourtyardLost = true
+	-- If it's recaptured then redo the UI elements back to the "defend" again
+	elseif g_CourtyardLost == true and EGroup_IsCapturedByPlayer (eg_noMans_pt3, player1, ANY) then
+		Objective_RemoveUIElements (OBJ_DefendCaen, OBJ_DefendCaen.CourtyardHelpPointID)
+		OBJ_DefendCaen.CourtyardHelpPointID = Objective_AddUIElements (OBJ_DefendCaen, eg_noMans_pt3, true, 1379122, true, 2)
+		g_VPCount = g_VPCount + 1
+		Objective_SetCounter (OBJ_DefendCaen, g_VPCount, 3)
+		g_CourtyardLost = false
+	end
+	
+end
+
+-- Starts the countdown timer if the player has too little territory or remove it if they have enough
+function DC_TerritoryTimer()
+	if fg_minimum_territory == false and fg_timer_started == false then
+	
+		Objective_StartTimer(OBJ_DefendCaen, COUNT_DOWN, 300)
+		fg_timer_started = true
+		fg_reminder1 = false
+		fg_reminder2 = false
+		
+		-- start checking the timer in order to trigger the reminder messages
+		Rule_AddInterval(DC_TimerAlerts, 3)
+		
+		-- tell the player they've lost too much territory
+		if fg_reminder1 == false then
+			Util_StartIntel (EVENTS.OBJ_LosingTerritory)
+			print ("losing territory")
+			fg_reminder1 = true
+		end
+		
+	-- if the player has enough territory, stop the timer
+	elseif fg_minimum_territory == true then
+		Objective_StopTimer(OBJ_DefendCaen)
+	end
+end
+
+-- this function triggers alert messages to remind the player of the time limit
+function DC_TimerAlerts()
+	if fg_minimum_territory == true then
+		Rule_RemoveMe()
+		
+	elseif Objective_GetTimerSeconds(OBJ_DefendCaen) <= 180 and fg_reminder2 == false then
+		print ("Remind timer running out")
+		fg_reminder2 = true
+	end
+end
+
+ 
+-------------------------------------------------------------------------
+-- Hummel Related
+-------------------------------------------------------------------------
+
+
+-- function that handles the arrival of Hummels
+function HummelsArrive()
+	if Rule_Exists(DC_wave4_barrage) == false then
+		for k,this in pairs(t_dc_support.hummel) do 
+			if SGroup_IsEmpty(this.sgroup) then
+				Hummel_Create(this.sgroup, this.dest, this.src)
+				done = false
+			end
+		end
+		
+		Rule_RemoveMe()
+		--Util_AutoIntel(t_defend_caen.event_wave4)
+		
+		-- spawn the tanks that guard the Hummels
+		guard_count = 1
+		Rule_AddInterval(SpawnGuards, 7)
+		
+		-- Start the behavior for the tanks guarding the Hummels
+		Rule_AddDelayedInterval(Wave4_GuardManager, 7, 5)
+		
+		-- the number of wave 4 tanks spawned
+		wave4_count = 1
+			
+		-- spawn the tanks for wave 4
+		Rule_AddInterval(DC_SpawnWave4Tanks, 20)
+		
+		-- Start the tank behavior
+		if Rule_Exists(DC_TankMonitor) == false then
+			Rule_AddDelayedInterval(DC_TankMonitor, 35, 3)
+		end
+		
+		-- Spawn infantry
+		Spawn_CaptureSquads(2)
+		Spawn_CaptureSquads(3)
+
+		-- now that the capture squads are spawned, flag them as alive
+		fg_infantry_all_dead = false
+		
+		-- Start infantry capture squads behavior (start capping points, check for death, etc...)
+		if Rule_Exists(DC_MonitorCaptureSquads) == false then
+			Rule_AddInterval(DC_MonitorCaptureSquads, 5)
+		end
+
+		-- Start checking if the wave is done
+		Rule_AddDelayedInterval(Wave4_CheckDone, 10, 3)
+		
+	end
+end
+
+-- this function is called periodically to stagger the spawning of tanks
+function SpawnGuards()
+	if guard_count > 4 then
+		Rule_RemoveMe()
+	else
+		-- Spawn the tanks that guard the Hummels
+--~ 		Util_CreateSquads(player2, t_wave4_guards[guard_count].sgroup, t_wave4_guards[guard_count].sbp, t_wave4_guards[guard_count].spawn, SGroup_GetPosition(t_wave4_guards[guard_count].hummel_sgroup), t_wave4_guards[guard_count].num)
+		Util_CreateSquads(player2, t_wave4_guards[guard_count].sgroup, t_wave4_guards[guard_count].sbp, t_wave4_guards[guard_count].spawn, t_hummel.marker, t_wave4_guards[guard_count].num)
+		SGroup_AddGroup(sg_wave4_tanks, t_wave4_guards[guard_count].sgroup)
+		guard_count = guard_count + 1
+	end
+end
+
+
+-- creates a Hummel and adds it to the Hummel manager
+-- assumes player 2
+function Hummel_Create(sgroup1, marker1, marker2)
+	Util_CreateSquadsAtMarker(player2, sgroup1, SBP.ELITE.HUMMEL, marker2, 1)
+	Modify_Vulnerability(sgroup1, .8)
+	Cmd_Move(sgroup1, marker1)
+	Hummel_Add(sgroup1, marker2)
+	Modify_WeaponRange(sgroup1, "hardpoint_01",  10)
+end
+
+
+-- adds a Hummel to the manager
+function Hummel_Add(sgroup1, marker1)
+	if t_hummel == nil then
+		t_hummel = {}
+	end
+	
+	table.insert(t_hummel, {sgroup = sgroup1, marker = marker1, count = 15})
+
+	if Rule_Exists(Hummel_Control) == false then
+		Rule_AddInterval(Hummel_Control, 5)
+	end
+end
+
+-- tells the Hummels to fire at random targets within their sphere
+-- assumes player 2 controlling
+-- assumes player 1 target
+function Hummel_Control()
+	for k,this in pairs(t_hummel) do 
+	
+		if SGroup_IsEmpty(this.sgroup) then
+			-- remove it from the table 
+			table.remove(t_hummel, k)
+			
+		-- are you moving?
+		elseif SGroup_IsMoving(this.sgroup, false) == false then
+			
+			-- are you under attack?
+			-- being under attack doesn't mean you can't do other things
+			if SGroup_IsUnderAttack(this.sgroup, false, 10) then
+				
+				if SGroup_GetAvgHealth(this.sgroup) < .4 then
+					-- if your health is low, run for the border
+					Cmd_Move(this.sgroup, Marker_GetPosition(this.marker), false, this.marker)
+					
+				else
+					-- else we may have you relocate
+					Cmd_Move(this.sgroup, this.sgroup, NO_QUEUE, NIL_DEST, NIL_FACE, OFFSET_BACK, World_GetRand(5, 10))
+				end
+				
+			end
+			
+			-- if the count is high enough we can fire
+			if this.count >= World_GetRand(18, 27) then
+				
+				-- find a target
+				local target = SGroup_CreateIfNotFound("sg_hummel_target")
+				Player_GetAllSquadsNearMarker(player1, target, SGroup_GetPosition(this.sgroup), 400)
+				local squadID = SGroup_GetRandomSpawnedSquad(target)
+				if scartype(squadID) ~= ST_NUMBER then
+					local targetPos = Squad_GetPosition(squadID)
+					-- and fire
+					Cmd_Ability(this.sgroup, ABILITY.ELITE.HOWITZER_BARRAGE, targetPos, nil, true)
+					
+					this.count = 0
+				end
+			end
+			-- increment the count regardless
+			this.count = this.count+1
+			
+		-- if we're moving set the count to ten to make a fire when it stops more likely
+		elseif this.count < 10 then
+			this.count = 10
+		end
+	end
+	
+	-- are you empty
+	if table.getn(t_hummel) == 0 then
+		Rule_RemoveMe()
+	end
+end
+
+
+-----------------------------------------------------------------------
+-- Bridge Functions
+-----------------------------------------------------------------------
+function Bridges_CheckStatus()
+	-- bridge 1 (on left)
+	if EGroup_IsEmpty(eg_bridge1) then
+		World_GetNeutralEntitiesNearMarker(eg_bridge1, mkr_bridge1)
+		EGroup_Filter(eg_bridge1, {EBP.BRIDGE_M6_PONT_TOURANT.NORMAL, EBP.BRIDGE_M6_PONT_TOURANT.WRECKED, EBP.BRIDGE_M6_PONT_TOURANT.REBUILT}, FILTER_KEEP)
+	end
+	
+	if EGroup_ContainsBlueprints(eg_bridge1, {EBP.BRIDGE_M6_PONT_TOURANT.NORMAL, EBP.BRIDGE_M6_PONT_TOURANT.REBUILT}, ANY) then
+		-- the bridge is fine or rebuilt
+		bridge1 = true
+	else
+		-- otherwise the bridge is destroyed
+		bridge1 = false
+	end
+	
+	-- bridge 2 (in middle)
+	if EGroup_IsEmpty(eg_bridge2) then
+		World_GetNeutralEntitiesNearMarker(eg_bridge2, mkr_bridge2)
+		EGroup_Filter(eg_bridge2, {EBP.BRIDGE_M6_PONT_TOURANT.NORMAL, EBP.BRIDGE_M6_PONT_TOURANT.WRECKED, EBP.BRIDGE_M6_PONT_TOURANT.REBUILT}, FILTER_KEEP)
+	end
+	
+	if EGroup_ContainsBlueprints(eg_bridge2, {EBP.BRIDGE_M6_PONT_TOURANT.NORMAL, EBP.BRIDGE_M6_PONT_TOURANT.REBUILT}, ANY) then
+		-- the bridge is fine or rebuilt
+		bridge2 = true
+	else
+		-- otherwise the bridge is destroyed
+		bridge2 = false
+	end
+	
+	-- bridge 3 (on right)
+	if EGroup_IsEmpty(eg_bridge3) then
+		World_GetNeutralEntitiesNearMarker(eg_bridge3, mkr_bridge3)
+		EGroup_Filter(eg_bridge3, {EBP.BRIDGE_M6_PONT_TOURANT.NORMAL, EBP.BRIDGE_M6_PONT_TOURANT.WRECKED, EBP.BRIDGE_M6_PONT_TOURANT.REBUILT}, FILTER_KEEP)
+	end
+	
+	if EGroup_ContainsBlueprints(eg_bridge3, {EBP.BRIDGE_M6_PONT_TOURANT.NORMAL, EBP.BRIDGE_M6_PONT_TOURANT.REBUILT}, ANY) then
+		-- the bridge is fine or rebuilt
+		bridge3 = true
+	else
+		-- otherwise the bridge is destroyed
+		bridge3 = false
+	end
+	
+-- bridge 4 (on top)
+	if EGroup_IsEmpty(eg_bridge4) then
+		World_GetNeutralEntitiesNearMarker(eg_bridge4, mkr_offmap12)
+		EGroup_Filter(eg_bridge4, {EBP.BRIDGE_M6_PONT_TOURANT.NORMAL, EBP.BRIDGE_M6_PONT_TOURANT.WRECKED, EBP.BRIDGE_M6_PONT_TOURANT.REBUILT}, FILTER_KEEP)
+	end
+	
+	if EGroup_ContainsBlueprints(eg_bridge4, {EBP.BRIDGE_M6_PONT_TOURANT.NORMAL, EBP.BRIDGE_M6_PONT_TOURANT.REBUILT}, ANY) then
+		-- the bridge is fine or rebuilt
+		bridge4 = true
+	else
+		-- otherwise the bridge is destroyed
+		bridge4 = false
+	end
+end
+
+
+
+-----------------------------------------------------------------------
+-- King Tiger functions
+-----------------------------------------------------------------------
+
+
+function TigerAmbush()
+
+	local tiger_spawn = false
+	current_time = World_GetGameTime()
+	time_passed = current_time - tiger_last_time_triggered
+	
+	if fg_wave5_done == true then
+		Rule_RemoveMe()
+	
+	-- check if there isn't a King Tiger already doing something and that it's time for another ambush
+	elseif fg_tiger_is_active == false and ( time_passed >= 180) then
+	
+		for k, ambush in pairs(t_tiger_ambushes) do
+		
+			if (current_time - ambush.time_triggered >= 240) and Prox_ArePlayersNearMarker(player1, ambush.mkr, ANY) then
+				-- check if the player can see any of the spawn points (want to spawn it in a hidden position)
+				for k, this in pairs (ambush.spawn) do
+					if Player_CanSeePosition(player1, Marker_GetPosition(this)) == false then
+						tiger_spawn = this
+						-- put this ambush marker on the bottom of the list so that new markers have priority
+						table.insert(ambush.spawn, this)
+						table.remove(ambush.spawn, k)
+						break
+					end
+					
+				end
+				
+				
+				if tiger_spawn ~= false then
+					local pos = World_GetHiddenPositionOnPath(player1, tiger_spawn, ambush.mkr, CHECK_IN_FOW)
+					if pos == nil then
+						pos = tiger_spawn
+					end
+					
+					-- flag the King Tiger as active on the map
+					fg_tiger_is_active = true
+					-- get the time it was triggered
+					ambush.time_triggered = World_GetGameTime()
+					tiger_last_time_triggered = World_GetGameTime()
+					
+					if SGroup_CountSpawned(sg_king_tiger) == 0 then
+						Game_TriggerLightning()
+						Util_CreateSquads(player2, sg_king_tiger, SBP.ELITE.KING_TIGER_ARNHEM, pos)
+						SGroup_SnapFacePosition(sg_king_tiger, Marker_GetPosition(ambush.mkr))
+						Cmd_AttackMove(sg_king_tiger, ambush.mkr)
+--~ 						Modify_Vulnerability(sg_king_tiger, 0.75)
+--~ 						Modify_WeaponAccuracy(sg_king_tiger, "hardpoint_01", 0.75)
+						Modify_UnitSpeed(sg_king_tiger, 3)
+						ThreatArrow_Add(tiger_threat_id, sg_king_tiger)
+						EventCue_Create(CUE.ATTACKED, 1379134, 1379199, sg_king_tiger)
+						
+					else
+						-- if the tiger previously appeared then it doesn't need to be re-created, just respawned
+						Game_TriggerLightning( )
+						Tiger_ReSpawnTowards( sg_king_tiger, pos, ambush.mkr )
+						ThreatArrow_Add(tiger_threat_id, sg_king_tiger)
+						EventCue_Create(CUE.ATTACKED, 1379134, 1379199, sg_king_tiger)
+						Cmd_AttackMove(sg_king_tiger, ambush.mkr)
+					end
+					
+					-- end the ambush after a certain amount of time
+					tiger_despawn = ambush.despawn
+					Rule_AddDelayedInterval(KingTigerManager, 20, 3)
+--~ 					Rule_AddInterval(CheckTigerDespawn, 3)
+					
+					-- put this ambush on the bottom of the list so that new ambushes have priority
+					table.insert(t_tiger_ambushes, ambush)
+					table.remove(t_tiger_ambushes, k)
+					
+					-- if this is the first ambush to occur, announce the text to the player
+					if fg_first_ambush == false then
+						Rule_AddOneShot(FirstAmbush, 5)
+						-- flag the first ambush as having been done
+						fg_first_ambush = true
+						Rule_AddInterval(FirstAmbushDone, 3)
+						
+					elseif fg_second_ambush == false then
+						Rule_AddOneShot(SecondAmbush, 5)
+						-- flag the first ambush as having been done
+						fg_second_ambush = true
+					end
+					
+					break
+				end
+			end
+		end
+	end
+end
+
+
+-- tells the King Tiger to use its Smoke
+function KingTigerSmoke()
+	if SGroup_IsEmpty(sg_king_tiger) == false then
+		Cmd_Ability(sg_king_tiger, ABILITY.SP.KING_TIGER)
+	end
+end
+
+-- This function tells the tiger to disappear or fight to the death
+function KingTigerManager()
+	
+	local sg_temp = SGroup_CreateIfNotFound("sg_temp")
+	
+	-- if the player can't see the tiger then despawn it
+	if SGroup_CountSpawned(sg_king_tiger) == 0 then
+		fg_tiger_is_active = false
+		Rule_RemoveMe()
+	
+	elseif Player_CanSeeSGroup(player1, sg_king_tiger, ALL) == false then
+		ThreatArrow_Remove(tiger_threat_id, sg_king_tiger)
+		Game_TriggerLightning( )
+		SGroup_DeSpawn(sg_king_tiger)
+		fg_tiger_is_active = false
+		Rule_RemoveMe()
+	
+	elseif SGroup_IsUnderAttack(sg_king_tiger, ALL, 10) then
+		SGroup_GetLastAttacker(sg_king_tiger, sg_temp)
+		
+		if SGroup_IsEmpty(sg_temp) == false and SGroup_CountSpawned(sg_king_tiger) > 0  then
+			Cmd_AttackMove(sg_king_tiger, Util_GetPosition(sg_temp))
+		end
+	
+	end
+end
+
+
+-- function to check when the King Tiger despawns
+function CheckTigerDespawn()
+	if SGroup_CountSpawned(sg_king_tiger) == 0 then
+		fg_tiger_is_active = false
+		Rule_RemoveMe()
+	end
+end
+
+
+-- function to announce the first Tiger ambush to the player
+function FirstAmbush()
+	Util_StartIntel (EVENTS.OBJ_KingTiger)
+end
+
+-- function to announce the first Tiger ambush to the player
+function SecondAmbush()
+	Util_StartIntel (EVENTS.OBJ_KingTiger)
+end
+
+
+-- function to announce the first Tiger ambush has been completed
+function FirstAmbushDone()
+	if fg_first_ambush == true and SGroup_CountSpawned(sg_king_tiger) == 0 then
+		--Util_AutoIntel(t_defend_caen.event_tiger_ambush1_done)
+		Rule_RemoveMe()
+	end
+end
+
+-- This function triggers the lurking behavior of the King Tiger
+function TigerLurk()
+
+	current_time = World_GetGameTime()
+	time_passed = current_time - tiger_last_time_triggered
+
+	if table.getn(t_tiger_lurk) == 0 then
+		Rule_RemoveMe()
+	
+	elseif fg_tiger_is_active == false and time_passed >= 120 then
+		for k, this in pairs(t_tiger_lurk) do
+			if Prox_ArePlayersNearMarker(player1, this.mkr, ANY, 60) == false and Prox_AreSquadsNearMarker(sg_player_buildings, this.mkr, ANY, 60) == false then
+				fg_tiger_is_active = true
+				tiger_last_time_triggered = World_GetGameTime()
+				
+				if SGroup_CountSpawned(sg_king_tiger) == 0 then
+					Util_CreateSquads(player2, sg_king_tiger, SBP.ELITE.KING_TIGER_ARNHEM, this.spawn)
+					Modify_Vulnerability(sg_king_tiger, 0.75)
+--~ 					Modify_WeaponAccuracy(sg_king_tiger, "hardpoint_01", 0.75)
+					Modify_UnitSpeed(sg_king_tiger, 3)
+					ThreatArrow_Add(tiger_threat_id, sg_king_tiger)
+					EventCue_Create(CUE.NORMAL, 1379133, 1379199, sg_king_tiger)
+					-- reveal the King Tiger
+					Game_TriggerLightning( )
+					FOW_RevealSGroupOnly(sg_king_tiger, 30)
+					
+				else
+					-- if the tiger previously appeared then it doesn't need to be re-created, just respawned
+					Tiger_ReSpawnTowards( sg_king_tiger, this.spawn, this.despawn )
+					Game_TriggerLightning( )
+					FOW_RevealSGroupOnly(sg_king_tiger, 30)
+					ThreatArrow_Add(tiger_threat_id, sg_king_tiger)
+					EventCue_Create(CUE.NORMAL, 1379133, 1379199, sg_king_tiger)
+				end
+				
+				Cmd_SquadPath(sg_king_tiger, this.path, true, 0, true, 0, this.despawn)
+				
+				-- remove this lurking item from the table so the same lurking pattern doesn't happen again
+				table.remove(t_tiger_lurk, k)
+				Rule_RemoveMe()
+				
+				-- start checking if the player is too close to the tiger
+				Rule_AddInterval(TigerLurkCheck, 3)
+				-- start checking for when the Tiger despawns
+				Rule_AddInterval(CheckTigerLurkDespawn, 3)
+				
+				-- if this is the first lurk to occur, announce the text to the player
+				if fg_first_lurk == false then
+					Rule_AddOneShot(FirstLurk, 5)
+					-- flag the first lurk as having been done
+					fg_first_lurk = true
+					Rule_AddInterval(FirstLurkDone, 3)
+				
+				-- if this is the second lurk, play the text for that
+				elseif fg_second_lurk == false then
+					Rule_AddOneShot(SecondLurk, 5)
+					-- flag the second lurk as having been done
+					fg_second_lurk = true
+				end
+				
+				break
+			end
+		end
+		
+		
+	end
+end
+
+-- checks if any of the player's units have gotten too close to the lurking tiger, and if they have, despawn the tiger
+function TigerLurkCheck()
+	if SGroup_CountSpawned(sg_king_tiger) == 0 then
+		Rule_RemoveMe()
+	elseif Prox_ArePlayersNearMarker(player1, SGroup_GetPosition(sg_king_tiger), ANY, 60) or Prox_AreSquadsNearMarker(sg_player_buildings, SGroup_GetPosition(sg_king_tiger), ANY, 60) then
+		Rule_RemoveMe()
+		ThreatArrow_Remove(tiger_threat_id, sg_king_tiger)
+		Game_TriggerLightning( )
+		SGroup_DeSpawn(sg_king_tiger)
+	end
+end
+
+
+-- function to check when the King Tiger despawns after a lurk
+function CheckTigerLurkDespawn()
+	if SGroup_CountSpawned(sg_king_tiger) == 0 then
+		Rule_RemoveMe()
+		Rule_AddOneShot(TigerLurkDone, 20)
+		
+	end
+end
+
+-- sets the tiger as not being active on the map (this is to make it so that an ambush doesn't happen until a bit after a lurk)
+function TigerLurkDone()
+	fg_tiger_is_active = false
+end
+
+-- function to announce the first Tiger lurk to the player
+function FirstLurk()
+	Util_StartIntel (EVENTS.TAC_Movement)
+end
+
+-- function to announce the second Tiger lurk to the player
+function FirstLurk()
+	Util_StartIntel (EVENTS.TAC_Movement)
+end
+
+
+-- function to announce the first Tiger lurk has been completed
+function FirstLurkDone()
+	if fg_first_lurk == true and SGroup_CountSpawned(sg_king_tiger) == 0 then
+		--Util_AutoIntel(t_defend_caen.event_tiger_lurk1_done)
+		Rule_RemoveMe()
+	end
+end
+
+-- function to announce the second Tiger lurk to the player
+function SecondLurk()
+	--Util_AutoIntel(t_defend_caen.event_tiger_lurk2)
+end
+
+
+-- This function handles the spawning of the King Tiger during ambushes
+function Tiger_ReSpawnTowards( sgroupid, pos, facing )
+
+	if scartype(pos) == ST_MARKER then
+		pos = Marker_GetPosition(pos)
+	end
+	
+	if scartype(facing) == ST_MARKER then
+		facing = Marker_GetPosition(facing)
+	end
+	
+	local _Spawn = function(gid, idx, sid)
+		Squad_SpawnToward(sid, pos, facing)
+	end
+	
+	SGroup_ForEachEx(sgroupid, _Spawn, false, true)
+
+end
+
+
+
+
+
+-------------------------------------------------------------------------
+-- Medal Objective - Neutralize the King Tiger
+-------------------------------------------------------------------------
+-- The player has to destroy the King Tiger before it escapes
+-------------------------------------------------------------------------
+function Initialize_OBJ_NeutralizeKingTiger()
+
+	OBJ_NeutralizeKingTiger = {
+		
+		SetupUI = function() 
+			-- mark a point or position
+		end,
+		
+		OnStart = function()
+			
+			-- announce the goal
+			
+			
+			-- win/lose check
+			Rule_AddInterval(NeutralizeKingTiger_WinCheck, 5)
+			
+			-- start related action
+			NeutralizeKingTiger_Kickoff()
+			
+		end,
+		
+		OnComplete = function()
+			
+		end,
+		
+		IsComplete = function()
+			return false
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they lost
+			
+		end,
+		
+		Title = 1379103,
+		Description = 1379113,
+		TitleEnd = 1379142,
+		Type = OT_Medal,
+		MedalID	= MEDALS.CXP1.CAEN_COUNTER,
+	}
+	
+	-- Register Objective
+	Objective_Register(OBJ_NeutralizeKingTiger)
+	-- Initialize Data
+--~ 	NeutralizeKingTiger_Init()
+	
+end
+
+
+function NeutralizeKingTiger_Init()
+	-- flag that marks whether the King Tiger is retreating
+	fg_king_tiger_retreating = false
+	print("KING TIGER RETREATING SET TO FALSE")
+end
+
+
+function NeutralizeKingTiger_WinCheck()
+
+	if fg_king_tiger_retreating == true then
+		if Prox_AreSquadsNearMarker(sg_wave6_p2_tank2, mkr_offmap9, ANY, 25) then
+			-- make it invulnerable so it doesn't die right before it can escape
+			SGroup_SetInvulnerable(sg_wave6_p2_tank2, true)
+			print("KING TIGER IS INVULNERABLE!!!!!!!!!!!!!!!!!!!!!!!")
+	
+		elseif SGroup_IsEmpty(sg_wave6_p2_tank2) then
+			Objective_Complete(OBJ_NeutralizeKingTiger)
+		
+		end
+		
+	elseif SGroup_IsEmpty(sg_wave6_p2_tank2) then
+		Objective_Complete(OBJ_NeutralizeKingTiger)
+	end
+end
+
+function NeutralizeKingTiger_Kickoff()
+
+
+
+end
+
+
+-- starts the medal objective when the player sees the King Tiger at the end of the waves
+function HasPlayerSpottedKingTiger()
+
+	if Player_CanSeeSGroup (player1, sg_wave6_p2_tank2, ANY) then
+		Rule_RemoveMe()
+		-- anounce the arrival of the tiger forces
+		Util_StartIntel(EVENTS.OBJ_KingTiger)
+		Objective_Start(OBJ_NeutralizeKingTiger)
+	end
+end
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+--Check if player is cmaping function
+-------------------------------------------------------------------------
+-- Checks if the player has destroyed all of the bridges and is camping the island
+
+function CheckPlayerCampingIsland()
+
+	if bridge1 == false and bridge2 == false and bridge3 == false then
+		-- if all of player's buildings are on the island
+		if Prox_AreSquadMembersNearMarker(sg_player_buildings, World_GetTerritorySectorID(EGroup_GetPosition(eg_caen_islandVP)), ALL) then
+			fg_player_camping_island = true
+			
+		
+		else
+			-- if just hq is on the island
+			if Prox_AreSquadMembersNearMarker(sg_player_hq, World_GetTerritorySectorID(EGroup_GetPosition(eg_caen_islandVP)), ALL) then
+				fg_player_hq_camping_island = true
+			end
+			
+			-- if just soldier hq is on the island
+			if Prox_AreSquadMembersNearMarker(sg_player_soldier_hq, World_GetTerritorySectorID(EGroup_GetPosition(eg_caen_islandVP)), ALL) then
+				fg_player_soldier_hq_camping_island = true
+			end
+			
+			-- if just armour hq is on the island
+			if Prox_AreSquadMembersNearMarker(sg_player_armour_hq, World_GetTerritorySectorID(EGroup_GetPosition(eg_caen_islandVP)), ALL) then
+				fg_player_armour_hq_camping_island = true
+			end
+		end
+		
+	else 
+		fg_player_camping_island = false
+		fg_player_hq_camping_island = false
+		fg_player_soldier_hq_camping_island = false
+		fg_player_armour_hq_camping_island = false
+	end
+end
+
+
+
+
+
+
+-----------------------------------------------------------------------
+-- Game Over
+-----------------------------------------------------------------------
+-- Functions to win/lose the game
+
+
+function Caen_GameOver_Win()
+	if Event_IsAnyRunning() == false then
+		
+		Game_EndSP(true)
+		
+		Rule_RemoveMe()
+		
+	end
+end
+
+function Caen_GameOver_Lose()
+	if Event_IsAnyRunning() == false then
+		
+		Game_EndSP(false)
+		
+		Rule_RemoveMe()
+		
+	end
+end
+
+
+function Caen_DelayFinalNIS()
+	
+	if Event_IsAnyRunning () == false then
+		Rule_RemoveMe()
+		Util_StartNIS(EVENTS.NIS02)
+		-- win the game
+		Rule_Add(Caen_GameOver_Win)
+	end
+	
+end

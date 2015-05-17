@@ -1,0 +1,2889 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+--
+-- Script File for Mission 05 - Redball Express
+--
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+import("ScarUtil.scar")
+
+-- custom file for table ID's instead of the default WB generated file
+import("M05_Redball_Express_IDtables.scar")
+
+function OnGameSetup()
+	-- set up the players
+	player1 = Setup_Player(1, 259020, TRACE_ALLIES,1)
+	player2 = Setup_Player(2, 259021, TRACE_AXIS,2)
+	player3 = Setup_Player(3, 259022, TRACE_ALLIES, 1)
+	player4 = Setup_Player(4, 259023, TRACE_ALLIES, 1)
+	player5 = Setup_Player(5, 259021, TRACE_AXIS, 2)
+end
+
+
+function OnGameRestore()
+	-- assign player IDs again
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+	player3 = World_GetPlayerAt(3)
+	player4 = World_GetPlayerAt(4)
+	player5 = World_GetPlayerAt(5)
+	
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+	
+	-- Re-set AI parameters
+	M05_Set_AI()
+	
+	if Objective_IsComplete(OBJ_RescueDog) == true then
+		g_AIControl_Pause = false
+	end
+	if Objective_IsComplete(OBJ_RescueDog) == true and timer_TurnOnAI ~= nil and Timer_GetRemaining(timer_TurnOnAI) == 0 and Rule_Exists(AxisHQ_TurnOnAttacking) == false then
+		Rule_AddOneShot(AxisHQ_TurnOnAttacking, 1)
+	end
+end
+
+
+-------------------------------------------------------------------------
+
+-- [[ ONINIT ]]
+
+-------------------------------------------------------------------------
+
+
+function OnInit()
+	--[[ Set Difficulty ]]
+	M05_Difficulty()
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	--[[ PRESET GAME STATE ]]
+	Game_Letterbox(true, 0)
+	Game_FadeToBlack(true, 0)
+	
+	g_MissionSpeechPath = "Mission05"
+	Sound_PreCacheSinglePlayerSpeech( g_MissionSpeechPath )
+	-- mute the sound before the NIS plays
+	Util_MuteAmbientSound(true)
+
+	-- use default veteran squads if necessary
+	if not Player_HasPersistentSquadFile(player1) then
+		Player_LoadPersistentSquadsFromFile(player1, "data:scenarios/sp/m05_redball_express/default_veteran_squads.lua")
+	end
+	
+	--[[ SET AI ]]
+	M05_Set_AI()
+
+	--[[ SET BINDINGS ]]
+	M05_Bindings()
+	
+	--[[ REGISTER OBJECTIVES ]]
+	M05_Objective_Register()
+	
+	--[[ MOD INITIAL STATS ]]
+	M05_Set_StatMods()
+	
+	--[[ SET RESTRICTIONS ]]
+	M05_Restrictions()
+	
+	--[[ SET INITIAL MOOD ]]
+	M05_MOOD()
+	
+	--[[ MISSION PRESETS ]]
+	M05_Mission_Preset()
+	
+	--[[ GAME START CHECK ]]
+	Rule_Add(M05_Mission_Start)
+end
+
+Scar_AddInit(OnInit)
+
+function M05_Difficulty()
+	-- get the difficulty
+	g_dif = DS_Med
+	if Game_GetSPDifficulty() ~= nil then
+		g_dif = Game_GetSPDifficulty()
+	end
+	
+	Setup_Difficulty(player1, g_dif)
+	Setup_Difficulty(player2, g_dif)
+	Setup_Difficulty(player3, g_dif)
+	Setup_Difficulty(player4, g_dif)
+	Setup_Difficulty(player5, g_dif)
+end
+
+function M05_Bindings()
+	-- carried from previous version - deg
+	
+	Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS01)')]])")
+	Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS02)')]])")
+	Scar_DebugConsoleExecute("bind([[ALT+3]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS03)')]])")
+	
+	Scar_DebugConsoleExecute("bind([[ALT+I]], [[Scar_DoString('Util_InvulnerableSelection(true)')]])")
+	Scar_DebugConsoleExecute("bind([[ALT+N]], [[Scar_DoString('Util_InvulnerableSelection(false)')]])")
+
+	Scar_DebugConsoleExecute("bind([[ALT+M]], [[Scar_DoString('Util_MergeSquads()')]])")
+end
+
+
+function M05_Objective_Register()
+	--[[ *** MUST INITIALIZE THE OBJ TABLE BEFORE REGISTERING *** ]]
+	Initialize_OBJ_RescueDog()
+	Initialize_OBJ_SecureRoad()
+	Initialize_OBJ_DefendRedball()
+	Initialize_OBJ_PanzerKill()
+	Initialize_OBJ_DESTROYHQ()
+end
+
+function M05_Set_AI()
+	--[[ Player ]]
+	Util_AI_Setup(player5, {Util_DifVar({20, 30, 40, 50}), 30}, player1, Game_GetSPDifficulty(), 7, Util_DifVar({1, 2, 3, 5}), 2, 3)
+	
+	-- Set up AI's resources
+	if g_playerResourceSetup ~= true then
+		Modify_PlayerSightRadius(player1, 1.25)
+		Modify_PlayerSightRadius(player2, 1.25)
+		Modify_PlayerSightRadius(player3, 1.25)
+		Modify_PlayerSightRadius(player4, 1.25)
+		Modify_PlayerSightRadius(player5, 1.25)
+		Player_SetResource(player1, RT_Fuel, 150)
+		Player_SetResource(player5, RT_Manpower, 200)
+		Player_SetResource(player5, RT_Munition, 200)
+		Player_SetResource(player5, RT_Fuel, 10)
+		Modify_PlayerResourceRate(player1, RT_Manpower, 1.15)
+		Modify_PlayerResourceRate(player5, RT_Manpower, 1.1)
+		Modify_PlayerResourceRate(player5, RT_Fuel, 0.2)
+		g_playerResourceSetup = true
+	end
+	
+	-- tell AI to go after strongest threat instead of the weakest
+	--AI_DoString( player5, "s_personality.attack_prefer_threat = true" )
+	--AI_DoString( player5, "s_personality.defend_prefer_threat = true" )
+
+	-- tell AI not to "defend" territories outside of the ring around its base
+	AI_EnableComponent(player5, false, COMPONENT_ForwardDefending)
+	
+	-- disable use of comapny commander menu and abilities
+	--AI_DoString( player5, "s_commandtree_enabled = false" )
+	--AI_DoString( player5, "s_playerabilities_enabled = false" )
+	
+	if Rule_Exists(M05_AI_Update) == false then
+		Rule_AddInterval(M05_AI_Update, 1)
+	end
+	
+	AI_EnableComponent(player5, false, COMPONENT_Attacking)
+end
+
+function M05_AI_Update()
+	if g_aicounter_setup ~= true then
+		g_aicounter = 0
+		g_aicounter_setup = true
+	end
+	
+	if g_aicounter > 300 or g_rescuedog_complete then
+		Util_AI_Setup(player5, {Util_DifVar({20, 35, 50, 60}), 30}, player1, Game_GetSPDifficulty(), 7, Util_DifVar({1, 2, 3, 5}), 2, 3)
+		Rule_RemoveMe()
+	end
+	g_aicounter = g_aicounter+1
+end
+
+function M05_Set_StatMods()
+	-- set pop cap override
+	currentmaxpopulation = 60
+	Player_SetPopCapOverride(player1, currentmaxpopulation)
+	
+	-- starting Command Point Bonus
+	-- Player_AddUnspentCommandPoints(player1, 2)
+	
+	-- stops player1 from earning action points by killing enemy squads
+	--Player_StopEarningActionPoints(player1)
+ 
+	-- pick an upgrade path for the player
+	
+	-- initially set the allowed pop cap low
+	-- once the player secures the HQ then increase the allowed pop cap
+	Player_SetMaxPopulation(player1, CT_Personnel, 40)
+end
+
+function M05_Restrictions()
+	--[[ RESOURCES ]]
+	Player_SetResource(player1, RT_Manpower, 400)
+	Player_SetResource(player1, RT_Munition, 120)
+	Player_SetResource(player1, RT_Fuel, 180)
+	
+	--[[ TECH TREE ]]
+	TechTreeSetup()
+end
+
+function M05_MOOD()
+	Player_SetDefaultSquadMoodMode(player1, MM_ForceTense)
+end
+
+
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ MISSION Preset ]]
+
+-------------------------------------------------------------------------
+
+function M05_Mission_Preset()
+	-- inits
+	Redball_Arrival_Init()
+	
+	-- set hq
+	EGroup_SetInvulnerable(eg_base_hq, .65)
+end
+
+
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ MISSION START ]]
+
+-------------------------------------------------------------------------
+
+function M05_Mission_Start()
+	-- start opening NIS
+	Util_StartNIS(EVENTS.NIS01)
+	
+	-- add 'end NIS check'
+	Rule_Add(M05_Mission_OpenNISOver)
+	
+	Rule_RemoveMe()
+end
+
+
+
+function M05_Mission_OpenNISOver()
+	if Event_IsAnyRunning() == false then
+		-- trigger music here
+		Util_PlayMusic("Sound/Music/sp/M05/M05_Ob1_HelpDog", 5, 5)		-- call the setup for 'Rescue Dogs'
+		
+		untouchable_trucks = EGroup_CreateIfNotFound("untouchable_trucks")
+		EGroup_SetSelectable(untouchable_trucks, false)
+		
+--		UI_ShowTacticalMap()
+--~ 		Game_Letterbox( false, 0)
+--~  		Game_FadeToBlack(FADE_IN, 1.5)
+--~ 		
+--~ 		Rule_AddInterval(M05_Mission_OBJDelay, 0.5)
+
+		OBJ_RescueDog_Setup()
+		-- add obj
+		Objective_Start(OBJ_RescueDog)
+		
+		-- add 'Rescue Dogs'
+		Rule_AddInterval(M05_DelayOBJ_ObjectiveName, 1)
+		
+		
+		-- call setup for 'Recapture HQ'
+		RecaptureHQ_Setup()
+		
+		-- add the first layer of defenses
+		Pak38_KickOff()
+		EastFarm_KickOff()
+		AxisHQ_KickOff()
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+function M05_Mission_OBJDelay()
+	OBJ_RescueDog_Setup()
+	-- add obj
+	Objective_Start(OBJ_RescueDog)
+	
+	-- add 'Rescue Dogs'
+	Rule_AddInterval(M05_DelayOBJ_ObjectiveName, 1)
+	
+	-- call setup for 'Recapture HQ'
+	RecaptureHQ_Setup()
+	
+	-- add the first layer of defenses
+	Pak38_KickOff()
+	EastFarm_KickOff()
+	AxisHQ_KickOff()
+	Rule_RemoveMe()
+end
+
+function M05_DelayOBJ_ObjectiveName()
+	if Event_IsAnyRunning() == false then
+		--Util_SetStartingResources(5)
+		
+		-- remove the germans that were used in the opening nis
+		SGroup_Kill(axis_doods)
+		
+		Player_Sherman_01 = SGroup_CreateIfNotFound("Player_Sherman_01")
+		Player_Sherman_02 = SGroup_CreateIfNotFound("Player_Sherman_02")
+		Player_Sherman_03 = SGroup_CreateIfNotFound("Player_Sherman_03")
+		Player_Greyhound_01 = SGroup_CreateIfNotFound("Player_Greyhound_01")
+		Player_Greyhound_02 = SGroup_CreateIfNotFound("Player_Greyhound_02")
+		Player_Greyhound_03 = SGroup_CreateIfNotFound("Player_Greyhound_03")
+		-- upgrade the Sherman crab
+		Cmd_InstantUpgrade(Player_Sherman_03, UPG.ALLIES.SHERMAN_CRAB, 1 )
+		-- upgrade the gunners
+		local sgroup = {Player_Sherman_01, Player_Sherman_02, Player_Sherman_03}
+		for i = 1, table.getn(sgroup) do 
+			Cmd_InstantUpgrade( sgroup[i], UPG.ALLIES.SHERMAN_MG, 1 )
+		end
+		local sgroup = {Player_Greyhound_01, Player_Greyhound_02, Player_Greyhound_03}
+		for i = 1, table.getn(sgroup) do 
+			Cmd_InstantUpgrade( sgroup[i], UPG.ALLIES.GREYHOUND_MG, 1 )
+		end
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ RESCUE DOG ]]
+
+-------------------------------------------------------------------------
+-- The player must rescue Dog Company by storming the courtyard 
+-- where they are pinned down and driving out the Germans who are
+-- assaulting the position.
+-------------------------------------------------------------------------
+function Initialize_OBJ_RescueDog()
+	OBJ_RescueDog = {
+		SetupUI = function()
+			-- the two buildings Dog Company is hiding in
+			Objective_AddUIElements(OBJ_RescueDog, eg_rescuedog1, true, 259203, true)
+			Objective_AddUIElements(OBJ_RescueDog, eg_rescuedog2, true, 259203, true)
+			-- hint point
+			hint_courtID = HintPoint_Add( mkr_rescuedog_courtyard, 50, 259204 )
+		end,
+		
+		OnStart = function()
+			
+			-- announce the goal
+--			Game_Letterbox(false, 1)
+--			Game_SetMode(UI_Normal)
+
+			Util_StartIntel(EVENTS.RescueDog_Start)
+			
+			-- win condition
+			Rule_AddInterval(OBJ_RescueDog_WinCondition, 5)
+			
+			-- action
+			OBJ_RescueDog_KickOff()
+			
+		end,
+		
+		OnComplete = function()
+			-- Save game
+			Scar_Autosave(259041)
+			
+			g_AIControl_Pause = false
+			
+			-- trigger music here
+			Util_PlayMusic("Sound/Music/sp/M05/M05_Ob2_DefendConvoy", 5, 5)
+			
+			-- turn the AI attack component on
+			-- 5 min, 2 min, 90 secs, 1 min
+			timer_TurnOnAI = 72389283
+			Timer_Start(timer_TurnOnAI, Util_DifVar({300, 120, 90, 60}))
+			Rule_AddInterval(AxisHQ_TurnOnAttacking, 1.5)
+			
+			-- award command point
+--			Player_AddUnspentCommandPoints(player1, 3)
+			
+			g_rescuedog_complete = true
+			HintPoint_Remove(hint_courtID)
+			
+			-- tell the player they did good
+--			Util_StartIntel(EVENTS.RescueDog_Complete)
+			Rule_AddOneShot(RescueDogEvent_Delay, 3)
+			
+			-- empty the squads out
+			Cmd_Ungarrison(eg_rescuedog1, Marker_GetPosition(mkr_rescuedog_unload1))
+			Cmd_Ungarrison(eg_rescuedog2, Marker_GetPosition(mkr_rescuedog_unload2))
+			
+			-- set owner
+			SGroup_SetPlayerOwner(sg_dogcompany_all, player1)
+			SGroup_SetInvulnerable(sg_dogcompany_all, false)
+			
+			Modifier_Remove(dogcompany_dmg_modifier)
+			
+			-- remove modifiers if they were previously set
+--~ 			if vulnerabilityID_dogcompany1 ~= nil then
+--~ 				Modifier_Remove(vulnerabilityID_dogcompany1)
+--~ 			end
+--~ 			if vulnerabilityID_dogcompany2 ~= nil then
+--~ 				Modifier_Remove(vulnerabilityID_dogcompany2)
+--~ 			end
+			
+			-- HQ hand over obj
+			Rule_Add(RescueDog_HQ)
+			
+			-- next obj
+			Rule_AddInterval(SecureRoad_GrantDelay, 6)
+			
+			--
+			EGroup_InstantCaptureStrategicPoint(eg_courtyard_flag, player1)
+			
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they failed
+			Util_StartIntel(EVENTS.GenericLoss)
+			
+			Rule_Add(EndMission_Loss)
+			
+		end,
+		
+		SitRep = {
+			Movie = "SR_05-01",
+			Force = true,
+			SpeechTiming =
+			{
+				{ 2.25, ACTOR.McKay, 250120 },
+				{ 7.25, ACTOR.McKay, 250130 },
+				{ 11.15, ACTOR.McKay, 250145 },
+			},
+		},
+		
+		Title 			= 259200,
+		Description 	= 259201,
+		Type	 		= OT_Primary,
+		TitleEnd	 	= 259205,
+		
+	}
+
+	Objective_Register(OBJ_RescueDog) 
+end
+
+function RescueDog_HQ()
+	if Event_IsAnyRunning() == false then
+		Util_StartNIS(EVENTS.RescueDog_Complete_NewHQ, 0)
+		
+		Rule_RemoveMe()
+	end
+end
+
+-- plays speech events after Dog Co rescued, slightly delayed so there's time for the titlecard to finish
+function RescueDogEvent_Delay()
+	Util_StartIntel(EVENTS.RescueDog_Complete)
+end
+
+function AxisHQ_TurnOnAttacking()
+	if Timer_GetRemaining(timer_TurnOnAI) == 0 then
+		AI_EnableComponent(player5, true, COMPONENT_Attacking)
+		AI_EnableComponent(player5, true, COMPONENT_ForwardDefending)
+		Rule_RemoveMe()
+	end
+end
+
+-------------------------------------------------------------------------
+
+-- RESCUE DOG - Functions
+
+-------------------------------------------------------------------------
+function OBJ_RescueDog_Setup()
+	-- how long dog can hold out
+	g_rescuedog_delay1 = 200
+	g_rescuedog_delay2 = 200
+	-- how many axis fighting in the courtyard
+	g_rescuedog_axisnum = 4
+	
+	-- create the members of Dog trapped in the buildings
+	local blue = {SBP.ALLIES.RIFLEMEN, SBP.ALLIES.ENGINEER}
+	for i = 1, 2 do
+		Util_CreateSquadsAndGarrison(player3, sg_dogcompany[i], blue[i], eg_rescuedog[i], 1)
+		SGroup_AddGroup(sg_dogcompany_all, sg_dogcompany[i])
+		SGroup_SetInvulnerable(sg_dogcompany[i], true)
+		
+		-- set the buildings to invulnerable as well
+		EGroup_SetInvulnerable(eg_rescuedog[i], true)
+		
+		dogcompany_dmg_modifier = Modify_WeaponDamage(sg_dogcompany_all, 'hardpoint_01', 0.3)
+	end
+	
+	
+	-- create the Germans attacking the position
+	for i = 1, 3 do 
+		local pos = Util_GetRandomPosition(mkr_rescuedog_courtyard, 20)
+		Util_CreateSquadsAtMarker(player2, sg_rescuedog_attackers, SBP.AXIS.VOLKSGRENADIER, pos, 1)
+	end
+end
+
+-- watch to see who wins
+function OBJ_RescueDog_WinCondition()
+	-- lasso the player's units
+	Player_GetAll(player1)
+	if SGroup_IsEmpty(sg_dogcompany_all) or SGroup_IsEmpty(sg_allsquads) then
+		
+		-- you loose
+		Objective_Fail(OBJ_RescueDog)
+		
+		Rule_RemoveMe()
+	elseif g_rescuedog_yardclear then
+		
+		-- you win
+		Objective_Complete(OBJ_RescueDog)
+		
+		Rule_RemoveMe()
+	end
+end
+
+-- where the fun starts
+function OBJ_RescueDog_KickOff()
+	sg_rescuedog_stugg = SGroup_CreateIfNotFound("sg_rescuedog_stugg")
+	sg_rescuedog_reinf = SGroup_CreateIfNotFound("sg_rescuedog_reinf")
+	
+	-- timer on how long Dog will hold out
+	Rule_AddOneShot(OBJ_RescueDog_Going, g_rescuedog_delay1)
+	
+	-- courtyard check
+	Rule_AddInterval(OBJ_RescueDog_PlayerInTheCourtyard_Check, 30)
+	
+	--[[ ze germans in the area ]]
+	-- start with a fast pace to get them all out there
+	Rule_AddIntervalEx(OBJ_RescueDog_Defenders, 3, 10)
+	Rule_AddInterval(OBJ_RescueDog_Defenders_Retreat, 3)
+	
+	-- this rule changes the pace to be more playable
+	Rule_AddInterval(OBJ_RescueDog_Defenders_ResetRate, 30)
+	-- ze germans in the courtyard
+	Rule_AddInterval(Obj_RescueDog_CouryardAttackers, 11)
+end
+
+
+
+function OBJ_RescueDog_PlayerInTheCourtyard_Check()
+	if g_rescuedog_complete then
+		
+		Rule_RemoveMe()
+		
+	elseif Prox_ArePlayersNearMarker(player1, mkr_rescuedog_courtyard, false, 45) then
+		
+		g_rescuedog_axisnum = 6
+		
+		g_rescuedog_escalate = true
+		
+		-- add squads to the mix
+		if EGroup_IsEmpty(eg_mainintersection_houses) == false then
+			-- dif handle
+			local rand = Util_DifVar({2, 3, 4})
+			Util_CreateSquads(player2, sg_rescuedog_attackers, SBP.AXIS.VOLKSGRENADIER, eg_mainintersection_houses, Marker_GetPosition(mkr_rescuedog_attackers), rand, 5, true)
+			Cmd_Ungarrison(eg_mainintersection_houses, Marker_GetPosition(mkr_rescuedog_attackers))
+			Cmd_Move(sg_rescuedog_attackers, Marker_GetPosition(mkr_rescuedog_attackers), nil, nil, nil, nil, nil, 30)
+		end
+		--[[
+		if g_dif ~= DS_Easy then
+			Cmd_InstantUpgrade(sg_rescuedog_reinf, UPG.AXIS.PANZERSCHRECK)
+		end
+		]]
+		-- add the stugg to the mix
+		if EGroup_IsEmpty(eg_axishq_depot2) == false then
+			Util_CreateSquadsAtMarker(player2, sg_rescuedog_stugg, SBP.AXIS.STUG, EGroup_GetPosition_EVEN_IF_EMPTY(eg_axishq_depot2), 1)
+			Cmd_Move(sg_rescuedog_stugg, mkr_rescuedog_attackers)
+		end
+		
+		-- secure point defense
+		Rule_AddOneShot(SecureFlag_KickOff, 1)
+		
+		-- the player has to survive 90 seconds before we start checking for the win condition
+		Rule_AddOneShot(OBJ_RescueDog_CourtyardClear_Delay, 30)
+		
+		Rule_RemoveMe()
+	end
+end
+
+function Util_OffCameraPos(player, origin, destination)
+	local pos = World_GetHiddenPositionOnPath(player, origin, destination, CHECK_OFFCAMERA)
+	if pos == nil then
+		pos = Marker_GetPosition(origin)
+	end
+	return pos
+end
+
+-- if there weren't enough germans in the square
+function OBJ_RescueDog_CourtyardClear_Delay()
+	Rule_AddInterval(OBJ_RescueDog_CourtyardClear_Check, 3)
+end
+
+function OBJ_RescueDog_CourtyardClear_Check()
+	if g_rescuedog_complete then
+		
+		Rule_RemoveMe()
+		
+	elseif ( Prox_AreSquadsNearMarker(sg_rescuedog_attackers, mkr_rescuedog_courtyard, false, 45) == false and SGroup_IsEmpty(sg_rescuedog_stugg) == true and Player_AreSquadsNearMarker(player5, mkr_rescuedog_courtyard) == false )
+	or ( SGroup_Count(sg_rescuedog_attackers) < 3 and SGroup_IsEmpty(sg_rescuedog_stugg) == true and Player_AreSquadsNearMarker(player5, mkr_rescuedog_courtyard) == false )then
+		
+		-- call the retreat
+		if SGroup_IsEmpty(sg_rescuedog_attackers) == false then
+			Cmd_Stop(sg_rescuedog_attackers)
+			Cmd_Move(sg_rescuedog_attackers, mkr_axishq_hilltop)
+		end
+		
+		-- flag the win 
+		g_rescuedog_yardclear = true
+		
+		Rule_RemoveMe()
+--~ 	elseif SGroup_IsEmpty(sg_rescuedog_stugg) == false and SGroup_GetAvgHealth(sg_rescuedog_stugg) < .5 
+--~ 	and SGroup_IsMoving(sg_rescuedog_stugg, false) == false then
+--~ 		Cmd_Move(sg_rescuedog_stugg, Util_GetRandomPosition(Marker_CenterJunction_02, 40))
+	end
+end
+
+
+
+-- has the player accomplished the obj yet?
+function OBJ_RescueDog_Going()
+	if g_rescuedog_complete ~= true then
+		for i = 1, 2 do
+			-- toggle it off
+			EGroup_SetInvulnerable(eg_rescuedog[i], false)
+			-- and set it to a percentage
+			EGroup_SetInvulnerable(eg_rescuedog[i], true, 75)
+			-- turn off invulnerability on Dog Co squads
+			SGroup_SetInvulnerable(sg_dogcompany[i], false)
+			-- but set them to be less vulnerable
+		end
+		
+--~ 		vulnerabilityID_dogcompany1 = Modify_Vulnerability(sg_dogcompany[1], 0.5)
+--~ 		vulnerabilityID_dogcompany2 = Modify_Vulnerability(sg_dogcompany[1], 0.5)
+
+		g_rescuedog_escalate = true
+		Rule_AddOneShot(OBJ_RescueDog_Gone, g_rescuedog_delay2)
+	end
+end
+
+-- has the player accomplished the obj YET?
+function OBJ_RescueDog_Gone()
+	if g_rescuedog_complete ~= true then
+		for i = 1, 2 do
+			-- toggle it off
+			EGroup_SetInvulnerable(eg_rescuedog[i], false)
+			-- toggle the infantry on off too
+--			SGroup_SetInvulnerable(sg_dogcompany[i], false)
+		end
+	end
+end
+
+
+
+
+
+function OBJ_RescueDog_Defenders_ResetRate()
+	if Rule_Exists(OBJ_RescueDog_Defenders) then
+		Rule_Remove(OBJ_RescueDog_Defenders)
+	else
+		Rule_AddInterval(OBJ_RescueDog_Defenders, 37)
+		Rule_RemoveMe()
+	end
+end
+
+-- local defense
+function OBJ_RescueDog_Defenders_Retreat()
+	if g_rescuedog_complete then
+		
+		Rule_RemoveMe()
+		
+	else
+		for i = 1, 7 do 
+			if SGroup_IsUnderAttack(sg_rescuedog_def[i], false, 15) then
+				
+				Cmd_Retreat(sg_rescuedog_def[i], Marker_GetPosition(mkr_rescuedog_courtyard))
+				--Cmd_Move(sg_rescuedog_def[i], Marker_GetPosition(mkr_rescuedog_courtyard), nil, nil, nil, nil, nil, 30 )
+				
+			end
+		end
+	end
+end
+
+function OBJ_RescueDog_Defenders()
+	t_rescuedog = {
+		sentry = {sg_rescuedog_sentry[1], sg_rescuedog_sentry[2]},
+		setup = { mkr_axis_sentry1, mkr_axis_sentry2},
+		spawn = { mkr_axis_offmap2, mkr_axis_offmap3},
+		sgroup = {
+			{ sg_rescuedog_def[1], sg_rescuedog_def[2], sg_rescuedog_def[3]},
+			{ sg_rescuedog_def[4], sg_rescuedog_def[5], sg_rescuedog_def[6], sg_rescuedog_def[7]},},
+		marker = {
+			{ mkr_rescuedog_def1, mkr_rescuedog_def2, mkr_rescuedog_def3},
+			{ mkr_rescuedog_def4, mkr_rescuedog_def5, mkr_rescuedog_def6, mkr_rescuedog_def7},},
+	}
+	
+	local t = t_rescuedog
+
+	if g_rescuedog_complete then
+		
+		Rule_RemoveMe()
+		
+	else
+		
+		for i = 1, 2 do 
+			
+			if SGroup_IsEmpty(t.sentry[i]) then
+				
+				if Prox_ArePlayersNearMarker(player1, t.spawn[i], false, 40) then
+					
+					-- don't do anything, the player is blocking the entrance
+					
+				else
+					
+					Util_CreateSquadsAtMarker(player2, t.sentry[i], SBP.AXIS.GRENADIER, t.spawn[i], 1)
+					SGroup_AddGroup(sg_rescuedog_sentry_all, t.sentry[i])
+					Util_GrantRandomUpgrade(t.sentry[i])
+					Cmd_Move(t.sentry[i], t.setup[i])
+					
+				end
+				
+			elseif SGroup_IsUnderAttack(t.sentry[i], false, 15) then
+				
+				-- the player is attacking, don't do anything
+				
+			else
+				
+				for y = 1, table.getn(t.sgroup[i]) do 
+					
+					if SGroup_IsEmpty(t.sgroup[i][y]) then
+						
+						if g_rescuedog_escalate ~= true then
+							Util_CreateSquadsAtMarker(player2, t.sgroup[i][y], SBP.AXIS.VOLKSGRENADIER, t.spawn[i], 1)
+						else
+							Util_CreateSquadsAtMarker(player2, t.sgroup[i][y], Util_VolkOrGrenSBP(), t.spawn[i], 1)
+							Util_GrantRandomUpgrade(t.sgroup[i][y])
+						end
+						
+						Cmd_AttackMove(t.sgroup[i][y], t.setup[i])
+						
+						break
+					else
+						
+						Cmd_AttackMove(t.sgroup[i][y], t.marker[i][y])
+						
+						break
+					end
+					
+				end
+				
+			end
+			
+		end
+		
+	end
+end
+
+function Obj_RescueDog_CouryardAttackers()
+	if g_rescuedog_complete then
+		Rule_RemoveMe()
+	elseif SGroup_IsEmpty(sg_rescuedog_attackers) == false and SGroup_IsEmpty(sg_dogcompany_all) == false then
+		local try = 0
+		while ( try < 5 and SGroup_Count(sg_rescuedog_attackers) < g_rescuedog_axisnum ) do
+			
+			local rand = World_GetRand(1, table.getn(sg_rescuedog_def))
+			if SGroup_IsEmpty(sg_rescuedog_def[rand]) == false then
+				-- grab it and strip it from the other group
+				SGroup_AddGroup(sg_rescuedog_attackers, sg_rescuedog_def[rand])
+				Cmd_Stop(sg_rescuedog_def[rand])
+				-- get it to the courtyard
+				Cmd_Move(sg_rescuedog_def[rand], mkr_rescuedog_courtyard)
+				
+				-- then make it attack
+				-- there's gotta be a better way than this - deg
+				local egroup = {eg_rescuedog1, eg_rescuedog2}
+				if SGroup_IsEmpty(sg_dogcompany[1]) then 
+					table.remove(egroup, 1)
+				elseif SGroup_IsEmpty(sg_dogcompany[2]) then
+					table.remove(egroup, 1)
+				end
+				Cmd_AttackMove(sg_rescuedog_def[rand], EGroup_GetPosition_EVEN_IF_EMPTY(egroup[World_GetRand(1, table.getn(egroup))]), true)
+				
+				-- and clear
+				SGroup_Clear(sg_rescuedog_def[rand])
+			end
+			
+			try = try+1
+			
+		end
+	end
+end
+
+
+
+
+-------------------------------------------------------------------------
+
+-- RECAPTURE HQ - Functions
+
+-------------------------------------------------------------------------
+function RecaptureHQ_Setup()
+	-- despawn
+	--EGroup_DeSpawn(eg_base_controlobj)
+	
+	-- who owns the base hq
+	g_baseowner = 2
+
+	-- create the player's starting infantry
+	Util_CreateSquadsAtMarker(player1, sg_player_start[1], SBP.ALLIES.HALFTRACK, mkr_player_starting1, 1)
+	Util_CreateSquadsAndGarrison( player1, sg_player_start[2], SBP.ALLIES.RIFLEMEN,sg_player_start[1], 1 )
+	
+	-- order the trak to move out
+	Cmd_Move(sg_player_start[1], mkr_player_startinggoto)
+	-- track unload
+	Rule_AddInterval(RecaptureHQ_UnloadTrak, 2)
+	
+	-- create the Germans attacking the position
+	Util_CreateSquadsAtMarker(player2, sg_recapturehq_axis[1], SBP.AXIS.VOLKSGRENADIER, mkr_recapturehq_axis1, 1)
+	
+	Rule_AddInterval(RecaptureHQ_WinCondition, 5)
+	-- track defenders
+	Rule_AddInterval(RecaptureHQ_TrackAxis, 2)
+end
+
+function RecaptureHQ_UnloadTrak()
+	if SGroup_IsEmpty(sg_player_start[1]) == false and SGroup_IsMoving(sg_player_start[1], true) == false then
+		
+		Cmd_Ungarrison(sg_player_start[1], SGroup_GetPosition_EVEN_IF_EMPTY(sg_player_start[1]))
+		
+		Rule_AddOneShot( RecaptureHQ_TrakSpread, 5)
+		
+		Rule_RemoveMe()
+	end
+end
+
+function RecaptureHQ_TrakSpread()
+	if SGroup_IsEmpty(sg_player_start[1]) == false and SGroup_IsEmpty(sg_player_start[2]) == false then
+		Cmd_Move(sg_player_start[2], SGroup_GetPosition_EVEN_IF_EMPTY(sg_player_start[1]), nil, nil, nil, OFFSET_FRONT, 7)
+	end
+end
+
+function RecaptureHQ_WinCondition()
+	if g_rescuedog_complete then
+		--EGroup_ReSpawn(eg_base_controlobj)
+		--EGroup_InstantCaptureStrategicPoint(eg_base_controlobj, player1)
+		
+		EGroup_InstantCaptureStrategicPoint(eg_base_territory, player1)
+		
+		-- set the hq to player 1
+		EGroup_SetPlayerOwner(eg_base_hq, player1)
+		EGroup_SetInvulnerable(eg_base_hq, false)
+		
+		Rule_AddInterval(HQ_Dead, 1)
+		
+		-- set pop cap override
+		currentmaxpopulation = 78
+		Player_SetPopCapOverride(player1, currentmaxpopulation)
+
+		
+		Rule_RemoveMe()
+	elseif EGroup_IsEmpty(eg_base_hq) then
+		Rule_RemoveMe()
+	end
+end
+
+
+function HQ_Dead()
+	if EGroup_IsEmpty(eg_base_hq) then
+		Player_GetAll(player1)
+		if SGroup_IsEmpty(sg_allsquads) then
+			Rule_Add(EndMission_Loss)
+			Rule_RemoveMe()
+		end
+	end
+end
+
+function RecaptureHQ_TrackAxis()
+	if SGroup_IsUnderAttack(sg_recapturehq_axis[1], false, 10) then
+		-- retreat
+		Cmd_Move(sg_recapturehq_axis[1], mkr_recapturehq_axis1_retreat)
+		--[[ make help
+		Util_CreateSquadsAtMarker(player2, sg_recapturehq_axis[2], SBP.AXIS.GRENADIER, mkr_axis_offmap2, 2)
+		Cmd_AttackMove(sg_recapturehq_axis[2], mkr_recapturehq_axis1)
+		]]
+		Rule_RemoveMe()
+	end
+end
+
+
+
+
+
+-------------------------------------------------------------------------
+-- [[ Secure Road to Cherbourg ]]
+-------------------------------------------------------------------------
+-- The player must capture all of the points leading to Cherbourg
+-- as the germans try to take them back
+-------------------------------------------------------------------------
+
+function Initialize_OBJ_SecureRoad()
+	OBJ_SecureRoad = {
+		SetupUI = function()
+			
+			-- tag the first point
+			OBJ_SecureRoad.PingID_Road1 = Objective_AddUIElements(OBJ_SecureRoad, eg_flag_secure1, true, 259244, true, 2)
+			-- hint point
+			--hint_secure1 = HintPoint_Add( eg_flag_secure1, 50, 259244 )
+			-- used to turn UI on and off
+			t_secure = {
+				{flag = eg_flag_secure1, point = false, ui = false, uiID = OBJ_SecureRoad.PingID_Road1},
+				{flag = eg_flag_secure2, point = false, ui = false, uiID = OBJ_SecureRoad.PingID_Road2},
+				{flag = eg_flag_secure3, point = false, ui = false, uiID = OBJ_SecureRoad.PingID_Road3},
+				{flag = eg_flag_secure4, point = false, ui = false, uiID = OBJ_SecureRoad.PingID_Road4},
+				{flag = eg_flag_secure5, point = false, ui = false, uiID = OBJ_SecureRoad.PingID_Road5},
+			}
+		end,
+		
+		OnStart = function()
+			-- announce the goal
+			Util_StartIntel(EVENTS.SecureRoad_Start)
+			
+			-- action
+			SecureRoad_KickOff()
+			
+			-- landmine warning
+			sg_landmines = SGroup_CreateIfNotFound("sg_landmines")
+			Rule_AddInterval(Landmaine_Warning, 1)
+		end,
+		
+		OnComplete = function()
+			-- trigger music here
+			Util_PlayMusic("Sound/Music/sp/M05/M05_Ob2_DefendConvoy", 5, 5)
+			
+			-- award command point
+--			Player_AddUnspentCommandPoints(player1, 2)
+			
+			g_roadsecure_complete = true
+			
+			-- tell the player they did good
+			Util_StartIntel(EVENTS.SecureRoad_Complete)
+			
+			-- move redball out
+			Rule_AddInterval(Redball_GoTime, 5)
+			Rule_AddInterval(Redball_EndzoneCheck, 1)
+		end,
+		
+		OnFail = function()
+			-- tell the player they failed
+			--Util_StartIntel(EVENTS.RecaptureHQ_Fail)
+		end,
+		
+		SitRep = {
+			Movie = "SR_05-02",
+			Force = true,
+			SpeechTiming =
+			{
+				{ 0.5, ACTOR.McKay, 250290 },
+				{ 5, ACTOR.McKay, 251002 },
+				{ 7.6, ACTOR.McKay, 251003 },
+				{ 15, ACTOR.McKay, 250320 },
+				{ 19.8, ACTOR.McKay, 250321 },
+			},
+		},
+		
+		Title 			= 259240,
+		Description 	= 259241,
+		Type	 		= OT_Primary,
+		TitleEnd	 	= 259246,
+	}
+	
+	Objective_Register(OBJ_SecureRoad) 
+end
+
+
+-------------------------------------------------------------------------
+-- [[ Secure Road to Cherbourg ]]
+-------------------------------------------------------------------------
+
+
+function SecureRoad_KickOff()
+	-- update condition
+	Rule_AddInterval(SecureRoad_UpdateTrigger, 2)
+end
+
+function SecureRoad_GrantDelay()
+	if blah83893 ~= 1 then
+		Rule_ChangeInterval(SecureRoad_GrantDelay, 1)
+	end
+	
+	if Event_IsAnyRunning() == false then
+		Objective_Start(OBJ_SecureRoad)
+		Rule_RemoveMe()
+	end
+end
+
+function SecureRoad_UpdateTrigger()
+	if Event_IsAnyRunning() == false and EGroup_IsCapturedByPlayer(eg_flag_secure1, player1, false) then
+		-- first flag captured
+		g_secure_firstpoint = true
+		
+		-- award command point
+--		Player_AddUnspentCommandPoints(player1, 2)
+		
+		-- delay the convoy
+		Rule_AddOneShot(Redball_Arrival_KickOff, 60)
+		
+		-- update the objective
+		Objective_RemoveUIElements(OBJ_SecureRoad, t_secure[1].uiID)
+		
+		Util_StartIntel(EVENTS.SecureRoad_Update)
+		HintPoint_Remove(hint_secure1)
+		
+		-- redball inbound
+		Rule_AddInterval(Redball_Inbound, 10)
+		
+		-- start the flag tracking
+		Rule_AddInterval(SecureRoad_Check, 1)
+		
+		-- add mob squads
+		Barracks_KickOff()
+		MotorPool_KickOff()
+		
+		Rule_RemoveMe()
+	end
+end
+
+function Redball_Inbound()
+	if Event_IsAnyRunning() == false then
+		Util_StartIntel(EVENTS.Redball_OnItsWay1)
+		Rule_RemoveMe()
+	end
+end
+
+-- mark the objective as complete once all road flags are captured
+function SecureRoad_Check()
+	for i = 1, 5 do
+		t_secure[i].point = Player_OwnsEGroup(player1, t_secure[i].flag)
+	end
+	
+	-- count up how many of the road flags the player owns
+	-- also turn UI flags on and off
+	local count = 0
+	for i = 1, 5 do 
+		if t_secure[i].point == true then
+			count = count + 1 
+			if t_secure[i].ui == true then
+				t_secure[i].ui = false
+				Objective_RemoveUIElements(OBJ_SecureRoad, t_secure[i].uiID)
+			end
+		elseif t_secure[i].point == false and t_secure[i].ui == false then
+			t_secure[i].ui = true
+			t_secure[i].uiID = Objective_AddUIElements(OBJ_SecureRoad, t_secure[i].flag, true, false, true, 2)
+		end
+	end
+	
+	if EGroup_IsCapturedByPlayer(eg_secure_left, player1, true) or EGroup_IsCapturedByPlayer(eg_secure_right, player1, true) then
+		Objective_Complete(OBJ_SecureRoad)
+		Rule_RemoveMe()
+	end
+end
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- [[ The Convoy Arrives ]]
+-------------------------------------------------------------------------
+-- The player must defend the convoy as it begins to assemble
+-------------------------------------------------------------------------
+--[[
+pth_convoy1
+pth_convoy2
+pth_convoy3
+pth_country1
+]]
+
+function Initialize_OBJ_DefendRedball()
+	OBJ_DefendRedball = {
+		SetupUI = function()
+			
+		end,
+		
+		OnStart = function()
+			Scar_Autosave(259260)
+			
+			g_pakambush = true
+			
+			Util_StartIntel(EVENTS.Redball_ItsHere2)
+			
+			-- count dead dueces
+			
+			
+			-- recapture action
+			sg_redmob_all 	= SGroup_CreateIfNotFound("sg_redmob_all")
+			sg_redmob_lead 	= SGroup_CreateIfNotFound("sg_redmob_lead")
+			sg_redmob 		= SGroup_CreateTable("sg_redmob%d", 5)
+			-- dif handle
+			local delay = Util_DifVar({180, 140, 100})
+			Rule_AddInterval(Redball_Arrival_AttackManager, delay)
+			
+		end,
+		
+		OnComplete = function()
+			
+			-- award command point
+--			Player_AddUnspentCommandPoints(player1, 1)
+			
+			g_redball_over = true
+			
+			-- hide all 
+			Util_DespawnAll(true, true, true)
+			-- prevent things from breaking
+			Rule_RemoveAll(100)
+			
+			Rule_AddOneShot( EndMission_TriggerNIS, 2)
+			
+		end,
+		
+		OnFail = function()
+			
+			-- tell the player they failed
+			--Util_StartIntel(EVENTS.RecaptureHQ_Fail)
+			
+		end,
+		
+		OnSitRep = function()
+		
+		end,
+		
+		Title 			= 259260,
+		Description 	= 259261,
+		Type	 		= OT_Primary,
+		TitleEnd	 	= 259262,
+	}
+
+	Objective_Register(OBJ_DefendRedball) 
+end
+
+function EndMission_TriggerNIS()
+	-- final NIS
+	Util_StartNIS(EVENTS.NIS03)
+	
+	Rule_Add(EndMission_TriggerNISOver)
+end
+
+function EndMission_TriggerNISOver()
+	if (Event_IsAnyRunning() == false) then
+		Game_EndSP(true, nil, true)
+		Rule_RemoveMe()
+	end
+end
+
+function EndMission_Loss()
+	if (Event_IsAnyRunning() == false) then
+		Game_EndSP(false, nil, true)
+		Rule_RemoveMe()
+	end
+end
+
+-------------------------------------------------------------------------
+-- [[ The Convoy Arrives ]]
+-------------------------------------------------------------------------
+function Redball_Arrival_Init()
+	-- how many trucks in the convoy?
+	g_redballcount = 8
+	-- sgroups
+	sg_redball = SGroup_CreateTable("sg_redball%d", g_redballcount)
+	sg_redball_all = SGroup_CreateIfNotFound("sg_redball_all")
+	sg_redball_go = SGroup_CreateIfNotFound("sg_redball_go")
+	sg_redball_mech = SGroup_CreateTable("sg_redball_mech%d", 3)
+	sg_redball_jeep = SGroup_CreateTable("sg_redball_jeep%d", 5)
+end
+
+function Redball_Arrival_KickOff()
+	-- add the rule 
+	Rule_AddInterval(Redball_Arrival_Create, 12)
+	Rule_AddInterval(Redball_Arrival_Breaks, 1)
+end
+
+function Redball_Arrival_Create()
+	-- remove rule first or it will never stop
+	if SGroup_Count(sg_redball_all) == g_redballcount and SGroup_IsMoving(sg_redball_all, true) == false then
+		-- update
+		Objective_Start(OBJ_DefendRedball)
+		
+		-- the count
+		g_rb_spawncount = 0
+		-- add the support checks
+		Rule_AddInterval(Redball_Arrival_WarningsManager, 2)
+		Rule_AddInterval(Redball_Arrival_RepairManager, 40)
+		Rule_AddInterval(Redball_Arrival_UpKeepManager, 30)
+		
+		Rule_RemoveMe()
+	else
+		for i = 1, g_redballcount do 
+			if SGroup_IsEmpty(sg_redball[i]) then
+				-- create truck 
+				if math.mod(i, 4) == 0 then
+					Util_CreateSquadsAtMarkerFacing(player4, sg_redball[i], SBP.ALLIES.JEEP, mkr_redball_spawn, Marker_SupplyTruckSpawn_03, 1)
+				else
+					Util_CreateSquadsAtMarkerFacing(player4, sg_redball[i], SBP.ALLIES.TRUCK, mkr_redball_spawn, Marker_SupplyTruckSpawn_03, 1)
+				end
+				Modify_UnitSpeed(sg_redball[i], .5)
+				SGroup_AddGroup(sg_redball_all, sg_redball[i])
+				Cmd_Move(sg_redball[i], mkr_redball_rally)
+				-- break so only 1 is made at a time
+				break
+			end
+		end
+		
+		for i = 1, g_redballcount do 
+			if i < g_redballcount and SGroup_IsEmpty(sg_redball[i]) 
+			-- make sure it's not a jeep 
+			and ( SGroup_IsEmpty(sg_redball[i+1]) == false and math.mod(i, 4) == 0 ) then
+				SGroup_AddGroup(sg_redball[i], sg_redball[i+1])
+				SGroup_Clear(sg_redball[i+1])
+			end
+		end
+	end
+	
+	if g_redball_first ~= true then
+		Util_StartIntel(EVENTS.Redball_ItsHere1)
+		g_redball_first = true
+	end
+end
+
+function Redball_Arrival_Breaks()
+	for i = 1, g_redballcount do 
+		if i > 1 and SGroup_IsEmpty(sg_redball[i-1]) == false and SGroup_IsEmpty(sg_redball[i]) == false then
+			if World_DistanceSGroupToPoint(sg_redball[i], SGroup_GetPosition_EVEN_IF_EMPTY(sg_redball[i-1]), true) < 30 then
+				Cmd_Stop(sg_redball[i])
+			end
+		end
+	end
+end
+
+function Redball_Arrival_WarningsManager()
+	if SGroup_IsEmpty(sg_redball_all) then
+		Rule_RemoveMe()
+	elseif g_rb_spawncount == 1 then
+		g_rb_spawncount = g_rb_spawncount+1
+		-- warn the player
+		Util_StartIntel(EVENTS.Redball_UnderFire)
+	elseif g_rb_spawncount == 7 then
+		g_rb_spawncount = g_rb_spawncount+1
+		-- warn the player
+		Util_StartIntel(EVENTS.Redball_NeedSupport)
+	elseif g_redball_lastwarning ~= true and SGroup_Count(sg_redball_all) < g_redballcount*.03 then
+		-- warn the player
+		Util_StartIntel(EVENTS.Redball_SittingDucks)
+		g_redball_lastwarning = true
+	elseif g_redball_firstwarning ~= true and SGroup_Count(sg_redball_all) < g_redballcount*.5 then
+		-- warn the player
+		Util_StartIntel(EVENTS.Redball_Desparate)
+		g_redball_firstwarning = true
+	elseif SGroup_IsUnderAttack(sg_redball_all, false, 10) then
+		local rand = World_GetRand(1, 4)
+		if rand == 1 then
+			-- play warning 1
+		elseif rand == 2 then
+			-- play warning 2
+		end
+	end
+end
+
+function Redball_Arrival_RepairManager()
+	-- are we done
+	if g_redball_over then
+		-- stop the engineers
+		if SGroup_IsEmpty(sg_redball_mech[1]) == false then
+			Cmd_Stop(sg_redball_mech[1])
+		end
+		Rule_RemoveMe()
+	else
+		for i = 1, g_redballcount do 
+			if SGroup_IsEmpty(sg_redball[i]) == false and SGroup_GetAvgHealth(sg_redball[i]) < 0.6 then
+				if SGroup_IsEmpty(sg_redball_mech[1]) then
+					-- create repair crew
+					print("here")
+					Util_CreateSquadsAtMarker( player4, sg_redball_mech[1], SBP.ALLIES.ENGINEER, mkr_redball_spawn, 1)
+				end
+				-- order them to repair the pnthr
+				Cmd_Ability( sg_redball_mech[1], ABILITY.REPAIR, sg_redball[i], nil, true)
+				break
+			end
+		end
+	end
+end
+
+function Redball_Arrival_AmbientManager()
+end
+
+
+function Redball_Arrival_AttackManager()
+	if g_roadsecure_complete then
+		Rule_RemoveMe()
+	else
+		local rand = World_GetRand(1, 3)
+		if rand ~= 2 or g_redmob_last == false then
+			g_redmob_last = true
+			
+			local sgroup = { all = sg_redmob_all, lead = sg_redmob_lead, mob = sg_redmob}
+			local mobs = {mobType.V, mobType.HMG, mobType.VG}
+			local mType = mobs[World_GetRand(1,3)]
+			
+			local source = {stype = stype.OFFMAP, spawn = mkr_axis_offmap1, rally = mkr_redball_rally2}
+			local destination = {pace = pace.FAST, count = 0, move = true, way = {mkr_eastfarm_gun1_retreat, mkr_guncrew2, Marker_SupplyTruckSpawn_Heading}, capture = nil}
+			
+			if rand == 1 then
+				source = {stype = stype.OFFMAP, spawn = mkr_axis_offmap3, rally = mkr_redmob_rally1}
+				destination = {pace = pace.FAST, count = 0, move = true, way = {mkr_redmob_way1, mkr_mob1_way5, mkr_redball_rally}, capture = nil}
+			end
+			
+			local dedication = true
+			
+			MobRule_AddMob(player2, sgroup, mType, source, destination, dedication)
+		else
+			g_redmob_last = false
+		end
+	end
+end
+
+function Redball_Arrival_UpKeepManager()
+	if g_redball_over then
+		Rule_RemoveMe()
+	else
+		for i = 1, g_redballcount do 
+			if SGroup_IsEmpty(sg_redball[i]) then
+				-- create truck 
+				Util_CreateSquadsAtMarkerFacing(player4, sg_redball[i], SBP.ALLIES.TRUCK, mkr_redball_spawn, Marker_SupplyTruckSpawn_03, 1)
+				
+				g_rb_spawncount = g_rb_spawncount+1
+				
+				Modify_UnitSpeed(sg_redball[i], .5)
+				SGroup_AddGroup(sg_redball_all, sg_redball[i])
+				if i == 1 then
+					Cmd_Move(sg_redball[i], mkr_redball_rally)
+				else
+					Cmd_Move(sg_redball[i], sg_redball[i-1], nil, nil, nil, 4, 15)
+				end
+				-- break so only 1 is made at a time
+				break
+			end
+		end
+	end
+end
+
+
+function Redball_GoTime()
+	if g_redball_over then
+		Rule_RemoveMe()
+	else
+		for i = 1, g_redballcount do 
+			if SGroup_IsEmpty(sg_redball[i]) == false and EGroup_IsCapturedByPlayer(eg_finalflags, player1, false) then
+				Modify_UnitSpeed(sg_redball[i], .8)
+				SGroup_AddGroup(sg_redball_go, sg_redball[i])
+				SGroup_Clear(sg_redball[i])
+				
+				if EGroup_IsCapturedByPlayer(eg_secure_left, player1, true) then
+--~ 					Cmd_Move(sg_redball_go, mkr_axis_offmap8)
+					Cmd_SquadPath(sg_redball_go, "pth_convoy3", true, false, false, 0)
+				else
+--~ 					Cmd_Move(sg_redball_go, mkr_axis_offmap9)
+					Cmd_SquadPath(sg_redball_go, "pth_convoy2", true, false, false, 0)
+				end
+				
+			elseif SGroup_IsEmpty(sg_redball[i]) == false and EGroup_IsCapturedByPlayer(eg_finalflags, player1, false) == false then
+				Cmd_Stop(sg_redball_go)
+			end
+		end
+	end
+end
+
+function Redball_EndzoneCheck()
+	if Prox_AreSquadsNearMarker(sg_redball_go, mkr_axis_offmap8, false, 20) then
+		g_redball_thru = true
+	elseif Prox_AreSquadsNearMarker(sg_redball_go, mkr_axis_offmap9, false, 20) then
+		g_redball_thru = true
+	end
+	
+	if g_redball_thru == true then
+		Game_FadeToBlack(FADE_OUT, 1)
+		Objective_Complete(OBJ_DefendRedball)
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ SOURCES ]]
+
+-------------------------------------------------------------------------
+-- german sources of bad guys
+
+-------------------------------------------------------------------------
+-- stuff specific to the Pak38's
+function Pak38_KickOff()
+	-- west side guns - move in after Dog Rescue
+	sg_westgun1 = SGroup_CreateIfNotFound("sg_westgun1")
+	sg_westgun2 = SGroup_CreateIfNotFound("sg_westgun2")
+	-- gun rotate
+	sg_Pak38_Rotate = SGroup_CreateIfNotFound("sg_Pak38_Rotate")
+	Rule_AddInterval(Pak38_Rotate, 15)
+
+	-- advance gun ambushes
+	Rule_AddInterval(Pak38_WestGuns, 1)
+	Rule_AddInterval(Pak38_SouthMines, 5)
+	Rule_AddInterval(Pak38_NorthMines, 5)
+end
+
+
+
+-- the guns move into position after the player rescues Dog
+function Pak38_WestGuns()
+	if g_rescuedog_complete then
+		Util_CreateSquadsAtMarker(player2, sg_westgun1, SBP.AXIS.PAK_38, mkr_axis_offmap4, 1)
+		Cmd_Move(sg_westgun1, mkr_westgun1)
+		
+		Util_CreateSquadsAtMarker(player2, sg_westgun2, SBP.AXIS.PAK_38, mkr_axis_offmap4, 1)
+		Cmd_Move(sg_westgun2, mkr_westgun2)
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+-- these guns move into position once the gunner comes under attack
+function Pak38_SouthMines()
+	if SGroup_IsEmpty(sg_southmine_gunner) or SGroup_IsUnderAttack(sg_southmine_gunner, false, 10) then
+		Cmd_Move(sg_westgun3, mkr_westgun3_goto)
+		Cmd_Move(sg_westgun4, mkr_westgun4_goto)
+		
+		Rule_RemoveMe()
+	end
+end
+-- this gun moves once the mines come under attack
+function Pak38_NorthMines()
+	if EGroup_IsEmpty(eg_mines_north_all) or EGroup_IsUnderAttack(eg_mines_north_all, false, 10) then
+		Cmd_Move(sg_westgun5, mkr_westgun5_goto)
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+-- this function doesn't work yet because the Pak38's don't acknowledge the 'FacePosition' function
+function Pak38_Rotate()
+	local gun = {sg_eastfarm1_gun, sg_eastfarm2_gun, sg_eastfarm3_gun, sg_westgun1, sg_westgun2}
+	for i = 1, table.getn(gun) do 
+		if SGroup_IsEmpty(gun[i]) == false then
+			--print(i.." is alive")
+			if SGroup_IsUnderAttack(gun[i], false, 10) then
+				--print(i.." is under attack")
+				SGroup_GetLastAttacker(gun[i], sg_Pak38_Rotate)
+				if SGroup_IsEmpty(sg_Pak38_Rotate) == false then
+					--print(i.." facing position")
+					SGroup_FacePosition(gun[i], SGroup_GetPosition_EVEN_IF_EMPTY(sg_Pak38_Rotate))
+				end
+				SGroup_Clear(sg_Pak38_Rotate)
+			end
+		end
+	end
+end
+
+
+-- [[ The East Farm Area ]]
+
+-------------------------------------------------------------------------
+-- the area on the North East side of the mission
+-- lots of field space and a few farm houses
+
+function EastFarm_KickOff()
+	sg_eastfarm1_help = SGroup_CreateIfNotFound("sg_eastfarm1_help")
+	sg_eastfarm1_trak = SGroup_CreateIfNotFound("sg_eastfarm1_trak")
+	
+	sg_eastfarm3_help = SGroup_CreateIfNotFound("sg_eastfarm3_help")
+	
+	sg_eastfarm3_house = SGroup_CreateTable("sg_eastfarm3_house%d", 3)
+	mkr_eastfarm3_ = {mkr_eastfarm3_1, mkr_eastfarm3_2, mkr_eastfarm3_3}
+	
+	sg_eastfarm1_hmg = SGroup_CreateIfNotFound("sg_eastfarm1_hmg")
+	sg_eastfarm2_ = SGroup_CreateTable("sg_eastfarm2_%d", 4)
+	sg_eastfarm_main = SGroup_CreateIfNotFound("sg_eastfarm_main")
+	mkr_eastfarm1_ = {mkr_eastfarm1_1, mkr_eastfarm1_2, mkr_eastfarm1_3}
+	
+	-- gun crews
+	Rule_AddInterval(EastFarm_PaksCheck, 3)
+	Rule_AddOneShot(EastFarm_HouseThree, 1)
+	Rule_AddOneShot(EastFarm_HouseMain, 1)
+end
+
+-------------------------------------------------------------------------
+function EastFarm_PaksCheck()
+	if SGroup_IsEmpty(sg_eastfarm_guncrews) then
+		-- remove until we can come up with something more intelligent
+		
+		Rule_RemoveMe()
+	elseif g_pakambush == true or EGroup_IsCapturedByPlayer(eg_eastfarm_ter1, player1, false) then
+		if g_pakambush then
+			Util_StartIntel(EVENTS.Redball_Flanking)
+		end
+		
+		Modify_SightRadius(sg_eastfarm_guncrews, 2)
+		
+		t_eastfarm_guns = {sg_eastfarm1_gun, sg_eastfarm2_gun, sg_eastfarm3_gun}
+		
+		Cmd_Move(sg_eastfarm1_gun, mkr_guncrew1)
+		Cmd_Move(sg_eastfarm2_gun, mkr_guncrew2)
+		Cmd_Move(sg_eastfarm3_gun, mkr_guncrew3)
+		
+		Rule_AddInterval(EastFarm_RollOutPaks, 5)
+		
+		Rule_RemoveMe()
+	end
+end
+
+function EastFarm_RollOutPaks()
+	if SGroup_IsMoving(sg_eastfarm_guncrews, true) == false then
+		Rule_AddInterval(EastFarm_GunCrewOne, 5)
+		Rule_AddInterval(EastFarm_GunCrewTwo, 5)
+		Rule_RemoveMe()
+	elseif table.getn(t_eastfarm_guns) > 0 then
+		for i = table.getn(t_eastfarm_guns), 1, -1 do 
+			if SGroup_IsUnderAttack(t_eastfarm_guns[i], false, 10) then
+				Cmd_Stop(t_eastfarm_guns[i])
+				table.remove(t_eastfarm_guns, i)
+			end
+		end
+	end
+end
+
+-- The Gun and the Trak
+function EastFarm_GunCrewOne()
+	if SGroup_IsEmpty(sg_eastfarm1_gun) then
+		EastFarm_GunCrewOne_TrakResponse()
+		Rule_RemoveMe()
+	elseif SGroup_IsUnderAttack(sg_eastfarm1_gun, false, 10) then
+		EastFarm_GunCrewOne_TrakResponse()
+		Rule_AddInterval(EastFarm_GunCrewOne_Retreat, 5)
+		Rule_RemoveMe()
+	end
+end
+
+-- a trak comes back to attack the player
+function EastFarm_GunCrewOne_TrakResponse()
+	Util_CreateSquadsAtMarker(player2, sg_eastfarm1_trak, SBP.AXIS.HALFTRACK, mkr_eastfarm1_offmap, 1)
+	Util_CreateSquadsAndGarrison( player2, sg_eastfarm1_help, Util_DifRandInfSBP(), sg_eastfarm1_trak, 1 )
+	AutoRetreat_AddSGroup(sg_eastfarm1_help, eg_eastfarm_all)
+	Cmd_AttackMove(sg_eastfarm1_trak, EGroup_GetPosition_EVEN_IF_EMPTY(eg_eastfarm_ter1))
+	
+	Rule_AddInterval(EastFarm_Trak_Unload, 3)
+	Rule_AddInterval(EastFarm_Trak_NextMove, 120)
+end
+
+-- retreat the gun if the point gets captured
+function EastFarm_GunCrewOne_Retreat()
+	if SGroup_IsEmpty(sg_eastfarm1_gun) then
+		Rule_RemoveMe()
+	elseif EGroup_IsCapturedByPlayer(eg_eastfarm_ter1, player1, false) then
+		Cmd_Retreat(sg_eastfarm1_gun, Marker_GetPosition(mkr_eastfarm_gun1_retreat))
+		Rule_RemoveMe()
+	end
+end
+-- unload the trak if it gets attacked
+function EastFarm_Trak_Unload()
+	if SGroup_IsEmpty(sg_eastfarm1_trak) then
+		Rule_RemoveMe()
+	elseif SGroup_IsUnderAttack(sg_eastfarm1_trak, false, 10) then
+		Cmd_Stop(sg_eastfarm1_trak)
+		Cmd_Ungarrison(sg_eastfarm1_trak, SGroup_GetPosition_EVEN_IF_EMPTY(sg_eastfarm1_trak))
+		Cmd_Move(sg_eastfarm1_trak, sg_eastfarm1_trak, nil, nil, nil, 4, 5)
+		Rule_RemoveMe()
+	end
+end
+-- move the trak back to the farm if it gets bored
+function EastFarm_Trak_NextMove()
+	if SGroup_IsEmpty(sg_eastfarm1_trak) then
+		Rule_RemoveMe()
+	else
+		Cmd_AttackMove(sg_eastfarm1_trak, eg_eastfarm_all)
+		Rule_RemoveMe()
+	end
+end
+
+-------------------------------------------------------------------------
+-- The Gun and the House
+function EastFarm_GunCrewTwo()
+	if SGroup_IsEmpty(sg_eastfarm3_gun) then
+		Util_CreateSquadsAndGarrisonExit(player2, sg_eastfarm3_help, Util_DifRandInfSBP(), eg_eastfarm_3, 2, Marker_GetPosition(mkr_eastfarm3_3), true, World_GetRand(3, 5))
+		AutoRetreat_AddSGroup(sg_eastfarm3_help, eg_eastfarm_3)
+		Cmd_Ungarrison(eg_eastfarm_3, Marker_GetPosition(mkr_eastfarm3_3))
+		Cmd_AttackMove(sg_eastfarm3_help, Marker_GetPosition(mkr_eastfarm3_help), nil, nil, 20)
+		
+		Rule_RemoveMe()
+	elseif SGroup_IsUnderAttack(sg_eastfarm3_gun, false, 10) then
+		
+		Util_CreateSquadsAndGarrisonExit(player2, sg_eastfarm3_help, Util_DifRandInfSBP(), eg_eastfarm_3, 2, Marker_GetPosition(mkr_eastfarm3_3), true, World_GetRand(3, 5))
+		AutoRetreat_AddSGroup(sg_eastfarm3_help, eg_eastfarm_3)
+		Cmd_Ungarrison(eg_eastfarm_3, Marker_GetPosition(mkr_eastfarm3_3))
+		if not SGroup_IsEmpty(sg_eastfarm1_gun) then
+			Cmd_AttackMove(sg_eastfarm3_help, sg_eastfarm1_gun)
+		end
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+-------------------------------------------------------------------------
+-- The lone farm house
+function EastFarm_HouseThree()
+	Util_CreateSquadsAndGarrisonExit(player2, sg_eastfarm3_house[1], Util_DifRandInfSBP(), eg_eastfarm_3, 1, Marker_GetPosition(mkr_eastfarm3_1), true, 1)
+	Cmd_Ungarrison(eg_eastfarm_3, Marker_GetPosition(mkr_eastfarm3_1))
+	
+	Rule_AddInterval(EastFarm_HouseThree_Track, 5)
+end
+
+function EastFarm_HouseThree_Track()
+	if SGroup_IsEmpty(sg_eastfarm3_house[1]) or SGroup_IsUnderAttack(sg_eastfarm3_house[1], false, 10) then
+		Rule_AddIntervalEx(EastFarm_HouseThree_Defense, 8, 4)
+		Rule_RemoveMe()
+	else
+		local rand = World_GetRand(1, 5)
+		if rand < 3 and SGroup_IsInHoldEntity(sg_eastfarm3_house[1], false) == false then
+			-- get in the building
+			Cmd_Garrison(sg_eastfarm3_house[1], eg_eastfarm_3, true)
+		elseif rand > 3 and SGroup_IsInHoldEntity(sg_eastfarm3_house[1], false) then
+			-- get out of the building
+			Cmd_Ungarrison(eg_eastfarm_3, Marker_GetPosition(mkr_eastfarm3_1))
+		end
+	end
+end
+
+function EastFarm_HouseThree_Defense()
+	-- trigger the next thing
+	local blue = {SBP.AXIS.HEAVYMG, SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.VOLKSGRENADIER}
+	for i = 1, 2 do 
+		if SGroup_IsEmpty(sg_eastfarm3_house[i]) then
+			if EGroup_IsEmpty(eg_eastfarm_3) == false then
+				Util_CreateSquadsAndGarrisonExit(player2, sg_eastfarm3_house[i], blue[i], eg_eastfarm_3, 1, Marker_GetPosition(mkr_eastfarm3_[i]), true, World_GetRand(3, 5))
+				AutoRetreat_AddSGroup(sg_eastfarm3_house[i], eg_eastfarm_3)
+				Cmd_Ungarrison(eg_eastfarm_3, Marker_GetPosition(mkr_eastfarm3_[i]))
+				Cmd_Move(sg_eastfarm3_house[i], Marker_GetPosition(mkr_eastfarm3_[i]), nil, nil, nil, nil, nil, 20)
+				break
+			end
+		end
+	end
+end
+
+
+-------------------------------------------------------------------------
+-- The Main Farm house group
+function EastFarm_HouseMain()
+	Util_CreateSquadsAndGarrison(player2, sg_eastfarm1_hmg, SBP.AXIS.HEAVYMG, eg_eastfarm_1, 1, true)
+	SGroup_AddGroup(sg_eastfarm_main, sg_eastfarm1_hmg)
+	
+	Util_CreateSquadsAndGarrisonExit(player2, sg_eastfarm2_[1], SBP.AXIS.MORTAR, eg_eastfarm_2, 1, Marker_GetPosition(mkr_eastfarm1_4), true)
+	SGroup_AddGroup(sg_eastfarm_main, sg_eastfarm2_[1])
+	Cmd_Ungarrison(eg_eastfarm_2, Marker_GetPosition(mkr_eastfarm1_4))
+	
+	Rule_AddInterval(EastFarm_HouseMain_Track, 5)
+end
+
+function EastFarm_HouseMain_Track()
+	if SGroup_IsEmpty(sg_eastfarm_main) or SGroup_IsUnderAttack(sg_eastfarm_main, false, 10) then
+		Rule_AddIntervalEx(EastFarm_HouseMain_Defense, 5, 5)
+		Rule_RemoveMe()
+	end
+end
+
+function EastFarm_HouseMain_Defense()
+	-- trigger the next thing
+	local blue = {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.HEAVYMG, SBP.AXIS.VOLKSGRENADIER}
+	for i = 1, 3 do 
+		if SGroup_IsEmpty(sg_eastfarm2_[i]) then
+			Util_CreateSquadsAndGarrisonExit(player2, sg_eastfarm2_[i], blue[i], eg_eastfarm_2, 1, Marker_GetPosition(mkr_eastfarm1_[i]), true, World_GetRand(3, 5))
+			Cmd_Ungarrison(eg_eastfarm_2, Marker_GetPosition(mkr_eastfarm1_[i]))
+			Cmd_Move(sg_eastfarm2_[i], Marker_GetPosition(mkr_eastfarm1_[i]), nil, nil, nil, nil, nil, 20)
+			break
+		end
+	end
+end
+
+function EastFarm_PakAmbush()
+end
+
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ Main Compound ]]
+
+-------------------------------------------------------------------------
+
+------------------------------------------------------------------------------------------------------------
+-- DESTROY THE HQ
+------------------------------------------------------------------------------------------------------------
+
+function Initialize_OBJ_DESTROYHQ()
+	OBJ_DESTROYHQ =
+	{
+		SetupUI = function()
+			-- ping point
+			Objective_AddUIElements(OBJ_DESTROYHQ, mkr_axishq_homel, true, 259302, false)
+		end,
+		
+		OnStart = function()
+			AxisHQ_SpawnBaseDefenses()										-- DALY: spawn some AT guns around the base so it's not such a cakewalk if you rush it at the start of the mission
+		end,
+		
+		OnComplete = function()
+			g_destroyHQ_complete = true
+			
+			-- trigger music here
+			Util_PlayMusic("Sound/Music/sp/M05/M05_Ob3_HQDestroyed", 5, 5)
+		end,
+		
+		OnFail = function()
+			
+		end,
+		
+		SitRep = {
+			Movie = "SR_05-03",
+			Force = false,
+			SpeechTiming =
+			{
+				{ 0.9, ACTOR.McKay, 250410 },
+				{ 6.45, ACTOR.McKay, 250420 },
+			},
+		},
+		
+		Title 			= 259300,
+		Description 	= 259301,
+		TitleEnd		= 259303,
+		Type 			= OT_Secondary,
+		Icon 			= IT_S_Default,
+	}
+	
+	Objective_Register(OBJ_DESTROYHQ)
+end
+
+-------------------------------------------------------------------------
+-- [[ Main Compound ]]
+-------------------------------------------------------------------------
+
+function AxisHQ_KickOff()
+	-- hq patrols
+	sg_axishq_officers = SGroup_CreateTable("sg_axishq_officers%d", 3)
+	sg_axishq_officers_all = SGroup_CreateIfNotFound("sg_axishq_officers_all")
+	sg_axishq_all = SGroup_CreateIfNotFound("sg_axishq_all")
+	
+	-- hq mobs
+	sg_HQmob_all 	= SGroup_CreateIfNotFound("sg_HQmob_all")
+	sg_HQmob_lead 	= SGroup_CreateIfNotFound("sg_HQmob_lead")
+	sg_HQmob 		= SGroup_CreateTable("sg_HQmob%d", 5)
+	
+	-- defenders
+	sg_axishq_def = SGroup_CreateTable("sg_axishq_def%d", 6)
+	
+	-- makes units to patrol the hq
+	Rule_AddInterval(AxisHQ_OfficerManager, 17)
+	-- checks to see if anyone is under attack
+	Rule_AddInterval(AxisHQ_CombatCheck, 5)
+	-- starts the offensive mobs coming from the HQ
+	Rule_AddInterval(AxisHQ_MobStart, 7)
+	
+	-- change the territory over
+	sg_axishq_retreat = SGroup_CreateIfNotFound("sg_axishq_retreat")
+	Rule_AddInterval(AxisHQ_TerritoryCheck, 1)
+end
+
+function AxisHQ_CombatCheck()
+	if SGroup_IsUnderAttack(sg_axishq_defense, false, 10) or SGroup_IsUnderAttack(sg_axishq_officers_all, false, 10) then
+		g_AxisHQ_underattack = true
+		
+		Objective_Start(OBJ_DESTROYHQ)
+		
+		g_axishq_endofficers = true
+		
+		-- music trigger
+		g_compoundCount = EGroup_Count(eg_axisbase_techtrees)
+		Rule_AddInterval(AxisHQ_Underattack, 5)
+		
+		-- defend the hq
+		Rule_AddIntervalEx(AxisHQ_HouseMain_Defense, 5, 7)
+		
+		Rule_RemoveMe()
+	end
+end
+
+-- DALY: Spawns AT Guns around the base once the objective is added, making it harder to destroy (it was quite easy if you rushed the base right from the start of the mission)
+function AxisHQ_SpawnBaseDefenses()
+	local ATSpawnMarker = {mkr_axishq_atspawn_01}
+	local ATsgroupName = {"axisHQ_at_01"}
+	local ATsgroup = {axisHQ_at_01}
+	
+	for i = 1, 1 do
+		ATsgroup[i] = SGroup_CreateIfNotFound(ATsgroupName[i])
+		Util_CreateSquadsAtMarker(player2, ATsgroup[i], SBP.AXIS.PAK_38, ATSpawnMarker[i], 1)
+	end
+end
+
+function AxisHQ_Underattack()
+	if EGroup_IsEmpty(eg_axisbase_techtrees) == false and EGroup_Count(eg_axisbase_techtrees) < g_compoundCount then
+		
+		Util_PlayMusic("Sound/Music/sp/M05/M05_Ob2a_TankAttack", 5, 5)
+		
+		timerID1 = 1
+		Timer_Start(timerID1, 400)
+		Rule_AddInterval(AxisHQ_ChangeMusic, 5)
+		
+		Rule_RemoveMe()
+	elseif EGroup_IsEmpty(eg_axisbase_techtrees) then
+		Rule_RemoveMe()
+	end
+end
+
+	
+function AxisHQ_ChangeMusic()
+	if EGroup_IsEmpty(eg_axisbase_techtrees) or Timer_GetElapsed(timerID1) > 300 then
+		Util_PlayMusic("Sound/Music/sp/M05/M05_Ob2_DefendConvoy", 5, 5)
+		Rule_RemoveMe()
+	end
+end
+	
+function AxisHQ_TerritoryCheck()
+	if EGroup_IsEmpty(eg_axisbase_techtrees) then
+		Objective_Complete(OBJ_DESTROYHQ)
+		
+--		EGroup_InstantCaptureStrategicPoint(eg_axishq_buildzone, player1)				-- DALY: commented this out because it created a bug where you are able to repair the Axis HQ and take possession of it (but you cannot build squads as the player race check kicks in)
+		
+		Player_GetAllSquadsNearMarker(player2, sg_axishq_retreat, mkr_axishq_hilltop, 60)
+		Cmd_Move(sg_axishq_retreat, Marker_GetPosition(mkr_axishq_retreat), 30)
+		--Cmd_Move(sg_axishq_retreat, mkr_axishq_retreat)
+		
+		Rule_RemoveMe()
+	end
+end
+
+-------------------------------------------------------------------------
+-- have squads mill around the hq to add life
+function AxisHQ_OfficerManager()
+	if g_axishq_endofficers then
+		-- they all run inside
+		if SGroup_IsEmpty(sg_axishq_officers_all)== false and EGroup_IsEmpty(eg_axishq_all) == false then
+			Cmd_Garrison(sg_axishq_officers_all, eg_axishq_all)
+		end
+		Rule_RemoveMe()
+	else
+		local home = {mkr_axishq2_spawn3, mkr_axishq2_spawn1}
+		local path = {"pth_axishq_1", "pth_axishq_2", "pth_axishq_3"}
+		for i = 1, 3 do 
+			if SGroup_IsEmpty(sg_axishq_officers[i]) and EGroup_IsEmpty(eg_axishq_all) == false then
+				Util_CreateSquadsAndGarrisonExit(player2, sg_axishq_officers[i], Util_VolkOrGrenSBP(), eg_axishq_all, 1, Marker_GetPosition(mkr_axishq_homel), true, World_GetRand(3, 4))
+				SGroup_AddGroup(sg_axishq_officers_all, sg_axishq_officers[i])
+				SGroup_AddGroup(sg_axishq_retreat, sg_axishq_officers[i])
+				Cmd_SquadPath(sg_axishq_officers[i], path[i], true, true, true, 17)
+				break
+			else
+				if SGroup_IsUnderAttack(sg_axishq_officers[i], false, 15) then
+					Cmd_Stop(sg_axishq_officers[i])
+					Cmd_Move(sg_axishq_officers[i], mkr_axishq_homel)
+				elseif SGroup_IsMoving(sg_axishq_officers[i], false) == false then
+					Cmd_SquadPath(sg_axishq_officers[i], path[i], true, true, true, 17)
+				end
+			end
+		end
+	end
+end
+	
+	
+-------------------------------------------------------------------------
+-- the base defense
+function AxisHQ_HouseMain_Defense()
+	-- trigger the next thing
+	local blue = {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.MORTAR, SBP.AXIS.STUG, SBP.AXIS.MORTAR, SBP.AXIS.MORTAR}
+	local source = {eg_axishq_1, eg_axishq_depot1, eg_axishq_depot2, eg_axishq_depot1, eg_axishq_depot1}
+	local goto = {mkr_axishq_homel, mkr_axishq_mortars, mkr_axishq_hilltop, mkr_axishq_mortars, mkr_axishq_mortars}
+	-- dif handle
+	local dif = Util_DifVar({3, 4, 5})
+	for i = 1, dif do 
+		if SGroup_IsEmpty(sg_axishq_def[i]) and EGroup_IsEmpty(source[i]) == false then
+			Util_CreateSquadsAndGarrisonExit(player2, sg_axishq_def[i], blue[i], source[i], 1, Marker_GetPosition(goto[i]), true, World_GetRand(3, 5))
+			SGroup_AddGroup(sg_axishq_retreat, sg_axishq_def[i])
+			Cmd_Ungarrison(source[i], Marker_GetPosition(goto[i]))
+			Cmd_Move(sg_axishq_def[i], goto[i])
+			
+			break
+		end
+	end
+	if SGroup_IsEmpty(sg_axishq_def[6]) and EGroup_IsEmpty(eg_axishq_2) == false then
+		Util_CreateSquadsAndGarrison(player2, sg_axishq_def[6], SBP.AXIS.HEAVYMG, eg_axishq_2, 1)
+	end
+end
+
+
+-------------------------------------------------------------------------
+-- the mob
+function AxisHQ_MobStart()
+	if g_rescuedog_complete or g_AxisHQ_underattack then
+		Rule_AddOneShot(AxisHQ_MobTrigger, World_GetRand(10, 30))
+		
+		Rule_RemoveMe()
+	end
+end
+
+function AxisHQ_MobTrigger()
+	if EGroup_IsEmpty(eg_axishq_all) == false and ( EGroup_IsEmpty(eg_axisbase_techtrees) and EGroup_IsUnderAttack(eg_axisbase_techtrees, false, 30) == false ) then
+		local sgroup = { all = sg_HQmob_all, lead = sg_HQmob_lead, mob = sg_HQmob}
+		
+		-- pick a random mob
+		local mobs = {mobType.V, mobType.MT, mobType.LT, mobType.V, mobType.V}
+		local mType = mobs[World_GetRand(1,4)]
+		
+		-- pick a random waypoint path
+		local paths = {
+			{mkr_HQmob_1, mkr_HQmob_2},
+			{mkr_HQmob_3, mkr_HQmob_4},
+			{mkr_HQmob_5, mkr_HQmob_6},}
+		local path = paths[World_GetRand(1,3)]
+		
+		local destination = {pace = pace.FAST, count = 0, move = true, way = path, capture = nil}
+		local source = {stype = stype.BUILD, spawn = eg_axishq_all, rally = mkr_axishq_homel}
+		
+		-- add mob
+		MobRule_AddMob(player2, sgroup, mType, source, destination)
+		
+		Rule_AddInterval(AxisHQ_MobReset, 200)
+	end
+end
+
+
+function AxisHQ_MobReset()
+	if SGroup_Count(sg_HQmob_all) < 3 then
+--[[
+		if SGroup_IsEmpty(sg_HQmob_all) == false then
+			SGroup_Clear(sg_HQmob_all)
+		end
+		for i = table.getn(sg_HQmob), 1, -1 do 
+			SGroup_Clear(sg_HQmob[i])
+		end
+		if SGroup_IsEmpty(sg_HQmob_lead) == false then
+			SGroup_Clear(sg_HQmob_lead)
+		end
+		]]
+		if EGroup_IsEmpty(eg_axishq_all) == false then
+			Rule_AddOneShot(AxisHQ_MobTrigger, World_GetRand(10, 30))
+		end
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+
+-------------------------------------------------------------------------
+
+-- [[Secure Flag Triggers ]]
+
+-------------------------------------------------------------------------
+
+function SecureFlag_KickOff()
+	sg_axisSecure_main = SGroup_CreateTable("sg_axisSecure_main%d", 3)
+	sg_axisSecure_north2 = SGroup_CreateIfNotFound("sg_axisSecure_north2")
+	sg_axisSecure_south1 = SGroup_CreateIfNotFound("sg_axisSecure_south1")
+	sg_axisSecure_south2 = SGroup_CreateIfNotFound("sg_axisSecure_south2")
+	Axis_PanzersArrive_01 = SGroup_CreateIfNotFound("Axis_PanzersArrive_01")
+	Axis_PanzersArrive_02 = SGroup_CreateIfNotFound("Axis_PanzersArrive_02")
+	Axis_PanzersArrive_03 = SGroup_CreateIfNotFound("Axis_PanzersArrive_03")
+	Axis_PanzersArrive_04 = SGroup_CreateIfNotFound("Axis_PanzersArrive_04")
+	
+	sg_newpanzer = SGroup_CreateTable("sg_newpanzer%d", 4)
+	sg_randPanzer = SGroup_CreateIfNotFound("sg_randPanzer")
+	
+	t_panzers = {
+		{sgroup = Axis_PanzersArrive_01, marker = mkr_panzer_ambush1},
+		{sgroup = Axis_PanzersArrive_03, marker = mkr_panzer_ambush2},
+		{sgroup = Axis_PanzersArrive_02, marker = mkr_panzer_ambush3},
+		{sgroup = Axis_PanzersArrive_04, marker = mkr_panzer_ambush4},
+	}
+	t_newpanzers = {
+		{sgroup = sg_newpanzer[1], marker = mkr_axis_offmap7, face = Marker_RightJunction},
+		{sgroup = sg_newpanzer[2], marker = mkr_axis_offmap6, face = Marker_LeftJunction},
+		{sgroup = sg_newpanzer[3], marker = mkr_axis_offmap8, face = Marker_LeftJunction},
+		{sgroup = sg_newpanzer[4], marker = mkr_axis_offmap9, face = Marker_RightJunction},
+	}
+	
+	Rule_AddInterval(SecureFlag_Main, 5)
+	g_panzertime = 0
+	Rule_AddInterval(SecureFlag_North1, 10)
+	Rule_AddInterval(SecureFlag_North2, 8)
+	Rule_AddInterval(SecureFlag_South1, 7)
+	Rule_AddInterval(SecureFlag_South2, 10)
+end
+
+-------------------------------------------------------------------------
+-- the main intersection
+function SecureFlag_Main()
+	if g_rescuedog_complete or Prox_ArePlayersNearMarker(player1, EGroup_GetPosition_EVEN_IF_EMPTY(eg_flag_secure1), false, 40) then
+		-- add squads to the mix
+		if EGroup_IsEmpty(eg_mainintersection_houses) == false then
+			Util_CreateSquadsAndGarrison(player2, sg_axisSecure_main[1], Util_RandomInfSBP(), eg_mainintersection_houses, World_GetRand(2, 3), false)
+		end
+		-- offmap guys
+		Util_CreateSquadsAtMarker(player2, sg_axisSecure_main[2], Util_RandomInfSBP(), mkr_axis_offmap4, World_GetRand(2, 3), World_GetRand(3, 4))
+		Cmd_AttackMove(sg_axisSecure_main[2], Marker_CenterJunction)
+		
+		Rule_AddInterval(SecureFlag_Main_Check1, 5)
+		Rule_AddInterval(SecureFlag_Main_Check2, 5)
+		
+		Rule_RemoveMe()
+	end
+end
+
+function SecureFlag_Main_Check1()
+	if SGroup_IsUnderAttack(sg_axisSecure_main[1], false, 10) then
+		Cmd_Ungarrison(sg_axisSecure_main[1], Marker_GetPosition(Marker_CenterJunction_03))
+		AutoRetreat_AddSGroup(sg_axisSecure_main[1], EGroup_GetPosition_EVEN_IF_EMPTY(eg_flag_secure3))
+		Rule_RemoveMe()
+	end
+end
+
+function SecureFlag_Main_Check2()
+	if SGroup_Count(sg_axisSecure_main[2]) <= 1 then
+		Cmd_Retreat(sg_axisSecure_main[2], EGroup_GetPosition_EVEN_IF_EMPTY(eg_flag_secure3))
+		Rule_RemoveMe()
+	end
+end
+
+
+
+
+
+
+-------------------------------------------------------------------------
+-- the panzer Medal
+-------------------------------------------------------------------------
+function Initialize_OBJ_PanzerKill()
+	OBJ_PanzerKill = {
+		SetupUI = function()
+			
+		end,
+		
+		OnStart = function()
+			Util_StartIntel(EVENTS.Panzers_Incoming)
+			
+			-- add the panzer kill counter
+			g_panzersKIA = 0
+			Objective_SetCounter(OBJ_PanzerKill, g_panzersKIA, Util_DifVar({8, 10, 12}))
+			
+			-- panzers all
+			sg_axisPanzers_all = SGroup_CreateIfNotFound("sg_axisPanzers_all")
+			local sgroup = {Axis_PanzersArrive_01, Axis_PanzersArrive_03, Axis_PanzersArrive_02, Axis_PanzersArrive_04}
+			for i = 1, 4 do
+				SGroup_AddGroup(sg_axisPanzers_all, sgroup[i])
+				--HintPoint_Add(sgroup[i], true, 259283)
+			end
+			g_panzercount = SGroup_Count(sg_axisPanzers_all)
+			g_panzerLastcount = g_panzercount
+			
+			-- track the escalation
+			Rule_AddInterval(Panzer_WinCheck, 4)
+			-- keep track of the kills
+			Rule_AddInterval(Panzer_DeadCount, 1)	
+			-- the panther action
+			Rule_AddIntervalEx(Panzer_Ambush_InitialResponse, 9, 10)
+			-- moves the Panzers on to their patrol positions
+			Rule_AddOneShot(Panzer_Ambush_TrackDelay, 145)
+		end,
+		
+		OnComplete = function()
+			g_panzerkill_complete = true
+			-- award command point
+--			Player_AddUnspentCommandPoints(player1, 1)
+		end,
+		
+		OnFail = function()
+			
+		end,
+		
+		Title 			= 259280,
+		Description 	= 259281,
+		Type	 		= OT_Medal,
+		MedalID 		= MEDALS.DISTINGUISHED_SERVICE_CROSS,
+		TitleEnd		= 259282,
+		Icon			= IT_M_Default,
+	}
+	Objective_Register(OBJ_PanzerKill)
+end
+
+
+
+-------------------------------------------------------------------------
+-- the panzer trigger
+function SecureFlag_North1()
+	if Event_IsAnyRunning() == false and
+	-- for time in seconds 60*10 = 600 = 10 minutes.
+	( g_panzertime > Util_DifVar({120, 105, 90})
+	or (( g_secure_firstpoint or g_AxisHQ_underattack ) and g_panzertime > 30 )
+	or Prox_ArePlayersNearMarker(player1, Marker_GetPosition(mkr_panzer_trigger), false, 35) 
+	or Prox_ArePlayersNearMarker(player1, Marker_GetPosition(Marker_NearWC_Prox), false, 25) ) then
+		g_secureflag_firstpast = true
+		
+		Util_StartNIS(EVENTS.NIS02)
+		
+		Rule_Add(Panzer_Ambush_PostNIS)
+		
+		Player_GetAll()
+		Cmd_Stop(sg_allsquads)
+		
+		Rule_RemoveMe()
+	end
+	
+	g_panzertime = g_panzertime+1
+end
+
+function Panzer_Ambush_PostNIS()
+	if Event_IsAnyRunning() == false then
+		-- trigger music here
+		Util_PlayMusic("Sound/Music/sp/M05/M05_Ob2a_TankAttack", 5, 5)
+		
+		-- obj start
+		Objective_Start(OBJ_PanzerKill)
+		
+		-- recapture action
+		sg_north1_all 	= SGroup_CreateIfNotFound("sg_north1_all")
+		sg_north1_lead 	= SGroup_CreateIfNotFound("sg_north1_lead")
+		sg_north1 		= SGroup_CreateTable("sg_north1%d", 5)
+		Rule_AddOneShot(SecureFlag_North1_Recapture, World_GetRand(30, 45))
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+-- keep a tally of the dead Panzers
+function Panzer_DeadCount()
+	if g_panzerkill_complete == true then
+		Rule_RemoveMe()
+	else --[[if SGroup_IsEmpty(sg_axisPanzers_all) == false then]]
+		local count = SGroup_Count(sg_axisPanzers_all)
+		
+		if count > g_panzercount then
+			-- the count has gone up
+			g_panzercount = count
+			
+		elseif count == g_panzercount then
+			-- don't have to do anything now
+		elseif count < g_panzercount then
+			-- the count has dropped, someone has died
+			-- increment the counter
+			g_panzersKIA = g_panzersKIA+(g_panzercount-count)
+			Objective_SetCounter(OBJ_PanzerKill, g_panzersKIA, Util_DifVar({8, 10, 12}))
+			g_panzercount = count
+			
+		end
+	end
+end
+
+-- modified to end once the allotted number are killed
+-- instead of waiting for the road to be secured
+function Panzer_WinCheck()
+--	if g_roadsecure_complete then
+		g_exitmarker = mkr_axis_offmap7
+		-- dif handle
+		local dif = Util_DifVar({8, 10, 12})
+		if g_panzersKIA >= dif then
+			Objective_Complete(OBJ_PanzerKill)
+			
+			-- keep the panzers moving out
+			Rule_AddInterval(Panzer_Cleanup, 5)
+			
+			Rule_RemoveMe()
+			
+		elseif g_roadsecure_complete then -- added this to compensate for removing the above statement
+			Cmd_AttackMove(sg_axisPanzers_all, g_exitmarker)
+			
+			Rule_AddInterval(Panzer_LoseCheck, 2)
+			
+			Rule_RemoveMe()
+		end
+		
+--	end
+end
+
+function Panzer_LoseCheck()
+	-- has the player killed at least 8 panzers?
+	-- dif handle
+	local dif = Util_DifVar({8, 10, 12})
+	if g_panzersKIA >= dif then
+		Objective_Complete(OBJ_PanzerKill)
+		
+		Rule_RemoveMe()
+	-- if the panzer group is not empty
+	elseif SGroup_IsEmpty(sg_axisPanzers_all) == false then
+		-- iterate through the group and see if anyone is near the marker
+		for i = 1, table.getn(t_panzers) do
+			local this = t_panzers[i]
+			if SGroup_IsEmpty(this.sgroup) == false then
+				-- if they are near the marker
+				if Prox_AreSquadsNearMarker(this.sgroup, mkr_axis_offmap7, false, 12) then
+					
+					-- destroy the one
+					SGroup_DestroyAllSquads(this.sgroup)
+					-- fail the obj
+					Objective_Fail(OBJ_PanzerKill)
+					
+					-- keep the panzers moving out
+					Rule_AddInterval(Panzer_Cleanup, 5)
+					
+					Rule_RemoveMe()
+					break
+				else
+					-- and order the rest to go to the point
+					Cmd_Move(this.sgroup, Marker_GetPosition(g_exitmarker))
+				end
+			end
+		end
+	else
+		-- else if the player managed to kill them all
+		Objective_Complete(OBJ_PanzerKill)
+		
+		Rule_RemoveMe()
+	end
+end
+
+function Panzer_Cleanup()
+	-- iterate through the group and see if anyone is near the marker
+	for i = 1, table.getn(t_panzers) do
+		local this = t_panzers[i]
+		if SGroup_IsEmpty(this.sgroup) == false then
+			-- if they are near the marker
+			if Prox_AreSquadsNearMarker(this.sgroup, mkr_axis_offmap7, false, 12) then
+				-- destroy the one
+				SGroup_DestroyAllSquads(this.sgroup)
+				
+				break
+			else
+				-- and order the rest to go to the point
+				Cmd_Move(this.sgroup, Marker_GetPosition(g_exitmarker))
+			end
+		end
+	end
+end
+
+function Panzer_Ambush_InitialResponse()
+	-- dif handle - number of tanks
+	local sgroup1 = {Axis_PanzersArrive_01, Axis_PanzersArrive_03}
+	local sgroup2 = {Axis_PanzersArrive_01, Axis_PanzersArrive_03, Axis_PanzersArrive_02, }
+	-- pick the final value
+	local sgroup = Util_DifVar({sgroup1, sgroup2})
+	
+	local underattack = nil
+	
+	-- find out if anyone is under attack
+	for i = 1, table.getn(sgroup) do
+		if SGroup_IsEmpty(sgroup[i]) == false then
+			-- under attack, no need to move
+			if SGroup_IsUnderAttack(sgroup[i], false, 10) then
+				Cmd_Move(sgroup[i], sgroup[i], nil, nil, nil, World_GetRand(3, 5), World_GetRand(10, 20))
+			-- head to the center
+			elseif g_secure_firstpoint then
+				Cmd_AttackMove(sgroup[i], Marker_CenterJunction)
+			-- head to the player's base
+			else
+				Cmd_AttackMove(sgroup[i], mkr_recapturehq_axis1)
+			end
+		end
+	end
+end
+
+-- this adds the rule that stops the Initial Response 
+-- and has the Panzers retreat to their previous positions
+function Panzer_Ambush_TrackDelay()
+	-- music back to normal
+	Util_PlayMusic("Sound/Music/sp/M05/M05_Ob2_DefendConvoy", 5, 5)
+	-- add the ambient behavior
+	Rule_AddInterval(Panzer_Ambush_TrackResponse, 12)
+	-- add in the extra Pazners
+	Rule_AddInterval(Panzer_CreateMore, 17)
+	timer_NewPanzers = 87238723
+	Timer_Start(timer_NewPanzers, 90)							-- DALY: start timer 
+end
+
+function Panzer_Ambush_TrackResponse()
+	if g_panzerkill_complete == true then
+		Rule_RemoveMe()
+	else
+		for i = 1, table.getn(t_panzers) do
+			local this = t_panzers[i]
+			if SGroup_IsEmpty(this.sgroup) == false then
+				if SGroup_IsUnderAttack(this.sgroup, false, 10) then
+					
+					local sgtemp = SGroup_CreateIfNotFound("sgtemp")
+					
+					SGroup_GetLastAttacker( this.sgroup, sgtemp )
+					Cmd_Move(this.sgroup, SGroup_GetPosition_EVEN_IF_EMPTY(sgtemp), nil, nil, nil, World_GetRand(2, 5), 15)
+					SGroup_Clear(sgtemp)
+					
+				elseif SGroup_IsMoving(this.sgroup, false) then
+					
+				elseif SGroup_CanSeeSGroup(this.sgroup, sg_allsquads, false) then
+					Cmd_AttackMove(this.sgroup, sg_allsquads)
+				else
+					--Cmd_Move(this.sgroup, this.sgroup, World_GetRand(0,7), 5)
+				end
+			end
+		end
+	end
+end
+
+-- create additional panzers
+function Panzer_CreateMore()
+	if g_panzerkill_complete == true then
+		Rule_RemoveMe()
+	else
+		for i = 1, table.getn(t_newpanzers) do
+			local this = t_newpanzers[i]
+			table.insert(t_panzers, t_newpanzers[i])
+			
+			if SGroup_IsEmpty(this.sgroup) then
+				local sgroup = SGroup_CreateIfNotFound("_newpanzercheck")
+				SGroup_Clear(sgroup)
+				Player_GetAllSquadsNearMarker(player1, sgroup, Marker_GetPosition(this.marker), 70)
+				if SGroup_IsEmpty(sgroup) and Timer_GetRemaining(timer_NewPanzers) == 0 then			-- DALY: added timer check to ensure lots of Panzers are not spawned in succession
+					-- create the new panzer
+					Util_CreateSquadsAtMarkerFacing(player2, this.sgroup, SBP.AXIS.PANZER, this.marker, Marker_CenterJunction, 1)
+					SGroup_AddGroup(sg_axisPanzers_all, this.sgroup)
+					Modify_SightRadius(this.sgroup, 2)
+					
+					SGroup_FaceMarker(this.sgroup, this.face)
+					
+					t_newsgroup = this.sgroup
+					t_newface = this.face
+					Rule_AddOneShot(Panzer_Face, 2)
+					
+					-- add the panzer to the pack
+					table.insert(t_panzers, this)
+					
+					Timer_Start(timer_NewPanzers, 120)									-- DALY: start timer so we don't spawn lots of Panzers at once
+					
+					-- add this rule again in a few seconds
+					if Rule_Exists(Panzer_CreateMore_Reset) == false then
+						Rule_AddIntervalEx(Panzer_CreateMore_Reset, 12, 3)
+					end
+					Rule_RemoveMe()
+					break
+				end
+			end
+		end
+	end
+end
+
+function Panzer_Face()
+	print("facing")
+	print(SGroup_GetName(t_newsgroup))
+	print(Marker_GetName(t_newface))
+	if SGroup_IsEmpty(t_newsgroup) == false then
+		print("not failed")
+		SGroup_FaceMarker(t_newsgroup, t_newface)
+		Rule_AddOneShot(Panzer_StepForward, 3)
+	else
+		print("failed")
+	end
+end
+function Panzer_StepForward()
+	print("facing")
+	print(SGroup_GetName(t_newsgroup))
+	if SGroup_IsEmpty(t_newsgroup) == false then
+		print("not failed")
+		Cmd_Move(t_newsgroup, t_newsgroup, nil, nil, nil, 0, 25)
+	else
+		print("failed")
+	end
+end
+
+-- keep them around
+function Panzer_CreateMore_Reset()
+	if g_panzerkill_complete == true then
+		Rule_RemoveMe()
+	else
+		if SGroup_Count(sg_randPanzer) < Util_DifVar({1, 2,}) then	
+			-- add some additional action
+			if Rule_Exists(Panzer_PostHQ_PanzerResponse) == false then
+				-- grab a random existing panzer
+				local rand = World_GetRand(1, 4)
+				if SGroup_IsEmpty(sg_newpanzer[rand]) == false then
+					local sgroup = sg_newpanzer[rand]
+					SGroup_AddGroup(sg_randPanzer, sg_newpanzer[rand])
+					SGroup_Clear(sg_newpanzer[rand])
+					-- roll out the action
+					Rule_AddIntervalEx(Panzer_PostHQ_PanzerResponse, 9, 7)
+				end
+			end
+			
+			if Rule_Exists(Panzer_CreateMore) == false then
+				-- if the HQ is dead, check sooner
+				if g_destroyHQ_complete == true then
+					Rule_AddInterval(Panzer_CreateMore, World_GetRand(35, 55))
+				else
+					Rule_AddInterval(Panzer_CreateMore, World_GetRand(58, 83))
+				end
+			end
+			
+			Rule_RemoveMe()
+		end
+	end
+end
+
+-- updated to attack the player's group of squads
+-- added a new sgroup for the purpose
+function Panzer_PostHQ_PanzerResponse()
+	if g_panzerkill_complete == true then
+		Rule_RemoveMe()
+	else
+	-- dif handle - number of tanks
+		local sgroup = sg_randPanzer
+		sg_panzertarget = SGroup_CreateIfNotFound("sg_panzertarget")
+		
+		if SGroup_IsEmpty(sgroup) == false then
+			-- under attack, no need to move
+			if SGroup_IsUnderAttack(sgroup, false, 10) then
+				Cmd_Move(sgroup, sgroup, nil, nil, nil, World_GetRand(3, 5), World_GetRand(10, 20))
+			-- head to the player's base
+			else
+				Player_GetAll(player1, sg_panzertarget)
+				Cmd_AttackMove(sgroup, sg_panzertarget)
+			end
+		end
+	end
+end
+
+
+-- send a squad to recapture the point
+function SecureFlag_North1_Recapture()
+	local sgroup = { all = sg_north1_all, lead = sg_north1_lead, mob = sg_north1}
+	-- dif handle
+	local mType = Util_DifVar({mobType.V, mobType.VG}) 
+	local source = {stype = stype.OFFMAP, spawn = mkr_axis_offmap5, rally = Marker_NearWC_Prox}
+	local destination = {pace = pace.FAST, count = 0, move = true, way = {mkr_panzer_intial1}, capture = eg_flag_secure3}
+	local dedication = true
+	
+	MobRule_AddMob(player2, sgroup, mType, source, destination, dedication)
+end
+
+
+
+-------------------------------------------------------------------------
+-- the north final flag
+-- couple buildings
+function SecureFlag_North2()
+	if g_secureflag_firstpast and Prox_ArePlayersNearMarker(player1, EGroup_GetPosition_EVEN_IF_EMPTY(eg_flag_secure5), false, 60) then
+		for i = 1, World_GetRand(2, 3) do 
+			Util_CreateSquadsAtMarker(player2, sg_axisSecure_north2, Util_DifRandInfSBP(), mkr_axis_offmap7, 1)
+		end
+		for i = 1, World_GetRand(2, 3) do 
+			Util_CreateSquadsAtMarker(player2, sg_axisSecure_north2, Util_DifRandInfSBP(), mkr_axis_offmap9, 1)
+		end
+		
+		Cmd_Garrison(sg_axisSecure_north2, eg_securenorth_buildings, true)
+		Cmd_AttackMove(sg_axisSecure_north2, EGroup_GetPosition_EVEN_IF_EMPTY(eg_flag_secure5), nil, nil, 30)
+		
+		-- recapture action
+		sg_north2_all 	= SGroup_CreateIfNotFound("sg_north2_all")
+		sg_north2_lead 	= SGroup_CreateIfNotFound("sg_north2_lead")
+		sg_north2 		= SGroup_CreateTable("sg_north2%d", 5)
+		g_n2_recap = 1
+		g_n2_recapLimit = 1
+		Rule_AddInterval(SecureFlag_North2_Recapture, World_GetRand(120, 200))
+		
+		Rule_RemoveMe()
+	end
+end
+	
+
+-- send a squad to recapture the point
+function SecureFlag_North2_Recapture()
+	local sgroup = { all = sg_north2_all, lead = sg_north2_lead, mob = sg_north2}
+	-- dif handle
+	local mobs1 = {mobType.V, mobType.VG}
+	local mobs2 = {mobType.VG, mobType.AT, mobType.VG}
+	local mobs = Util_DifVar({mobs1, mobs2})
+	local mType = mobs[World_GetRand(1,table.getn(mobs))]
+	
+	local source = {stype = stype.OFFMAP, spawn = mkr_axis_offmap7, rally = mkr_axis_offmap7}
+	local destination = {pace = pace.FAST, count = 0, move = true, way = {Marker_RightJunction}, capture = eg_flag_secure5}
+	local dedication = true
+	
+	-- using this equation, 1, 2, 4, 8 etc.. will be the iterations that trigger the mob
+	-- that means at least 2m, 4m, 8m 16m, etc.. will be the fastest the mob will arrive
+	if g_n2_recap >= g_n2_recapLimit then
+		MobRule_AddMob(player2, sgroup, mType, source, destination, dedication)
+		g_n2_recapLimit = g_n2_recapLimit*2
+	end
+	g_n2_recap = g_n2_recap+1
+end
+
+
+
+
+-------------------------------------------------------------------------
+-- the church
+function SecureFlag_South1()
+	if Prox_ArePlayersNearMarker(player1, EGroup_GetPosition_EVEN_IF_EMPTY(eg_flag_secure2), false, 40) then
+		g_secureflag_firstpast = true
+		
+		for i = 1, World_GetRand(3, 4) do 
+			Util_CreateSquadsAtMarker(player2, sg_axisSecure_south1, Util_DifRandInfSBP(), mkr_axis_offmap4, 1, World_GetRand(3, 4))
+		end
+		Cmd_Garrison(sg_axisSecure_south1, eg_church, true)
+		
+		Rule_AddInterval(SecureFlag_South1_Check, 5)
+		Rule_AddInterval(SecureFlag_South1_Capture, 5)
+		
+		Rule_RemoveMe()
+	end
+end
+
+function SecureFlag_South1_Check()
+	if SGroup_IsUnderAttack(sg_axisSecure_south1, false, 10) then
+		Cmd_Ungarrison(sg_axisSecure_south1, Marker_GetPosition(mkr_church_unload))
+		AutoRetreat_AddSGroup(sg_axisSecure_south1, EGroup_GetPosition_EVEN_IF_EMPTY(eg_barraks_flag))
+		Rule_RemoveMe()
+	end
+end
+
+-- check when the player captures the flag
+function SecureFlag_South1_Capture()
+	if EGroup_IsCapturedByPlayer(eg_flag_secure2, player1, true) then
+		-- recapture action
+		sg_south1_all 	= SGroup_CreateIfNotFound("sg_south1_all")
+		sg_south1_lead 	= SGroup_CreateIfNotFound("sg_south1_lead")
+		sg_south1 		= SGroup_CreateTable("sg_south1%d", 5)
+		Rule_AddOneShot(SecureFlag_South1_Recapture, World_GetRand(20, 30))
+		
+		Rule_RemoveMe()
+	end
+end
+-- send a squad to recapture the point
+function SecureFlag_South1_Recapture()
+	local sgroup = { all = sg_south1_all, lead = sg_south1_lead, mob = sg_south1}
+	local mType = Util_DifVar({mobType.V, mobType.VG}) 
+	local source = {stype = stype.OFFMAP, spawn = mkr_axis_offmap6, rally = mkr_mob1_rally}
+	local destination = {pace = pace.FAST, count = 0, move = true, way = {mkr_mob1_way1}, capture = eg_flag_secure2}
+	local dedication = true
+	
+	MobRule_AddMob(player2, sgroup, mType, source, destination, dedication)
+end
+
+
+
+
+
+-------------------------------------------------------------------------
+-- the south final flag
+-- urban intersection
+function SecureFlag_South2()
+	if g_secureflag_firstpast and Prox_ArePlayersNearMarker(player1, EGroup_GetPosition_EVEN_IF_EMPTY(eg_flag_secure4), false, 60) then
+		for i = 1, World_GetRand(2, 3) do 
+			Util_CreateSquadsAtMarker(player2, sg_axisSecure_south2, Util_DifRandInfSBP(), mkr_axis_offmap6, 1)
+		end
+		
+		for i = 1, World_GetRand(2, 3) do 
+			Util_CreateSquadsAtMarker(player2, sg_axisSecure_south2, Util_DifRandInfSBP(), mkr_axis_offmap8, 1)
+		end
+		
+		Cmd_Garrison(sg_axisSecure_south2, eg_securesouth_buildings, true)
+		
+		-- recapture action
+		sg_south2_all 	= SGroup_CreateIfNotFound("sg_south2_all")
+		sg_south2_lead 	= SGroup_CreateIfNotFound("sg_south2_lead")
+		sg_south2 		= SGroup_CreateTable("sg_south2%d", 5)
+		g_s2_recap = 1
+		g_s2_recapLimit = 1
+		Rule_AddInterval(SecureFlag_South2_Recapture, World_GetRand(120, 200))
+		
+		Rule_RemoveMe()
+	end
+end
+
+
+-- send a squad to recapture the point
+function SecureFlag_South2_Recapture()
+	local sgroup = { all = sg_south2_all, lead = sg_south2_lead, mob = sg_south2}
+	-- dif handle
+	local mobs1 = {mobType.V, mobType.VG}
+	local mobs2 = {mobType.VG, mobType.AT, mobType.VG}
+	local mobs = Util_DifVar({mobs1, mobs2})
+	local mType = mobs[World_GetRand(1,table.getn(mobs))]
+	
+	local source = {stype = stype.OFFMAP, spawn = mkr_axis_offmap8, rally = mkr_axis_offmap8}
+	local destination = {pace = pace.FAST, count = 0, move = true, way = {Marker_LeftJunction}, capture = eg_flag_secure4}
+	local dedication = true
+	
+	-- using this equation, 1, 2, 4, 8 etc.. will be the iterations that trigger the mob
+	-- that means at least 2m, 4m, 8m 16m, etc.. will be the fastest the mob will arrive
+	if g_s2_recap >= g_s2_recapLimit then
+		MobRule_AddMob(player2, sgroup, mType, source, destination, dedication)
+		g_s2_recapLimit = g_s2_recapLimit*2
+	end
+	g_s2_recap = g_s2_recap+1
+end
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ Landmine Warning ]]
+
+-------------------------------------------------------------------------
+
+function Landmaine_Warning()
+	if Prox_ArePlayersNearMarker(player1, mkr_mines_south, false, 20) then
+		-- used below
+		g_landmines_triggered = true
+		-- used in NIS
+		g_landmines_south = true
+		
+		Player_GetAll()
+		Cmd_StopSquadsExcept(sg_allsquads, true, true)
+	elseif Prox_ArePlayersNearMarker(player1, mkr_mines_north, false, 20) then
+		-- used below
+		g_landmines_triggered = true
+		-- used in NIS
+		g_landmines_north = true
+		
+		Player_GetAll()
+		Cmd_StopSquadsExcept(sg_allsquads, true, true)
+	end
+	
+	if g_landmines_triggered then
+		Util_StartNIS(EVENTS.Landmines, 0)
+		Rule_RemoveMe()
+	end
+end
+
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ Motor Pool ]]
+
+-------------------------------------------------------------------------
+function MotorPool_KickOff()
+	sg_MotorMob_all 	= SGroup_CreateIfNotFound("sg_MotorMob_all")
+	sg_MotorMob_lead 	= SGroup_CreateIfNotFound("sg_MotorMob_lead")
+	sg_MotorMob 		= SGroup_CreateTable("sg_MotorMob%d", 5)
+
+	Rule_AddInterval(MotorPool_MobAttack, 90)
+end
+
+-- strike teams to aggress the player
+function MotorPool_MobAttack()
+	-- is the mob group empty
+	if SGroup_IsEmpty(sg_MotorMob_all) or SGroup_IsEmpty(sg_MotorMob_lead) then
+		-- has the player had no fighting in the last minute?
+		if SGroup_IsUnderAttack(Player_GetSquads(player1), false, 200) == false then
+			local sgroup = { all = sg_MotorMob_all, lead = sg_MotorMob_lead, mob = sg_MotorMob}
+			local mtype = mobType.LT 
+			local source = {stype = stype.BUILD, spawn = eg_motorpool_mob, rally = mkr_motormob_rally}
+			local destination = {pace = pace.MED, count = 0, move = true, way = {mkr_HQmob_6, Marker_WA_SpawnAxis_Left}, capture = nil}
+			MobRule_AddMob(player2, sgroup, mtype, source, destination)
+		end
+	elseif EGroup_IsEmpty(eg_motorpool_mob) then
+		Rule_RemoveMe()
+	end
+end
+
+
+-------------------------------------------------------------------------
+
+-- [[ Barracks ]]
+
+-------------------------------------------------------------------------
+function Barracks_KickOff()
+	sg_BrrksMob_all 	= SGroup_CreateIfNotFound("sg_BrrksMob_all")
+	sg_BrrksMob_lead 	= SGroup_CreateIfNotFound("sg_BrrksMob_lead")
+	sg_BrrksMob 		= SGroup_CreateTable("sg_BrrksMob%d", 5)
+
+	Rule_AddInterval(Barracks_MobAttack, 80)
+end
+
+-- strike teams to aggress the player
+function Barracks_MobAttack()
+	-- is the mob group empty
+	if SGroup_IsEmpty(sg_BrrksMob_all) or SGroup_IsEmpty(sg_BrrksMob_lead) then
+		-- has the player had no fighting in the last minute?
+		if SGroup_IsUnderAttack(Player_GetSquads(player1), false, 120) == false then
+			local sgroup = { all = sg_BrrksMob_all, lead = sg_BrrksMob_lead, mob = sg_BrrksMob}
+			local mobs = {mobType.V, mobType.M, mobType.VG, mobType.V}
+			local mType = mobs[World_GetRand(1,4)]
+			local source = {stype = stype.BUILD, spawn = eg_axisbarracks3, rally = mkr_mob1_rally}
+			local destination = {pace = pace.FAST, count = 0, move = true, way = {mkr_mob1_way1, mkr_mob1_way2}, capture = nil}
+			MobRule_AddMob(player2, sgroup, mType, source, destination)
+		end
+	elseif EGroup_IsEmpty(eg_axisbarracks3) then
+		Rule_RemoveMe()
+	end
+end
+
+
+
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+-- EVENT CUES
+--------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- clickable event cue each time a new supply convoy is spawned
+function Rule_EventCue_NewConvoyAvailable()
+	if Event_IsAnyRunning() == false then
+		Rule_RemoveMe()
+	end
+end
+function EventCue_NewConvoyAvailable_Focus()
+	Camera_FocusOnTargetMarker(Marker_SupplyTruckSpawn_01)
+end
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+function Mob_Test()
+	sg_mobA_all 	= SGroup_CreateIfNotFound("sg_mobA_all")
+	sg_mobA_lead 	= SGroup_CreateIfNotFound("sg_mobA_lead")
+	sg_mobA 		= SGroup_CreateTable("sg_mobA%d", 5)
+	
+	Rule_AddInterval(Mob_Trigger, 120)
+end
+
+function Mob_Trigger()
+	local sgroup = {all = sg_mobA_all, lead = sg_mobA_lead, mob = sg_mobA}
+	local mType = mobType.V
+	local source = {stype = stype.OFFMAP, spawn = mkr_axis_offmap6, rally = mkr_mob1_rally}
+	local destination = {pace = pace.FAST, count = 0, move = true, way = {mkr_mob1_way1, mkr_mob1_way2, mkr_mob1_way3, mkr_mob1_way4}, capture = nil}
+	
+	MobRule_AddMob(player2, sgroup, mType, source, destination)
+end
+
+
+-------------------------------------------------------------------------
+--[[ Random Util Stuff ]]
+-------------------------------------------------------------------------
+
+-- returns a random offset, same as Util_GetRandomPosition
+-- but for a position value
+function Util_GetRandOffset(pos, dist)
+	if (scartype(pos) == ST_MARKER) then
+		pos = Marker_GetPosition(pos)
+	end
+	
+	local newpos = pos
+	newpos.x = World_GetRand(dist*-1, dist)
+	newpos.z = World_GetRand(dist*-1, dist)
+	return newpos
+end
+
+-- returns a random SBP for an armoured vehicle
+function Util_RandomTankSBP()
+	local sbps = {SBP.AXIS.OSTWIND, SBP.AXIS.STUG, SBP.AXIS.OSTWIND}
+	local rand = World_GetRand(1, table.getn(sbps))
+	return sbps[rand]
+end
+
+-- returns a random SBP for a lighter armoured vehicle
+function Util_RandomLightTankSBP()
+	local sbps = {SBP.AXIS.MOTORCYCLE, SBP.AXIS.PUMA, SBP.AXIS.HALFTRACK}
+	local rand = World_GetRand(1, table.getn(sbps))
+	return sbps[rand]
+end
+
+-- returns a random SBP for infantry
+function Util_RandomInfSBP()
+	local sbps = {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER, SBP.AXIS.HEAVYMG}
+	local rand = World_GetRand(1, table.getn(sbps))
+	return sbps[rand]
+end
+
+-- returns a random SBP for infantry
+function Util_VolkOrGrenSBP()
+	local sbps = {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER, SBP.AXIS.VOLKSGRENADIER}
+	local rand = World_GetRand(1, table.getn(sbps))
+	return sbps[rand]
+end
+
+-- performs the Instant Upgrade but uses a randomly selected weapon
+function Util_GrantRandomUpgrade(sgroup)
+	local upgrades = {UPG.AXIS.GREN_MG42, nil, UPG.AXIS.GREN_PANZERSCHRECK, nil, UPG.AXIS.GREN_MG42}
+	local rand = World_GetRand(1, table.getn(upgrades))
+	if upgrades[rand] ~= nil then
+		Cmd_InstantUpgrade(sgroup, upgrades[rand])
+	end
+end
+
+-- toggles invulnerability for a squad selection
+function Util_InvulnerableSelection(boolean)
+	if boolean then
+		if Rule_Exists(_InvulnerableSelection) == false then
+			Rule_AddInterval(_InvulnerableSelection, 5)
+		end
+	else
+		Rule_RemoveIfExist(_InvulnerableSelection)
+	end
+end
+
+function _InvulnerableSelection(boolean)
+	_invsgroup = SGroup_CreateIfNotFound("_invsgroup")
+	if SGroup_IsEmpty(_invsgroup) == false then
+		SGroup_SetInvulnerable(_invsgroup, false)
+	end
+	Misc_GetSelectedSquads(_invsgroup, false)
+	if SGroup_IsEmpty(_invsgroup) == false then
+		SGroup_SetInvulnerable(_invsgroup, true)
+	end
+end
+
+-- returns a random SBP for infantry
+function Util_DifRandInfSBP()
+	-- easy
+	local sbps1 = {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER, SBP.AXIS.VOLKSGRENADIER}
+	-- med
+	local sbps2 = {SBP.AXIS.GRENADIER, SBP.AXIS.GRENADIER, SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER}
+	-- hard
+	local sbps3 = {SBP.AXIS.GRENADIER, SBP.AXIS.GRENADIER, SBP.AXIS.STORMTROOPER}
+	
+	local sbp = Util_DifVar({sbps1, sbps2, sbps3})
+	local rand = World_GetRand(1, table.getn(sbp))
+	return sbp[rand]
+end
+
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+function Util_MergeSquads()
+	_merge = SGroup_CreateIfNotFound("_merge")
+	Misc_GetSelectedSquads(_merge, false)
+	
+	if SGroup_IsEmpty(_merge) == false and SGroup_CountSpawned(_merge) > 1 then
+		local squadZero = SGroup_GetSpawnedSquadAt(_merge, 1)
+		for i = SGroup_CountSpawned(_merge), 2, -1  do 
+			local squadID = SGroup_GetSpawnedSquadAt(_merge, i)
+			if ( Squad_Count(squadZero) + Squad_Count(squadZero) ) <= Squad_GetMax(squadZero) 
+			and	Squad_GetBaseUnitName(squadZero) == Squad_GetBaseUnitName(squadID) then
+				Squad_Merge(squadZero, squadID)
+			end
+		end
+	end
+end
+

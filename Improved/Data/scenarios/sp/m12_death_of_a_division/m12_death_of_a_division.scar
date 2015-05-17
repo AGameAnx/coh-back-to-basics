@@ -1,0 +1,3471 @@
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+-- MISSION 12: DEATH OF A DIVISION (DOAD)
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+import("ScarUtil.scar")
+-- custom file for table ID's in addition to the default WB generated file
+import("M12_Death_Of_A_Division_IDTables.scar")
+
+
+-------------------------------------------------------------------------
+-- [[ SETUP ]]
+-------------------------------------------------------------------------
+
+function OnGameSetup()
+	--[[ string numbers should reference dat files ]]
+	player1 = Setup_Player(1, 329040, TRACE_ALLIES, 1)
+	player2 = Setup_Player(2, 329041, TRACE_AXIS, 2)
+	player3 = Setup_Player(3, 329041, TRACE_AXIS, 2)
+
+	print ("---------------------------------------------------------------------------------------------")
+	print ("------------------------------------- MISSION 12 STARTED ------------------------------------")
+	print ("---------------------------------------------------------------------------------------------")
+end
+
+function OnGameRestore()
+	player1 = World_GetPlayerAt(1)
+	player2 = World_GetPlayerAt(2)
+	player3 = World_GetPlayerAt(3)
+	
+	-- function takes care of restoring all global mission parameters after a save/load
+	Game_DefaultGameRestore()
+	
+	-- restore the AI settings on reload
+	DOAD_AIPreset()
+end
+
+
+-------------------------------------------------------------------------
+-- [[ ONINIT ]]
+-------------------------------------------------------------------------
+
+function OnInit()
+	
+	g_AIControl_Enable = false
+	g_AIControl_Pause = true
+	
+	--[[ PRESET GAME STATE ]]
+	AutoCinematic(true, 0)
+	
+	--[[ AUDIO SETTINGS ]]
+	DOAD_SetAudio()
+
+	--[[ GLOBAL VARIABLES ]]
+	g_MOBILE_INF_SBPS = {SBP.AXIS.GRENADIER, SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.STORMTROOPER}
+	g_BASE_UNDER_ATTACK = "g_BASE_UNDER_ATTACK"
+	g_AUTOSAVE_DELAY = 10		-- the amount of time to wait before trying to autosave.
+	
+	SBP_AXIS_PANTHER_SP_M12	= BP_GetSquadBlueprint("sbps/races/axis/vehicles/panther_sp_m12_squad.lua")
+	ABILITY_SP_SMOKE_BARRAGE = BP_GetAbilityBlueprint("abilities/sp/sp_m12_ally_mortar_smoke_barrage.lua")
+	
+	-- use default veteran squads if necessary
+	if not Player_HasPersistentSquadFile(player1) then
+		Player_LoadPersistentSquadsFromFile(player1, "data:scenarios/sp/M12_death_of_a_division/default_veteran_squads.lua")
+	end
+
+	--[[ TEMPORARY/DEBUGGING ]]
+	Scar_DebugConsoleExecute("bind([[ALT+2]], [[Scar_DoString('Util_StartNIS(EVENTS.MISSION_COMPLETE)')]])")
+	Scar_DebugConsoleExecute("bind([[ALT+1]], [[Scar_DoString('Util_StartNIS(EVENTS.NIS01)')]])")
+	Scar_DebugConsoleExecute("bind([[ALT+I]], [[Scar_DoString('Util_InvulnerableSelection(true)')]])")
+	Scar_DebugConsoleExecute("bind([[ALT+N]], [[Scar_DoString('Util_InvulnerableSelection(false)')]])")
+	
+	--[[ REGISTER OBJECTIVES ]]
+ 	DOAD_Objective_Register()
+	
+	--[[ MOD INITIAL STATS ]]
+	DOAD_Set_StatMods()
+	
+	--[[ SET RESTRICTIONS ]]
+	DOAD_Restrictions()
+	
+	--[[ SET INITIAL MOOD ]]
+	DOAD_Mood()
+	
+	--[[ SET DIFFICULTY ]]
+	DOAD_Difficulty()
+	
+	--[[ TECH TREE ]]
+	TechTreeSetup()
+	
+	--[[ MISSION PRESETS ]]
+	DOAD_Mission_Preset()
+	DOAD_AIPreset()
+	
+	--[[ GAME START CHECK ]]
+	Rule_Add(DOAD_CheckStart)
+
+end
+
+Scar_AddInit(OnInit)
+
+function DOAD_Objective_Register()
+
+	--[[ *** MUST INITIALIZE THE OBJ TABLE BEFORE REGISTERING *** ]]
+	Initialize_OBJ_DestroyPanthers()
+	Initialize_PreventTankLoss()
+
+end
+
+function DOAD_Set_StatMods()
+	
+	-- mod resource rates
+	player1_resource_modifiers = {
+		
+		RT_Manpower = Modify_PlayerResourceRate(player1, RT_Manpower, 1),
+		RT_Munition = Modify_PlayerResourceRate(player1, RT_Munition, 1),
+		RT_Fuel = Modify_PlayerResourceRate(player1, RT_Fuel, 1)	
+	}
+	
+	g_REPAIR_MODIFIER = Modify_VehicleRepairRate(player1, 3)
+	
+end
+
+function DOAD_Restrictions()
+
+	--[[ UN/RESTRICT UPGRADES ]]
+	Cmd_InstantUpgrade(player1, UPG.ALLIES.GRENADE)
+	Cmd_InstantUpgrade(player1, UPG.ALLIES.SMOKE_SCREEN)
+	Cmd_InstantUpgrade(player2, UPG.ALLIES.SMOKE_SCREEN)
+
+	
+	--[[ RESOURCES 	]]
+--~ 	Player_SetResource(player1, RT_Manpower, 600)				-- now set globally with Util_SetStartingResources after NIS
+--~ 	Player_SetResource(player1, RT_Munition, 300)
+--~ 	Player_SetResource(player1, RT_Fuel, 200)
+	
+	--[[ UN/RESTRICT ABILITIES ]]
+	
+	--[[ UN/RESTRICT POP CAP ]]
+	Player_SetPopCapOverride(player1, 75)
+	
+	--[[ UN/RESTRICT UI ]]
+	
+end
+
+function DOAD_Mood()
+	Player_SetDefaultSquadMoodMode(player1, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player2, MM_Auto)
+	Player_SetDefaultSquadMoodMode(player3, MM_Auto)
+end
+
+
+function DOAD_Difficulty()
+
+	-- get the difficulty
+	g_DIFFICULTY = Game_GetSPDifficulty()
+	
+	-- set health bonus for player 1
+	Setup_Difficulty(player1, g_DIFFICULTY) -- pass the player and difficulty global variable into the Set Health function
+	Setup_Difficulty(player2, g_DIFFICULTY) -- do it for each player that you have defined
+	Setup_Difficulty(player3, g_DIFFICULTY) -- do it for each player that you have defined
+	
+	t_difficulty = {
+		pnthr_upg1  = Util_DifVar( {3, 1, 0, 0} ), 		-- number of panthers that need to be destroyed for the first upgrade
+		pnthr_upg2 	= Util_DifVar( {5, 3, 1, 0} ),		-- number of panthers that need to be destroyed for the 2nd upgrade
+		pnthr_upg3 	= Util_DifVar( {7, 5, 3, 2} ),		-- number of panthers that need to be destroyed for the 3rd upgrade
+	}
+	
+
+end
+
+function DOAD_SetAudio()
+
+	-- default speech path for the mission
+	g_MissionSpeechPath = "Mission12"
+	
+	-- precaching as required by code
+	Sound_PreCacheSinglePlayerSpeech("mission12")
+	
+	-- mute the sound before the NIS plays
+	Util_MuteAmbientSound(true)
+
+end
+
+
+
+
+-------------------------------------------------------------------------
+
+-- [[ MISSION Preset ]]
+
+-------------------------------------------------------------------------
+
+function DOAD_Mission_Preset()
+
+	-- [[ PLAYER'S STARTING UNITS ]]
+	t_player_start_units = {
+		
+		{ sgroup = sg_player_start[1], sbp = SBP.ALLIES.SHERMAN, mkr_sp = mkr_player_start[1], },
+		{ sgroup = sg_player_start[2], sbp = SBP.ALLIES.M10, mkr_sp = mkr_player_start[2], },
+		{ sgroup = sg_player_start[3], sbp = SBP.ALLIES.RIFLEMEN, mkr_sp = mkr_player_start[3], },
+		{ sgroup = sg_player_start[4], sbp = SBP.ALLIES.ENGINEER, mkr_sp = mkr_player_start[4], },
+	}
+
+	for i=1, table.getn(t_player_start_units) do 
+		Util_CreateSquadsAtMarker(player1, 	t_player_start_units[i].sgroup, t_player_start_units[i].sbp, t_player_start_units[i].mkr_sp, 1)
+	end
+	
+	local inf = {
+	
+		-- sbp type, upgrade (if any)
+		{SBP.AXIS.HEAVYMG, nil},						-- 1
+		{SBP.AXIS.SNIPER, nil},							-- 2
+		{SBP.AXIS.SNIPER, nil},							-- 3
+		{SBP.AXIS.HEAVYMG, nil},						-- 4
+		{SBP.AXIS.HEAVYMG, nil},						-- 5
+
+	}
+	
+	--[[ ENEMY STARTING UNITS]]
+	t_ax_inf = {}
+	for i in pairs(inf) do
+		
+		t_ax_inf[i] = 
+		{
+			sgroup = sg_ax_inf[i], 
+			sbp = inf[i][1], 
+			mkr_sp = mkr_axsp_inf[i], 
+			destination = eg_inf[i],
+			upg = inf[i][2],
+			state = 0,
+		}
+	end
+	
+	DOAD_InfSpawn(t_ax_inf)
+	
+	-- spawn a secure structure on the player's starting resource point
+	Util_CreateEntities(player1, eg_temp, EBP.ALLIES.OBSERVATION_POST, EGroup_GetPosition_EVEN_IF_EMPTY(eg_rp2), 1)
+	
+	t_pnthr_autosave = {329353}
+	
+	--[[ AI DATA SETUP]]
+	-- table that the AI will use to determine how much of the map that the AI wants to control
+	-- after each panther is destroyed
+	t_ai_capture ={
+		0.7,
+		0.5,
+		0.3,
+		0.2,
+		0.1,
+		0,
+		0,
+	}
+	
+	-- start AI off with no resources
+	Player_SetResource(player3, RT_Manpower, 200)
+	Player_SetResource(player3, RT_Munition, 100)
+	Player_SetResource(player3, RT_Fuel, 25)
+	
+	--[[ AMBIENT BUILDINGS ]]
+	Util_CreateSquadsAndGarrison(player3, sg_ambient_ai, SBP.AXIS.GRENADIER, eg_ai_ambient1, 1, true)
+	Util_CreateSquadsAndGarrison(player3, sg_ambient_ai, SBP.AXIS.GRENADIER, eg_ai_ambient2, 1, true)
+	
+	Cmd_InstantUpgrade( eg_ai_ambient1, UPG.ALLIES.CONVERT_AMBIENT_BUILDING)
+	Cmd_InstantUpgrade( eg_ai_ambient2, UPG.ALLIES.CONVERT_AMBIENT_BUILDING)
+	
+	-- give the AI a boost in manpower occasionally
+	DOAD_AILimitResources()
+	
+	Cmd_InstantUpgrade(player3, UPG.AXIS.PHASE2)
+	Cmd_InstantUpgrade(player3, UPG.AXIS.PHASE3)
+	Cmd_InstantUpgrade(player3, UPG.AXIS.PHASE4)
+	
+	-- predetermine the AI's commander tree
+	UI_ForceCommanderTreeChoice(player3, UPG.COMMANDER_TREE.AXIS.BLITZKRIEG)
+	
+end
+
+
+function DOAD_AIPreset()
+	
+	--[[ AI ENABLE ]]
+	AI_Enable(player3, true)
+	Util_AI_Setup(player3, {30}, player1, AD_Hard, false, 2, 4, 4)
+	
+	--[[ AI BUILD TABLE ]]
+	t_ai_build_table = {
+		{ SBP.AXIS.STUG, 			10, 2 },
+		{ SBP.AXIS.PUMA, 		0, 	3 },
+		{ SBP.AXIS.PANZER, 			10, 1 },
+		{ SBP.AXIS.OSTWIND, 	0, 	3 },
+		{ SBP.AXIS.HALFTRACK,		0,  5 },
+		{ SBP.AXIS.MORTAR, 			5, 	10},
+		{ SBP.AXIS.PIONEER, 		0, 	5 },
+		{ SBP.AXIS.GRENADIER, 		0, 	3 },
+	}
+
+	AI_SetBuildTable(player3, t_ai_build_table)
+	
+	AI_LockSGroup(player3, sg_ambient_ai)
+	
+	AI_ClearAllBudgetWeight(player3)
+	AI_SetBudgetWeight(player3, "BUDGET_Tech", 50)
+	AI_SetBudgetWeight(player3, "BUDGET_Units", 950)
+	AI_DoString(player3, "s_personality.fallback_percentage = 0.2")
+		
+	AI_EnableComponent(player3, false, COMPONENT_Securing)
+	AI_EnableComponent(player3, false, COMPONENT_BuildStructures)
+
+	AI_DoString( player3, "s_personality.max_percentage_to_capture = 0.8" )
+	AI_DoString( player3, "s_personality.max_num_capturers = 2" )
+	AI_DoString( player3, "s_personality.defensiveness=0.8" )
+	AI_DoString( player3, "s_personality.attack_prefer_threat = true" )
+	AI_DoString( player3, "s_personality.defend_prefer_threat = true" )
+
+end
+
+function DOAD_AILimitResources()
+
+	-- NOTE: AI is NOT getting a boost in resources, because the AI does not have an HQ on this
+	-- map, he is not getting the normal resource rate a player would get on a map this size
+	t_resource_mods = {
+		Modify_PlayerResourceRate(player3, RT_Manpower, 1.25),
+	}
+	
+	-- remove the resource limits after a certain amount of time has passed
+	Rule_AddOneShot(DOAD_AIReleaseResources, 3*60)
+
+end
+
+function DOAD_AIReleaseResources()
+
+	-- remove resource modifier limitations on the AI
+	for i=1, table.getn(t_resource_mods) do 
+		Modifier_Remove(t_resource_mods[i])
+	end
+
+	-- add resource limits after a certain amount of time has passed
+	Rule_AddOneShot(DOAD_AILimitResources, 3*60)
+
+end
+
+-------------------------------------------------------------------------
+
+-- [[ MISSION START ]]
+
+-------------------------------------------------------------------------
+
+
+-- changing the beginning of all the functions to DOAD to remove the mission number
+function DOAD_CheckStart()
+
+	-- play NIS01: Opening Cinematic
+	Util_StartNIS(EVENTS.NIS01)
+	Rule_Add(DOAD_Start)
+	Rule_RemoveMe()
+	
+end
+
+function DOAD_Start()
+	
+	if Event_IsAnyRunning() == false then
+		-- out of cinematic
+--		AutoCinematic(false, 1)
+		Util_SetStartingResources(11)
+	
+		-- delay first objective
+		Rule_AddOneShot(OBJ_DP_AddNewObjDelay, 2)
+		OBJ_FM_DefendersSetup()
+		
+		Rule_AddInterval(Rule_M10TankDestroyerSelected, 1.5)
+--~ 		Rule_AddInterval(Rule_HeavyTankPoolSelected, 2)
+		Rule_AddInterval(Rule_M10sBuild, 10)
+		Rule_AddInterval(DOAD_CheckPlayerFail, 5)
+--~ 		g_AUTOSAVE = 329350
+--~ 		Rule_AddOneShot(DOAD_AutosaveDelay, 10)
+		Rule_RemoveMe()
+	end
+end
+
+
+
+
+
+
+-------------------------------------------------------------
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- PRIMARY OBJECTIVE 1
+-- DESTROY PANTHER TANKS
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The goal of the player is to destroy 80% of all the panthers on the map
+-- The player cannot lose this mission other than dying
+-- The goal of this mission is to set up some interesting AI challenges to 
+--	make it appear as if the tanks are repositioning and moving to counter
+--	the player's actions.
+-------------------------------------------------------------------------
+function Initialize_OBJ_DestroyPanthers()
+
+	OBJ_DestroyPanthers = {
+		
+		SetupUI = function()
+			
+			OBJ_DestroyPanthers.PnthrsMapElementID = {}
+			Objective_SetCounter(OBJ_DestroyPanthers, 0, table.getn(mkr_axsp_pnthr))
+			
+		end,
+		
+		OnStart = function()
+		Util_PlayMusic("SOUND/Music/genericmissionmusic_Legacy", 0, 0)
+							
+			-- add completion check
+			Rule_AddInterval(OBJ_DP_WinConditionCheck, 5)
+			
+			-- updating the pings on the minimap
+			Rule_AddInterval(DOAD_UpdatePnthrMapPing, 5)
+			
+			-- Add logic for controlling the Panther Tanks
+			DOAD_PnthrStart()
+			
+		end,
+		
+		OnComplete = function()
+			
+			-- [[ DIALOGUE ]]
+
+			Rule_RemoveAll() -- Mission is Over
+			OBJ_PTL_Complete()
+			Util_StartNIS(EVENTS.MISSION_COMPLETE)
+
+
+		end,
+		
+		OnFail = function()
+			
+			-- the player can only give up, not fail
+			
+		end,
+		
+		OnSitRep = function()
+		
+		end,
+		
+		Title 				= 329022,
+		Description 		= 329031,
+		Type	 			= OT_Primary,
+		Icon				= IT_P_Attack,
+		PanthersDestroyed 	= 0,
+		CommandRewardAmount	= 1,
+
+		SitRep =
+		{
+			Movie = "SR_12-01",
+			Force = true,
+			SpeechTiming =
+			{
+				{ 0.25, ACTOR.McKay, 323001 },
+				{ 7.1, ACTOR.McKay, 321070 },
+				{ 12.5, ACTOR.McKay, 321080 },
+				{ 17.7, ACTOR.McKay, 321081 },
+			},
+		},
+	}
+	
+	Objective_Register(OBJ_DestroyPanthers)
+
+end
+
+-------------------------------------------------------------------------
+-- [[ Destroy Panthers - Functions ]]
+-------------------------------------------------------------------------
+
+function OBJ_DP_AddNewObjDelay()
+
+	Objective_Start(OBJ_DestroyPanthers, true)
+
+end
+
+function OBJ_DP_WinConditionCheck()
+	
+	-- if all the panther tanks are destroyed, then the player has won!
+	local count = 0
+	
+	for i=1, table.getn(t_pnthr_manager) do 
+		
+		-- state: 2 = dead
+		if t_pnthr_manager[i].state == 2 then
+			count = count + 1
+		end
+	end
+
+	if count == table.getn(t_pnthr_manager) then
+		-- the player has destroyed all the panthers
+		Objective_Complete(OBJ_DestroyPanthers, false)
+		Rule_RemoveMe()
+	end
+	
+end
+
+
+
+-------------------------------------------------------------------------
+
+function DOAD_PnthrStart()
+
+	--------------------------
+	-- PANTHER SPAWNING
+	--------------------------
+	Rule_AddOneShot(DOAD_PnthrSpawnSetup, 1)
+	Rule_AddOneShot(DOAD_PnthrAttackBaseSetup, 4)
+	Rule_AddInterval(DOAD_PnthrCheckState, 5)	
+	
+	--------------------------
+	-- PANTHER AI
+	--------------------------	
+	
+
+end
+
+
+
+-------------------------------------------------------------
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- SETUP PANTHERS AND THE OBJECTIVE MANAGER
+-- this function sets up the manager table for all the panthers
+-- on the map, it is globally used for accessinga  variety of
+-- information about the panthers.
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------------------------------------
+
+function DOAD_PnthrSpawnSetup()
+
+	-- used to store all relevant data regarding the panthers
+	-- and manage their states
+	t_pnthr_manager = {}
+	for i=1, table.getn(mkr_axsp_pnthr) do
+		t_pnthr_manager[i] = 
+		{
+			sgroup 				= sg_ax_pnthr[i], 				-- SGroup container
+			sbp 				= SBP_AXIS_PANTHER_SP_M12,		-- Squad Blue Print
+			mkr_sp 				= mkr_axsp_pnthr[i],			-- marker at which to spawn the panthers
+			mkr_check 			= mkr_pnthr_prox_lg[i], 		-- the location to check to spawn the surrounding units
+			player 				= player2,						-- the player associated with this panther (for adding player color decals)
+			paths 				= {},							-- a table of paths the panther will follow with AI routines (currently not used)
+			rng_mod 			= 1,							-- range modifier
+			state 				= 0, 							-- 0 = not spawned, 1 = spawned, 2 = dead
+			attack_state 		= 0,							-- 0 = idle, 1 = attacking
+			var_attack 			= nil,							-- marker that spawned the attack
+			obj_ui_id 			= nil, 							-- these tables should match, since they are both generated by the same markers
+			inf 				= nil,  						-- associated infantry group (setup below)
+			inf_spawned 		= false,						-- flage to track whether infantry have been spawned
+			mkr_pion 			= mkr_ax_despawn, 				-- a table that points to the various markers that pioneers could be spawned at the repair the pnthrs
+			sg_pion 			= sg_pion[i], 					-- if a pioneer squad is spawned to heal the panther
+			repair_threshold 	= 0.75,							-- threshold at which the tank needs to be before the repairers are spawned
+			rps 				= {}, 							-- resource points the panther is defending
+			bln_apply_ui 		= true,							-- whether or not to apply the UI to the player
+			fnc_spawn 			= function() end,				-- function to call when the player is spawned
+			fnc_check 			= function() end,				-- function to call when the player comes withing a given proximity of the panther
+			fnc_dead 			= function() end,				-- function to call when the panther is dead
+			atk_cue_timer 		= "PNTHR ATTACK TIMER"..i,		-- Attack cue timer for how often to display the attack cue
+			atk_cue_length 		= 45,							-- Attack cue timer length
+			last_position 		= nil,							-- last position of the panther
+			repair_timer		= "PANTHER REPAIR TIMER"..i,	-- timer to track the return of the engineers
+			repair_tmr_length 	= 60,
+			eg_ai 				= eg_ai_military[i],			-- egroup that tells the AI to defend the location of the panther
+		}
+		
+	end
+
+	-- used to spawn each panther that the player interacts with, but depletes the 
+	-- table after going through each iteration.
+	t_pnthr_spawn = {}
+	for i=1, table.getn(t_pnthr_manager) do
+		-- 
+		t_pnthr_spawn[i] = 
+		{
+			id = i,
+			mkr = t_pnthr_manager[i].mkr_check,
+		}
+		
+	end
+	
+	-- updates some variables in the EVENTS table
+	-- that it will need to format text for titlecard
+	
+	EVENTS.total_panthers = table.getn(t_pnthr_manager)
+	EVENTS.panthers_left = EVENTS.total_panthers
+	
+	--------------------------------
+	-- Associated Resource Points --
+	--------------------------------
+	DOAD_ResourcePointSetup()
+	
+	-- this table stores references to another table that manages each of the resource points
+
+	--------------------------------
+	-- Setup associated Functions   --
+	--------------------------------
+
+	-- Panther 1 -- 
+	Pnthr1Train_Setup()
+	t_pnthr_manager[1].fnc_spawn 	= function() Pnthr1Train_Spawn() end
+	t_pnthr_manager[1].fnc_check 	= function() Rule_AddInterval(Pnthr1Train_Check, 3) end
+	t_pnthr_manager[1].fnc_dead 	= function() Rule_Remove(Pnthr1Train_Check) end
+	
+	-- Panther 2 -- 
+	Pnthr2Smoke_Setup()
+	t_pnthr_manager[2].fnc_spawn 	= function() Pnthr2Smoke_Spawn() end
+	t_pnthr_manager[2].fnc_check 	= function() Rule_AddInterval(Pnthr2Smoke_Check, 3) end
+	t_pnthr_manager[2].fnc_dead 	= function() Rule_Remove(Pnthr2Smoke_Check) end
+
+	-- Panther 3 -- 
+	Pnthr3Patrol_Setup()
+	t_pnthr_manager[3].fnc_spawn 	= function() Pnthr3Patrol_Spawn() end
+	t_pnthr_manager[3].fnc_check 	= function() Rule_AddInterval(Pnthr3Patrol_Check, 3) end
+	t_pnthr_manager[3].fnc_dead 	= function() Rule_Remove(Pnthr3Patrol_Check) end
+	
+	-- Panther 4 -- 
+	Pnthr4Goliath_Setup()
+	t_pnthr_manager[4].fnc_spawn 	= function() Pnthr4Goliath_Spawn() end
+	t_pnthr_manager[4].fnc_check 	= function() Rule_AddInterval(Pnthr4Goliath_Check, 3) end
+	t_pnthr_manager[4].fnc_dead 	= function() Rule_Remove(Pnthr4Goliath_Check) end
+	
+	-- Panther 5 -- 
+	Pnthr5Bush_Setup()
+	t_pnthr_manager[5].fnc_spawn 	= function() Pnthr5Bush_Spawn() end
+	t_pnthr_manager[5].fnc_check 	= function() Rule_AddInterval(Pnthr5Bush_Check, 3) end
+	t_pnthr_manager[5].fnc_dead 	= function() Rule_Remove(Pnthr5Bush_Check) end
+	
+	-- Panther 6 -- 
+	Pnthr6WallBust_Setup()
+	t_pnthr_manager[6].fnc_spawn 	= function() Pnthr6WallBust_Spawn() end
+	t_pnthr_manager[6].fnc_check 	= function() Rule_AddInterval(Pnthr6WallBust_Check, 3) end
+	t_pnthr_manager[6].fnc_dead		= function() Rule_Remove(Pnthr6WallBust_Check) end
+		
+	-- Panther 7 -- 
+	Pnthr7Platform_Setup()
+	t_pnthr_manager[7].fnc_spawn 	= function() Pnthr7Platform_Spawn() end
+	t_pnthr_manager[7].fnc_check 	= function() Rule_AddInterval(Pnthr7Platform_Check, 3) end
+	t_pnthr_manager[7].fnc_dead 	= function() Rule_Remove(Pnthr7Platform_Check) end
+		
+	-- used to track which movement actions a given panther 
+	--  has taken in the middle of combat
+	t_pnthr_actions = {}
+	
+	-- add the spawn check
+	Rule_AddInterval(DOAD_PnthrSpawnCheck, 5)
+	
+	-- special function to active the stug if the building or the model is under attack
+	Rule_AddInterval(Pnthr1_VehPremptivelyAttacked, 1.5)
+	
+	-- global values for panthers
+	g_UPGRADE1 = false
+	g_UPGRADE2 = false
+	g_UPGRADE3 = false
+	
+end
+
+
+
+
+
+
+
+
+
+
+
+--------------------------------
+-- SPAWNING FUNCTIONS 
+--------------------------------
+
+function DOAD_PnthrSpawnCheck()
+	
+	-- create a table with all the panther markers in it.
+	-- loop through the table, that stores the original position, as
+	-- each panther is created, it is removed from this table to reduce
+	-- the number of iterations of the loop.
+	for i=table.getn(t_pnthr_spawn), 1, -1 do 
+		
+		if (Prox_ArePlayersNearMarker(player1, t_pnthr_spawn[i].mkr, ANY, 90)) then
+			
+			DOAD_PnthrSpawn(t_pnthr_spawn[i].id)
+			
+			-- remove this pnthr from the list of pnthrs to spawn
+			table.remove(t_pnthr_spawn, i)
+			
+		end
+		
+	end
+	
+	if table.getn(t_pnthr_spawn) == 0 then
+		Rule_RemoveMe()
+	end
+	
+end
+
+function DOAD_PnthrSpawn(pnthr_id, bln_add_action)
+
+	local sgroup = t_pnthr_manager[pnthr_id].sgroup
+	local mkr = t_pnthr_manager[pnthr_id].mkr_sp
+		
+	if SGroup_IsEmpty(sgroup) then
+		Util_CreateSquads( player2, sgroup, t_pnthr_manager[pnthr_id].sbp, mkr)
+		
+		if OBJ_DestroyPanthers.PanthersDestroyed >= t_difficulty.pnthr_upg1 then
+			SGroup_IncreaseVeterancyRank(sgroup, 1, true)
+		end
+		
+		if OBJ_DestroyPanthers.PanthersDestroyed >= t_difficulty.pnthr_upg2 then
+			SGroup_IncreaseVeterancyRank(sgroup, 1, true)
+		end
+		
+		if OBJ_DestroyPanthers.PanthersDestroyed >= t_difficulty.pnthr_upg3 then
+			SGroup_IncreaseVeterancyRank(sgroup, 1, true)
+		end
+		
+	end
+	
+
+	
+	-- modify the weapon range on the tank
+	Modify_WeaponRange(sgroup, "hardpoint_01", t_pnthr_manager[pnthr_id].rng_mod)
+	
+	t_pnthr_manager[pnthr_id].fnc_spawn()
+	t_pnthr_manager[pnthr_id].fnc_check()
+
+	if bln_add_action ~= false then
+		DOAD_PnthrActionAdd(sgroup, pnthr_id)
+	end
+	
+	-- state: 1 = spawned
+	t_pnthr_manager[pnthr_id].state = 1
+	t_pnthr_manager[pnthr_id].last_position = SGroup_GetPosition_EVEN_IF_EMPTY(sgroup)
+	
+	-- rule, add a squad event to give a message when the panther is destroyed
+	Rule_AddSGroupEvent(DOAD_RulePnthrDestroyed, sgroup, GE_SquadKilled)
+		
+end
+
+--------------------------------------------------------------
+-- UTILITY FUNCTIONS FOR INFANTRY SPAWNING AND AI
+--------------------------------------------------------------
+
+function DOAD_InfSpawn(inf_manager)
+
+	for i=1, table.getn(inf_manager) do
+	
+		local sbp = inf_manager[i].sbp
+		if sbp == nil then
+			sbp = Util_RandomInfSBP()
+		end
+	
+		if inf_manager[i].state == 0 then
+			
+			-- mark as spawned
+			inf_manager[i].state = 1
+			
+			-- order the infantry to garrison the nearby building
+			dest = inf_manager[i].destination
+			if dest ~= nil 
+			and EGroup_IsEmpty(dest) == false 
+			and Player_OwnsEGroup(player1, dest) == false then
+				Util_CreateSquadsAtMarker(player2, inf_manager[i].sgroup, sbp, inf_manager[i].mkr_sp, 1)
+				Cmd_Garrison(inf_manager[i].sgroup, dest, true)
+			else
+				Util_CreateSquadsAtMarker(player2, inf_manager[i].sgroup, sbp, inf_manager[i].mkr_sp, 1)
+				if sbp == SBP.AXIS.HEAVYMG then
+					Cmd_InstantSetupTeamWeapon(inf_manager[i].sgroup)
+				end
+			end
+			
+			-- perform upgrades to occur on the particular group of units
+			if (inf_manager[i].upgrade ~= nil) then
+				Cmd_InstantUpgrade(inf_manager[i].sgroup, inf_manager[i].upgrade)
+			end
+		end
+	
+	end
+
+end
+
+-- orders the infantry  within an infantry manager to attack a specific position
+function DOAD_InfAttack(inf_mgr, var)
+	
+	local pos = Util_GetPosition_EVEN_IF_EMPTY(var)
+	
+	for i in pairs(inf_mgr) do
+	
+		local sgroup = inf_mgr[i].sgroup
+		local sbp = inf_mgr[i].sbp
+		
+		if SGroup_IsEmpty(sgroup) == false and SGroup_IsInHoldEntity(sgroup, ALL) == false then
+
+			for k in pairs(g_MOBILE_INF_SBPS) do 
+				if sbp == g_MOBILE_INF_SBPS[k] then
+					
+					print("DOAD_InfAttack: "..SGroup_GetName(sgroup))
+					Cmd_AttackMove(sgroup, pos)
+					break
+				end
+			end
+		end
+		
+	end
+end
+
+-- orders infantry to return to their stationed positions
+function DOAD_InfReposition(inf_manager)
+
+	for i=1, table.getn(inf_manager) do
+		
+		-- order the infantry to garrison the nearby building
+		for k=1, table.getn(g_MOBILE_INF_SBPS) do 
+		
+			local sbp = inf_manager[i].sbp
+			if sbp == g_MOBILE_INF_SBPS[k] then
+				print("DOAD_InfReposition: "..SGroup_GetName(inf_manager[i].sgroup).." regrouping...")
+				Cmd_Move(inf_manager[i].sgroup, inf_manager[i].mkr_sp)
+				break
+			end
+		end
+		
+	end
+
+end
+
+function DOAD_AddInfRetreat(inf_manager)
+
+	if inf_manager == nil then
+		print("DOAD_AddInfRetreat - Fatal Error: Tried to Pass in a nil for Inf Manager")
+		return
+	end
+
+	if t_retreat_mgr == nil then
+		t_retreat_mgr = {}
+	end
+	
+	for i=1, table.getn(inf_manager) do 
+		table.insert( t_retreat_mgr, {
+			sgroup = inf_manager[i].sgroup,
+			egroup = inf_manager[i].destination,
+		})
+	end
+	
+	if Rule_Exists(DOAD_InfRetreat) == false then
+		Rule_AddInterval(DOAD_InfRetreat, 1.72)
+	end
+	
+end
+
+-- orders infantry to retreat to a location and "despawn"
+function DOAD_InfRetreat()
+
+	for i=table.getn(t_retreat_mgr), 1, -1 do 
+		
+		local sgroup = t_retreat_mgr[i].sgroup
+		local egroup = t_retreat_mgr[i].egroup
+		
+		if SGroup_IsEmpty(sgroup) then
+			table.remove(t_retreat_mgr, i)
+		elseif SGroup_IsInHoldEntity(sgroup, ANY)
+		and egroup ~= nil
+		and EGroup_IsEmpty(egroup) == false then
+			print("DOAD_InfRetreat - Exiting Garrisoned Building: "..SGroup_GetName(sgroup))
+			Cmd_Ungarrison(egroup, EGroup_GetPosition_EVEN_IF_EMPTY(egroup))
+		elseif Prox_AreSquadMembersNearMarker(sgroup, Marker_GetPosition(mkr_ax_despawn5), ANY, 10) then
+			print("DOAD_InfRetreat - Infantry At Marker: "..SGroup_GetName(sgroup))
+			SGroup_DestroyAllSquads(sgroup)
+			table.remove(t_retreat_mgr, i)
+		elseif SGroup_IsMoving(sgroup, ANY) == false then
+			print("DOAD_InfRetreat: Retreating: "..SGroup_GetName(sgroup))
+			Cmd_Retreat(sgroup, Marker_GetPosition(mkr_ax_despawn5))
+		end
+		
+	end
+	
+	if table.getn(t_retreat_mgr) <= 0 then
+		Rule_RemoveMe()
+	end
+
+end
+
+
+--------------------------------------------------------------
+-- UTILITY FUNCTIONS FOR VEHICLES SPAWNING & AI
+--------------------------------------------------------------
+
+-- orders vehicles to reposition and face a direction
+function DOAD_VehReposition(veh_manager, mkr)
+	
+	for i in pairs(veh_manager) do
+		
+		local sg = veh_manager[i].sgroup
+		
+		if SGroup_IsEmpty(sg) == false
+		and Player_OwnsSGroup(player2, sg) then		
+			Cmd_Move(sg, veh_manager[i].mkr_sp)
+			DOAD_FallBackFaceAdd(sg, mkr, veh_manager[i].mkr_sp)
+		end
+	end
+
+end
+
+function DOAD_VehSpawn(veh_manager)
+
+	for i=1, table.getn(veh_manager) do
+	
+		local sbp = veh_manager[i].sbp
+		if sbp == nil then
+			sbp = Util_RandomTankSBP()
+		end
+		
+		if veh_manager[i].state == nil and SGroup_IsEmpty(veh_manager[i].sgroup) then
+			Util_CreateSquadsAtMarker( player2, veh_manager[i].sgroup, sbp, veh_manager[i].mkr_sp, 1)
+			-- mark as spawned
+			veh_manager[i].state = 1
+			
+			-- perform upgrades to occur on the particular group of units
+			if (veh_manager[i].upgrade ~= nil) then
+				Cmd_InstantUpgrade(veh_manager[i].sgroup, veh_manager[i].upgrade)
+			end
+		end
+	
+	end
+
+end
+
+
+
+--------------------------
+-- OBJECTIVE UPDATES
+--------------------------
+
+-- the intention of this function is the update the map ping
+-- for any given panther on the mini-map and the tactical map for when
+-- the player sees the Panther. It records the Panther's last known location
+function DOAD_UpdatePnthrMapPing()
+
+	-- check if the player sees the pnther
+	for i in pairs(t_pnthr_manager) do 
+		if SGroup_IsEmpty(t_pnthr_manager[i].sgroup) == false then
+			if Player_CanSeeSGroup(player1, t_pnthr_manager[i].sgroup, ALL) then
+			
+				if t_pnthr_manager[i].spotted == nil then
+					
+					if t_pnthr_manager[i].obj_ui_id ~= nil then
+						Objective_RemoveUIElements(OBJ_DestroyPanthers, t_pnthr_manager[i].obj_ui_id)
+					end
+					t_pnthr_manager[i].obj_ui_id = Objective_AddUIElements(OBJ_DestroyPanthers, t_pnthr_manager[i].sgroup, true, 329030, true, 0.5)
+--~ 					print(t_pnthr_manager[i].obj_ui_id)
+					t_pnthr_manager[i].spotted = true
+				end
+				
+				t_pnthr_manager[i].last_position = Util_GetPosition_EVEN_IF_EMPTY(t_pnthr_manager[i].sgroup)
+				
+			elseif Player_CanSeeSGroup(player1, t_pnthr_manager[i].sgroup, ALL) == false and t_pnthr_manager[i].spotted ~= nil then
+				if g_FIRST_PING_UPDATE == nil then
+					Util_StartIntel(EVENTS.OBJ_DP_LostInFOW)
+					g_FIRST_PING_UPDATE = true
+				end
+				
+				-- update the map pings location
+				if t_pnthr_manager[i].obj_ui_id ~= nil then
+					Objective_RemoveUIElements(OBJ_DestroyPanthers, t_pnthr_manager[i].obj_ui_id)
+				end
+				
+				t_pnthr_manager[i].obj_ui_id = Objective_AddUIElements(OBJ_DestroyPanthers, t_pnthr_manager[i].last_position, true, 329030, false)
+				
+				EventCue_Create(CUE.NORMAL, 329110, 329110, t_pnthr_manager[i].last_position)
+				t_pnthr_manager[i].spotted = nil
+			end
+		end
+	
+	end
+
+end
+
+-- this function checks whether or not a panther has been spawned then killed
+-- and marks that panther as dead when that happens for the objective completion.
+function DOAD_PnthrCheckState()
+
+	-- check every second to see if the panther is alive or not
+	for i=1, table.getn(t_pnthr_manager) do
+	
+		if t_pnthr_manager[i].state == 1 and SGroup_IsEmpty(t_pnthr_manager[i].sgroup) then
+			
+			-- remove the corresponding ping on the tactical map
+			Objective_RemoveUIElements(OBJ_DestroyPanthers, t_pnthr_manager[i].obj_ui_id)
+			
+			-- update the objective counter (can we show a counter on screen?)
+			OBJ_DestroyPanthers.PanthersDestroyed = OBJ_DestroyPanthers.PanthersDestroyed + 1
+			EVENTS.panthers_left = table.getn(t_pnthr_manager) - OBJ_DestroyPanthers.PanthersDestroyed
+			
+			EventCue_Create(CUE.VEHICLE, 329111, 329111, t_pnthr_manager[i].last_position)
+			
+			Objective_SetCounter(OBJ_DestroyPanthers, OBJ_DestroyPanthers.PanthersDestroyed, table.getn(t_pnthr_manager))
+			t_pnthr_manager[i].fnc_dead()
+						
+			-- state: dead = 2
+			t_pnthr_manager[i].state = 2
+			
+			if i ~= 3 then
+				EGroup_DeSpawn(t_pnthr_manager[i].eg_ai)
+			end
+			
+			-- order the infantry around the panther to run away
+			DOAD_AddInfRetreat(t_pnthr_manager[i].inf)
+			
+			-- At various points during the mission, depending on difficulty the Axis panthers will get a vehicle upgrade
+			if OBJ_DestroyPanthers.PanthersDestroyed >= t_difficulty.pnthr_upg1 and g_UPGRADE1 == false then
+				Cmd_InstantUpgrade(player2, UPG.AXIS.VETERANCY.TANK1)
+				Cmd_InstantUpgrade(player3, UPG.AXIS.VETERANCY.TANK1)
+				DOAD_PnthrUpdateRank()
+				g_UPGRADE1 = true
+			end
+			
+			if OBJ_DestroyPanthers.PanthersDestroyed >= t_difficulty.pnthr_upg2 and g_UPGRADE2 == false then
+				Cmd_InstantUpgrade(player2, UPG.AXIS.VETERANCY.TANK2)
+				Cmd_InstantUpgrade(player3, UPG.AXIS.VETERANCY.TANK2)
+				DOAD_PnthrUpdateRank()
+				g_UPGRADE2 = true
+			end
+			
+			if OBJ_DestroyPanthers.PanthersDestroyed >= t_difficulty.pnthr_upg3 and g_UPGRADE3 == false then
+				Cmd_InstantUpgrade(player2, UPG.AXIS.VETERANCY.TANK3)
+				Cmd_InstantUpgrade(player3, UPG.AXIS.VETERANCY.TANK3)
+				DOAD_PnthrUpdateRank()
+				g_UPGRADE3 = true
+			end
+			
+			-- lower the AI's capture percentage for each 
+			if table.getn(t_ai_capture) > 0 then
+				AI_DoString(player3, "s_personality. max_percentage_to_capture = "..t_ai_capture[1] )
+				table.remove(t_ai_capture, 1)
+			end
+				
+			-- At various points during the mission, depending on the number of panthers destroyed the player will be attacked	
+			if OBJ_DestroyPanthers.PanthersDestroyed == 3 then
+				DOAD_PnthrAttackBase()
+				
+				-- autosave when 3rd Panther is killed
+				g_AUTOSAVE = t_pnthr_autosave[1]
+				if Rule_Exists(DOAD_AutosaveDelay) == false then
+					Rule_AddOneShot(DOAD_AutosaveDelay, g_AUTOSAVE_DELAY)
+				end
+			elseif OBJ_DestroyPanthers.PanthersDestroyed == 5 then
+				DOAD_CounterAttackSetup()
+			end
+						
+		end
+				
+	end
+		
+end
+
+-- goes through the list of all panthers and increases their veterancy rank if they are alive
+function DOAD_PnthrUpdateRank()
+
+	-- upgrade each of the panther's individually since they won't take the global upgrade
+	for j in pairs(t_pnthr_manager) do 
+		if SGroup_IsEmpty(t_pnthr_manager[j].sgroup) == false then
+			SGroup_IncreaseVeterancyRank(t_pnthr_manager[j].sgroup, 1, true)
+		end
+	end
+
+end
+
+function DOAD_RulePnthrDestroyed(squad)
+
+	if scartype(squad) == ST_SQUAD then
+		SGroup_Clear(sg_temp)
+		Squad_GetLastAttacker(squad, sg_temp)
+		SGroup_Filter(sg_temp, t_obj_ptl_mgr.sbps, FILTER_KEEP)
+	
+		if SGroup_IsEmpty(sg_temp) == false then
+			Util_StartStinger(EVENTS.OBJ_DP_PnthrDestroyedVeh)
+			return
+		end
+	end 
+		
+	Util_StartStinger(EVENTS.OBJ_DP_PnthrDestroyed)
+	
+end
+
+function DOAD_PnthrAttackCue(pnthr_id)
+
+--~ 	print("Panther Attacking: "..pnthr_id)
+	if Timer_GetRemaining(t_pnthr_manager[pnthr_id].atk_cue_timer) <= 0 
+	and SGroup_IsEmpty(t_pnthr_manager[pnthr_id].sgroup) == false
+	and SGroup_IsUnderAttack(t_pnthr_manager[pnthr_id].sgroup, ANY, 3) then
+		EventCue_Create(CUE.ATTACKED, 329112, 329112, t_pnthr_manager[pnthr_id].sgroup)
+		Util_StartStinger(EVENTS.OBJ_DP_PnthrAttackGeneral)
+		Timer_Start(t_pnthr_manager[pnthr_id].atk_cue_timer, t_pnthr_manager[pnthr_id].atk_cue_length)
+	end
+
+end
+
+
+function DOAD_FirstPnthrAttack(sgroup, pnthr_id)
+
+	SGroup_Filter(sgroup, t_obj_ptl_mgr.sbps, FILTER_KEEP)
+
+	if SGroup_IsEmpty(sgroup) == false then
+		Util_StartStinger(EVENTS.OBJ_DP_PnthrAttackVeh)
+		Rule_AddInterval(DOAD_Rule_PantherTactics, 1)
+	else
+		Util_StartStinger(EVENTS.OBJ_DP_PnthrAttackInf)
+	end
+	
+	EventCue_Create(CUE.ATTACKED, 329112, 329112, t_pnthr_manager[pnthr_id].sgroup)
+	Timer_Start(t_pnthr_manager[pnthr_id].atk_cue_timer, t_pnthr_manager[pnthr_id].atk_cue_length)
+	
+end
+
+
+
+
+
+
+
+
+
+----------------------------------------------------
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- PANTHER AI FUNCTIONS
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+----------------------------------------------------
+
+
+-- orders the panther to reposition at his spawn point
+function DOAD_PnthrReposition(pnthr_id)
+	
+	local pos = Util_GetPosition_EVEN_IF_EMPTY(t_pnthr_manager[pnthr_id].var_attack)
+	local sg = t_pnthr_manager[pnthr_id].sgroup
+	
+	if SGroup_IsEmpty(sg) == false then
+		Cmd_Move(sg, t_pnthr_manager[pnthr_id].mkr_sp)
+		DOAD_FallBackFaceAdd(sg, pos, t_pnthr_manager[pnthr_id].mkr_sp)
+	end
+
+end
+
+
+------------------------------------------------------------
+-- PANTHER ACTIONS
+-- global actions that the panther can take after he has been
+-- attacked
+------------------------------------------------------------
+
+function DOAD_PnthrActionAdd(l_sgroup, pnthr_id)
+	
+	table.insert(t_pnthr_actions,  
+	{
+		id = pnthr_id,
+		sgroup = l_sgroup,
+		under_attack = false,
+		ua_counter = 0,
+	})
+	
+	-- start the rule up if it doesn't exist
+	if Rule_Exists(DOAD_PnthrUnderAttack) == false then
+		Rule_AddInterval(DOAD_PnthrUnderAttack, 2)
+	end
+	
+
+end
+
+function DOAD_PnthrUnderAttack()
+	
+	-- this function checks the whether a panther is under attack, and sets a timer to go off
+	-- in 20 seconds.
+	-- path.  Several checks need to be involved.  We only want the panther to move once per path, and the panther needs to have time 
+	-- to be healed before he tries to move again.
+	for i=table.getn(t_pnthr_actions), 1, -1 do
+		
+		-- used so that I don't have to access the table for every call, and it makes the code faster to read
+		local sg = t_pnthr_actions[i].sgroup
+		local uattack = t_pnthr_actions[i].under_attack
+		local counter = t_pnthr_actions[i].ua_counter
+		
+		-- they the panther has not been attacked, and was recently attacked.  Start the timer.
+		if SGroup_IsEmpty(sg) == false and (SGroup_IsUnderAttack(sg, ANY, 2)) and (uattack == false) then
+			
+			-- boolean flag, and the counter for being under attack
+			t_pnthr_actions[i].under_attack = true
+			t_pnthr_actions[i].ua_counter = 1
+			FOW_RevealSGroupOnly(sg, 5)
+			
+		-- the panther was recently attacked, continued to be attacked, but the "time limit" has not passed, 
+		-- increment the counter
+		elseif SGroup_IsEmpty(sg) == false and (uattack == true) and (counter <= 10) and (SGroup_IsUnderAttack(sg, ANY, 5)) then
+		
+			-- increment the counter for this tank
+			t_pnthr_actions[i].ua_counter = counter + 1
+			FOW_RevealSGroupOnly(sg, 5)
+		
+		-- if the counter reaches the threshold, and the group is still under attack, then 
+		--  perform it's AI routine
+		elseif SGroup_IsEmpty(sg) == false and (uattack == true) and (counter > 10) and SGroup_IsUnderAttack(sg, ANY, 3) then
+		
+			print("Panther"..i..": Get Repaired")
+			DOAD_PnthrRepairAdd(t_pnthr_actions[i].id)
+			
+			-- reset its under attack value			
+			t_pnthr_actions[i].under_attack = false
+			t_pnthr_actions[i].ua_counter = 0
+
+		-- otherwise, if he was under attack, and is no longer under attack,
+		--  reset everything and send in the repair guys if needed.
+		elseif SGroup_IsEmpty(sg) == false and (uattack == true) and SGroup_IsUnderAttack(sg, ANY, 10) == false then
+			-- otherwise reset everything
+			t_pnthr_actions[i].under_attack = false
+			t_pnthr_actions[i].ua_counter = 0
+			-- see if the the tank needs repairs!
+			DOAD_PnthrRepairAdd(t_pnthr_actions[i].id)
+			
+		elseif SGroup_IsEmpty(sg) then
+			table.remove(t_pnthr_actions, i)
+		end
+	end
+	
+	if table.getn(t_pnthr_actions) <= 0 then
+		Rule_RemoveMe()
+	end
+	
+end
+
+-- the intention of this function is to force any vehicle
+-- to face a specific direction once he retreats to the intended 
+-- position.
+function DOAD_FallBackFaceAdd(l_sgroup, position_to_face, prox_mkr)
+
+	if (t_pnthr_fallbk_face == nil) then
+		t_pnthr_fallbk_face = {}
+	end
+	
+	table.insert(t_pnthr_fallbk_face, 
+	{
+		sgroup = l_sgroup,
+		face = position_to_face,
+		mkr_prox = prox_mkr,
+	})
+	
+	if Rule_Exists(DOAD_FallBackFaceCheck) == false then
+		Rule_AddInterval(DOAD_FallBackFaceCheck, 3)
+	end
+
+end
+
+
+function DOAD_FallBackFaceCheck()
+
+	for i=table.getn(t_pnthr_fallbk_face), 1, -1 do
+		
+		local pos = Util_GetPosition_EVEN_IF_EMPTY(t_pnthr_fallbk_face[i].face)
+		local sg = t_pnthr_fallbk_face[i].sgroup
+
+		if SGroup_IsEmpty(sg) then
+			table.remove(t_pnthr_fallbk_face, i)
+		elseif SGroup_IsMoving(sg, ANY) == false 
+		and Prox_AreSquadsNearMarker(sg, t_pnthr_fallbk_face[i].mkr_prox, ALL, 5) == false then
+			Cmd_Move(sg, t_pnthr_fallbk_face[i].mkr_prox)
+		elseif Prox_AreSquadsNearMarker(sg, t_pnthr_fallbk_face[i].mkr_prox, ALL, 5) then
+			SGroup_FacePosition(sg, pos)
+			table.remove(t_pnthr_fallbk_face, i)
+		end
+	end
+	
+	if table.getn(t_pnthr_fallbk_face) <= 0 then
+		Rule_RemoveMe()
+	end
+
+end
+
+
+
+----------------------------------------------------------------------------------------
+-- [[ PANTHER PIONEER REPAIR ROUTINE ]]
+-- the intention of this routine is to 
+-- 1) Spawn a group of pioneers to repair the Panthers at a 
+-- 		predetermined location
+-- 2) After they are done repairing the Panther, then they should
+-- 		return to their spawned location and despawn.
+-- 3) They should not spawn if the Panther is currently under attack.
+-- 4) OPTIONAL TODO: Future enhancement, the player has the opportunity to intercept
+--		the pioneers and kill them which means the Panther can no longer be repaired
+----------------------------------------------------------------------------------------
+
+function DOAD_PnthrRepairAdd(id)
+
+	print("DOAD_PnthrRepairAdd")
+	-- declare the table for use when we need it
+	if t_pnthr_repair == nil then
+		t_pnthr_repair = {}
+	end
+	
+	for i=1, table.getn(t_pnthr_repair) do
+		
+		if t_pnthr_repair[i].id == id then
+			return -- exit function
+		end
+		
+	end
+
+	table.insert(t_pnthr_repair, {
+	
+		sgroup 				= t_pnthr_manager[id].sgroup,
+		id 					= id,
+		
+		-- 0 = repairing, or moving to repair
+		-- 1 = done repairing and going back
+		state 				= 0,
+		
+		-- marker from which to spawn and return pioneers
+		mkr 				= Util_GetClosestMarker(t_pnthr_manager[id].sgroup, t_pnthr_manager[id].mkr_pion),
+		pioneer 			= t_pnthr_manager[id].sg_pion,
+		repair_threshold 	= t_pnthr_manager[id].repair_threshold,
+		timer 				= t_pnthr_manager[id].repair_timer,
+		tmr_length 			= t_pnthr_manager[id].repair_tmr_length,
+	})
+	
+	-- start the rule up if it doesn't exist
+	if Rule_Exists(DOAD_PnthrRepairCheck) == false then
+		Rule_AddInterval(DOAD_PnthrRepairCheck, 5)
+	end
+
+end
+
+function DOAD_PnthrRepairCheck()
+
+
+	for i=table.getn(t_pnthr_repair), 1, -1 do 
+	
+		local panther = t_pnthr_repair[i].sgroup
+		local pioneer = t_pnthr_repair[i].pioneer
+		local threshold = t_pnthr_repair[i].repair_threshold
+		local mkr = t_pnthr_repair[i].mkr
+		
+		-- Determine if panther needs to be repaired
+		-- ************** TODO: Check for major critical hits as well *****************
+		if  SGroup_IsEmpty(panther) == false 			-- panther isn't dead
+		and SGroup_IsEmpty(pioneer) 					-- repair team doesn't exist
+		and SGroup_GetAvgHealth(panther) <= threshold
+		and Timer_GetRemaining(t_pnthr_repair[i].timer) <= 0 then	-- panther is below health threshold
+			DOAD_PnthrRepair(i)
+			Timer_Start(t_pnthr_repair[i].timer, t_pnthr_repair[i].tmr_length)
+		end
+		
+		-- after Panther has been healed send the pioneers away
+		if (SGroup_GetAvgHealth(panther) >= 1 or SGroup_IsEmpty(panther)) 
+		and (SGroup_IsEmpty(pioneer) == false) then
+			
+			if (t_pnthr_repair[i].state == 0) then
+				Cmd_Retreat(pioneer, Marker_GetPosition(mkr))
+				t_pnthr_repair[i].state = 1
+			
+			elseif t_pnthr_repair[i].state == 1
+			and Prox_AreSquadsNearMarker(pioneer, mkr, ALL, 10)
+			and Player_CanSeeSGroup(player1,  pioneer, ANY) == false then
+				SGroup_DestroyAllSquads(pioneer)
+			end
+			
+		end
+		
+		-- if the panther is at the threshold health and the pioneer is gone then remove this item from the table.
+		if (SGroup_GetAvgHealth(panther) >= threshold or SGroup_IsEmpty(panther)) and SGroup_IsEmpty(pioneer) then
+			table.remove(t_pnthr_repair, i)
+		end
+	end
+	
+	-- if table is empty, then remove the rule!
+	if table.getn(t_pnthr_repair) <= 0 then
+		Rule_RemoveMe()
+	end
+
+end
+
+
+-- the id is just the number of the position of the panther in the t_pnthr_manager table
+function DOAD_PnthrRepair(id)
+	
+	local panther = t_pnthr_repair[id].sgroup
+	local mkr = t_pnthr_repair[id].mkr
+	local pioneer = t_pnthr_repair[id].pioneer	
+	
+	-- spawn the pioneers at the location
+	local mkr = World_GetHiddenPositionOnPath(player1, mkr_axsp_fmprox, t_pnthr_repair[id].mkr, CHECK_OFFCAMERA)
+	
+	if mkr == nil then
+		mkr = t_pnthr_repair[id].mkr
+	end
+	
+	Util_CreateSquadsAtMarker( player2, pioneer, SBP.AXIS.PIONEER, mkr, 1)
+	-- order them to repair the pnthr
+	Cmd_Ability( pioneer, ABILITY.REPAIR, panther, nil, true)
+		
+end
+
+
+
+
+
+
+------------------------------------------------------
+-- RECAPTURE CAPTURED RESOURCE POINTS
+------------------------------------------------------
+
+-- 1) check through a list of all the captured rps
+-- if one is captured, figure out which panther "owns" it,
+
+-- 2) The panther is then responsible for sending 
+-- one of its infantry squads to recapture the point.
+-- preferably not a sniper.
+-- 3) The panther accompanies the infantry to take out
+-- any defenses or agressors. 
+-- 4) If the panther is successful, then it returns to its previous 
+-- ambush location.
+
+function DOAD_ResourcePointSetup()
+
+	t_rp_manager = {}
+	for i=1, table.getn(eg_rp) do
+		t_rp_manager[i] = 
+		{
+			rp = eg_rp[i],
+			-- states: 0 = not captured, 1 = capturing crew deployed, 2 = using spawned inf
+			state = 0,
+			time_to_spawn = 300,
+			time_mult = 60,
+			timer_id = "eg_rp"..i,
+			sg_inf = sg_rp_inf[i],
+			attempts = 0,
+			attempts_max = 3,
+			-- TODO: *********** ADD PANTHER OWNERS WHO HELP ATTACK ************* 
+			owner = nil,
+		}
+	end
+	
+	t_rp_attackers = {}
+	for i=1, table.getn(sg_rp_attackers) do 
+		t_rp_attackers[i] = 
+		{
+			sgroup = sg_rp_attackers[i],
+			mkr_sp = mkr_ax_despawn,
+			busy = false,
+			rp_to_capture = nil,
+		}
+	end
+	
+end
+
+
+function DOAD_CheckResourcePoints()
+
+	local eg
+	local inf
+	local inf_mgr
+	local rps_to_attack ={}
+	
+	-- for points that are in the process of being captured
+	-- starting at 3 so that the first 2 rps are ignored
+	for i=table.getn(t_rp_manager), 3, -1 do 
+			
+		eg = t_rp_manager[i].rp
+			
+		if Player_OwnsEGroup(player1, eg) and t_rp_manager[i].attempts < t_rp_manager[i].attempts_max then
+					
+			if t_rp_manager[i].state == 0 -- it is not currently being captured
+			or (t_rp_manager[i].state == 1 and SGroup_IsEmpty(t_rp_manager[i].sg_inf)) then
+				if Timer_Exists(t_rp_manager[i].timer_id) == false then
+					Timer_Start(t_rp_manager[i].timer_id, t_rp_manager[i].time_to_spawn)				
+				elseif Timer_GetRemaining(t_rp_manager[i].timer_id) <= 0 then
+					DOAD_ResourcePointAllocateAttacker(i)
+				end
+			end
+								
+		-- reset the state if the Axis retake the ResourcePoint
+		elseif Player_OwnsEGroup(player2, eg) and (t_rp_manager[i].state == 1) then
+				
+			-- send them to guard a nearby location
+			Util_FallBackToGarrisonBuilding(t_rp_manager[i].sg_inf, 40)
+			
+			t_rp_manager[i].state = 0
+			Timer_End(t_rp_manager[i].timer_id)
+			
+			-- Loop through all the attackers and...
+			for k=1, table.getn(t_rp_attackers) do
+				if t_rp_attackers[k].rp_to_capture == eg then
+					t_rp_attackers[k].rp_to_capture = nil
+				end
+			end -- end for
+		end	-- end 	if
+	end
+	
+end
+
+
+-- this function actually sends the infantry out to capture the resource point
+--  and update the manager.
+function DOAD_ResourcePointInfAttack(mgr_id, sgroup, eg)
+
+		print("RP Capture Started -- Id: "..mgr_id.." EGroup: "..EGroup_GetName(eg).." SGroup: "..SGroup_GetName(sgroup))
+		local timer_id = t_rp_manager[mgr_id].timer_id
+		local attempts = t_rp_manager[mgr_id].attempts
+		
+		period = (attempts * t_rp_manager[mgr_id].time_mult) + t_rp_manager[mgr_id].time_to_spawn
+		
+		t_rp_manager[mgr_id].attempts = attempts + 1
+		if Timer_Exists(timer_id) == false then
+			Timer_Start(timer_id, t_rp_manager[mgr_id].time_to_spawn)
+		else	
+			Timer_Add(timer_id, period)
+		end
+
+		if SGroup_IsInHoldEntity(sgroup, ANY) then
+			EGroup_Clear(eg_temp)
+			EGroup_Add(eg_temp, SGroup_GetGarrisonedBuildingEntity(sgroup))
+			Cmd_Ungarrison(eg_temp, EGroup_GetPosition_EVEN_IF_EMPTY(eg))
+		end
+				
+		Cmd_AttackMoveThenCapture(sgroup, eg, false)
+		
+		t_rp_manager[mgr_id].sg_inf = sgroup
+		t_rp_manager[mgr_id].state = 1
+		
+end
+
+function DOAD_ResourcePointAllocateAttacker(mgr_id)
+	-- the intention of this function is to loop through a table and 
+	-- spawn some infantry at points at the edge of the map
+	-- that will try to recapture the resource points
+	-- these are meant to be back ups to the on-map infantry
+	-- duplication may occur with the on-map-infantry due to the timer.
+	local eg = t_rp_manager[mgr_id].rp
+	
+	for k=1, table.getn(t_rp_attackers) do 
+		
+		if SGroup_IsEmpty(t_rp_attackers[k].sgroup) then
+			
+			local mkr = Util_GetClosestMarker(eg, t_rp_attackers[k].mkr_sp)
+			Util_CreateSquadsAtMarker(player2, t_rp_attackers[k].sgroup, Util_RandomInfSBP(), mkr, 1)
+			Util_GrantRandomUpgrade(t_rp_attackers[k].sgroup)
+			DOAD_ResourcePointInfAttack(mgr_id, t_rp_attackers[k].sgroup, eg)
+			t_rp_attackers[k].rp_to_capture = eg
+			break -- only send one group of infantry per RP
+			
+		elseif SGroup_IsEmpty(t_rp_attackers[k].sgroup) == false and t_rp_attackers[k].rp_to_capture == nil then
+		
+			t_rp_attackers[k].rp_to_capture = eg
+			DOAD_ResourcePointInfAttack(mgr_id, t_rp_attackers[k].sgroup, eg)
+			break -- only send one group of infantry per RP
+			
+		end
+	end
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---------------------------------------------------------------------
+--
+--  [[ PLAYER BASE ATTACK ]]
+--  Sends a group of units to attack the player's base.
+--   
+---------------------------------------------------------------------
+
+--~ 1) Determine when to attack 
+--~ 2) Spawn the atackers
+--~ 3) Go for it
+
+function DOAD_PnthrAttackBaseSetup()
+	
+	t_base_attackers = {}
+	t_base_attackers = 
+	{
+		t_sgroup = sg_ax_baseatk,
+		inf = {SBP.AXIS.GRENADIER, SBP.AXIS.VOLKSGRENADIER},
+		-- modify this number to modify the chance of an upgrade
+		-- 0 to X (0-3 = 25%)
+		inf_upg = 2,
+		t_mkr = mkr_axsp_baseatk,
+		paths = path_baseatk,
+	}
+
+
+end
+
+function DOAD_PnthrAttackBase()
+
+	-- spawn attackers
+	local rand = World_GetRand(1, table.getn(mkr_axsp_baseatk))
+	local sg = t_base_attackers.t_sgroup[rand]
+	local mkr = t_base_attackers.t_mkr[rand]
+	local path = t_base_attackers.paths[rand]
+	local sbp
+	local upg = 0
+	
+	for i=1, table.getn(sg) do
+	
+		-- get a random tank for the first spot
+		if i==1 then
+			sbp = Util_RandomTankSBP()
+		-- otherwise get some generic infantry and a random upgrade
+		else
+			rand = World_GetRand(1, table.getn(t_base_attackers.inf))
+			sbp = t_base_attackers.inf[rand]
+			upg = World_GetRand(0, t_base_attackers.inf_upg)
+		end
+		
+		local orig = Util_GetClosestMarker(mkr[i], mkr_face)
+		local pos = World_GetHiddenPositionOnPath(player1, orig,  mkr[i], CHECK_OFFCAMERA)
+		
+		if pos == nil then
+			pos =  mkr[i]
+		end		
+		
+		Util_CreateSquadsAtMarker(player2, sg[i], sbp, mkr[i], 1)
+		if upg ~= 0 then
+			Util_GrantRandomUpgrade(sg[i])
+		end
+		Cmd_SquadPath( sg[i], path, true, false, true, 0)
+	
+	end
+
+end
+
+function DOAD_Rule_PantherTactics()
+	
+	if Event_IsAnyRunning() == false then
+		Util_StartIntel(EVENTS.OBJ_DP_PantherTactics)
+		Rule_RemoveMe()
+	end
+
+end
+
+
+---------------------------------------------------------------------
+--
+--  [[ PANTHER COUNTERATTACK ]]
+--  After the player has defeated X number of panthers,
+-- 	the goal of this set of functions is for the 
+--   
+---------------------------------------------------------------------
+
+function DOAD_CounterAttackSetup()
+
+	g_COUNTERATTACK = true
+
+	-- first spawn the remaining two panthers
+	for i=table.getn(t_pnthr_spawn), 1, -1 do 
+		DOAD_PnthrSpawn(t_pnthr_spawn[i].id, false)
+		table.remove(t_pnthr_spawn, i)
+	end
+	
+	for i=1, table.getn(t_pnthr_manager) do 
+		if SGroup_IsEmpty(t_pnthr_manager[i].sgroup) == false then
+			Modify_UnitSpeed(t_pnthr_manager[i].sgroup, 0.5)
+		end
+	end
+	
+	-- special case code for PNTHR 6 - WALL BUST
+	if pnthr_wall_bust_speed == nil and SGroup_IsEmpty(t_pnthr_manager[5].sgroup) == false then
+		--make the panther appear in the building
+		Cmd_Ability(t_pnthr_manager[6].sgroup, ABILITY.AXIS.CAMOUFLAGE, nil, nil, true)
+		pnthr_wall_bust_speed = 1
+	end
+	
+	-- special case code for PNTHR 5 - BUSH ATTACK
+	if g_PNTHR5_FIRST == nil and SGroup_IsEmpty(t_pnthr_manager[5].sgroup) == false then
+		-- make the panther appear, but only toggle the ability on this first time.
+		Cmd_Ability(t_pnthr_manager[5].sgroup, ABILITY.AXIS.CAMOUFLAGE, nil, nil, true)
+		g_PNTHR5_FIRST = false
+	end
+
+	t_cntr_attack = {}
+	for i in pairs(t_pnthr_manager) do
+		if t_pnthr_manager[i].state ~= 2 then
+			table.insert(t_cntr_attack, {
+				id 			= i,
+				target 		= nil,
+				sg_attack 	= nil,
+				time_wait	= 1*60,
+			})
+		end
+	end
+	
+	sg_ct_attack = SGroup_CreateTable("sg_ct_attack%d", table.getn(t_cntr_attack))
+	
+	for i in pairs(t_cntr_attack) do
+		t_cntr_attack[i].sg_attack = sg_ct_attack[i]
+	end
+	
+	-- spawn support vehicles
+	local sbps = {
+		SBP.AXIS.PANZER,
+		SBP.AXIS.PANZER,
+		SBP.AXIS.PUMA,
+		SBP.AXIS.PUMA,
+	}
+	
+	-- get all of the available player2 units on the map
+	SGroup_Clear(sg_temp)
+	Player_GetAll(player2, sg_temp)
+	
+	-- spawn additional support for the player
+	for i=1, table.getn(sbps) do
+	
+		local index
+		local mkr
+
+		if math.mod(i, 2) == 0 then
+			index = 1
+			mkr = mkr_ax_despawn2
+		else
+			index = 2
+			mkr = mkr_ax_despawn5
+		end
+		
+		local orig = Util_GetClosestMarker(mkr, mkr_face)
+		local pos = World_GetHiddenPositionOnPath(player1, orig, mkr, CHECK_OFFCAMERA)
+		
+		if pos == nil then
+			pos = mkr
+		end
+		
+		Util_CreateSquadsAtMarkerFacing(player2, t_cntr_attack[index].sg_attack, sbps[i], pos, mkr_hq_rally_point, 1)
+	end
+	
+	-- filter out the unwanted squad types
+	SGroup_Filter(sg_temp, SBP.AXIS.HEAVYMG, FILTER_REMOVE)
+	SGroup_Filter(sg_temp, SBP.AXIS.PAK_38, FILTER_REMOVE)
+	SGroup_Filter(sg_temp, SBP.AXIS.GOLIATH, FILTER_REMOVE)
+	
+	-- we are under the assumption at this point that the 
+	-- counter attack will not involve more than two groups or two panthers
+	for i=1, SGroup_CountSpawned(sg_temp) do
+		if math.mod(i, 2) == 0 then
+			SGroup_Add(t_cntr_attack[1].sg_attack, SGroup_GetSpawnedSquadAt(sg_temp, i))
+		else
+			SGroup_Add(t_cntr_attack[2].sg_attack, SGroup_GetSpawnedSquadAt(sg_temp, i))
+		end
+	end
+
+	-- first find the largest concentration of the player's forces in a given territory.
+	-- send one panther after them
+	for i=1, table.getn(eg_rp_sector) do 
+		Player_GetAllSquadsNearMarker(player1, sg_temp, eg_rp_sector[i])
+		
+		if SGroup_CountSpawned(sg_temp) > SGroup_CountSpawned(sg_ct_target) then
+			SGroup_Clear(sg_ct_target)
+			SGroup_AddGroup(sg_ct_target, sg_temp)
+		end
+	end
+	
+	-- if the player's HQ is dead, then
+	-- check to see if the player has created an ambient HQ somewhere
+	if EGroup_IsEmpty(eg_player_hq) then
+		Player_GetAll(player1, eg_ct_target)
+	else
+		eg_ct_target = eg_player_hq
+	end
+	
+
+	for i in pairs(t_cntr_attack) do 
+		if i == 1 then
+			t_cntr_attack[i].target = sg_ct_target
+		else
+			t_cntr_attack[i].target = eg_ct_target
+		end
+	end
+	
+	Rule_AddOneShot(DOAD_CounterAttackStart, t_cntr_attack[1].time_wait)
+	Rule_Remove(DOAD_PnthrUnderAttack)
+	Rule_Remove(Util_UnderAttackCheck)
+
+end
+
+-- order the units to begin the counter attack
+function DOAD_CounterAttackStart()
+	
+	for i in pairs(t_cntr_attack) do 
+		Cmd_AttackMove(t_cntr_attack[i].sg_attack, Util_GetPosition_EVEN_IF_EMPTY(t_cntr_attack[i].target))
+	end
+	
+	Rule_AddInterval(DOAD_CounterAttackCheck, 7)
+	
+	-- force the AI to attack the player as well
+	AI_ForceAttack(player3, player1)
+
+
+end
+
+-- this function checks to make sure the counterattack is seeking out the player
+-- especially if he countinues to move or dies, etc.
+function DOAD_CounterAttackCheck()
+
+	for i in pairs(t_cntr_attack) do
+	
+		local sgroup = t_cntr_attack[i].sg_attack
+		local target = t_cntr_attack[i].target
+		if (scartype(target) == ST_EGROUP and EGroup_IsEmpty(target)) 
+		or (scartype(target) == ST_SGROUP and SGroup_IsEmpty(target)) then
+			EGroup_Clear(eg_temp)
+			Player_GetAll(player1, eg_temp)
+			t_cntr_attack[i].target = eg_ct_target
+			EGroup_AddEGroup(eg_ct_target, eg_temp)
+		end
+			
+		if SGroup_IsEmpty(sgroup) == false 
+		and SGroup_IsMoving(sgroup, ANY) == false 
+		and SGroup_IsUnderAttack(sgroup, ANY, 10) == false then
+			Cmd_Stop(sgroup)
+			Cmd_AttackMove(sgroup, Util_GetPosition_EVEN_IF_EMPTY(t_cntr_attack[i].target))
+		end
+			
+	end
+
+end
+
+
+
+
+
+
+
+---------------------------------------------------------------------
+--
+--  [[ PANTHER 1 - TRAIN DEPOT PANTHER ]]
+--  Panther guards the train depot.  As the player approaches the area, he 
+--  performs a pincer movement on the player to destroy him.
+--   
+---------------------------------------------------------------------
+
+function Pnthr1Train_Setup()
+	
+	-- SPECIFIC TO PANTHER
+	t_pnthr_manager[1].var_attack = mkr_pnthr1_attack1
+	
+	t_pnthr1_def_mgr = {
+		sgroup = t_pnthr_manager[1].sgroup,					-- an sgroup to check
+		counter = -1,					-- the counter to iterate a number of checks
+		counter_max = 5,				-- the max number of times to check
+		fnc_ai_routine = function() Pnthr1_UnderAttack() end,	-- a function to call when the max number of checks is reached
+		fnc_reset = function() Pnthr1_Reset() end,		-- a function to call to tell the sgroup what to do when not being attacked
+	}
+	
+	g_PNTHR1_TRAP_TRIGGERED = false
+	
+	-- VEHICLES
+	t_pnthr1_veh = {}
+	for i in pairs(sg_pnthr[1].veh) do
+		t_pnthr1_veh[i] = {
+			sgroup = sg_pnthr[1].veh[i],
+			sbp = SBP.AXIS.OSTWIND,
+			mkr_sp = mkr_pnthr[1].veh[i],
+			mkr_escape = mkr_pnthr[1].escape[i],
+			
+			-- under Attack variables
+			counter = -1,					-- the counter to iterate a number of checks
+			counter_max = 3,				-- the max number of times to check
+			fnc_ai_routine = function() Pnthr1_VehUnderAttack() end,	-- a function to call when the max number of checks is reached
+			fnc_reset = function() Pnthr1_Reset() end,		-- a function to call to tell the sgroup what to do when not being attacked	
+		}
+	end
+	-- special unit that already is on the map
+	t_pnthr1_veh[1].sgroup = sg_pnthr1_stug
+
+	-- hide the minimap icon for the stug in the railyard before the mission starts
+	SGroup_EnableMinimapIndicator(t_pnthr1_veh[1].sgroup, false)
+	SGroup_SetInvulnerable(t_pnthr1_veh[1].sgroup, true)
+	
+	-- INFANTRY
+	local inf = 
+	{
+		-- type of unit, upgrades
+		{ SBP.AXIS.HEAVYMG, nil},
+		{ SBP.AXIS.GRENADIER, UPG.AXIS.PANZERSCHRECK},
+		{ SBP.AXIS.HEAVYMG, nil},
+	}
+	
+	t_pnthr1_inf = {}
+	for i in pairs(inf) do
+		t_pnthr1_inf[i] = 
+		{
+			sgroup = sg_pnthr[1].inf[i],
+			mkr_sp = mkr_pnthr[1].inf[i],
+			sbp = inf[i][1],
+			upgrade = inf[i][2],
+			-- state: 0 = empty, 1 = spawned, 2 = dead,
+			state = 0,
+			destination = eg_pnthr[1].inf[i],
+		}
+	end
+	
+	t_pnthr_manager[1].inf = t_pnthr1_inf
+	
+end
+
+function Pnthr1Train_Spawn()
+	
+	DOAD_VehSpawn(t_pnthr1_veh)
+	Pnthr1_AddUnderAttack()
+	
+end
+
+function Pnthr1Train_Check()
+	
+	local mkr = t_pnthr_manager[1].var_attack
+	-- order the enemy to continue and press its attack until everyone is dead.
+	Player_GetAllSquadsNearMarker(player1, sg_temp, mkr)
+	SGroup_Filter(sg_temp, SBP.ALLIES.SNIPER, FILTER_REMOVE)
+	
+	if SGroup_IsEmpty(sg_temp) == false then
+		
+		if g_PNTHR1_TRAP_TRIGGERED == false then
+
+			Util_RemoveUnderAttackItem(t_pnthr1_def_mgr)
+			for i in pairs(t_pnthr1_veh) do 
+				Util_RemoveUnderAttackItem(t_pnthr1_veh[i])
+			end
+			g_PNTHR1_TRAP_TRIGGERED = true
+			
+			SGroup_SetPlayerOwner(t_pnthr1_veh[1].sgroup, player2)
+			Rule_Remove(Pnthr1_VehPremptivelyAttacked)
+			SGroup_EnableMinimapIndicator(t_pnthr1_veh[1].sgroup, true)
+			SGroup_SetInvulnerable(t_pnthr1_veh[1].sgroup, false)
+			
+			-- [[ DIALOGUE ]]
+			DOAD_FirstPnthrAttack(sg_temp, 1)
+			
+		else
+			DOAD_PnthrAttackCue(1)
+		end
+		
+		Pnthr1_Attack(mkr)
+	
+	elseif t_pnthr_manager[1].attack_state == 1 then
+		Pnthr1_Reset()
+	end
+	
+end
+
+function Pnthr1_UnderAttack()
+
+--~ 	SGroup_Clear(sg_temp)
+--~ 	SGroup_GetLastAttacker(t_pnthr_manager[1].sgroup, sg_temp)
+--~ 	Pnthr1_Attack(sg_temp)
+	Cmd_Move(t_pnthr_manager[1].sgroup, mkr_pnthr1_escape1)
+	DOAD_FallBackFaceAdd(t_pnthr_manager[1].sgroup, t_pnthr_manager[1].var_attack, mkr_pnthr1_escape1)
+	
+end
+
+function Pnthr1_VehUnderAttack()
+
+	SGroup_SetInvulnerable(t_pnthr1_veh[1].sgroup, false)
+
+	for i in pairs(t_pnthr1_veh) do
+		-- the counter should be 1 or higher if this function has been called
+		-- but since not all tanks may be attacked, it is a way to filter the
+		-- one being attacked out.
+		local sg = t_pnthr1_veh[i].sgroup
+		if t_pnthr1_veh[i].counter > 0 and SGroup_IsEmpty(sg) == false then
+			
+			if i == 1 then
+				SGroup_SetPlayerOwner(t_pnthr1_veh[i].sgroup, player2)
+				Cmd_SquadPath(sg, "path_pnthr1_veh1", true, false, false, 0)
+			else
+				Cmd_Move(sg, t_pnthr1_veh[i].mkr_escape)
+			end
+			
+			DOAD_FallBackFaceAdd(sg, t_pnthr_manager[1].var_attack, t_pnthr1_veh[i].mkr_escape)		
+		end
+	end
+	
+	
+end
+
+function Pnthr1_Attack(var)
+	
+	local mkr = Util_GetPosition_EVEN_IF_EMPTY(var)
+	-- order panther to attack
+	
+	Cmd_AttackMove(t_pnthr_manager[1].sgroup, mkr)
+	DOAD_InfSpawn(t_pnthr1_inf)	
+	
+	-- order vehicles to attack
+	Cmd_SquadPath(t_pnthr1_veh[1].sgroup, "path_pnthr1_veh1", true, false, true, 0)
+	Cmd_SquadPath(t_pnthr1_veh[2].sgroup, "path_pnthr1_veh2", true, false, true, 0)
+	
+	t_pnthr_manager[1].attack_state = 1
+
+end
+
+function Pnthr1_Reset()
+	t_pnthr_manager[1].attack_state = 0
+	DOAD_InfReposition(t_pnthr1_inf)
+	DOAD_VehReposition(t_pnthr1_veh, t_pnthr_manager[1].var_attack)
+	DOAD_PnthrReposition(1)
+	Pnthr1_AddUnderAttack()
+	Rule_Remove(Pnthr1Train_Check)
+end
+
+
+function Pnthr1_AddUnderAttack()
+	
+	g_PNTHR1_TRAP_TRIGGERED = false
+	-- start checking to see if any of them are under attack
+	Util_AddUnderAttackItem(t_pnthr1_def_mgr)
+	for i in pairs(t_pnthr1_veh) do 
+		Util_AddUnderAttackItem(t_pnthr1_veh[i])
+	end
+	
+end
+
+function Pnthr1_VehPremptivelyAttacked()
+
+	if (SGroup_IsEmpty(sg_pnthr1_stug) == false and SGroup_IsUnderAttack(sg_pnthr1_stug, ANY, 10)) 
+	or (EGroup_IsEmpty(eg_pnthr1_veh1) == false and EGroup_IsUnderAttack(eg_pnthr1_veh1, ANY, 10)) then
+		t_pnthr1_veh[1].counter = 1
+		Pnthr1_VehUnderAttack()
+		Rule_RemoveMe()
+	end
+
+end
+
+
+
+
+
+
+---------------------------------------------------------------------
+--
+--  [[ PANTHER 2 - SMOKE GRENADES ]]
+--  Panther guards the train depot.  As the player approaches the area, he 
+--  performs a pincer movement on the player to destroy him.
+--   
+---------------------------------------------------------------------
+
+function Pnthr2Smoke_Setup()
+	
+	-- SPECIAL PANTHER TRACKING
+	t_pnthr_manager[2].var_attack =	mkr_pnthr2_attack1
+	g_PNTHR2_SMOKE_STATE = 0
+	g_PNTHR2_UNDER_ATTACK = false
+	
+	t_pnthr2_def_mgr = {
+		sgroup = t_pnthr_manager[2].sgroup,		-- an sgroup to check
+		counter = -1,							-- the counter to iterate a number of checks
+		counter_max = 2,						-- the max number of times to check
+		fnc_ai_routine = function() Pnthr2_UnderAttack() end,	-- a function to call when the max number of checks is reached
+		fnc_reset = function() Pnthr2_Reset() end,		-- a function to call to tell the sgroup what to do when not being attacked
+	}
+	
+	-- VEHICLES
+	t_pnthr2_veh = {}
+	for i in pairs(sg_pnthr[2].veh) do
+		t_pnthr2_veh[i] = {
+			sgroup = sg_pnthr[2].veh[i],
+			sbp = SBP.AXIS.PANZER,
+			mkr_sp = mkr_pnthr[2].veh[i],
+			mkr_escape = mkr_pnthr[2].escape[i],
+			
+			-- under attack values
+			counter = -1,					-- the counter to iterate a number of checks
+			counter_max = 2,				-- the max number of times to check
+			fnc_ai_routine = function() Pnthr2_VehUnderAttack() end,	-- a function to call when the max number of checks is reached
+			fnc_reset = function() Pnthr2_Reset() end,		-- a function to call to tell the sgroup what to do when not being attacked	
+		}
+	end
+	
+	-- INFANTRY
+	local inf = 
+	{
+		-- type of unit, upgrades
+		{ SBP.AXIS.HEAVYMG, nil},
+		{ SBP.AXIS.HEAVYMG, nil},
+	}
+	
+	t_pnthr2_inf = {}
+	for i in pairs(inf) do
+		t_pnthr2_inf[i] = 
+		{
+			sgroup = sg_pnthr[2].inf[i],
+			mkr_sp = mkr_pnthr[2].inf[i],
+			sbp = inf[i][1],
+			upgrade = inf[i][2],
+			-- state: 0 = empty, 1 = spawned, 2 = dead,
+			state = 0,
+			destination = eg_pnthr[2].inf[i],
+		}
+	end
+	
+	t_pnthr_manager[2].inf = t_pnthr2_inf
+	
+end
+
+function Pnthr2Smoke_Spawn()
+
+	DOAD_VehSpawn(t_pnthr2_veh)
+	Pnthr2_AddUnderAttack()
+	
+end
+
+function Pnthr2Smoke_Check()
+
+	local mkr = Util_GetPosition_EVEN_IF_EMPTY(t_pnthr_manager[2].var_attack)
+	
+	if SGroup_IsEmpty(t_pnthr_manager[2].sgroup) then
+		Rule_RemoveMe()
+		return
+	end
+	
+	Player_GetAllSquadsNearMarker(player1, sg_temp, mkr, 30)
+	SGroup_Filter(sg_temp, SBP.ALLIES.SNIPER, FILTER_REMOVE)
+	
+	if SGroup_IsEmpty(sg_temp) == false then
+		
+		if g_PNTHR2_SMOKE_STATE == 0 then
+			print("Smoke Bombs Go!")
+			
+			for i=1, 4 do
+				Cmd_Ability(player2, ABILITY_SP_SMOKE_BARRAGE, Util_GetPosition_EVEN_IF_EMPTY(mkr_pnthr2_smoke[i]))
+			end
+			
+			-- [[ DIALOGUE ]]
+			-- special case dialogue for this panther
+			Util_StartIntel(EVENTS.OBJ_DP_EncounterPnthr2)
+			EventCue_Create(CUE.ATTACKED, 329112, 329112, t_pnthr_manager[2].sgroup)
+			
+			g_PNTHR2_SMOKE_STATE = 1
+		else
+			DOAD_PnthrAttackCue(2)
+		end
+		
+		if g_PNTHR2_UNDER_ATTACK == false then
+			Util_RemoveUnderAttackItem(t_pnthr2_def_mgr)
+			for i in pairs(t_pnthr2_veh) do 
+				Util_RemoveUnderAttackItem(t_pnthr2_veh[i])
+			end
+			g_PNTHR2_UNDER_ATTACK = true
+		end
+		
+		if Rule_Exists(Pnthr2Smoke_Attack) == false then
+			Rule_AddOneShot(Pnthr2Smoke_Attack, 5)
+		end
+
+		t_pnthr_manager[2].attack_state = 1
+		
+	elseif t_pnthr_manager[2].attack_state == 1 then
+		Pnthr2_Reset()
+	end
+
+end
+
+function Pnthr2Smoke_Attack()
+
+	local mkr = mkr_pnthr2_attack1
+	-- order panther to attack
+	Cmd_AttackMove(t_pnthr_manager[2].sgroup, mkr)
+	
+	-- order vehicles to attack
+	Cmd_SquadPath(t_pnthr2_veh[2].sgroup, "path_pnthr2_veh2", true, false, true, 0)
+	Cmd_AttackMove(t_pnthr2_veh[1].sgroup, mkr)
+	
+	local rand = World_GetRand(1,2)
+	EventCue_Create(CUE.ATTACKED, 329104, 329104, t_pnthr2_veh[rand].sgroup)
+	FOW_RevealSGroup(t_pnthr2_veh[rand].sgroup, 10)
+	
+	-- order infantry to spawn and garrison buildings
+	DOAD_InfSpawn(t_pnthr2_inf)
+
+end
+
+
+function Pnthr2_UnderAttack()
+
+	Cmd_Move(t_pnthr_manager[2].sgroup, mkr_pnthr2_escape3)
+	DOAD_FallBackFaceAdd(t_pnthr_manager[2].sgroup, t_pnthr_manager[2].var_attack, mkr_pnthr2_escape3)
+	
+end
+
+function Pnthr2_VehUnderAttack()
+
+	for i in pairs(t_pnthr2_veh) do
+		-- the counter should be 1 or higher if this function has been called
+		-- but since not all tanks may be attacked, it is a way to filter the
+		-- one being attacked out.
+		local sg = t_pnthr2_veh[i].sgroup
+		if t_pnthr2_veh[i].counter > 0 and SGroup_IsEmpty(sg) == false then
+			Cmd_Move(sg, t_pnthr2_veh[i].mkr_escape)
+			DOAD_FallBackFaceAdd(sg, t_pnthr_manager[2].var_attack, t_pnthr2_veh[i].mkr_escape)		
+		end
+	end
+	
+	
+end
+
+function Pnthr2_Reset()
+	t_pnthr_manager[2].attack_state = 0
+	DOAD_InfReposition(t_pnthr2_inf)
+	DOAD_VehReposition(t_pnthr2_veh, t_pnthr_manager[2].var_attack)
+	DOAD_PnthrReposition(2)
+	Pnthr2_AddUnderAttack()
+
+end
+
+function Pnthr2_AddUnderAttack()
+	-- start checking to see if any of them are under attack
+	Util_AddUnderAttackItem(t_pnthr2_def_mgr)
+	for i in pairs(t_pnthr2_veh) do 
+		Util_AddUnderAttackItem(t_pnthr2_veh[i])
+	end
+	g_PNTHR2_UNDER_ATTACK = false
+
+end
+
+
+
+---------------------------------------------------------------------
+--
+--  [[ PANTHER 3 - PATROLLING PANTHER ]]
+--  Panther roves around the map to attack the player and his various RPs.
+--   
+---------------------------------------------------------------------
+
+-- 1) Spawn the Panther and support units at beginning of map
+-- 2) Choose a random path
+-- 3) Panther follows the path once, when he reaches the end
+-- 4) He chooses a new path and keeps going
+
+function Pnthr3Patrol_Setup()
+
+	t_pnthr_patrol_mgr = 
+	{
+		sgroups = sg_pnthr_patrol,
+		sbp = {SBP.AXIS.STUG, SBP.AXIS.PANZER, SBP.AXIS.STORMTROOPER},
+		paths = {"path_pnthr3_patrol_1"},
+		mkr_sp = t_pnthr_manager[3].mkr_sp,
+		path_current = nil,
+		mkr_current = nil,
+		wait = 5,
+	}
+	
+	g_PNTHR3_FIRST_CONTACT = nil
+	
+	---------------------------------------------------
+	-- special case stuff for the panther #3
+	---------------------------------------------------
+	table.insert(t_pnthr_patrol_mgr.sgroups, t_pnthr_manager[3].sgroup) -- specifially adding the 3rd Panther
+	
+	
+end
+
+function Pnthr3Patrol_Spawn()
+	
+	local flak = false
+	
+	for i=1, table.getn(t_pnthr_patrol_mgr.sgroups) do
+		
+		local rand = World_GetRand(1, table.getn(t_pnthr_patrol_mgr.sbp))
+		local sbp = t_pnthr_patrol_mgr.sbp[rand]
+				
+		-- if the sgroup matches the 3rd panther, then...
+		if t_pnthr_manager[3].sgroup == t_pnthr_patrol_mgr.sgroups[i] then
+			if SGroup_IsEmpty(t_pnthr_manager[3].sgroup) then
+				DOAD_PnthrSpawn(3)
+			end
+		else
+			
+			local orig = Util_GetClosestMarker(t_pnthr_patrol_mgr.mkr_sp, mkr_face)
+			local pos = World_GetHiddenPositionOnPath(player1, orig,  t_pnthr_patrol_mgr.mkr_sp, CHECK_OFFCAMERA)
+			
+			if pos == nil then
+				pos =  t_pnthr_patrol_mgr.mkr_sp
+			end	
+			
+			Util_CreateSquadsAtMarker(player2, t_pnthr_patrol_mgr.sgroups[i], sbp, pos, 1)
+		end
+	end
+	
+	Pnthr3Patrol_FollowPath()
+
+end
+
+function Pnthr3Patrol_Check()
+
+	local all_dead = true
+	
+	if SGroup_IsEmpty(t_pnthr_manager[3].sgroup) 
+	and SGroup_IsUnderAttack(t_pnthr_manager[3].sgroup, ANY, 10) then
+	
+		if g_PNTHR3_FIRST_CONTACT == nil then
+			Player_GetAllSquadsNearMarker(player1, sg_temp, Util_GetPosition_EVEN_IF_EMPTY(t_pnthr_manager[3].sgroup), 30)
+		
+			-- [[ DIALOGUE ]]
+			DOAD_FirstPnthrAttack(sg_temp, 3)
+		
+			g_PNTHR3_FIRST_CONTACT = 1
+		else
+			DOAD_PnthrAttackCue(3)
+		end
+	end
+	
+	for i=1, table.getn(t_pnthr_patrol_mgr.sgroups) do 
+		if SGroup_IsEmpty(t_pnthr_patrol_mgr.sgroups[i]) == false then
+			all_dead = false
+			return
+		end
+	end
+	
+	if all_dead then
+		Rule_RemoveMe()
+	end
+end
+
+function Pnthr3Patrol_FollowPath()
+
+	local num = World_GetRand(1, table.getn(t_pnthr_patrol_mgr.paths))
+	t_pnthr_patrol_mgr.path_current = t_pnthr_patrol_mgr.paths[num]
+	
+	for i=1, table.getn(t_pnthr_patrol_mgr.sgroups) do 
+		if SGroup_IsEmpty(t_pnthr_patrol_mgr.sgroups[i]) == false then
+			Cmd_SquadPath(t_pnthr_patrol_mgr.sgroups[i], t_pnthr_patrol_mgr.path_current, true, true, true, t_pnthr_patrol_mgr.wait)
+		end
+	end
+	
+end
+
+
+
+
+
+
+
+
+---------------------------------------------------------------------
+--
+--  [[ PANTHER 4 - GOLIATH PANTHER ]]
+--  Panther busts through the wall and attacks the player.
+--   
+---------------------------------------------------------------------
+function Pnthr4Goliath_Setup()
+
+	-- SPECIALTY PANTHER FUNCTIONS
+	t_pnthr4_def_mgr = {
+		sgroup = t_pnthr_manager[4].sgroup,		-- an sgroup to check
+		counter = -1,							-- the counter to iterate a number of checks
+		counter_max = 4,						-- the max number of times to check
+		fnc_ai_routine = function() Pnthr4_UnderAttack() end,	-- a function to call when the max number of checks is reached
+		fnc_reset = function() Pnthr4_Reset() end,		-- a function to call to tell the sgroup what to do when not being attacked
+	}
+	
+	-- SPECIALTY UNITS (GOLIATHS)
+	t_pnthr4_gol = {}
+	for i in pairs(sg_pnthr4_gol) do
+		t_pnthr4_gol[i] = {
+			sgroup = sg_pnthr4_gol[i],
+			sbp = SBP.AXIS.GOLIATH,
+			mkr_sp = mkr_pnthr4_gol[i],
+			target = SGroup_CreateIfNotFound("sg_pnthr4_gol_target"..i),
+			detonate_dist = 5,
+			active = false,
+			timer_id = "t_pnthr4_gol",
+			timer_amount = 10,
+		}
+	end
+	
+	-- VEHICLES
+	t_pnthr4_veh = {}
+	for i in pairs(sg_pnthr[4].veh) do
+		t_pnthr4_veh[i] = {
+			sgroup = sg_pnthr[4].veh[i],
+			sbp = SBP.AXIS.OSTWIND,
+			mkr_sp = mkr_pnthr[4].veh[i],
+		}
+	end
+
+	-- INFANTRY
+	local inf = 
+	{
+		-- type of unit, upgrades
+		{SBP.AXIS.GRENADIER, nil},	-- 1
+		{SBP.AXIS.SNIPER, nil}, 	-- 2
+		{SBP.AXIS.HEAVYMG, nil}, 	-- 3
+		
+	}
+	
+	t_pnthr4_inf = {}
+	for i in pairs(inf) do
+		t_pnthr4_inf[i] = 
+		{
+			sgroup = sg_pnthr[4].inf[i],
+			mkr_sp = mkr_pnthr[4].inf[i],
+			sbp = inf[i][1],
+			upgrade = inf[i][2],
+			-- state: 0 = empty, 1 = spawned, 2 = dead,
+			state = 0,
+			destination = eg_pnthr[4].inf[i],
+		}
+	end
+	
+	g_FIRST_GOLIATH_ATTACK = nil
+	g_FIRST_PNTHR4_ATTACK = nil
+	
+	t_pnthr_manager[4].inf = t_pnthr4_inf
+
+end
+
+function Pnthr4Goliath_Spawn()
+
+	DOAD_VehSpawn(t_pnthr4_veh)
+
+	if g_COUNTERATTACK ~= true then
+		DOAD_InfSpawn(t_pnthr4_inf)
+		DOAD_VehSpawn(t_pnthr4_gol)
+	end
+	Util_AddUnderAttackItem(t_pnthr4_def_mgr)
+	
+end
+
+-- proximity check to determine if the player is near the panther.
+function Pnthr4Goliath_Check()
+
+	-- set a default marker
+	local mkr = mkr_pnthr[4].prox[1]
+	
+	for i in pairs(mkr_pnthr[4].prox) do 
+	
+		mkr = mkr_pnthr[4].prox[i]
+		Player_GetAllSquadsNearMarker(player1, sg_temp, mkr)
+		SGroup_Filter(sg_temp, SBP.ALLIES.SNIPER, FILTER_REMOVE)
+		
+		if SGroup_IsEmpty(sg_temp) == false then
+			t_pnthr_manager[4].var_attack = mkr
+			Pnthr4_Attack()
+			return
+		end
+		
+	end
+	
+	-- if we loop through all the possible markers and everyone has been attacking,
+	-- reset the units to their correct locations.
+	if t_pnthr_manager[4].attack_state == 1 then
+		Pnthr4_Reset()
+	end
+
+end
+
+function Pnthr4_Attack()
+	
+	local pos = Util_GetPosition_EVEN_IF_EMPTY(t_pnthr_manager[4].var_attack)
+
+	if Rule_Exists(Pnthr4_GoliathAttack) == false then
+		Rule_AddInterval(Pnthr4_GoliathAttack, 1)
+	end
+	
+	-- order panther to attack
+	Cmd_AttackMove(t_pnthr_manager[4].sgroup, pos)
+	
+	if g_FIRST_PNTHR4_ATTACK == nil then
+		-- [[ DIALOGUE ]]
+		
+		Player_GetAllSquadsNearMarker(player1, sg_temp, pos, 30)
+		DOAD_FirstPnthrAttack(sg_temp, 4)
+		g_FIRST_PNTHR4_ATTACK = 1
+	else
+		DOAD_PnthrAttackCue(4)
+	end
+
+	
+	-- order vehicles to attack
+	for k in pairs(t_pnthr4_veh) do 
+		Cmd_AttackMove(t_pnthr4_veh[k].sgroup, pos)
+	end
+	
+	-- order infantry to attack
+	DOAD_InfAttack(t_pnthr4_inf, t_pnthr_manager[4].var_attack)
+	t_pnthr_manager[4].attack_state = 1
+			
+end
+
+-- orders the various goliaths to attack
+function Pnthr4_GoliathAttack()
+
+	local active = false
+	for i=table.getn(t_pnthr4_gol), 1, -1 do 
+		
+		local timer_id = t_pnthr4_gol[i].timer_id
+		
+		if Timer_Exists(timer_id) and Timer_GetRemaining(timer_id) > 0 then
+			-- if the timer has been started and it is not zero, don't attack with another goliath
+			break
+		end
+		
+		if SGroup_IsEmpty(t_pnthr4_gol[i].sgroup) == false then
+			-- if the there is a target already, then activate the goliath
+			if SGroup_IsEmpty(t_pnthr4_gol[i].target) == false then
+				t_pnthr4_gol[i].active = true
+			else
+				print("Pnthr4Goliath_Attack: Determining Target")
+				Pnthr4Goliath_DetermineTarget(i)
+			
+				-- if the target is STILL empty then return to spawned locations and deactivate
+				if SGroup_IsEmpty(t_pnthr4_gol[i].target) then
+					Cmd_Move(t_pnthr4_gol[i].sgroup, t_pnthr4_gol[i].mkr_sp)
+					t_pnthr4_gol[i].active = false
+					print("Goliath Inactive: "..i)
+				-- otherwise attack the target
+				else
+					print("Goliath Actived: "..i)
+					t_pnthr4_gol[i].active = true
+				end
+			end
+			
+			if t_pnthr4_gol[i].active then
+				Cmd_AttackMove(t_pnthr4_gol[i].sgroup, t_pnthr4_gol[i].target)
+				
+				if g_FIRST_GOLIATH_ATTACK == nil then
+					Util_StartStinger(EVENTS.OBJ_DP_EncounterPnthr4)
+					EventCue_Create(CUE.ATTACKED, 329100, 329100, t_pnthr4_gol[i].sgroup, 329101)
+					g_FIRST_GOLIATH_ATTACK = false
+				end
+				
+--~ 				print("Goliath Attack: "..i)
+				
+				if SGroup_IsEmpty(t_pnthr4_gol[i].target) == false
+				and SGroup_IsEmpty(t_pnthr4_gol[i].sgroup) == false
+				and World_DistanceSGroupToPoint(t_pnthr4_gol[i].target, Util_GetPosition_EVEN_IF_EMPTY(t_pnthr4_gol[i].sgroup), true) <= t_pnthr4_gol[i].detonate_dist then
+					Cmd_Ability(t_pnthr4_gol[i].sgroup, ABILITY.AXIS.GOLIATH_DETONATE, nil, nil, true)
+				end
+				-- force the loop to the end, so that only one goliath is active at a time.
+				i = 0
+				active = true
+			end
+			
+		else
+			-- this is assuming that one died recently by its own accord or it got destroyed
+			if Timer_Exists(timer_id) == false then				
+				Timer_Start(timer_id, t_pnthr4_gol[i].timer_amount)
+			else
+				Timer_Add(timer_id,  t_pnthr4_gol[i].timer_amount)
+			end
+			
+			-- the goliath is dead then remove it from the table altogether
+			table.remove(t_pnthr4_gol, i)
+
+		end
+
+	end
+	
+	if table.getn(t_pnthr4_gol) <= 0 or active == false then
+		Rule_RemoveMe()
+	end
+
+end
+
+function Pnthr4Goliath_DetermineTarget(gol_id)
+	
+	-- ******* TODO: (optionally) Filter out the group so that the Goliath prefers tanks ************
+	local pos = Util_GetPosition_EVEN_IF_EMPTY(t_pnthr_manager[4].var_attack)
+	Player_GetAllSquadsNearMarker (player1, t_pnthr4_gol[gol_id].target, pos, 30)
+	print("Goliath Target Selected: "..gol_id)
+	
+end
+
+function Pnthr4_UnderAttack()
+
+	t_pnthr_manager[4].var_attack = t_pnthr_manager[4].sgroup
+	Pnthr4_Attack()
+	
+end
+
+function Pnthr4_Reset()
+	t_pnthr_manager[4].attack_state = 0
+	DOAD_InfReposition(t_pnthr4_inf)
+	DOAD_VehReposition(t_pnthr4_veh, t_pnthr_manager[4].var_attack)
+	Rule_Remove(Pnthr4Goliath_Check)
+	DOAD_PnthrReposition(4)
+end
+
+
+
+
+
+
+
+------------------------------------------------------
+--
+-- PANTHER 5 - BUSH ATTACK
+--
+------------------------------------------------------
+function Pnthr5Bush_Setup()
+
+	-- SPECIAL PANTHER VARIABLES
+	pnthr5_speed_id = nil
+	SGroup_AddGroup(t_pnthr_manager[5].sgroup, sg_pnthr_bush)
+	t_pnthr_manager[5].var_attack = mkr_pnthr5_prox1
+	
+	--toggle the camouflage on before the map starts
+	Cmd_Ability(t_pnthr_manager[5].sgroup, ABILITY.AXIS.CAMOUFLAGE, nil, nil, true)
+	-- prevent any UI from being added while he's camoflaged
+	t_pnthr_manager[5].bln_apply_ui = false
+	
+	-- VEHICLES
+	t_pnthr5_veh = {}
+	for i in pairs(sg_pnthr[5].veh) do
+		t_pnthr5_veh[i] = {
+			sgroup = sg_pnthr[5].veh[i],
+			sbp = nil,
+			mkr_sp = mkr_pnthr[5].veh[i],
+		}
+	end
+	
+	t_pnthr5_veh[1].sgroup = sg_pnthr5_pIV_trap
+
+	t_pnthr5_trap = {
+		sgroup = t_pnthr5_veh[1].sgroup,					-- an sgroup to check
+		counter = -1,					-- the counter to iterate a number of checks
+		counter_max = 2,				-- the max number of times to check
+		fnc_ai_routine = function() Pnthr5Bush_PIVRetreat() end,	-- a function to call when the max number of checks is reached
+		fnc_reset = function() end,		-- a function to call to tell the sgroup what to do when not being attacked
+		path = "path_pnthr5_veh1",
+		speed_id = nil,
+	}
+	
+	Util_AddUnderAttackItem(t_pnthr5_trap)
+
+	-- INFANTRY
+	local inf = 
+	{
+		-- type of unit, upgrades
+		{ SBP.AXIS.HEAVYMG, nil},
+		{ SBP.AXIS.GRENADIER, nil},
+	}
+	
+	t_pnthr5_inf = {}
+	for i in pairs(inf) do
+		t_pnthr5_inf[i] = 
+		{
+			sgroup = sg_pnthr[5].inf[i],
+			mkr_sp = mkr_pnthr[5].inf[i],
+			sbp = inf[i][1],
+			upgrade = inf[i][2],
+			-- state: 0 = empty, 1 = spawned, 2 = dead,
+			state = 0,
+			destination = eg_pnthr[5].inf[i],
+		}
+	end
+	
+	t_pnthr_manager[5].inf = t_pnthr5_inf
+
+	
+end
+
+function Pnthr5Bush_Spawn()
+
+	DOAD_VehSpawn(t_pnthr5_veh)
+	
+	if g_COUNTERATTACK ~= true then
+		DOAD_InfSpawn(t_pnthr5_inf)
+	end
+
+end
+
+function Pnthr5Bush_Check()
+
+	local mkr = t_pnthr_manager[5].var_attack
+	
+	Player_GetAllSquadsNearMarker(player1, sg_temp, mkr)
+	SGroup_Filter(sg_temp, SBP.ALLIES.SNIPER, FILTER_REMOVE)
+	
+	if SGroup_IsEmpty(sg_temp) == false then
+		
+		if pnthr5_speed_id == nil then
+			pnthr5_speed_id = Modify_UnitSpeed(t_pnthr_manager[5].sgroup, 4)
+			Timer_Start("pnthr5_speed", 8)
+		end
+		
+		if g_PNTHR5_FIRST == nil then
+			-- make the panther appear, but only toggle the ability on this first time.
+			Cmd_Ability(t_pnthr_manager[5].sgroup, ABILITY.AXIS.CAMOUFLAGE, nil, nil, true)
+			
+			-- [[ DIALOGUE ]]
+			-- special case dialogue for this panther
+			Util_StartIntel(EVENTS.OBJ_DP_EncounterPnthr5)
+			EventCue_Create(CUE.ATTACKED, 329112, 329112, t_pnthr_manager[5].sgroup)
+			Cmd_Move(t_pnthr_manager[5].sgroup, mkr_pnthr5_pt1)
+			
+			g_PNTHR5_FIRST = false
+		else
+			DOAD_PnthrAttackCue(5)
+		end
+		
+		for i in pairs(t_pnthr5_veh) do 
+			Cmd_AttackMove(t_pnthr5_veh[i].sgroup, mkr)
+		end
+		DOAD_InfAttack(t_pnthr5_inf, mkr)
+		t_pnthr_manager[5].attack_state = 1
+		
+	elseif t_pnthr_manager[5].attack_state == 1 then
+		t_pnthr_manager[5].attack_state = 0
+		
+		-- panther is going on a rampage and attacking the player's base
+		DOAD_InfAttack(t_pnthr5_inf, eg_player_hq)
+		Cmd_AttackMove(t_pnthr_manager[5].sgroup, eg_player_hq)
+		for i in pairs(t_pnthr5_veh) do 
+			Cmd_AttackMove(t_pnthr5_veh[i].sgroup, eg_player_hq)
+		end
+
+	end
+	
+	-- return unit speed to normal
+	if pnthr5_speed_id ~= nil and Timer_GetRemaining("pnthr5_speed") <= 0 then 
+		Modifier_Remove(pnthr5_speed_id)
+	end
+	
+	if t_pnthr5_trap.state == 0 then
+		Pnthr5Bush_PIVRetreatCheck()
+	elseif t_pnthr5_trap.speed_id ~= nil then
+		Modifier_Remove(t_pnthr5_trap.speed_id)
+	end
+
+
+end
+
+function Pnthr5Bush_PIVRetreat()
+
+	local sg = t_pnthr5_trap.sgroup
+	Cmd_SquadPath(sg, t_pnthr5_trap.path, true, false, false, 0)
+	t_pnthr5_trap.speed_id = Modify_UnitSpeed(sg, 3)
+	t_pnthr5_trap.state = 1
+	Util_RemoveUnderAttackItem(t_pnthr5_trap)
+	
+end
+
+
+
+
+---------------------------------------------------------------------
+--
+--  [[ PANTHER 6 - WALL BUST PANTHER ]]
+--  Panther busts through the wall and attacks the player.
+--   
+---------------------------------------------------------------------
+function Pnthr6WallBust_Setup()
+	-- flag to speed up panther for when it busts through the wall
+	pnthr_wall_bust_speed = nil
+	SGroup_AddGroup(t_pnthr_manager[6].sgroup, sg_pnthr_wall_bust)
+	t_pnthr_manager[6].var_attack = mkr_pnthr_wall_bust_prox
+	
+	--toggle the camouflage on before the map starts
+	Cmd_Ability(t_pnthr_manager[6].sgroup, ABILITY.AXIS.CAMOUFLAGE, nil, nil, true)
+	t_pnthr_manager[6].bln_apply_ui = false
+	SGroup_SetPlayerOwner(t_pnthr_manager[6].sgroup, player2)
+	
+	-- VEHICLES
+	t_pnthr6_veh = {}
+	for i in pairs(sg_pnthr[6].veh) do
+		t_pnthr6_veh[i] = {
+			sgroup = sg_pnthr[6].veh[i],
+			sbp = SBP.AXIS.PANZER,
+			mkr_sp = mkr_pnthr[6].veh[i],
+		}
+	end
+
+	-- INFANTRY
+	local inf = 
+	{
+		-- type of unit, upgrades
+		{ SBP.AXIS.GRENADIER, nil},
+		{ SBP.AXIS.HEAVYMG, nil},
+		{ SBP.AXIS.HEAVYMG, nil},
+	}
+	
+	t_pnthr6_inf = {}
+	for i in pairs(inf) do
+		t_pnthr6_inf[i] = 
+		{
+			sgroup = sg_pnthr[6].inf[i],
+			mkr_sp = mkr_pnthr[6].inf[i],
+			sbp = inf[i][1],
+			upgrade = inf[i][2],
+			-- state: 0 = empty, 1 = spawned, 2 = dead,
+			state = 0,
+			destination = eg_pnthr[6].inf[i],
+		}
+	end
+	
+	t_pnthr_manager[6].inf = t_pnthr6_inf
+
+end
+
+function Pnthr6WallBust_Spawn()
+	
+	DOAD_VehSpawn(t_pnthr6_veh)
+	
+	if g_COUNTERATTACK ~= true then
+		DOAD_InfSpawn(t_pnthr6_inf)
+	end
+
+end
+
+function Pnthr6WallBust_Check()
+	
+	local mkr = t_pnthr_manager[6].var_attack
+	
+	Player_GetAllSquadsNearMarker(player1, sg_temp, mkr)
+	SGroup_Filter(sg_temp, SBP.ALLIES.SNIPER, FILTER_REMOVE)
+	
+	if SGroup_IsEmpty(sg_temp) == false then
+		if (pnthr_wall_bust_speed == nil) then
+			pnthr_wall_bust_speed = Modify_UnitSpeed(t_pnthr_manager[6].sgroup, 4)
+			Timer_Start("pnthr_wall_bust_speed", 8)
+			
+			--make the panther appear in the building
+			Cmd_Ability(t_pnthr_manager[6].sgroup, ABILITY.AXIS.CAMOUFLAGE, nil, nil, true)
+			-- add any hint information to the Panther
+		end
+		
+		if g_PNTHR6_FIRST_CONTACT == nil then
+			-- [[ DIALOGUE ]]
+			DOAD_FirstPnthrAttack(sg_temp, 6)
+			g_PNTHR6_FIRST_CONTACT = false
+			Cmd_Move(t_pnthr_manager[6].sgroup, mkr_pnthr6_pt1)
+		else
+			DOAD_PnthrAttackCue(6)
+		end
+		
+		for i in pairs(t_pnthr6_veh) do
+			Cmd_AttackMove(t_pnthr6_veh[i].sgroup, mkr)
+		end
+		
+		DOAD_InfAttack(t_pnthr6_inf, mkr)
+		t_pnthr_manager[6].attack_state = 1
+		
+	elseif t_pnthr_manager[6].attack_state == 1 then
+		t_pnthr_manager[6].attack_state = 0
+		DOAD_VehReposition(t_pnthr6_veh, mkr)
+		DOAD_PnthrReposition(6)
+		DOAD_InfReposition(t_pnthr6_inf)
+
+	end
+	
+	if pnthr_wall_bust_speed ~= nil and Timer_GetRemaining("pnthr_wall_bust_speed") <= 0 then 
+		Modifier_Remove(pnthr_wall_bust_speed)
+	end
+
+end
+
+
+
+---------------------------------------------------------------------
+--
+--  [[ PANTHER 7 - PLATFORM PANTHER ]]
+--  Panther busts through the wall and attacks the player.
+--   
+---------------------------------------------------------------------
+
+function Pnthr7Platform_Setup()
+
+	-- SPECIALTY PANTHER TABLES
+	t_pnthr7_defender =
+	{
+		sgroup = t_pnthr_manager[7].sgroup,		-- an sgroup to check
+		counter = 0,							-- the counter to iterate a number of checks
+		counter_max = 5,						-- the max number of times to check
+		fnc_ai_routine = function() Pnthr7Platform_Retreat() end,	-- a function to call when the max number of checks is reached
+		fnc_reset = function() 
+			Util_RemoveUnderAttackItem(t_pnthr7_defender) 
+			g_PNTHR7_RETREAT_ADDED = false 
+		end,		-- a function to call to tell the sgroup what to do when not being attacked
+	}
+	
+	g_PNTHR7_RETREAT_ADDED = false
+	g_PNTHR7_RETREAT = false
+
+	-- VEHICLES
+	t_pnthr7_veh = {}
+	for i in pairs(sg_pnthr[7].veh) do
+		t_pnthr7_veh[i] = {
+			sgroup = sg_pnthr[7].veh[i],
+			sbp = SBP.AXIS.PANZER,
+			mkr_sp = mkr_pnthr[7].veh[i],
+			path = "path_pnthr7_veh"..i,
+		}
+	end
+
+	-- INFANTRY
+	local inf = 
+	{
+		-- type of unit, upgrades
+		{ SBP.AXIS.HEAVYMG, nil},
+		{ SBP.AXIS.GRENADIER, nil},
+		{ SBP.AXIS.GRENADIER, nil},
+	}
+	
+	t_pnthr7_inf = {}
+	for i in pairs(inf) do
+		t_pnthr7_inf[i] = 
+		{
+			sgroup = sg_pnthr[7].inf[i],
+			mkr_sp = mkr_pnthr[7].inf[i],
+			sbp = inf[i][1],
+			upgrade = inf[i][2],
+			-- state: 0 = empty, 1 = spawned, 2 = dead,
+			state = 0,
+			destination = eg_pnthr[7].inf[i],
+		}
+	end
+	
+	g_FIRST_PNTHR7_ATTACK = nil
+	
+	t_pnthr_manager[7].inf = t_pnthr7_inf
+
+end
+
+function Pnthr7Platform_Spawn()
+	
+	-- give this panther a little boost of speed
+	Modify_UnitSpeed(t_pnthr_manager[7].sgroup, 2)
+	DOAD_VehSpawn(t_pnthr7_veh)
+	
+	if g_COUNTERATTACK ~= true then
+		DOAD_InfSpawn(t_pnthr7_inf)
+	end
+	
+end
+
+function Pnthr7Platform_Check()
+		
+	local mkr = mkr_pnthr[7].prox[1]
+
+	for i in pairs(mkr_pnthr[7].prox) do 
+	
+		mkr = mkr_pnthr[7].prox[i]
+		
+		Player_GetAllSquadsNearMarker(player1, sg_temp, mkr)
+		SGroup_Filter(sg_temp, SBP.ALLIES.SNIPER, FILTER_REMOVE)
+		
+		if SGroup_IsEmpty(sg_temp) == false then
+			
+			t_pnthr_manager[7].var_attack = mkr
+			
+			-- check to see if the panther is in the same area, and if so then start the under
+			-- attack check.
+			if Prox_AreSquadsNearMarker(t_pnthr_manager[7].sgroup, mkr, ANY, 42) and g_PNTHR7_RETREAT_ADDED == false then
+				Util_AddUnderAttackItem(t_pnthr7_defender)
+				g_PNTHR7_RETREAT_ADDED = true
+			end
+			
+			if g_PNTHR7_RETREAT == false then
+				Cmd_AttackMove(t_pnthr_manager[7].sgroup, mkr)			
+			end
+			
+			if g_FIRST_PNTHR7_ATTACK == nil then
+				-- [[ DIALOGUE ]]
+				DOAD_FirstPnthrAttack(sg_temp, 7)
+				g_FIRST_PNTHR7_ATTACK = 1
+			else
+				DOAD_PnthrAttackCue(7)
+			end
+			
+			-- order vehicles to attack
+			if mkr == mkr_pnthr[7].prox[1] or mkr == mkr_pnthr[7].prox[2] then
+				Cmd_SquadPath(t_pnthr7_veh[2].sgroup, "path_pnthr7_veh2", true, false, true, 0)
+				Cmd_SquadPath(t_pnthr7_veh[1].sgroup, "path_pnthr7_veh1", true, false, true, 0)
+				
+				local rand = World_GetRand(1,2)
+				EventCue_Create(CUE.ATTACKED, 329104, 329104, t_pnthr7_veh[rand].sgroup)
+				FOW_RevealSGroup(t_pnthr7_veh[rand].sgroup, 10)
+				
+			else
+				Cmd_AttackMove(t_pnthr7_veh[1].sgroup, mkr)
+				Cmd_AttackMove(t_pnthr7_veh[2].sgroup, mkr)
+			end
+			-- order infantry to spawn and garrison buildings
+			DOAD_InfSpawn(t_pnthr7_inf)
+			t_pnthr_manager[6].attack_state = 1
+			return
+		end
+	end
+	
+	if t_pnthr_manager[7].attack_state == 1 then
+		t_pnthr_manager[7].attack_state = 0
+		DOAD_InfReposition(t_pnthr7_inf)
+		DOAD_VehReposition(t_pnthr7_veh, mkr)
+	end
+	
+end
+
+-- the panther should retreat to a given position based on the way the player
+-- enters the platform.  When he does this he should drop a smoke bomb
+-- and retreat.
+
+function Pnthr7Platform_Retreat()
+
+	print("Pnthr7Platform_Retreat")
+	-- determine retereat position
+	local retreat_loc = mkr_pnthr[7].prox[1]
+	local sg = t_pnthr_manager[7].sgroup
+	local num
+	
+	-- as the panther is attacked depending on the proximity marker
+	-- that he is near, if he is attacked, he moves to another one
+	-- and keeps looping as the player goes after him.
+	for i=1, table.getn(mkr_pnthr[7].prox) do
+		if mkr_pnthr[7].prox[i] == t_pnthr_manager[7].var_attack then
+			num = i+1
+			if num >  table.getn(mkr_pnthr[7].prox) then
+				num = 1
+			end
+			retreat_loc = mkr_pnthr[7].prox[num]
+			break
+		end	
+	end
+	
+
+--~ 	Cmd_Ability(player2, ABILITY_SP_SMOKE_BARRAGE, Util_GetPosition_EVEN_IF_EMPTY(sg))
+	Cmd_Move(sg, retreat_loc, false)
+	g_PNTHR7_RETREAT = true
+	
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- FORWARD AXIS BASE
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------------------------------------
+
+function OBJ_FM_DefendersSetup()
+
+	t_fm_manager = {}
+	
+	for i=1, table.getn(mkr_axsp_fmsg) do 
+	
+		t_fm_manager[i] = 
+		{
+			sgroup = sg_ax_fm[i],
+			sbp = nil,
+			mkr_sp = mkr_axsp_fmsg[i],
+			mobile = true,
+			upg = nil,
+		}	
+	end
+
+	t_fm_manager[1].sbp = SBP.AXIS.PAK_38
+	t_fm_manager[1].mobile = false
+	
+	t_fm_manager[2].sbp = SBP.AXIS.HEAVYMG
+	t_fm_manager[2].mobile = false
+	
+	t_fm_manager[3].sbp = SBP.AXIS.MORTAR
+	t_fm_manager[3].mobile = false
+	
+	Rule_AddInterval(OBJ_FM_DefendersSpawn, 6)
+	
+end
+
+
+function OBJ_FM_DefendersSpawn()
+
+	Player_GetAllSquadsNearMarker(player1, sg_temp, mkr_axsp_fmprox, 90)
+	if SGroup_IsEmpty(sg_temp) == false then
+	
+		for i=1, table.getn(t_fm_manager) do 
+			
+			Util_CreateSquadsAtMarker(player2, t_fm_manager[i].sgroup, t_fm_manager[i].sbp, t_fm_manager[i].mkr_sp, 1)
+			if t_fm_manager[i].upg ~= nil then
+				Cmd_InstantUpgrade(t_fm_manager[i].sgroup, t_fm_manager[i].upg)
+			end
+			
+			if t_fm_manager[i].sbp == SBP.AXIS.HEAVYMG then
+				Cmd_InstantSetupTeamWeapon(t_fm_manager[i].sgroup)
+			end
+		end
+		
+		Rule_RemoveMe()
+	end
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- MEDAL: PREVENT LOSS OF TANKS
+-- The player is ordered to mimize his tank casualties for
+--	the mission.
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------------------------------------
+function Initialize_PreventTankLoss()
+
+	OBJ_PreventTankLoss = {
+		
+		SetupUI = function()
+			
+			if t_obj_ptl_mgr.deaths_allowed > 0 then
+				Objective_SetCounter(OBJ_PreventTankLoss, 0, t_obj_ptl_mgr.deaths_allowed)
+			end
+		end,
+		
+		OnStart = function()			
+			
+		end,
+		
+		OnComplete = function()
+			
+		end,
+		
+		OnFail = function()
+		
+		end,
+		
+		OnSitRep = function()
+		
+		end,
+		
+		Title 					= 329200,
+		Description 			= 329201,
+		Type	 				= OT_Medal,
+		MedalID 				= MEDALS.DISTINGUISHED_SERVICE_MEDAL,
+		Icon					= IT_M_Default,
+	}
+	
+	Objective_Register(OBJ_PreventTankLoss)
+	OBJ_PTL_Setup()
+
+end
+
+function OBJ_PTL_AddNewObjDelay()
+
+	-- triggered when the first tank dies
+	if Event_IsAnyRunning() == false then
+		Objective_Start(OBJ_PreventTankLoss, true)
+		Rule_RemoveMe()
+	end
+
+end
+
+function OBJ_PTL_Setup()
+
+	t_obj_ptl_mgr = {
+		sg_tanks 			= sg_player_tanks,
+		sbps				= {SBP.ALLIES.SHERMAN, SBP.ALLIES.M10, SBP.ALLIES.CROCODILE},
+		deaths				= 0,
+		deaths_allowed		= 5,	-- difficulty handle
+		progress_perc		= {0.25, 0.50, 0.75}
+	}
+	
+	Rule_AddInterval(OBJ_PTL_PlayerCheckForTanks, 5.7)
+
+end
+
+function OBJ_PTL_PlayerCheckForTanks()
+	
+	Player_GetAll(player1, sg_temp)
+	SGroup_Filter(sg_temp, t_obj_ptl_mgr.sbps, FILTER_KEEP)
+	SGroup_RemoveGroup(sg_temp, t_obj_ptl_mgr.sg_tanks)
+	
+	if SGroup_IsEmpty(sg_temp) == false then
+		Rule_AddSGroupEvent(OBJ_PTL_TankDestroyed, sg_temp, GE_SquadKilled)
+		SGroup_AddGroup(t_obj_ptl_mgr.sg_tanks, sg_temp)
+	end
+
+end
+
+function OBJ_PTL_Complete()
+
+	if Objective_IsFailed(OBJ_PreventTankLoss) then
+		return
+	end
+
+	Objective_Complete(OBJ_PreventTankLoss, true)
+
+end
+
+function OBJ_PTL_TankDestroyed()
+
+	if Objective_IsFailed(OBJ_PreventTankLoss) then
+		return
+	end
+	
+	if g_FIRST_TANK_DESTROYED == nil then
+		Rule_AddInterval(OBJ_PTL_AddNewObjDelay, 1)
+		g_FIRST_TANK_DESTROYED = true
+		return
+	end
+	
+	t_obj_ptl_mgr.deaths = t_obj_ptl_mgr.deaths + 1
+	if t_obj_ptl_mgr.deaths >= t_obj_ptl_mgr.deaths_allowed then
+		
+		Objective_Fail(OBJ_PreventTankLoss, true)
+		Rule_Remove(OBJ_PTL_PlayerCheckForTanks)
+		return
+	end
+	
+	Objective_SetCounter(OBJ_PreventTankLoss, t_obj_ptl_mgr.deaths, t_obj_ptl_mgr.deaths_allowed)
+	EventCue_Create(CUE.ATTACKED, 329205, 329205)
+	
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+--[[ Random Util Stuff ]]
+-------------------------------------------------------------------------
+
+-- performs the Instant Upgrade but uses a randomly selected weapon, but there is chance 
+-- that no upgrade will be performed
+function Util_GrantRandomUpgrade(sgroup)
+	local upgrades = {UPG.AXIS.GREN_MG42, UPG.AXIS.GREN_PANZERSCHRECK, 0}
+	local rand = World_GetRand(1, table.getn(upgrades))
+	if upgrades[rand] ~=0 then
+		Cmd_InstantUpgrade(sgroup, upgrades[rand])
+	end
+end
+
+-- returns a random SBP for an armoured vehicle
+function Util_RandomTankSBP()
+	local sbps = {SBP.AXIS.OSTWIND, SBP.AXIS.STUG, SBP.AXIS.OSTWIND, SBP.AXIS.PUMA}
+	local rand = World_GetRand(1, table.getn(sbps))
+	return sbps[rand]
+end
+
+-- returns a random SBP for infantry
+function Util_RandomInfSBP()
+	local sbps = {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER}
+	local rand = World_GetRand(1, table.getn(sbps))
+	return sbps[rand]
+end
+
+function Rule_M10sBuild()
+
+	SGroup_Clear(sg_temp)
+	Player_GetAll(player1, sg_temp)
+	SGroup_Filter(sg_temp, SBP.ALLIES.M10, FILTER_KEEP)
+	
+	if g_BUILD_M10s_COUNT == 5 then
+		Rule_RemoveMe()
+		return
+	end
+	
+	if g_BUILD_M10s == nil then
+		g_BUILD_M10s = "TIMER_BUILD_M10s"
+		g_BUILD_M10s_COUNT = 0
+	end
+	
+	if SGroup_IsEmpty(sg_temp)
+	and Timer_GetRemaining(g_BUILD_M10s) <= 0
+	and Event_IsAnyRunning() == false then
+		Util_StartStinger(EVENTS.M10_TankDestroyer_Build)
+		Timer_Start(g_BUILD_M10s, 45)
+		g_BUILD_M10s_COUNT = g_BUILD_M10s_COUNT+1
+	end
+	
+end
+
+function Rule_M10TankDestroyerSelected()
+	SGroup_Clear(sg_temp)
+	Misc_GetSelectedSquads(sg_temp, false)
+	SGroup_Filter(sg_temp, SBP.ALLIES.M10, FILTER_KEEP)
+	
+	if SGroup_IsEmpty(sg_temp) == false and Event_IsAnyRunning() == false then
+		g_M10_HP = HintPoint_Add(sg_temp, true, 329300)
+		Rule_AddOneShot(Rule_M10TD_RemoveHint, 10)
+		UI_HighlightSGroup(sg_temp, 10)
+		Util_StartStinger(EVENTS.M10_TankDestroyer_Select)
+		Rule_RemoveMe()
+	end
+
+end
+
+function Rule_M10TD_RemoveHint()
+	HintPoint_Remove(g_M10_HP)
+end
+
+function Rule_HeavyTankPoolSelected()
+	EGroup_Clear(eg_temp)
+	Misc_GetSelectedEntities(eg_temp, true)
+	EGroup_Filter(eg_temp, EBP.ALLIES.TANK_DEPOT, FILTER_KEEP)
+
+	if EGroup_IsEmpty(eg_temp) == false then
+		g_M10_PROD_HP = HintPoint_AddToProductionButton(PITEM_Spawn, SBP.ALLIES.M10, 329301, true)
+		Rule_AddOneShot(RuleM10Prod_RemoveHint, 10)
+		Rule_RemoveMe()
+	end
+	
+end
+
+function RuleM10Prod_RemoveHint()
+	HintPoint_Remove(g_M10_PROD_HP)
+end
+
+function Rule_BaseUnderAttack()
+	
+	if Timer_GetRemaining(g_BASE_UNDER_ATTACK) <= 0 
+	and EGroup_IsUnderAttack(eg_player_hq, ANY, 10) then
+		EventCue_Create(CUE.ATTACKED, 329102, 329102, eg_player_hq)
+		Timer_Start(g_BASE_UNDER_ATTACK, 30)
+	end
+end
+
+function DOAD_CheckPlayerFail()
+
+	if Player_HasLost(player1, CRITICAL_BUILDINGS.ALLIES) then
+		Game_EndSP(false, nil, true)
+	end
+	
+end
+
+function DOAD_AutosaveDelay()
+
+	--[[ AUTOSAVE ]]
+	if Rule_Exists(DOAD_Autosave) == false then
+		Rule_Add(DOAD_Autosave)		
+	end
+	
+end
+
+
+function DOAD_Autosave()
+
+	if Event_IsAnyRunning() == false then
+		Scar_Autosave(g_AUTOSAVE)
+		Rule_RemoveMe()
+	end
+	
+end
+
+---------------------------------------------------------
+-- RULES TO MANAGE WHEN VARIOUS OBJECTS ARE UNDER ATTACK
+---------------------------------------------------------
+
+function Util_AddUnderAttackItem(t_defender_mgr)
+
+	--[[
+	-- the t_defender_mgr should have the following
+		t_defender_mgr = 
+		{
+			sgroup = nil,					-- an sgroup to check
+			counter = 0,					-- the counter to iterate a number of checks
+			counter_max = 0,				-- the max number of times to check
+			fnc_ai_routine = function() end,	-- a function to call when the max number of checks is reached
+			fnc_reset = function() end,		-- a function to call to tell the sgroup what to do when not being attacked
+		}
+	]]	
+
+	if t_under_attack_mgr == nil then
+		t_under_attack_mgr = {}
+	end
+	
+	table.insert(t_under_attack_mgr, t_defender_mgr)
+	
+	if Rule_Exists(Util_UnderAttackCheck) == false then
+		Rule_AddInterval(Util_UnderAttackCheck, 3)
+	end
+	
+end
+
+function Util_RemoveUnderAttackItem(t_def_mgr)
+
+	for i=table.getn(t_under_attack_mgr), 1, -1 do 
+		if t_def_mgr == t_under_attack_mgr[i] then
+			table.remove(t_under_attack_mgr, i)
+			return true
+		end
+	end
+
+	return false
+
+end
+
+function Util_UnderAttackCheck()
+
+	for i=table.getn(t_under_attack_mgr), 1, -1 do 	
+		-- used so that I don't have to access the table for every call, and it makes the code faster to read
+		local t_defender_mgr = t_under_attack_mgr[i]
+		local sg = t_defender_mgr.sgroup
+		local counter = t_defender_mgr.counter
+		
+		if SGroup_IsEmpty(sg) then
+			table.remove(t_under_attack_mgr, i)
+		elseif SGroup_IsEmpty(sg) == false and SGroup_IsUnderAttack(sg, ANY, 5) then
+			if counter <= t_defender_mgr.counter_max then
+				-- increment the counter for this tank
+				t_defender_mgr.counter = counter + 1
+--~ 				print("Util_UnderAttackCheck -- Not Yet: "..counter)
+			
+			-- if the counter reaches the threshold, and the group is still under attack, then perform its AI routine
+			elseif counter > t_defender_mgr.counter_max then
+				t_defender_mgr.fnc_ai_routine()
+--~ 				print("Util_UnderAttackCheck: "..counter)
+				t_defender_mgr.counter = 0
+				
+			-- otherwise, if he was under attack, and is no longer under attack,
+			--  reset everything
+			end
+		elseif SGroup_IsEmpty(sg) == false and SGroup_IsUnderAttack(sg, ANY, 10) == false and t_defender_mgr.counter == 0 then
+			-- otherwise reset everything
+--~ 			print("Util_UnderAttackCheck: The rule is being reset")
+			t_defender_mgr.counter = -1
+			t_defender_mgr.fnc_reset()
+		end
+	end
+	
+	if table.getn(t_under_attack_mgr) <= 0 then
+		Rule_RemoveMe()
+	end
+	
+end
+
+
+function TEST()
+
+	testTemp = Objective_AddPing(OBJ_DestroyPanthers, Util_GetPosition_EVEN_IF_EMPTY(eg_player_hq), 10)
+	print(testTemp)
+
+end
