@@ -566,29 +566,25 @@ function RankDefendTargets()
 		local wHalfWidth = wWidth/2
 		local wHalfHeight = wHeight/2
 		
-		if table.getn(defend_point_ranking) > 0 then
-			table.sort(defend_point_ranking, function(a,b) return a.PriorityValue > b.PriorityValue end)
-			for idx,entry in pairs(defend_point_ranking) do
-				
-				if entry and entry.Point then
-					if Military_IsMilitaryPointValid(entry.Point) then
-						local entity = Military_GetMilitaryPointEntity(entry.Point)
-						if entity then
-							local entityPos = Entity_GetPosition(entity)
-							if entityPos and entityPos.x and entityPos.z then
-								local color
-								if entry.PriorityValue == 0 then
-									color = 0
-								else
-									color = math.min(255, math.max(0, math.ceil(255 * entry.PriorityValue/3 * 1.5)+120))
-								end
-								
-								dr_text2d("aicustomdebug2"..s_selfplayerid,
-									0.005 + (s_selfplayerid-1000)*0.25 + 0.21*(entityPos.x+wHalfWidth) / (wWidth+1),
-									0.005 + 0.6*(1 - (entityPos.z+wHalfHeight) / (wHeight+1)),
-									string.format("%.0f", entry.PriorityValue),
-									15+math.ceil(color/3), color, 15+math.ceil(color/3))
+		for idx,entry in pairs(defend_point_ranking) do
+			if entry and entry.Point then
+				if Military_IsMilitaryPointValid(entry.Point) then
+					local entity = Military_GetMilitaryPointEntity(entry.Point)
+					if entity then
+						local entityPos = Entity_GetPosition(entity)
+						if entityPos and entityPos.x and entityPos.z then
+							local color
+							if entry.PriorityValue == 0 then
+								color = 0
+							else
+								color = math.min(255, math.max(0, math.ceil(255 * entry.PriorityValue/3 * 1.5)+120))
 							end
+							
+							dr_text2d("aicustomdebug2"..s_selfplayerid,
+								0.005 + 0.8*     (entityPos.x+wHalfWidth ) / (wWidth +1)  * math.max(0.333, 1-math.min(1, wHeight/wWidth)),
+								0.005 + 0.8*(1 - (entityPos.z+wHalfHeight) / (wHeight+1)) * math.max(0.333, 1-math.min(1, wWidth/wHeight)),
+								string.format("%.0f", entry.PriorityValue),
+								15+math.ceil(color/3), color, 15+math.ceil(color/3))
 						end
 					end
 				end
@@ -674,26 +670,24 @@ function RankAttackTargets()
 		local wHalfWidth = wWidth/2
 		local wHalfHeight = wHeight/2
 		
-		if table.getn(attack_point_ranking) > 0 then
-			for idx,entry in pairs(attack_point_ranking) do
-				if entry and entry.Point and Military_IsMilitaryPointValid(entry.Point) then
-					local entity = Military_GetMilitaryPointEntity(entry.Point)
-					if entity then
-						local entityPos = Entity_GetPosition(entity)
-						if entityPos and entityPos.x and entityPos.z then
-							local color
-							if entry.PriorityValue == 0 then
-								color = 0
-							else
-								color = math.min(255, math.max(0, math.ceil(255 * entry.PriorityValue/2 * 1.5)+120))
-							end
-							
-							dr_text2d("aicustomdebug2"..s_selfplayerid,
-								0.005 + 0.8*     (entityPos.x+wHalfWidth ) / (wWidth +1)  * math.max(0.333, 1-math.min(1, wHeight/wWidth)),
-								0.005 + 0.8*(1 - (entityPos.z+wHalfHeight) / (wHeight+1)) * math.max(0.333, 1-math.min(1, wWidth/wHeight)),
-								string.format("%.0f", entry.PriorityValue),
-								color, 15+math.ceil(color/3), 15+math.ceil(color/3))
+		for idx,entry in pairs(attack_point_ranking) do
+			if entry and entry.Point and Military_IsMilitaryPointValid(entry.Point) then
+				local entity = Military_GetMilitaryPointEntity(entry.Point)
+				if entity then
+					local entityPos = Entity_GetPosition(entity)
+					if entityPos and entityPos.x and entityPos.z then
+						local color
+						if entry.PriorityValue == 0 then
+							color = 0
+						else
+							color = math.min(255, math.max(0, math.ceil(255 * entry.PriorityValue/2 * 1.5)+120))
 						end
+						
+						dr_text2d("aicustomdebug2"..s_selfplayerid,
+							0.005 + 0.8*     (entityPos.x+wHalfWidth ) / (wWidth +1)  * math.max(0.333, 1-math.min(1, wHeight/wWidth)),
+							0.005 + 0.8*(1 - (entityPos.z+wHalfHeight) / (wHeight+1)) * math.max(0.333, 1-math.min(1, wWidth/wHeight)),
+							string.format("%.0f", entry.PriorityValue),
+							color, 15+math.ceil(color/3), 15+math.ceil(color/3))
 					end
 				end
 			end
