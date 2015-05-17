@@ -617,21 +617,23 @@ AI:
 - Overhauled much of Attack and Defend targets logic. Key new features include:
  * Additional logic for moving units to corners of the map which weren't usually considered by the AI. This affects maps like Wolfheze most of all
  * Improved AI spreading out across the map overall.
+ * Significantly improved AIs rushing to the middle of the map at the beginning of the game.
  * Fixed an issue where AI would be too hesitant to advance onto enemy positions. This also massively improves the issue of it getting stuck on bridges.
- * Fixed AI for maps where HQ are closer together than normal (like Etavaux)
+ * Fixed AI for maps where HQ are closer together than normal (like Etavaux).
  * Further improved frontline forming and enemy encirclement by the AI.
  * AI is now more likely to defend areas with its attacking units, making it not leave any holes in its frontline and also resulting in fewer unit clumps when attacking.
  * AI will now consider targets distance from both friendly HQs instead of just its own.
  * AI will now respond to threats near its base and in friendly territory much better.
  * Improved defensive building placement.
+ * Introduced a balanced randomness element to how AI chooses its attack and defend targets which gets reset periodically to a new value, ensuring that AI will try new approaches rather than trying same strategies over and over. This also helps plug any holes in the overall targets logic.
 - AI will no longer idle for a number of seconds at the beginning of the game, it is initialized almost instantly.
-- Reduced instances where AI would get stuck and not do anything.
-- Reduced instances where AI would get stuck on bridges.
+- Significantly reduced instances where AI would get stuck and not do anything due to map types or topology.
+- Fixed an issue which caused AI to get stuck on and around bridges or some map areas.
 - Made crucial improvements and fixes to AI capture logic:
  * No more capturing under fire.
  * Can now capture non-connected territory if it wants to.
- * Reduced instances of the endless move-capture orders bug.
-- Difficulty settings adjusted and the resource bonuses have been reduced.
+ * Significantly reduced instances of the endless move-capture orders bug.
+- Difficulty settings adjusted and the resource bonuses have been reworked.
 - AI can now use reward units.
 - Significant improvements made to aicontrol script:
  * Added many more types of units to aicontrol such as AT guns, mobile artillery, snipers.
@@ -687,7 +689,6 @@ AI:
  * Grenades have had additional demand logic added so that they aren't thrown every time AI gets a target.
  * Repair changes - pioneers and engineers will find repair targets on larger distances (this helps repair bridges and idle tanks that will be around due to new aicontrol script), PE infantry had its repair radius and priority reduced to prevent mass repairs that tended to happen too often.
 - AI will sometimes buy flamethrowers on engineers and pioneers again. The demand function was not working correctly.
-- Reduced the amount AI points that were automatically randomly removed for increased performance. Users might notice a performance hit, however this also significantly improves AI behavior when playing alone.
 - Improved the way PE AI buys upgrades and techs up.
 
 Maps:
