@@ -1,0 +1,118 @@
+-- tactic filters
+--   return true or false
+
+function TacticFilter_TrivialAccept(squad)
+	return true
+end
+
+function TacticFilter_IsSquadEngineer(squad)
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+	if (sim_squad == nil) then
+		return false
+	end
+
+	return (Squad_GetBlueprint(sim_squad) == s_engineer)
+end
+
+function TacticFilter_TankMove(squad)
+	--if (not s_personality.tankmove_tactic_enabled) then
+		return false
+	--end
+	
+	-- no tactic if we're not actively engaged with an enemy vehicle
+	--[[local sim_squad = AISquad_ConvertToSimSquad(squad)
+	if (sim_squad == nil) then
+		return false
+	end
+
+	local target_squad = SquadQuery_GetAnySquadCombatTarget(sim_squad)
+	
+	if (target_squad == nil or not SquadQuery_IsVehicle(target_squad)) then
+		return false
+	end
+	
+	-- ALSO require that they not be already behind the target
+	return SquadIsInFront(sim_squad, target_squad)]]
+end
+
+function TacticFilter_TeamWeapon(squad)
+	return false
+end
+
+function TacticFilter_Avoid(squad)
+	-- should avoid this time?
+	return AI_RandRange(0,100) < s_personality.ability_avoidance_percentage
+end
+
+sk_timeBetweenMineDrops = 60*8
+s_greyhoundmine_dropTimer = 0
+function TacticFilter_GreyhoundMine(squad)
+	-- use a timer to determine if we should drop another greyhound mine
+	if (s_greyhoundmine_dropTimer < sk_timeBetweenMineDrops) then
+		s_greyhoundmine_dropTimer = s_greyhoundmine_dropTimer + 1
+		return false
+	end
+	
+	s_greyhoundmine_dropTimer = 0
+	
+	return true
+end
+
+function TacticFilter_IsBeingAttacked(squad)
+	return AISquad_HasBeenAttacked(squad, s_CombatHistoryTicks)
+end
+
+function TacticFilter_IsShooting(squad)
+	return AISquad_HasFiredWeapon(squad, s_CombatHistoryTicks)
+end
+
+function TacticFilter_IsShootingVehicle(squad)
+	if (not AISquad_HasFiredWeapon(squad, s_CombatHistoryTicks)) then
+		return false
+	end
+
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+	if sim_squad == nil then
+		-- abort
+		return nil
+	end
+
+	local target_squad = SquadQuery_GetAnySquadCombatTarget(sim_squad)
+	if (target_squad == nil or not SquadQuery_IsVehicle(target_squad)) then
+		-- no longer targeting a tank
+		return false
+	end
+
+	-- shooting and have a vehicle/building target
+	return true
+end
+
+
+function TacticFilter_InCombat(squad)
+	return TacticFilter_IsShooting(squad) or TacticFilter_IsBeingAttacked(squad)
+end
+
+function TacticFilter_HealthLow_SimSquad(sim_squad, threshold)
+	local h = Squad_GetHealth(sim_squad)
+	local hMax = Squad_GetHealthMax(sim_squad)
+	local hP = h / hMax
+	
+	return hP < threshold
+end
+
+function TacticFilter_HealthLow(squad)
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+	if (sim_squad == nil) then
+		return false
+	end
+	
+	return TacticFilter_HealthLow_SimSquad(sim_squad, s_LowHealthPercentage)
+end
+
+function TacticFilter_HealthLow_Entity(entity)
+	return Entity_GetHealthPercentage(entity) < s_LowHealthPercentage
+end
+
+function TacticFilter_RevertableEntity(entity)
+	return EntityQuery_IsRevertable(entity)
+end

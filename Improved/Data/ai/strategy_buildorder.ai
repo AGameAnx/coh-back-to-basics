@@ -1,0 +1,161 @@
+import("util/demand.ai")
+
+strategy_buildorder = {}
+
+--------------------------------------------------------------------------------
+
+function strategy_buildorder.trace(msg)
+	local ticks = World_GetGameTime() * 8
+	-- pipe this out also
+	msg = "[" .. ticks .. "]" .. msg
+
+	aitrace_ext("Build_Order_Strategy", msg)
+end
+function strategy_buildorder.trace_clear()
+	aitraceclear_ext("Build_Order_Strategy")
+end
+
+strategy_buildorder.init = function()
+	-- personality files have to be initialized at this point
+	dbAssert(s_personality ~= nil and s_personality.buildorder ~= nil)
+
+	s_buildorder_num = 1
+	s_lastbuilder_num = s_buildorder_num
+	
+	--strategy_buildorder.trace("BuildOrderChosen:"..s_personality.buildorder.name)
+end
+	
+strategy_buildorder.calculate_capture_priorities = function()
+	if (s_personality.buildorder == nil) then return end
+	
+	local fuel_mult = 1.0
+	local mt_mult = 1.0
+	local vp_mult = 1.0
+	local vphalf = 0
+	
+	if s_personality.buildorder.vp_mult ~= nil then
+		vp_mult = s_personality.buildorder.vp_mult
+		
+		if (cache.vp_total) then
+			-- rank half the VP points with this value and no more than 3
+			vphalf = math.min(math.ceil(cache.vp_total*0.5), 3)
+		end
+	end
+	
+	if s_personality.buildorder.fuel_mult ~= nil then
+		fuel_mult = s_personality.buildorder.fuel_mult
+	end
+	
+	if s_personality.buildorder.mt_mult ~= nil then
+		mt_mult = s_personality.buildorder.mt_mult
+	end
+	
+	RankCapturePoints(vp_mult, vphalf, fuel_mult, mt_mult)
+end
+
+strategy_buildorder.execute = function()
+	--strategy_buildorder.trace_clear()
+	if (s_personality.buildorder == nil) then return end
+	
+	--strategy_buildorder.trace("BuildOrderChosen:"..s_personality.buildorder.name)
+	
+	if (s_done~=true) then
+		local buildorder_list = s_personality.buildorder.list
+		for s_buildorder_num=s_lastbuilder_num, table.getn(buildorder_list) do
+			local current_build_order = buildorder_list[ s_buildorder_num ]
+			
+			-- if this step has a condition, evaluate it and determine if we should keep this step
+			if (current_build_order.condition == nil or current_build_order.condition()>0) then
+				if (current_build_order[1] == "query") then
+					if (current_build_order[2]==nil or current_build_order[2]()==false) then
+						-- determine if we should pass this list
+						--strategy_buildorder.trace("Waiting on something")
+
+						-- remember the last build number
+						s_lastbuilder_num = s_buildorder_num
+						return
+					end
+				elseif (current_build_order[1] == "capture") then
+					-- check to see if this is enabled
+					if s_components[COMPONENT_Resourcing] == true then
+						-- does nothing
+					end
+				elseif (current_build_order[1] == "produce" and current_build_order[3] ~= nil) then
+					local maxlimit = 1000
+					if (current_build_order.maxlimit ~= nil) then maxlimit = current_build_order.maxlimit end
+					
+					bcount = PBG_GetCount(s_selfplayer, current_build_order[3])
+					--strategy_buildorder.trace("Name:"..BP_GetName(current_build_order[3]).." NUm:"..bcount.." Max:"..maxlimit)
+					if (bcount < maxlimit) then
+						Request_Production(s_selfplayer, TGROUP_BuildOrder, TPRIORITY_BuildOrder, current_build_order[2], current_build_order[3], DEFAULT_HERO_ID)
+						--strategy_buildorder.trace("BuildOrder:Do produce order:"..BP_GetName(current_build_order[3]))
+					else
+						--strategy_buildorder.trace("Produce - but already have ("..bcount..") of "..BP_GetName(current_build_order[3]))
+					end
+				elseif (current_build_order[1] == "building") then
+					-- this should also account for how many are also in-proxy (this does count in-production)
+					local maxlimit = 1000
+					if (current_build_order.maxlimit ~= nil) then maxlimit = current_build_order.maxlimit end
+					
+					local bs_style = BS_NearBase
+					if (current_build_order.bs_style ~= nil) then bs_style = current_build_order.bs_style end
+					
+					local bcount = PBG_GetCount(s_selfplayer, current_build_order[2])
+					if (bcount < maxlimit) then
+						Request_Construction(s_selfplayer, TGROUP_BuildOrder, TPRIORITY_BuildOrder, current_build_order[2], bs_style)
+						-- if current_build_order[2] is in TechTreeBuildingTable
+						----s_personality.lastConstructionTime = World_GetTime()
+						--strategy_buildorder.trace("Do build building:"..BP_GetName(current_build_order[2]))
+					else
+						--strategy_buildorder.trace("Build - but already have ("..bcount..") of "..BP_GetName(current_build_order[2]))
+					end
+				end
+			end
+			-- remember the last order we processed
+			s_lastbuilder_num = s_buildorder_num
+		end
+		s_done = true
+	end
+end
+
+-- function to determine if the buildorder is done, so the game fallback to the dynamic rule system
+function strategy_buildorder.is_done()
+	if (s_done) then
+		local captureOrders = Task_Count(s_selfplayer, TASK_Capture)
+		local captureActive = Task_CountActive(s_selfplayer, TASK_Capture, true)
+		local MaxDamage = s_personality.max_damage
+		local MaxTime = s_personality.max_time
+		
+		-- count the number of tasks in the buildorder group, not including the capture tasks
+		local tasksInGroup = Task_CountInGroup(s_selfplayer, TGROUP_BuildOrder) - captureOrders
+		local tasksActiveInGroup = Task_CountActiveInGroup(s_selfplayer, TGROUP_BuildOrder) - captureActive
+		
+		--strategy_buildorder.trace("Buildorder: Tasks:"..tasksInGroup.." Active:"..tasksActiveInGroup)
+		
+		if s_personality.buildorder.max_damage ~= nil then MaxDamage = s_personality.buildorder.MaxDamage end
+		if s_personality.buildorder.max_damage ~= nil then MaxTime = s_personality.buildorder.MaxDamage end
+		
+		if MaxDamage ~= nil and MaxTime ~= nil then
+			if (AIPlayer_TotalDamageReceived(s_selfplayer)) > MaxDamage then
+				--strategy_buildorder.trace("Buildorder: Ended due to Maximum Damage being received")
+				return true
+			end
+			
+			if World_GetGameTime() > MaxTime then
+				--strategy_buildorder.trace("Buildorder: Ended due to hitting the Maximum Time")
+				return true
+			end
+		end
+		
+		if (tasksActiveInGroup == tasksInGroup) then
+			--strategy_buildorder.trace("Buildorder: Has been completed!")
+			return true
+		end
+		
+		--strategy_buildorder.trace("Buildorder: Has been submitted but has not been completed!")
+		return false
+	end
+	
+	--strategy_buildorder.trace("Buildorder: Has not finished submitted!")
+	return false
+end

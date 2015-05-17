@@ -1,0 +1,587 @@
+--------------------------------------------------------------
+-- Rules For The Purchasing Of Units
+
+----------------------------------------------------------------
+-- The purchase limits dictate the maximum amount of certain units to build
+----------------------------------------------------------------
+
+allied_purchase_limits = {
+	[BP_GetID(SBP.ALLIES.SERGEANT)] = 3,
+	[BP_GetID(SBP.ALLIES.HALFTRACK)] = 1,
+	[BP_GetID(SBP.ALLIES.JEEP)] = 1,
+	[BP_GetID(SBP.ALLIES.SNIPER)] = 3,
+	[BP_GetID(SBP.ALLIES.MORTAR)] = 2,
+	[BP_GetID(SBP.ALLIES.HEAVYMG)] = 3,
+	[BP_GetID(SBP.ALLIES.TRUCK)] = 0,
+	[BP_GetID(SBP.ALLIES.MEDIC)] = 2
+}
+
+allied_cw_purchase_limits = {
+	[BP_GetID(SBP.CW.BREN_CARRIER)] = 1,
+	[BP_GetID(SBP.CW.KANGAROO)] = 0,
+	[BP_GetID(SBP.CW.COMMANDOS_MORTAR)] = 2,
+}
+
+axis_purchase_limits = {
+	[BP_GetID(SBP.AXIS.MOTORCYCLE)] = 1,
+	[BP_GetID(SBP.AXIS.HALFTRACK)] = 2,
+	[BP_GetID(SBP.AXIS.VOLKSGRENADIER)] = 3,
+	[BP_GetID(SBP.AXIS.SNIPER)] = 3,
+	[BP_GetID(SBP.AXIS.MORTAR)] = 2,
+	[BP_GetID(SBP.AXIS.HEAVYMG)] = 3,
+	[BP_GetID(SBP.AXIS.OPEL_BLITZ_MEDIC)] = 1,
+	[BP_GetID(SBP.AXIS.GOLIATH)] = 0,
+	[BP_GetID(SBP.AXIS.OPELBLITZ)] = 0,
+	[BP_GetID(SBP.AXIS.NEBELWERFER)] = 2,
+}
+
+axis_pe_purchase_limits = {
+	[BP_GetID(SBP.ELITE.HALFTRACK_251)] = 0,
+	[BP_GetID(SBP.ELITE.HALFTRACK_VAMPIRE)] = 0,
+	[BP_GetID(SBP.ELITE.BERGETIGER)] = 0,
+	[BP_GetID(SBP.ELITE.KETTENRAD)] = 1,
+	[BP_GetID(SBP.ELITE.SCHWIMMWAGEN)] = 0,
+	[BP_GetID(SBP.ELITE.MORTAR)] = 1,
+}
+
+local sbpListCache = {}
+local ebpListCache = {}
+
+local sbpLists = {
+	HMG = {
+		SBP.AXIS.HEAVYMG,
+		SBP.ALLIES.HEAVYMG,
+	},
+	Sniper = {
+		SBP.AXIS.SNIPER,
+		SBP.ALLIES.SNIPER,
+	},
+	LightVehicle = {
+		SBP.AXIS.MOTORCYCLE,
+		SBP.ALLIES.JEEP,
+	},
+	Artillery = {
+		SBP.AXIS.NEBELWERFER,
+		SBP.CW.PRIEST,
+		SBP.ELITE.HUMMEL,
+		SBP.ALLIES.CALLIOPE,
+		SBP.ALLIES.HOWITZER,
+		SBP.ALLIES.M7,
+	},
+	ArtilleryTargets = {
+		SBP.ALLIES.HEAVYMG,
+		SBP.ALLIES.MORTAR,
+		SBP.ALLIES.AT_57MM,
+		
+		SBP.AXIS.HEAVYMG,
+		SBP.AXIS.MORTAR,
+		SBP.AXIS.PAK_40,
+		
+		SBP.CW.MORTAR,
+		SBP.CW.VICKERSMG,
+		SBP.CW.COMMANDOS_MORTAR,
+		SBP.CW.CAPTURE_MG,
+		SBP.CW.CAPTURE_MORTAR,
+		SBP.CW.CAPTURE_AXIS_ATGUN,
+		SBP.CW.CAPTURE_ATGUN,
+		SBP.CW.SIXPOUNDER,
+		
+		SBP.ELITE.MORTAR,
+		SBP.ELITE.HEAVYMG,
+	},
+}
+if (AI_IsMODCoHO() == true) then
+	sbpLists.HMG = {
+		SBP.AXIS.HEAVYMG,
+		SBP.ALLIES.HEAVYMG,
+		BP_GetSquadBlueprint("SBPs/Races/Allies/soldiers_heroic/sniper_squad_special_ops"),
+		BP_GetSquadBlueprint("SBPs/Races/Allies/soldiers_heroic/sniper_squad_survival"),
+		BP_GetSquadBlueprint("SBPs/Races/Axis/soldiers_heroic/sniper_eagle_eye"),
+		BP_GetSquadBlueprint("SBPs/Races/Axis/soldiers_heroic/sniper_field_specialist"),
+	}
+	sbpLists.Sniper = {
+		SBP.AXIS.SNIPER,
+		SBP.ALLIES.SNIPER,
+		BP_GetSquadBlueprint("SBPs/Races/Allies/soldiers_heroic/sniper_squad_special_ops"),
+		BP_GetSquadBlueprint("SBPs/Races/Allies/soldiers_heroic/sniper_squad_survival"),
+		BP_GetSquadBlueprint("SBPs/Races/Axis/soldiers_heroic/sniper_eagle_eye"),
+		BP_GetSquadBlueprint("SBPs/Races/Axis/soldiers_heroic/sniper_field_specialist"),
+	}
+	sbpLists.LightVehicle = {
+		SBP.AXIS.MOTORCYCLE,
+		SBP.ALLIES.JEEP,
+		BP_GetSquadBlueprint("SBPs/Races/Allies/vehicles_heroic/jeep_assault"),
+		BP_GetSquadBlueprint("SBPs/Races/Allies/vehicles_heroic/jeep_forward_observation_squad"),
+		BP_GetSquadBlueprint("SBPs/Races/Allies/vehicles_heroic/jeep_skilled"),
+		BP_GetSquadBlueprint("SBPs/Races/Axis/vehicles_heroic/motorcycle_accomplished"),
+		BP_GetSquadBlueprint("SBPs/Races/Axis/vehicles_heroic/motorcycle_fritz_squad"),
+		BP_GetSquadBlueprint("SBPs/Races/Axis/vehicles_heroic/motorcycle_squad_grenadier"),
+	}
+end
+
+local ebpLists = {
+	Artillery = {
+		EBP.AXIS.HOWITZER_88_NEST,
+		EBP.AXIS.LEFH_NEST,
+		EBP.AXIS.MORTAR_81MM_NEST,
+		EBP.CW.MORTAR_NEST,
+		EBP.CW.HOWITZER_NEST,
+		EBP.ALLIES.HOWITZER,
+	},
+	ArtilleryTargets = {
+		EBP.ALLIES.MG_NEST,
+		
+		EBP.AXIS.BUNKER,
+		EBP.AXIS.FLAK_88_NEST,
+		
+		EBP.CW.MG_NEST,
+		EBP.CW.BOFORS_NEST,
+		EBP.CW.ANTITANK_NEST,
+		EBP.CW.MORTAR_NEST,
+		
+		EBP.ELITE.MG42_NEST,
+		EBP.ELITE.FLAKVIERLING_NEST,
+		EBP.ELITE.FLAK_88_NEST,
+	},
+}
+
+function GetPlayerSquadAndEntityCountsPreCache() --  to alleviate lag issues this is called in the strategy file once per update cycle
+	sbpListCache = {}
+	ebpListCache = {}
+	
+	for sbpListId,sbpList in pairs(sbpLists) do
+		sbpListCache[sbpListId] = {Total=0}
+	end
+	for ebpListId,ebpList in pairs(ebpLists) do
+		ebpListCache[ebpListId] = {Total=0}
+	end
+	
+	local pcount = World_GetPlayerCount()
+	for p=1,pcount do
+		local player = World_GetPlayerAt(p)
+		for sbpListId,sbpList in pairs(sbpLists) do
+			sbpListCache[sbpListId][p] = 0
+		end
+		for ebpListId,ebpList in pairs(ebpLists) do
+			ebpListCache[ebpListId][p] = Player_GetBuildingsCountOnly(player, ebpList)
+			ebpListCache[ebpListId].Total = ebpListCache[ebpListId].Total + ebpListCache[ebpListId][p]
+		end
+		
+		-- These calculations are too slow. Need to split this into smaller update chunks
+		--[[local UpdateListCache = function(gid, idx, sid)
+			for sbpListId,sbpList in pairs(sbpLists) do
+				for i=1,table.getn(sbpList) do
+					if Squad_GetBlueprint(sid) == sbpList[i] then
+						sbpListCache[sbpListId].Total = sbpListCache[sbpListId].Total + 1
+						sbpListCache[sbpListId][p] = sbpListCache[sbpListId][p] + 1
+						break
+					end
+				end
+			end
+		end
+		SGroup_ForEach(Player_GetSquads(player), UpdateListCache)]]
+	end
+end
+
+function GetPlayerSquadCount(sbpListName, playerIndex)
+	if sbpListCache[sbpListName] then
+		if player then
+			return sbpListCache[sbpListName][playerIndex]
+		else
+			return sbpListCache[sbpListName].Total
+		end
+	end
+	return 0
+end
+function GetPlayerEntityCount(ebpListName, playerIndex)
+	if ebpListCache[ebpListName] then
+		if player then
+			return ebpListCache[ebpListName][playerIndex]
+		else
+			return ebpListCache[ebpListName].Total
+		end
+	end
+	return 0
+end
+
+function SniperDemand()
+	local num_hmgs = 0
+
+	local pcount = World_GetPlayerCount()
+	for p=1,pcount do
+		local player = World_GetPlayerAt(p)
+		if Player_IsAlive(player) then
+			if Player_GetTeam(player) ~= s_self_team then
+				num_hmgs = num_hmgs + GetPlayerSquadCount("HMG", p)
+			end
+		end
+	end
+
+	return math.min((num_hmgs-1)*1.5+math.min(World_GetGameTime()/35-10, 0), 0) -- increase sniper demand for each HMG that the enemy has
+end
+
+function LightVehicleDemand()
+	local num_snipers = 0
+	local num_light_vehicle = 0
+	local pcount = World_GetPlayerCount()
+	for p=1,pcount do
+		local player = World_GetPlayerAt(p)
+		if (Player_IsAlive(player)) then
+			if (Player_GetTeam(player) ~= s_self_team) then
+				num_snipers = num_snipers + GetPlayerSquadCount("Sniper", p)
+			else
+				num_light_vehicle = num_light_vehicle + GetPlayerSquadCount("LightVehicle", p)
+			end
+		end
+	end
+	
+	--strategy_unit_purchase.trace(string.format("   *Special light vehicle demand calculation. [Allied light vehicles: %d] [Enemy snipers: %d]", num_light_vehicle, num_snipers))
+	
+	--if (num_snipers <= num_light_vehicle) then
+		--strategy_unit_purchase.trace(string.format("   *there are not enough snipers for the light vehicles to hunt"))
+		--return DEMAND_NeverBuild -- there are not enough snipers for the light vehicles to hunt
+	--else
+		return math.min(-num_light_vehicle*0.75+num_snipers*0.5-1.35-World_GetGameTime()/100, 0) -- decrease demand for each additional light vehicle
+	--end
+end
+
+function MortarDemand()
+	local num_structures = 0
+	local num_squads = 0
+	local num_negative_structures = 0
+	local num_negative_squads = 0
+	local pcount = World_GetPlayerCount()
+	for p=1,pcount do
+		local player = World_GetPlayerAt(p)
+		if Player_IsAlive(player) then
+			if Player_GetTeam(player) ~= s_self_team then
+				num_structures = num_structures + GetPlayerEntityCount("ArtilleryTargets", p)
+				num_squads = num_squads + GetPlayerSquadCount("ArtilleryTargets", p)
+				num_negative_structures = num_negative_structures + GetPlayerEntityCount("Artillery", p)
+				num_negative_squads = num_negative_squads + GetPlayerSquadCount("Artillery", p)
+			end
+		end
+	end
+	return math.min(math.min(num_structures-1, 4)*2.5 + math.min(num_squads-1.5, 5)/3-2, 1)*4 - num_negative_structures*1.25 - num_negative_squads*0.75
+end
+
+function EngineerPioneerDemand(unitPBG)
+	-- should also do engineer demand (if we want tech/defences we should make sure
+	-- we have some engineers to build this stuff)
+	local totalEngineers = UtilPBG_CountTotal(s_engineer)
+	if unitPBG ~= nil and unitPBG ~= s_engineer then
+		totalEngineers = totalEngineers + UtilPBG_CountTotal(unitPBG)
+	end
+	
+	-- do not focus on engineers if base is under attack
+	if (cache.threat_at_base < 2) then
+		if (cache.percentage_pts_captured > 50) then
+			-- TODO: add exceptions (could see how many engineer tasks are requested to determine demand)
+			if (totalEngineers < s_personality.min_engineers_after_50_owned) then
+				--strategy_unit_purchase.trace("    *Engineer Demand HIGH returning 50")
+				return 5
+			end
+		else
+			if (totalEngineers < s_personality.min_engineers_below_50_owned) then
+				--strategy_unit_purchase.trace("    *Engineer Demand HIGH returning 50")
+				return 5
+			end
+		end
+	end
+	
+	local max_engineers
+	if (cache.num_allies == 0) then
+		max_engineers = s_personality.max_engineers
+	else
+		max_engineers = s_personality.max_engineers_with_teammates
+	end
+	
+	--strategy_unit_purchase.trace("    *EngineerDemand-MaxEngineersAllowed:"..max_engineers.." Total:"..totalEngineers)
+	if (totalEngineers >= max_engineers) then
+		return DEMAND_NeverBuild
+	end
+	
+	return math.min(cache.vehicle_count*4.75-1.25-totalEngineers*2.45, 15)
+end
+
+--------------------------------------------------------------
+-- Special Unit Demand Rules
+
+function Allied_SpecialUnitDemand(unitPBG, currentDemand)
+	local demand_increase = 0
+	
+	local curpopcap = AIResource_GetCurrentPopulation(s_selfplayer, CT_Personnel)
+	local maxpopcap = AIResource_GetMaxPopulation(s_selfplayer, CT_Personnel)
+	
+	local pbgid = BP_GetID(unitPBG)
+	
+	if (unitPBG == s_engineer) then
+		demand_increase = demand_increase + EngineerPioneerDemand() - 1
+	elseif (unitPBG == SBP.ALLIES.RIFLEMEN) then
+		demand_increase = demand_increase - math.sqrt(math.max(0, UtilPBG_CountAliveOrProduced(unitPBG)-0.75))*1.8+1.55 + (math.max(-12, math.min(0, maxpopcap-curpopcap-20)))*0.4
+	elseif (unitPBG == SBP.ALLIES.MORTAR) then
+		demand_increase = demand_increase + MortarDemand() - UtilPBG_CountAliveOrProduced(unitPBG)*25 + UtilPBG_CountAliveOrProduced(SBP.ALLIES.RIFLEMEN)*0.7-4
+	elseif (unitPBG == SBP.ALLIES.HEAVYMG) then
+		demand_increase = demand_increase - UtilPBG_CountAliveOrProduced(unitPBG)*5 + UtilPBG_CountAliveOrProduced(SBP.ALLIES.RIFLEMEN)*0.6 - 4
+	elseif (unitPBG == SBP.ALLIES.SNIPER) then
+		demand_increase = demand_increase + SniperDemand() - UtilPBG_CountAliveOrProduced(unitPBG)*6 + UtilPBG_CountAliveOrProduced(SBP.ALLIES.RIFLEMEN)*0.5
+	elseif (unitPBG == SBP.ALLIES.LOGISTICS_ENGINEER) then
+		demand_increase = demand_increase + EngineerPioneerDemand(unitPBG)
+	elseif (unitPBG == SBP.ALLIES.JEEP) then
+		demand_increase = demand_increase + LightVehicleDemand()-4.5
+	elseif (unitPBG == SBP.ALLIES.AT_57MM) then
+		demand_increase = demand_increase - UtilPBG_CountAliveOrProduced(unitPBG)*1.75 - math.min(2.5, World_GetGameTime()/300)
+	elseif (unitPBG == SBP.ALLIES.T17 or unitPBG == SBP.ALLIES.GREYHOUND or unitPBG == SBP.ALLIES.STUART) then
+		demand_increase = demand_increase + LightVehicleDemand() - math.max(-5, math.min(0, World_GetGameTime()/350+3))
+	elseif (unitPBG == SBP.ALLIES.MEDIC) then
+		demand_increase = demand_increase - UtilPBG_CountAliveOrProduced(unitPBG)*4 + UtilPBG_CountAliveOrProduced(SBP.ALLIES.RIFLEMEN)*0.35 - 2.5
+	elseif (unitPBG == SBP.ALLIES.SERGEANT) then
+		demand_increase = demand_increase + math.min(cache.infantry_count*0.125-2.75-UtilPBG_CountAliveOrProduced(SBP.ALLIES.SERGEANT)*15, (World_GetGameTime()/2-200)/10, 0)
+	elseif (unitPBG == SBP.ALLIES.COMMANDER) then
+		demand_increase = demand_increase + math.min(cache.infantry_count*0.15-4, (World_GetGameTime()-550)/10, 0)
+	end
+	return demand_increase
+end
+
+function Axis_SpecialUnitDemand(unitPBG, currentDemand)
+	local demand_increase = 0
+	
+	local curpopcap = AIResource_GetCurrentPopulation(s_selfplayer, CT_Personnel)
+	local maxpopcap = AIResource_GetMaxPopulation(s_selfplayer, CT_Personnel)
+	
+	local curResources = AIResource_GetCurrentResources(s_selfplayer)
+	local resRate = AIResource_GetCurrentResourceRate(s_selfplayer)
+	
+	if (unitPBG == SBP.AXIS.HEAVYMG) then
+		demand_increase = demand_increase - math.sqrt(math.max(100-World_GetGameTime(), 0)) + UtilPBG_CountAliveOrProduced(SBP.AXIS.VOLKSGRENADIER)*1.25 - UtilPBG_CountAliveOrProduced(SBP.AXIS.HEAVYMG)*1.65 - 5.0
+	elseif (unitPBG == s_engineer) then
+		demand_increase = demand_increase + EngineerPioneerDemand() - 1 + cache.vehicle_count/2
+	elseif (unitPBG == SBP.AXIS.VOLKSGRENADIER) then
+		demand_increase = demand_increase - math.sqrt(math.max(0, UtilPBG_CountAliveOrProduced(unitPBG)-0.75, 0))*1.2+2.15 - math.min(1.75, World_GetGameTime()/250) + (math.max(-12, math.min(0, maxpopcap-curpopcap-20)))*0.5
+	elseif (unitPBG == SBP.AXIS.GRENADIER) then
+		demand_increase = demand_increase - math.sqrt(math.max(UtilPBG_CountAliveOrProduced(unitPBG)-0.75, 0))*1.75+1.15 + (math.max(-12, math.min(0, maxpopcap-curpopcap-20)))*0.2
+	elseif (unitPBG == SBP.AXIS.MORTAR) then
+		demand_increase = demand_increase + MortarDemand() - UtilPBG_CountAliveOrProduced(unitPBG)*7 + math.min(World_GetGameTime()-375, 0)/10 - 11
+	elseif (unitPBG == SBP.AXIS.NEBELWERFER) then
+		demand_increase = demand_increase + MortarDemand() + curResources.munition/12 + resRate.munition/5 - 15 - UtilPBG_CountAliveOrProduced(unitPBG)*10
+	elseif (unitPBG == SBP.AXIS.HALFTRACK) then
+		demand_increase = demand_increase + MortarDemand()/2 + curResources.munition/6 + resRate.munition/4 - 25 - UtilPBG_CountAliveOrProduced(unitPBG)*5
+	elseif (unitPBG == SBP.AXIS.MOTORCYCLE) then
+		demand_increase = demand_increase + LightVehicleDemand()-4.5
+	elseif (unitPBG == SBP.AXIS.SCHWIMMWAGEN) then
+		demand_increase = demand_increase + LightVehicleDemand()-4.5
+	elseif (unitPBG == SBP.AXIS.SNIPER) then
+		demand_increase = demand_increase + SniperDemand() - UtilPBG_CountAliveOrProduced(unitPBG)*6
+	elseif (unitPBG == SBP.AXIS.OFFICER) then
+		demand_increase = demand_increase + math.min(cache.infantry_count*12-150, World_GetGameTime()-450, 5)
+	elseif (unitPBG == SBP.AXIS.PAK_40) then
+		demand_increase = demand_increase - 1.15 - math.min(1, math.max(0, 2-World_GetGameTime()/400))
+	elseif (unitPBG == SBP.AXIS.OPEL_BLITZ_MEDIC) then
+		demand_increase = demand_increase + cache.infantry_count*2-10
+	--[[elseif (unitPBG == SBP.AXIS.GOLIATH) then
+		-- always make sure there are at least 3 support units on your side before building a goliath
+		if (cache.military_non_engineer_count < 3) then
+			return DEMAND_NeverBuild
+		end
+		
+		local count = UtilPBG_CountTotal(unitPBG)
+		if (count>0) then
+			-- hard limit of 3-4
+			if (count>3) then
+				return DEMAND_NeverBuild
+			end
+			-- decrease demand by X for each additional goliath so we reduce the number of these units at the same time
+			demand_increase = demand_increase - count*100
+		end]]
+	end
+	return demand_increase
+end
+
+function AlliedCW_SpecialUnitDemand(unitPBG, currentDemand)
+	local demand_increase = 0
+	
+	local pbgid = BP_GetID(unitPBG)
+	
+	if (unitPBG == s_engineer) then
+		demand_increase = demand_increase + EngineerPioneerDemand()
+	elseif (unitPBG == SBP.CW.COMMANDOS_MORTAR) then
+		demand_increase = demand_increase + MortarDemand() - UtilPBG_CountAliveOrProduced(unitPBG)*25-4
+	elseif (unitPBG == SBP.CW.LIEUTENANT) then
+		local NumLt = UtilPBG_CountAliveOrProduced(unitPBG)
+		if NumLt < 1 then
+			demand_increase = demand_increase + 25
+		elseif NumLt == 1 then
+			demand_increase = demand_increase + 2
+		elseif NumLt == 2 then
+			demand_increase = demand_increase + 0
+		end
+		demand_increase = demand_increase + math.min(0, -100+World_GetGameTime())
+	elseif (unitPBG == SBP.CW.CAPTAIN) then
+		local NumSap = UtilPBG_CountAliveOrProduced(SBP.CW.SAPPER)
+		if UtilPBG_CountAliveOrProduced(SBP.CW.ARMOUR_HQ) >= 1 then
+			demand_increase = demand_increase - 2
+		end
+		if NumSap < 1 then
+			demand_increase = demand_increase - 1.5
+		elseif NumSap == 1 then
+			demand_increase = demand_increase + 15
+		elseif NumSap >= 2 then
+			demand_increase = demand_increase + 30
+		end
+	elseif (unitPBG == SBP.CW.SAPPER) then
+		local NumSelf = UtilPBG_CountAliveOrProduced(unitPBG)
+		local NumCapt = UtilPBG_CountAliveOrProduced(SBP.CW.CAPTAIN)
+		if NumSelf < 1 then
+			demand_increase = demand_increase + 10
+		elseif NumSelf >= 1 and NumCapt <= 0 then
+			demand_increase = demand_increase + 5
+		elseif NumSelf >= 1 and NumCapt >= 1 then
+			demand_increase = demand_increase + 0
+		end
+	elseif (unitPBG == SBP.CW.INFANTRY_HQ) then
+		demand_increase = demand_increase + 100
+	elseif (unitPBG == SBP.CW.ARMOUR_HQ) then
+		demand_increase = demand_increase + 5 + UtilPBG_CountAliveOrProduced(EBP.CW.HOWITZER_NEST)*10
+	end
+	
+	return demand_increase
+end
+
+function AxisPE_SpecialUnitDemand(unitPBG, currentDemand)
+	local demand_increase = 0
+	
+	-- Note: no engineer demand because it caps grenadier count and we don't want that
+	if (unitPBG == SBP.ELITE.KETTENRAD) then
+		demand_increase = demand_increase - cache.percentage_pts_captured*10 - 35
+	elseif (unitPBG == SBP.ELITE.ARMOURCAR_221) then
+		demand_increase = demand_increase - cache.percentage_pts_captured*3 - UtilPBG_CountAliveOrProduced(unitPBG)
+	elseif (unitPBG == SBP.ELITE.HALFTRACK_MORTAR) then
+		demand_increase = demand_increase + MortarDemand() - UtilPBG_CountAliveOrProduced(unitPBG)*40 + math.min(World_GetGameTime()-150, 0)/5
+	end
+	
+	return demand_increase
+end
+
+--------------------------------------------------------------
+-- Special Ability Demand Rules
+
+-- {SQUADS, LIMIT, INITIAL_PRIORITY, PRIORITY_DECREASE_PER_SQUAD (optional), PRIORITY_FUNC (optional)}
+
+allied_callin_settings = {
+	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_M7)]				= {{SBP.ALLIES.M7}, 1, 1, 4},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_CALLIOPE)]			= {{SBP.ALLIES.CALLIOPE}, 2, 9, 5},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_ASSAULT_SHERMAN)]	= {{SBP.ALLIES.SHERMAN_ASSAULT}, 2, 1, 1},
+	
+	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_PARADROP)]			= {{SBP.ALLIES.PARATROOPER}, 3, 7, 2},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_PARADROP_AT)]		= {{SBP.ALLIES.PARATROOPER_AT_57MM, SBP.ALLIES.AT_57MM}, 5, 1, 1},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_RANGERS)]			= {{SBP.ALLIES.RANGER}, 4, 5, 1.5},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_COMBAT_GROUP_NEW)]	= {{SBP.ALLIES.HELLCAT, SBP.ALLIES.RANGER, SBP.ALLIES.RIFLEMEN}, 12, 22, 3},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_ARMORED_INF)]		= {{SBP.ALLIES.LOGISTICS_ENGINEER}, 2, 2, 2},
+	
+	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_PERSHING)]			= {{SBP.ALLIES.M36_JACKSON}, 3, 9, 3},
+	--[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_SCOTT)]				= {{SBP.ALLIES.SCOTT}, 1, 0, 2},
+	
+	[BP_GetID(ABILITY.ALLIES.PARADROP_ENGINEERS)]						= {{}, 1, 1000, 0},
+}
+
+allied_cw_callin_settings = {
+	[BP_GetID(ABILITY.COMMANDER_TREE.CW.RECRUIT_KANGAROO)]				= {{SBP.CW.KANGAROO, SBP.CW.TOMMIES_CANADIAN}, 0, 0, 0},
+	[BP_GetID(ABILITY.COMMANDER_TREE.CW.RECRUIT_PRIEST)]				= {{SBP.CW.PRIEST}, 2, 3, 3},
+	
+	[BP_GetID(ABILITY.COMMANDER_TREE.CW.RECRUIT_HIGHLANDERS)]			= {{EBP.CW.HIGHLANDERS}, 3, 1.5, 1},
+	[BP_GetID(ABILITY.COMMANDER_TREE.CW.GLIDER_COMMANDOS)]				= {{EBP.CW.GLIDER_COMMANDOS, SBP.CW.COMMANDOS}, 3, 1.5, 2},
+	[BP_GetID(ABILITY.COMMANDER_TREE.CW.GLIDER_HQ)]						= {{EBP.CW.GLIDER_HQ}, 1, 1, 0},
+	
+	[BP_GetID(ABILITY.COMMANDER_TREE.CW.GLIDER_TETRARCH)]				= {{EBP.CW.GLIDER_TETRARCH, SBP.CW.TETRARCH}, 1, 0, 0},
+	[BP_GetID(ABILITY.COMMANDER_TREE.CW.RECRUIT_CHURCHILL)]				= {{SBP.CW.CHURCHILL}, 3, 3, 2},
+	[BP_GetID(ABILITY.COMMANDER_TREE.CW.RECRUIT_STAGHOUND)]				= {{SBP.CW.STAGHOUND}, 3, 2, 2},
+	--[BP_GetID(ABILITY.COMMANDER_TREE.CW.RECRUIT_CUCKOO)]				= {{SBP.CW.CUCKOO}, 2, 10, 5},
+	
+	[BP_GetID(ABILITY.CW.HQ_REINFORCE)]									= {{}, 1, 1000, 0},
+}
+
+axis_callin_settings = {
+	[BP_GetID(ABILITY.COMMANDER_TREE.AXIS.RECRUIT_STORMTROOPERS)]		= {{SBP.AXIS.STORMTROOPER}, 4, 4, 1},
+	[BP_GetID(ABILITY.COMMANDER_TREE.AXIS.RECRUIT_WAFFENSS)]			= {{SBP.AXIS.WAFFENSS}, 3, 2, 1},
+	[BP_GetID(ABILITY.COMMANDER_TREE.AXIS.RECRUIT_STURMPIONEERS)]		= {{SBP.AXIS.STURMPIONEER}, 2, 2, 2},
+	
+	[BP_GetID(ABILITY.COMMANDER_TREE.AXIS.RECRUIT_STUH42)]				= {{SBP.AXIS.STUH}, 2, 3, 6},
+	[BP_GetID(ABILITY.COMMANDER_TREE.AXIS.RECRUIT_GESCHUTZWAGEN)]		= {{SBP.AXIS.GESCHUTZWAGEN}, 3, 2, 1},
+	
+	[BP_GetID(ABILITY.COMMANDER_TREE.AXIS.RECRUIT_TIGER)]		= {{}, 15, 0, 0},
+	
+	[BP_GetID(ABILITY.AXIS.PIONEERS_REINFORCEMENT)]						= {{}, 1,1000, 0},
+}
+
+axis_pe_callin_settings = {
+	[BP_GetID(ABILITY.COMMANDER_TREE.ELITE.RECRUIT_LUFTWAFFE)]			= {{SBP.ELITE.LUFTWAFFE}, 1, 1, 2},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ELITE.RECRUIT_FALLSCHIRMJAGER_PAK)]= {{SBP.ELITE.FALLSCHIRMJAGER_PAK}, 3, 3, 2},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ELITE.RECRUIT_FALLSCHIRMJAGER)]	= {{SBP.ELITE.FALLSCHIRMJAGER}, 3, 8, 4},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ELITE.RECRUIT_GEBIRGSJAGER)]		= {{SBP.ELITE.GEBIRGSJAGER}, 2, 2, 2},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ELITE.DRACHE_DROP_OFF)]			= {{SBP.ELITE.FALLSCHIRMJAGER_HMG, SBP.ELITE.FALLSCHIRMJAGER_MORTAR}, 3, 2, 1},
+	
+	[BP_GetID(ABILITY.COMMANDER_TREE.ELITE.BERGE_TIGER)]				= {{SBP.ELITE.BERGETIGER}, 0, 0, 0},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ELITE.RECRUIT_NASHORN)]			= {{SBP.ELITE.NASHORN}, 2, 3, 3},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ELITE.WIRBLE_WIND)]				= {{SBP.ELITE.WIRBLEWIND}, 2, 4, 3},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ELITE.RECRUIT_HUMMEL)]				= {{SBP.ELITE.HUMMEL}, 2, 4, 5},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ELITE.RECRUIT_HOTCHKISS)]			= {{SBP.ELITE.HOTCHKISS}, 2, 2, 2},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ELITE.RECRUIT_HETZER)]				= {{SBP.ELITE.HETZER}, 3, 3, 3},
+	--[BP_GetID(ABILITY.COMMANDER_TREE.ELITE.RECRUIT_JAGDPANTHER)]		= {{SBP.ELITE.JAGDPANTHER}, 2, 15, 10},
+	
+	[BP_GetID(ABILITY.ELITE.GREN_REINFORCEMENT_SMALL)]				    = {{}, 1, 1000, 0},
+	[BP_GetID(ABILITY.ELITE.GREN_REINFORCEMENT_LARGE)]				    = {{}, 1, 1000, 0},
+}
+
+function CallInDemand(abilityPBG, t)
+	local v = t[BP_GetID(abilityPBG)]
+	if v then
+		local count = 0
+		for i=1,table.getn(v[1]) do
+			if type(v[1][i]) == "nil" then
+				CustomDebug.Print("Bad reference @ "..BP_GetName(abilityPBG).."["..i.."]")
+			else
+				count = count + UtilPBG_CountAliveOrProduced(v[1][i])
+				if count >= v[2] then
+					return DEMAND_NeverBuild
+				end
+			end
+		end
+		
+		local initial_priority, decrease, func_priority
+		if v[3] then
+			initial_priority = v[3]
+		else
+			initial_priority = 0
+		end
+		if v[4] then
+			decrease = v[4]
+		else
+			decrease = 0
+		end
+		if v[5] then
+			func_priority = v[5](abilityPBG)
+		else
+			func_priority = 0
+		end
+		
+		--CustomDebug.Print("CallIn demand for "..BP_GetName(abilityPBG).." :: count: "..count.." -> "..(initial_priority - decrease*count + func_priority))
+		return initial_priority - decrease*count + func_priority
+	end
+	return 0
+end
+
+function Allied_SpecialUnitAbilityDemand(abilityPBG, currentDemand)
+	return CallInDemand(abilityPBG, allied_callin_settings)
+end
+
+function Axis_SpecialUnitAbilityDemand(abilityPBG, currentDemand)
+	return CallInDemand(abilityPBG, axis_callin_settings)
+end
+
+function AlliedCW_SpecialUnitAbilityDemand(abilityPBG, currentDemand)
+	return CallInDemand(abilityPBG, allied_cw_callin_settings)
+end
+
+function AxisPE_SpecialUnitAbilityDemand(abilityPBG, currentDemand)
+	return CallInDemand(abilityPBG, axis_pe_callin_settings)
+end

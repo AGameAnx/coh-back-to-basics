@@ -1,0 +1,33 @@
+
+
+-- overrides of the defaults
+s_personality.name = "Easy Personality"
+
+s_personality.start_attack_time = 60
+s_personality.start_attack_time_variance = 30
+s_personality.default_attack_percentage = 0.1
+s_personality.fallback_chance = 0.25
+s_personality.retreat_chance = 0.3
+s_personality.min_military_value_start = 40
+s_personality.min_military_value_increment_per_minute = 2
+s_personality.glue_military_percentage = 1.2
+
+s_personality.ability_avoidance_percentage = 10
+s_personality.demand_variance = 0.75
+
+s_personality.defensiveness = 0.6
+s_personality.max_secured_pts = 4
+s_personality.default_percentage_to_capture = 0.3
+s_personality.max_percentage_to_capture = 0.5
+s_personality.max_percentage_vp_wanted = 0.7
+s_personality.vp_ticker_warning_level = 125
+s_personality.capture_percentage_growth_start_time = 2*60
+s_personality.capture_percentage_growth_per_min = 0.015
+
+s_personality.tankmove_tactic_enabled = false
+
+s_personality.use_military_strength_percentage_cap = true
+s_personality.military_strength_percentage_cap = 1.2
+
+s_personality.purchase_delay_pace = 4
+s_personality.threat_aggressiveness = 0.4

@@ -1,0 +1,238 @@
+-- tactic entity target filters
+--   return an entity, or nil
+
+function EntityTargetFilter_TrivialAccept(squad, target_entities)
+	return EGroup_GetSpawnedEntityAt(target_entities, 1)
+end
+
+function EntityTargetFilter_FirstEnemy(squad, target_entities)	
+	return get_first_enemy_entity(target_entities)
+end
+
+function EntityTargetFilter_FirstEnemyStructure(squad, target_entities)	
+	return get_first_enemy_entity_filter(target_entities, EntityQuery_IsStructure)
+end
+
+function EntityTargetFilter_AcceptBarbwire(squad, target_entities)
+	if s_enemy_barbwire then return AISquad_GetClosestObstructionOfType(squad, s_ObstructionSearchRadius, s_enemy_barbwire) end
+	return World_Pos(COORD_INVALID, COORD_INVALID, COORD_INVALID)
+end
+
+function EntityTargetFilter_FirstHold(squad, target_entities)
+	-- dont want to load into vehicles, this works because vehicles are not passed in
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+	local squadHoldEntity = Squad_GetHoldEntity(sim_squad)
+	if squadHoldEntity then return squadHoldEntity end
+	
+	local distance
+	local result
+	
+	local count = EGroup_CountSpawned(target_entities)
+	for i=1,count do
+		local target_entity = EGroup_GetSpawnedEntityAt(target_entities, i)
+		local newDist = World_DistanceSquaredPointToPoint(AISquad_GetAnchorPos(squad), Entity_GetPosition(target_entity))
+		if Entity_CanLoadSquad(target_entity, sim_squad, true, false) and (not distance or distance > newDist) and Entity_GetHealth(target_entity) > 150 then
+			result = target_entity
+			distance = newDist
+		end
+	end
+	
+	return result
+end
+
+function EntityTargetFilter_FirstGarrisoned(squad, target_entities)
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+	local tempsg =  SGroup_Create("FirstGarrisonTempSG")
+	local count = EGroup_CountSpawned(target_entities)
+	for i=1, count do
+		local target_entity = EGroup_GetSpawnedEntityAt(target_entities, i)
+		if not Entity_IsVehicle(target_entity) and Entity_GetSquadsHeld(target_entity, tempsg) then
+			SGroup_Destroy(tempsg)
+			return target_entity
+		end
+	end
+	SGroup_Destroy(tempsg)
+	return nil
+end
+
+-- this is a special tactic that doesn't take an entitygroup to choose from
+function EntityTargetFilter_Obstruction(squad, ents)
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+	if sim_squad == nil then
+		-- abort
+		return nil
+	end
+	
+	local target_squad = SquadQuery_GetAnySquadCombatTarget(sim_squad)
+	if target_squad ~= nil then
+		-- dont kil obstructions if we already have a target
+		return nil
+	end
+	
+	-- ask the obstruction system for the closest obstruction
+	-- pass in true to filter out allied obstructions (may need revisit)
+	local entity_target = AISquad_GetClosestObstruction(squad, s_ObstructionSearchRadius, false)
+	
+	return entity_target
+end
+
+
+-- this is a special tactic that doesn't take an entitygroup to choose from
+function EntityTargetFilter_Obstruction_Wire(squad, ents)
+	local target = EntityTargetFilter_Obstruction(squad,ents)
+	
+	if target == nil then
+		return nil
+	end
+
+	if s_enemy_barbwire == nil then
+		return nil
+	end
+	
+	if Entity_GetBlueprint(target) ~= s_enemy_barbwire then
+		return nil
+	end
+
+	return target
+end
+
+function EntityTargetFilter_FirstFriendlyStructure_LowHealth(squad, target_entities)	
+	return get_first_friendly_entity_filter(target_entities, TacticFilter_HealthLow_Entity)
+end
+
+function EntityTargetFilter_FirstRepairableStructure(squad, target_entities)	
+	-- look for special repairables
+	local count = EGroup_CountSpawned(target_entities)
+	for i=1, count do
+		local target_entity = EGroup_GetSpawnedEntityAt(target_entities, i)
+		
+		if is_friendly_entity(target_entity) then
+			if Entity_IsOfType(target_entity, "hq_wreck") then
+				return target_entity
+			end
+		else
+			if not is_enemy_entity(target_entity) then
+				-- a neutral - wrecked bridges are good to go
+				if Entity_IsOfType(target_entity, "wrecked_bridge") then
+					return target_entity
+				end				
+			end
+		end
+	end	
+
+	-- fall back on looking for low health friendlies
+	return get_first_friendly_entity_filter(target_entities, TacticFilter_HealthLow_Entity)
+end
+
+
+function EntityTargetFilter_FindRevertableBuilding(squad, target_entities)	
+	return get_first_enemy_entity_filter(target_entities, TacticFilter_RevertableEntity)
+end
+
+function EntityTargetFilter_FirstScorchedPoint(squad, target_entities)
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+	local squadpos = Squad_GetPosition(sim_squad)
+
+	-- for each neutral military point, look for entities (points) that have been 'scorched'
+	local militaryPoint_count = Military_GetNeutralMilitaryPointCount(s_selfplayer)
+	for i=0, militaryPoint_count-1 do
+		
+		local militaryPoint = Military_GetNeutralMilitaryPointAt(s_selfplayer, i)
+		
+		if Military_IsMilitaryPointValid(militaryPoint) then
+			local target_entity = Military_GetMilitaryPointEntity(militaryPoint)
+			
+			if not Modifier_IsEnabled(target_entity, "modifiers\\enable_capture_entity_modifier.lua", true) then
+				-- scorched!, use it if it is close enough
+				local ePos = Entity_GetPosition(target_entity)
+				
+				if World_DistanceSquaredPointToPoint(squadpos, ePos) < 35*35 then
+					return target_entity
+				end
+			end
+		end
+	end
+	
+	return nil
+end
+
+function EntityTargetFilter_FirstBoobyTrapTarget(squad, target_entities)
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+	local squadpos = Squad_GetPosition(sim_squad)
+
+	-- look for entities (points) that aren't booby trapped
+	
+	-- for each neutral military point
+	local neutralMilitaryPointCount = Military_GetNeutralMilitaryPointCount(s_selfplayer)
+	for i=0,neutralMilitaryPointCount-1 do
+		local militaryPoint = Military_GetNeutralMilitaryPointAt(s_selfplayer, i)
+		
+		if Military_IsMilitaryPointValid(militaryPoint) then
+			local target_entity = Military_GetMilitaryPointEntity(militaryPoint)
+			
+			if not Entity_IsDemolitionReady(target_entity) then
+				local ePos = Entity_GetPosition(target_entity)
+				
+				if World_DistanceSquaredPointToPoint(squadpos, ePos) < 50 then
+					return target_entity
+				end
+			end
+		end
+	end
+	
+	-- for each friendly military point
+	local friendlyMilitaryPointCount = Military_GetMilitaryPointCount(s_selfplayer, s_self_modplayer)
+	for j=0, friendlyMilitaryPointCount-1 do
+		local militaryPoint = Military_GetMilitaryPointAt(s_selfplayer, s_self_modplayer, j)
+	
+		if Military_IsMilitaryPointValid(militaryPoint) then
+			local target_entity = Military_GetMilitaryPointEntity(militaryPoint)
+			
+			if not Entity_IsDemolitionReady(target_entity) then
+				local ePos = Entity_GetPosition(target_entity)
+				
+				if World_DistanceSquaredPointToPoint(squadpos, ePos) < 50 then
+					return target_entity
+				end
+			end
+		end
+	end
+	
+	return nil
+end
+
+function EntityTargetFilter_PickUp(squad, target_entities)
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+	
+	local count = EGroup_CountSpawned(target_entities)
+	for i=1, count do
+		local target_entity = EGroup_GetSpawnedEntityAt(target_entities, i)
+		
+		-- if you are allied player and this is a cargo-drop (check so we only pickup our own drops)
+		if (Entity_GetBlueprint(target_entity) == s_cargodrop and s_current_race == TRACE_ALLIES) then
+			local cargo_playerid = Player_GetID(Entity_GetPlayerOwner(target_entity))
+			-- make sure this is ours
+			if (cargo_playerid == s_selfplayerid) then
+				return target_entity
+			end
+		else
+			return target_entity
+		end
+	end
+	
+	return nil
+end
+
+function EntityTargetFilter_CaptureTeamWeapon(squad, target_entities)
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+	
+	local count = EGroup_CountSpawned(target_entities)
+	for i=1, count do
+		local target_entity = EGroup_GetSpawnedEntityAt(target_entities, i)
+		if (Squad_CanCaptureTeamWeapon(sim_squad, target_entity)) then
+			return target_entity
+		end
+	end
+	
+	return nil
+end

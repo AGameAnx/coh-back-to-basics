@@ -1,0 +1,205 @@
+-- util
+
+local base_sectors = {}
+for i=1,World_GetPlayerCount() do
+	base_sectors[i] = World_GetTerritorySectorID(Player_GetStartingPosition(World_GetPlayerAt(i)))
+end
+
+function is_in_base_sector(pos)
+	for i=1,World_GetPlayerCount() do
+		if World_GetTerritorySectorID(pos) == base_sectors[i] then
+			return true
+		end
+	end
+	return false
+end
+
+function check_clump(pos, radius, threshold, infantry)
+	if threshold == nil then threshold = 2 end
+	if radius == nil then radius = 20 end
+	if infantry == nil then infantry = true end
+	--[[CustomDebug.Print("check_clump")
+	local count = 0
+	CustomDebug.Print("1")
+	for i=1,World_GetPlayerCount() do
+		local p = World_GetPlayerAt(i)
+		if Player_GetRelationship(s_self_modplayer, p) == R_ENEMY then
+			CustomDebug.Print("2")
+			local sg = SGroup_Create("clump_check_sg")
+			--Scar_DoString("local sg = SGroup_Create(\"clump_check_sg\") local pos = World_Pos(52, 10, -79) Player_GetAllSquadsNearMarker(World_GetPlayerAt(2), sg, pos, 25)")
+			CustomDebug.Print(string.format("3 --[ player: %d pos: (%.2f, %.2f, %.2f) radius: %.2f]", World_GetPlayerIndex(p), pos.x, pos.y, pos.z, radius))
+			CustomDebug.Print(tostring(Player_GetAllSquadsNearMarker))
+			Player_GetAllSquadsNearMarker(p, sg, pos, radius)
+			CustomDebug.Print("4")
+			for j=1,SGroup_CountSpawned(sg) do
+				local squad = SGroup_GetSpawnedSquadAt(j)
+				if not SquadQuery_IsVehicle(squad) == infantry then
+					CustomDebug.Print("5")
+					count = count + 1
+				end
+			end
+			SGroup_Destroy(sg)
+		end
+	end
+	CustomDebug.Print("end")
+	return count >= threshold]]
+	return true
+end
+
+function is_enemy_squad(target_squad)
+	if not World_OwnsSquad(target_squad) then
+		local target_player = Squad_GetPlayerOwner(target_squad)
+		return Player_GetRelationship(s_self_modplayer, target_player) == R_ENEMY
+	end
+	return false
+end
+
+function is_friendly_squad(target_squad)
+	if not World_OwnsSquad(target_squad) then
+		local target_player = Squad_GetPlayerOwner(target_squad)
+		return Player_GetRelationship(s_self_modplayer, target_player) == R_ALLY
+	end
+	return false
+end
+
+function is_enemy_entity(target_entity)
+	if not World_OwnsEntity(target_entity) then
+		local target_player = Entity_GetPlayerOwner(target_entity)
+		return Player_GetRelationship(s_self_modplayer, target_player) == R_ENEMY
+	end
+	return false
+end
+
+function is_friendly_entity(target_entity)
+	if not World_OwnsEntity(target_entity) then
+		local target_player = Entity_GetPlayerOwner(target_entity)
+		return Player_GetRelationship(s_self_modplayer, target_player) == R_ALLY
+	end
+	return false
+end
+
+function get_first_enemy_entity_filter(target_entities, filterPred)
+	local count = EGroup_CountSpawned(target_entities)
+	for i=1, count do
+		local target_entity = EGroup_GetSpawnedEntityAt(target_entities, i)
+		
+		if is_enemy_entity(target_entity) then
+			if filterPred == nil or filterPred(target_entity) then
+				return target_entity
+			end
+		end
+	end
+	return nil
+end
+
+function get_first_friendly_entity_filter(target_entities, filterPred)
+	local count = EGroup_CountSpawned(target_entities)
+	for i=1, count do
+		local target_entity = EGroup_GetSpawnedEntityAt(target_entities, i)
+		
+		if is_friendly_entity(target_entity) then
+			if filterPred == nil or filterPred(target_entity) then
+				return target_entity
+			end
+		end
+	end
+	return nil
+end
+
+function get_first_enemy_squad_filter(target_squads, filterPred)
+	local count = SGroup_CountSpawned(target_squads)
+	for i=1, count do
+		local target_squad = SGroup_GetSpawnedSquadAt(target_squads, i)
+		if is_enemy_squad(target_squad) and not Squad_IsRetreating(target_squad) then
+			-- check functor  --  and AIPlayer_CanSeeSquad(s_selfplayer, target_squad)
+			if ((filterPred == nil or filterPred(target_squad))) then
+				return target_squad
+			end
+		end
+	end
+	return nil
+end
+
+function get_first_friendly_squad_filter(target_squads, filterPred)
+	local count = SGroup_CountSpawned(target_squads)
+	for i=1, count do
+		local target_squad = SGroup_GetSpawnedSquadAt(target_squads, i)
+		if is_friendly_squad(target_squad) and not Squad_IsRetreating(target_squad) and not Squad_IsInHoldEntity(target_squad) then
+			-- check functor
+			if filterPred == nil or filterPred(target_squad) then
+				return target_squad
+			end
+		end
+	end
+	return nil
+end
+
+function get_first_enemy_entity(target_entities)
+	return get_first_enemy_entity_filter(target_entities, nil)
+end
+
+function get_first_enemy_squad(target_squads)
+	return get_first_enemy_squad_filter(target_squads, nil)
+end
+
+function get_first_enemy_hmg_squad(target_squads)
+	return get_first_enemy_squad_filter(target_squads, SquadIsHMG)
+end
+
+function get_first_enemy_squad_vehicle(target_squads)
+	return get_first_enemy_squad_filter(target_squads, SquadQuery_IsVehicle)
+end
+
+function is_not_vehicle(target_squad)
+	return not SquadQuery_IsVehicle(target_squad) and not Squad_IsInHoldSquad(target_squad)
+end
+
+function have_clumps(squad)
+	return AIPlayer_GetBestClumpIdx(s_selfplayer, squad, s_NearClumpDistanceCap) >= 0
+end
+
+function have_clumps_near(squad)
+	return AIPlayer_GetBestClumpIdx(s_selfplayer, squad, s_NearClumpDistanceCap_Small) >= 0
+end
+
+function have_clumps_near_range(squad, range)
+	return AIPlayer_GetBestClumpIdx(s_selfplayer, squad, range) >= 0
+end
+
+function PointIsInFrontOfSquad(localPos, other_squad)
+	local targetHeading = Squad_GetHeading(other_squad)
+	if targetHeading.x == 0 and targetHeading.z == 0 then
+		-- crazy physics?
+		return false
+	end
+	local targetPos = Squad_GetPosition(other_squad)
+	local targetPosRef = {x=targetPos.x + targetHeading.x,z=targetPos.z + targetHeading.z}
+	local V1 = {x = targetPosRef.x - targetPos.x, z = targetPosRef.z - targetPos.z}
+	local V2 = {x = localPos.x - targetPos.x,z = localPos.z - targetPos.z}
+	local V1L = math.sqrt(V1.x*V1.x+V1.z*V1.z)
+	local V2L = math.sqrt(V2.x*V2.x+V2.z*V2.z)	
+	if V1L == 0 or V2L == 0 then
+		-- heading is screwy
+		return false
+	end
+	local cosAlpha = (V1.x * V2.x + V1.z * V2.z) / (V1L*V2L)
+	local alpha = math.acos(cosAlpha)
+	return alpha >= -1.570795 and alpha <= 1.570795
+end
+
+function is_low_health_vehicle(target_squad)
+	if not SquadQuery_IsVehicle(target_squad) then
+		return false
+	end
+	
+	return TacticFilter_HealthLow_SimSquad(target_squad, s_LowHealthPercentageVehicle)
+end
+
+function SquadIsInFront(squad, other_squad)
+	return PointIsInFrontOfSquad(Squad_GetPosition(squad), other_squad)
+end
+
+function SquadIsHMG(squad)
+	local bp = Squad_GetBlueprint(squad)
+	return bp == SBP.AXIS.HEAVYMG or bp == SBP.ALLIES.HEAVYMG
+end

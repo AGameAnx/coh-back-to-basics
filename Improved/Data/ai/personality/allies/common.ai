@@ -1,0 +1,6 @@
+
+s_personality.defensiveness = 0.05
+
+s_personality.budget_levels.units = {35, 35, 35, 45, 30}
+s_personality.budget_levels.tech = {5, 10, 20, 20, 25}
+s_personality.budget_levels.secure = {35, 25, 15, 15, 15}

@@ -1,0 +1,29 @@
+
+scar_interface = {}
+
+function scar_interface:init()
+	self:unlock_all_resources()
+end
+
+function scar_interface:lock_manpower(amount)
+	self.locked_resources.manpower = self.locked_resources.manpower + amount
+end
+function scar_interface:lock_munitions(amount)
+	self.locked_resources.munitions = self.locked_resources.munitions + amount
+end
+function scar_interface:lock_fuel(amount)
+	self.locked_resources.fuel = self.locked_resources.fuel + amount
+end
+function scar_interface:lock_command(amount)
+	self.locked_resources.command = self.locked_resources.command + amount
+end
+function scar_interface:lock_resources(manpower, munitions, fuel, command)
+	if manpower ~= nil then self:lock_manpower(manpower) end
+	if munitions ~= nil then self:lock_munitions(munitions) end
+	if fuel ~= nil then self:lock_fuel(fuel) end
+	if command ~= nil then self:lock_command(command) end
+end
+
+function scar_interface:unlock_all_resources()
+	self.locked_resources = ResourceAmount_Zero()
+end

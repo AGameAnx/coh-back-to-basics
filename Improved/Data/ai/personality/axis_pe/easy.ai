@@ -1,0 +1,9 @@
+import('personality/base_easy.ai')
+import('personality/axis_pe/common.ai')
+import('personality/axis_pe/buildorder_lib.ai')
+
+-- randomly choose a build order from the given list defined in the allied lib of buildorders
+s_personality.buildorder = RandomlyChooseBuildorder(axis_pe_buildorder)
+
+-- randomly choose a command-tree order from the given list
+s_personality.command_tree_pref_tbl = ChooseRandomCommandTree(command_trees.axis_pe)

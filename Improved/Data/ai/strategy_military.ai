@@ -1,0 +1,227 @@
+strategy_military = {}
+
+-- TODO: better make this personaility setting
+-- delay before defend tasks are added (ie no defend task in the beginning of the game
+s_defendBeginTime = 0*60*8
+
+-- how long should the tasks be idle before being deleted?
+s_defendTaskTimeoutAtRally 	= 3*60*8
+s_defendTaskTimeoutAtTarget	= 2*60*8
+s_attackTaskTimeoutAtRally 	= 3*60*8
+s_attackTaskTimeoutAtTarget	= 30*8
+
+function strategy_military.trace(msg)
+	local ticks = World_GetGameTime() * 8
+	-- pipe this out also
+	msg = "[" .. ticks .. "]" .. msg
+
+	aitrace_ext("Military_Strategy", msg)
+end
+
+function strategy_military.trace_clear()
+	aitraceclear_ext("Military_Strategy")
+end
+
+strategy_military.init = function()
+	strategy_military.base_under_attack = false
+end
+
+--------------------------------------------------------------------------------
+--
+
+strategy_military.calculate_military_priorities_prepass = function()
+	RankTargetsPrepass()
+end
+
+strategy_military.calculate_military_priorities = function(skip_attack, skip_defend)
+	if skip_attack == nil then skip_attack = false end
+	if skip_defend == nil then skip_defend = false end
+	
+	if s_components[COMPONENT_Defending] == true then
+		if not skip_defend then
+			RankDefendTargets()
+		end
+	else
+		Military_ClearTargets(s_selfplayer, MTARGET_Defend)
+	end
+	
+	if s_components[COMPONENT_Attacking] == true then
+		if not skip_attack then
+			RankAttackTargets()
+		end
+	else
+		Military_ClearTargets(s_selfplayer, MTARGET_Attack)
+	end
+	
+	-- after ranking, suggest potential targets for combat squads
+	Military_SuggestSquadTargets(s_selfplayer)
+end
+
+--------------------------------------------------------------------------------
+--
+	
+strategy_military.execute = function()
+	--strategy_military.trace_clear()
+	--strategy_military.trace("<MilitaryStrategy>")
+	--strategy_military.trace("Desired Attack Percentage "..military_attackPercentage)
+	
+	--------------------------------------------------------------------------------
+	-- create goliath tasks
+	
+	-- ensure there is a task for a goliath
+	local numGTasks = Task_CountEmpty(s_selfplayer, TASK_Goliath, AI_Squad)
+	if numGTasks <= 0 then
+		
+		local goliathData =
+		{
+			-- goliath params
+			move_ap	= 4.0,
+			stopFollowDistance = 30.0,
+			stopFollowHealth = 0.6,
+			ticks_rescan = 48,
+			goforbrokeHealth = 0.45,
+			detonateHealth = 0.08,
+			clumpScanRange = 1000,
+
+			-- threat clump params
+			threat_weighting=1.0,
+			importance_weighting=0,
+			must_be_seen=false,
+			min_threat = 5
+		}
+		
+		Request_Goliath(s_selfplayer, TGROUP_SpecialUnit, TPRIORITY_SpecialUnit, goliathData)
+	end	
+	
+	--------------------------------------------------------------------------------
+	-- create sniper tasks
+	
+	-- want an empty sniper task at all times
+	local numSniperTasks = Task_CountEmpty(s_selfplayer, TASK_Sniper, AI_Squad)
+	if numSniperTasks <= 0 then
+		-- choose a random sniper style
+		-- defend 80% of the time
+		local rand = AI_RandMax(10)
+		
+		--if rand < 8 then
+		--	Request_Sniper(s_selfplayer, TGROUP_SpecialUnit, TPRIORITY_SpecialUnit, SNIPER_Defend)
+		--elseif rand >= 8 then
+			Request_Sniper(s_selfplayer, TGROUP_SpecialUnit, TPRIORITY_SpecialUnit, SNIPER_Attack)
+		--end
+	end
+	
+	-- want an empty immobile combat task at all times
+	local numImmobileTasks = Task_CountEmpty(s_selfplayer, TASK_ImmobileCombat, AI_Squad)
+	if numImmobileTasks <= 0 then
+		Request_ImmobileCombat(s_selfplayer, TGROUP_SpecialUnit, TPRIORITY_SpecialUnit)
+	end
+
+	-- ensure leaders have stuff to do
+	local numLeaderTasks = Task_CountEmpty(s_selfplayer, TASK_Leader, AI_Squad)
+	if numLeaderTasks == 0 then
+		Request_LeaderTask(s_selfplayer, TGROUP_SpecialUnit, TPRIORITY_SpecialUnit, ABILITY.CW.LIEUTENANT_FOLLOW)
+	end
+
+	-- ensure mobile trucks have stuff to do
+	--local numMobileTruckTasks = Task_CountEmpty(s_selfplayer, TASK_MobileTruck, AI_Squad)
+	--if numMobileTruckTasks == 0 then
+	--	Request_MobileTruckTask(s_selfplayer, TGROUP_SpecialUnit, TPRIORITY_SpecialUnit, ABILITY.CW.HQ_SETUP, UPG.CW.ENABLE_MOBILE_HQ)
+	--end
+
+	--------------------------------------------------------------------------------
+	-- create combat tasks
+
+	-- count total number of combat tasks
+	local numAttackTasks  = Task_CountCombat(s_selfplayer, COMBAT_Attack)
+	local numDefendTasks  = Task_CountCombat(s_selfplayer, COMBAT_Defend)
+	local numDefaultTasks = Task_CountCombat(s_selfplayer, COMBAT_Default)
+	
+	local numCombatTasks = numAttackTasks + numDefendTasks
+	--strategy_military.trace("CombatTasks: "..numCombatTasks)
+	
+	-- how many units can do combat
+	-- note: we assume combat only uses one squad per task
+	local numCombatTasksDesired = AIResource_GetNumCombatants(s_selfplayer) - numDefaultTasks
+	if numCombatTasksDesired < 0 then
+		numCombatTasksDesired = 0
+	end
+	--strategy_military.trace("Combat Squads:"..numCombatTasksDesired)
+	
+	-- figure out number of attack and defend tasks desired
+	local numAttackTasksDesired = math.ceil(military_attackPercentage*numCombatTasksDesired)
+	local numDefendTasksDesired = numCombatTasksDesired - numAttackTasksDesired
+	
+	-- cap min
+	local numAttackTasksMin = AIResource_GetNumCombatantsWhoCanOnlyAttack(s_selfplayer)
+	local numDefendTasksMin = AIResource_GetNumCombatantsWhoCanOnlyDefend(s_selfplayer)
+	if numAttackTasksDesired < numAttackTasksMin then
+		numAttackTasksDesired = numAttackTasksMin
+	end
+	if numDefendTasksDesired < numDefendTasksMin then
+		numDefendTasksDesired = numDefendTasksMin
+	end
+	
+	-- cap max.. do this after cap min so that if there are no targets we definitely don't create tasks
+	if Military_GetTargetCount(s_selfplayer, MTARGET_Attack) <= 0 then
+		--strategy_military.trace("No Attack Targets")
+		numAttackTasksDesired = 0
+	end
+	if Military_GetTargetCount(s_selfplayer, MTARGET_Defend) <= 0 then
+		--strategy_military.trace("No Defend Targets")
+		numDefendTasksDesired = 0
+	end
+	
+	-- clear unwanted attack tasks each frame
+	if numAttackTasks > numAttackTasksDesired then
+		--strategy_military.trace("Killing inactive attack tasks")
+		Task_KillInactiveTasksInGroup(s_selfplayer, TGROUP_Attack)
+	-- else add new attack tasks
+	elseif numAttackTasks < numAttackTasksDesired then
+		--strategy_military.trace("Adding new attack task")
+		
+		local combatOrderParams =
+		{
+			combat_type						= COMBAT_Attack,
+			rally_location 					= RALLY_NearDefendPoint,
+			timeout_ticks_at_rally 			= s_attackTaskTimeoutAtRally,
+			timeout_ticks_at_target 		= s_attackTaskTimeoutAtTarget,
+			score_threat 					= 5.0,
+			score_avoid_clumps_at_no_threat	= 25.0,
+			score_distance_to_squad			= 5.0,
+			score_distance_to_base			= 5.0,
+			score_inertia 					= 1.4,
+		}
+		
+		Request_Combat(s_selfplayer, TGROUP_Attack, TPRIORITY_Attack, combatOrderParams)
+	end
+		
+	-- clear unwanted defend tasks each frame
+	if numDefendTasks > numDefendTasksDesired then
+		--strategy_military.trace("Killing inactive defend tasks")
+		Task_KillInactiveTasksInGroup(s_selfplayer, TGROUP_Defend)
+	-- else add new defend tasks
+	elseif numDefendTasks < numDefendTasksDesired then
+	
+		local ticks = World_GetGameTime() * 8
+		if ticks >= s_defendBeginTime then
+			--strategy_military.trace("Adding new defend task")
+			
+			local combatOrderParams =
+			{
+				combat_type						= COMBAT_Defend,
+				rally_location 					= RALLY_LastPosSafe,
+				timeout_ticks_at_rally 			= s_defendTaskTimeoutAtRally,
+				timeout_ticks_at_target			= s_defendTaskTimeoutAtTarget,
+				score_threat 					= -1.0,
+				score_avoid_clumps_at_no_threat	= 25.0,
+				score_distance_to_squad			= 5.0,
+				score_distance_to_base			= 5.0,
+				score_inertia 					= 1.4,
+			}
+			
+			Request_Combat(s_selfplayer, TGROUP_Defend, TPRIORITY_Defend, combatOrderParams)
+		--else
+			--strategy_military.trace("Waiting to add defend task. Starting at ".. (s_defendBeginTime-ticks)/8 .." seconds")
+		end
+	end
+end	

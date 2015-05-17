@@ -1,0 +1,12 @@
+
+allied_cw_buildorder = {
+	
+	{
+		name = "",
+		mt_mult = 1,
+		vp_mult = 1,
+		list = {
+		}
+	},
+	
+}

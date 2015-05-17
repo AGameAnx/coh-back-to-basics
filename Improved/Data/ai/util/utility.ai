@@ -1,0 +1,119 @@
+
+stack_trace_num = 0
+tracing = {}
+
+function aitrace(msg)
+	if (msg == nil) then return end
+	
+	for i = 0, stack_trace_num-1 do
+		msg = ("   "..msg)
+	end
+	table.insert(tracing, msg)
+end
+
+function aipushtrace(name)
+	aitrace(name)
+	stack_trace_num = stack_trace_num + 1
+end
+
+function aipoptrace(name)
+	stack_trace_num = stack_trace_num - 1
+	aitrace(name)
+end
+
+function aiprint(x, y, text)
+	-- the selected color of the text:
+	local colour = {255,255,192}
+	dr_text2d("aidebug"..AI_GetPlayerID(), x, y, text, colour[1], colour[2], colour[3])
+end
+
+function aitraceclear()
+	tracing = {}
+	stack_trace_num = 0
+end
+
+function aitracedump(xval, yval, ystep)
+	aiprint(xval, yval, "Current AI trace (PLAYER: " .. s_selfplayerid .. "):")
+	yval = yval + ystep
+	for i, ii in pairs(tracing) do
+		yval = yval + ystep
+		aiprint(xval, yval, tracing[i])
+	end
+	
+	-- reset the stack - in case we forgot some pops
+	stack_trace_num = 0
+end
+
+function aiclearscreen()
+	dr_clear("aidebug"..AI_GetPlayerID())
+end
+
+function dbAssert(b)
+	if (b == false) then
+		ai_assert = true
+		local t = debug.getinfo(2)
+		local txt = "ASSERT: src:"..t.source.." line:"..t.currentline
+		aitrace(txt)
+		error(txt)
+	end
+end
+
+function basename(path)
+	local i = string.len(path)
+	
+	while string.sub(path, i, i) == "\\" and i > 0 do
+		path = string.sub(path, 1, i - 1)
+		i = i - 1
+	end
+	while i > 0 do
+		if string.sub(path, i, i) == "\\" then break end
+		i = i - 1
+	end
+	if i > 0 then path = string.sub(path, i + 1, -1) end
+	if path == "" then path = "\\" end
+	
+	return path
+end
+
+function res_to_str(resource_amount)
+	local txt = string.format("<MP:%.1f MN:%.1f FL:%.1f>", resource_amount.manpower, resource_amount.munition, resource_amount.fuel)
+	return txt
+end
+
+if AI_IsRTM() then
+	-- kill aitracing
+	emptyfunc = function() end
+	aitrace=emptyfunc
+	aipushtrace=emptyfunc
+	aipoptrace=emptyfunc
+	aitracedump=emptyfunc
+	aiclearscreen=emptyfunc
+	aitraceclear=emptyfunc
+	aiprint=emptyfunc
+end
+
+trace_table = {}
+function aitrace_ext(category, msg)
+	if msg == nil or category == nil then return end
+	if trace_table[category] == nil then trace_table[category] = {} end
+	
+	table.insert(trace_table[category], msg)
+end
+
+function aitraceclear_ext(category)
+	trace_table[category] = {}
+end
+
+function aitracedump_ext(category, xval, yval, ystep)
+	if trace_table[category] == nil then return yval end
+	
+	aiprint(xval, yval, "Current AI [" .. category .. "] trace (PLAYER: " .. s_selfplayerid .. ") Personality: (" .. s_personality.name .. ")" )
+	
+	yval = yval + ystep
+	for i, ii in pairs(trace_table[category]) do
+		yval = yval + ystep
+		aiprint(xval, yval, trace_table[category][i])
+	end
+	
+	return yval
+end

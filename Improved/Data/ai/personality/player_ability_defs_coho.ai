@@ -1,0 +1,125 @@
+
+dbAssert(TRACE_AXIS ~= nil)
+dbAssert(TRACE_AXIS_PANZER_ELITE ~= nil)
+dbAssert(TRACE_ALLIES ~= nil)
+dbAssert(TRACE_ALLIES_COMMONWEALTH ~= nil)
+
+allied_airborne_tree = "allied_airborne_commander"
+allied_armour_tree = "allied_armour_commander"
+allied_infantry_tree = "allied_infantry_commander"
+
+axis_blitz_tree = "axis_blitzkrieg_commander"
+axis_defense_tree = "axis_defensive_commander"
+axis_terror_tree = "axis_terror_commander"
+
+s_player_ability_defs_coho = {}
+s_player_ability_defs_coho[TRACE_AXIS] = {}
+s_player_ability_defs_coho[TRACE_AXIS_PANZER_ELITE] = {}
+s_player_ability_defs_coho[TRACE_ALLIES] = {}
+s_player_ability_defs_coho[TRACE_ALLIES_COMMONWEALTH] = {}
+
+---------------------------------- ALLIED ------------------------------------------	
+
+if (AI_IsMODCoHO() == true) then
+
+	s_player_ability_defs_coho[TRACE_ALLIES][allied_airborne_tree] =
+		{
+			munition_abilities = {
+				ABILITY.COMMANDER_TREE.COHO.ALLY_AIRBORNE_RECON,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_AIRBORNE_STRIKE,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_AIRBORNE_SUPPLY,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_AIRBORNE_SMOKE,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_AIRBORNE_DECOYS,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_AIRBORNE_BOMBING,
+			},
+			production_abilities = {
+				ABILITY.COMMANDER_TREE.COHO.ALLY_AIRBORNE_SUPPORT,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_AIRBORNE_PARADROP,
+			},
+		}
+
+	s_player_ability_defs_coho[TRACE_ALLIES][allied_armour_tree] =
+		{
+			munition_abilities = {
+				ABILITY.COMMANDER_TREE.COHO.ALLY_ARMOUR_BOUNTY,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_ARMOUR_HVAP,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_ARMOUR_RAID,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_ARMOUR_HEAL,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_ARMOUR_WARMACHINE,
+			},
+			production_abilities = {
+				ABILITY.COMMANDER_TREE.COHO.ALLY_ARMOUR_CALLIOPE,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_ARMOUR_GROUP,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_ARMOUR_PERSHING,
+			},
+		}
+		
+	s_player_ability_defs_coho[TRACE_ALLIES][allied_infantry_tree] =
+		{
+			munition_abilities = {
+				ABILITY.COMMANDER_TREE.COHO.ALLY_INFANTRY_ARTILLERY,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_INFANTRY_ATTRITION,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_INFANTRY_CAMOUFLAGE,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_INFANTRY_BARRACK,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_INFANTRY_CHARGE,
+			},
+			production_abilities = {
+				ABILITY.COMMANDER_TREE.COHO.ALLY_INFANTRY_ENGINEER,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_INFANTRY_RANGER,
+				ABILITY.COMMANDER_TREE.COHO.ALLY_INFANTRY_REINFORCEMENTS,
+			},
+		
+	}
+			
+	---------------------------------- AXIS ------------------------------------------
+
+	s_player_ability_defs_coho[TRACE_AXIS][axis_blitz_tree] =
+		{
+			munition_abilities = {
+				ABILITY.COMMANDER_TREE.COHO.AXIS_BLITZKRIEG_FLARES,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_BLITZKRIEG_PILLAGE,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_BLITZKRIEG_INSPIRED,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_BLITZKRIEG_RESORUCES,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_BLITZKRIEG_BARRAGE,
+			},
+			production_abilities = {
+				ABILITY.COMMANDER_TREE.COHO.AXIS_BLITZKRIEG_ARMOUR,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_BLITZKRIEG_REINFORCEMENTS,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_BLITZKRIEG_STORMTROOPER,
+			},
+		}
+
+	s_player_ability_defs_coho[TRACE_AXIS][axis_defense_tree] =
+		{
+			munition_abilities = {
+				ABILITY.COMMANDER_TREE.COHO.AXIS_DEFENSE_AGGRESSIVE,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_DEFENSE_HEAL,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_DEFENSE_ENTRENCH,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_DEFENSE_AMBUSH,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_DEFENSE_ARTILLERY,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_DEFENSE_RECOUP,		
+				ABILITY.COMMANDER_TREE.COHO.AXIS_DEFENSE_FATHERLAND,
+			},
+			production_abilities = {
+				ABILITY.COMMANDER_TREE.COHO.AXIS_DEFENSE_REINFORCEMENTS,
+			},
+		}
+		
+	s_player_ability_defs_coho[TRACE_AXIS][axis_terror_tree] =
+		{
+			munition_abilities = {
+				ABILITY.COMMANDER_TREE.COHO.AXIS_TERROR_BLACKOUT,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_TERROR_FIRESTORM,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_TERROR_RETREAT,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_TERROR_ZEAL,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_TERROR_PROPAGANDA,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_TERROR_V1,			
+			},
+			production_abilities = {
+				ABILITY.COMMANDER_TREE.COHO.AXIS_TERROR_TIGER,
+				ABILITY.COMMANDER_TREE.COHO.AXIS_TERROR_OFFICER
+			},
+		}
+end
+
+------------------------------------------------------------------------------------

@@ -1,0 +1,14 @@
+
+axis_pe_buildorder = {
+
+	{
+		name = "Grenadiers",
+		vp_mult = 0.25,
+		fuel_mult = 2.0,
+		list = {
+			{"produce", PITEM_Spawn, SBP.ELITE.PANZERGRENADIER, maxlimit = 4 },
+			{"produce", PITEM_Spawn, SBP.ELITE.PANZERGRENADIER, maxlimit = 4 },
+		}
+	}
+	
+}

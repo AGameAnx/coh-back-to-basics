@@ -1,0 +1,540 @@
+--
+-- This file is responsible for purchasing tech (this includes structures, upgrades, etc)
+-- These are usually items used to unlock military units or their abilities.
+--
+
+import("util/demand.ai")
+import("rules_tech_purchase.ai")
+
+strategy_tech_purchase = {}
+
+-- purchase variables - help to determine how long we will wait for something good
+s_eta_structure_wait_time = 30
+s_eta_production_wait_time = 15
+s_min_production_demand_required = -15
+
+s_try_occupy = false
+
+-- types for tech demand
+DEMAND_Building = 1
+DEMAND_Upgrade = 2
+DEMAND_Occupy = 3
+
+DEMAND_NeverBuild = -99999
+
+-----------------------------------------------
+
+function strategy_tech_purchase.trace(msg)
+	local ticks = World_GetGameTime() * 8
+	-- pipe this out also
+	msg = "[" .. ticks .. "]" .. msg
+	--if s_selfplayerid - 999 == 3 then
+	--	CustomDebug.Print(msg)
+	--end
+	aitrace_ext("Tech_Purchase_Strategy", msg)
+end
+
+function strategy_tech_purchase.trace_clear()
+	--CustomDebug.Clear()
+	aitraceclear_ext("Tech_Purchase_Strategy")
+end
+
+-----------------------------------------------
+-- INIT TECH PURCHASE SYSTEM
+
+function strategy_tech_purchase.init()
+	--print("strategy_tech_purchase.init")
+	
+	s_eta_structure_wait_time = s_personality.eta_structure_wait_time
+	s_eta_production_wait_time = s_personality.eta_production_wait_time
+	s_min_production_demand_required = s_personality.min_production_demand_required
+
+	if (s_current_race == TRACE_ALLIES) then
+		s_special_techtree_rules = Allied_SpecialTechBuildingRules
+		s_special_upgrade_rules = Allied_SpecialUpgradeRules
+	elseif (s_current_race == TRACE_AXIS) then
+		s_special_techtree_rules = Axis_SpecialTechBuildingRules
+		s_special_upgrade_rules = Axis_SpecialUpgradeRules
+	elseif (s_current_race == TRACE_AXIS_PANZER_ELITE) then
+		s_special_techtree_rules = AxisPE_SpecialTechBuildingRules
+		s_special_upgrade_rules = AxisPE_SpecialUpgradeRules
+	elseif (s_current_race == TRACE_ALLIES_COMMONWEALTH) then
+		s_special_techtree_rules = AlliedCW_SpecialTechBuildingRules
+		s_special_upgrade_rules = AlliedCW_SpecialUpgradeRules
+	else
+		error("Player has invalid race "..s_current_race)
+	end
+end
+
+function strategy_tech_purchase.simulate_pre()
+	s_try_occupy = AI_RandRange(0,1) < s_personality.chance_to_occupy
+	
+	-- always turn this on in deathmatch games
+	if (cache.vp_total == 0) then
+		s_try_occupy = true
+	-- never occupy in short vpticket games
+	elseif (cache.max_vp_tickets<500) then
+		s_try_occupy = false
+	end
+end
+
+function CalculateTechETA()
+	--strategy_tech_purchase.trace("CalculateTechETA")
+	
+	local offset_eta = 0
+	-- if we have some military units then we have some safe-guard so we can increase
+	-- it slightly
+	if (cache.military_non_engineer_count > 3) then
+		offset_eta = offset_eta + (cache.military_non_engineer_count-3)*5
+	end
+	-- if we have spawners (tech) then increase the wait time
+	if cache.spawner_tier1_count > 0 then
+		offset_eta = offset_eta + 15
+	end
+	if cache.spawner_tier2_count > 0 then
+		offset_eta = offset_eta + 30
+	end
+	
+	--strategy_tech_purchase.trace("OffsetETA:"..offset_eta)
+	
+	-- get the base rate from the personality file
+	s_eta_structure_wait_time = s_personality.eta_structure_wait_time + offset_eta
+	s_eta_production_wait_time = s_personality.eta_production_wait_time + offset_eta
+	
+	--strategy_tech_purchase.trace("NewTechETA:"..s_eta_structure_wait_time)
+	--strategy_tech_purchase.trace("NewProductionETA:"..s_eta_production_wait_time)
+end
+
+function IsDefensiveStructure(pbg)
+	if s_defend_structures then
+		for i,v in pairs(s_defend_structures) do
+			if v.pbg == pbg then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- rules to determine what structure to build
+function MilitaryStructureDemand()
+	local num_engineers = PBG_GetCount(s_selfplayer, s_engineer)
+	
+	-- no demand for structures when there are NO engineers to build them
+	-- this could be built into the CanBuild check
+	if num_engineers < 1 then
+		--strategy_tech_purchase.trace("NO ENGINEERS TO BUILD THESE STRUCTURES")
+		return
+	end
+	
+	-----------------------------------------------------------------------------
+	--
+	local bcount = AIProduction_GetBuildableBuildingCount(s_selfplayer)-1
+	--strategy_tech_purchase.trace("Considering "..bcount.." military/tech buildings for purchase")
+	for i=0, bcount do
+		-- go through each building we can get and determine its priority
+		local pbg = AIProduction_GetBuildableBuildingAt(s_selfplayer, i)
+		
+		local spawnCount = PBG_ProductionItemCount(pbg, PITEM_Spawn)
+		local upgradeCount = PBG_ProductionItemCount(pbg, PITEM_Upgrade)
+		local bSecures = PBG_IsSecuringStructure(pbg)
+		local defPriority = PBG_GetDefencePriority(pbg)
+		
+		--strategy_tech_purchase.trace("SpawnCount:"..spawnCount.." UpgradeCount:"..upgradeCount.." Secures:"..tostring(bSecures).."Def:"..defPriority.." Name:"..BP_GetName(pbg))
+		
+		-- don't consider securing buildings or defence buildings - they are done elsewhere
+		if not IsDefensiveStructure(pbg) and bSecures==false and defPriority==0 and (spawnCount>0 or upgradeCount>0) then
+			-- get the total number of current structures plus those that are requested
+			local structureCount = UtilPBG_CountTotal(pbg)
+			--strategy_tech_purchase.trace("["..BP_GetName(pbg).."] StructureCount:"..structureCount)
+	
+			if structureCount <= 0 then
+				if Construction_CanConstruct(s_selfplayer, pbg) then
+					local calcbuildstyle = BS_OuterBase
+					if spawnCount==0 then
+						calcbuildstyle = BS_NearBase
+					end
+					
+					local techdemand = AI_RandRange(-5, 5)
+					
+					local structureETA = GetStructureETA(pbg)
+					if structureETA < s_eta_structure_wait_time then
+						-- test special rules for the given race
+						if s_special_techtree_rules then
+							techdemand = techdemand + s_special_techtree_rules(pbg)
+						end
+						
+						--strategy_tech_purchase.trace(string.format("     CAN CONSTRUCT: [%.0f] ETA:%.2f", techdemand, structureETA))
+						if techdemand > -50 then
+							s_techDemand[ pbg ] = {demand=techdemand, buildstyle = calcbuildstyle, demand_type = DEMAND_Building }
+						end
+					--else
+					--	strategy_tech_purchase.trace("     SKIPPING BECAUSE OF ETA:"..BP_GetName(pbg).." Limit:"..s_eta_structure_wait_time)
+					end
+				--else
+				--	strategy_tech_purchase.trace("     CANNOT CONSTRUCT:"..BP_GetName(pbg))
+				end
+			--else
+			--	strategy_tech_purchase.trace("     ALREADY HAVE ENOUGH:"..BP_GetName(pbg))
+			end
+			
+			--strategy_tech_purchase.trace("")
+		end
+ 	end
+end
+
+function UpgradeDemand()
+	-- determine how many requests for upgrades are outstanding. We shouldn't request another
+	-- upgrade unless the required building doesn't already have an outstanding request
+	
+	local ucount = AIProduction_GetProductionItemCount(s_selfplayer, PITEM_Upgrade) - 1
+	--strategy_tech_purchase.trace("UpgradeDemand: Considering "..ucount.." upgrades!")
+	for i=0, ucount do
+		local upgradePBG = AIProduction_GetProductionItemPBGAt(s_selfplayer, PITEM_Upgrade, i)
+		
+		local numRequested = Task_CountActivePBG(s_selfplayer, upgradePBG, false)
+		
+		-- extract info about this upgrade, does it match our demands/ strategies
+		if (numRequested == 0 and AIProduction_CanProduce(s_selfplayer, PITEM_Upgrade, upgradePBG, DEFAULT_HERO_ID)) then
+			local productionETA = GetProductionETA(PITEM_Upgrade, upgradePBG)
+			--strategy_tech_purchase.trace("")
+			--strategy_tech_purchase.trace(""..i..". ["..BP_GetName(upgradePBG).."] ETA:"..productionETA)
+			
+			if (productionETA < s_eta_production_wait_time) then
+				local demandoffset = 0
+				if (s_special_upgrade_rules) then
+					demandoffset = s_special_upgrade_rules(upgradePBG)
+					--strategy_tech_purchase.trace("DemandOffset:"..demandoffset)
+				end
+				local demandval = AI_RandRange(-5,5) + demandoffset
+				--strategy_tech_purchase.trace(string.format("UpgDemand: %.1f",demandval))
+				-- currently random, will definitely need rules for each upgrade
+				if demandval >= s_min_production_demand_required then
+					s_techDemand[ upgradePBG ] = {demand=demandval, buildstyle = nil, demand_type = DEMAND_Upgrade }
+				end
+			--else
+				--strategy_tech_purchase.trace("--Skipping because ETA is too long")
+			end
+		end
+	end
+	--strategy_tech_purchase.trace("")
+end
+
+function OccupyBuildingDemand()
+	-- ambient building usage rules
+	--strategy_tech_purchase.trace("<OccupyBuildingDemand>")
+
+	-- i'd imagine we'd have to have at least a single tier1 building first
+	if (cache.spawner_tier2_count < 1 or cache.percentage_pts_captured < 0.45) then
+		--strategy_tech_purchase.trace("Occupy:Waiting on tier2 and capturing 45% of the points")
+		return
+	end
+
+	local ptsOwned = AIResource_GetNumOwnedCapturePoints(s_selfplayer)
+	if (ptsOwned < 4) then
+		--strategy_tech_purchase.trace("Occupy:Waiting to at least own 4 capture points:"..ptsOwned)
+		return
+	end
+	
+	-- only want one of these running at any time...
+	local numocctasks = Task_Count(s_selfplayer,TASK_Occupy)
+	if (numocctasks > 0) then
+		--strategy_tech_purchase.trace("Occupy:Already have a task")
+		return
+	end
+	
+	-- not worrying about available units, since occupation is just a temporary
+	-- garrison of the building and the squads will not be locked indefinitely
+	
+	-- make sure we have the static list of capture points
+	-- wont be using this right now, unless it becomes really important to consider points
+--~ 	if (s_capture_points == nil) then
+--~ 		s_capture_points = EGroup_Create("eg_ai_capture")
+--~ 		EntityQuery_GetCapturePoints(s_capture_points)
+--~ 	end
+	
+	
+	-- make sure we have the static list of buildings
+	-- only need do this once, when a building is destroyed it should be removed from the
+	-- EGroup automatically
+	if (s_ambient_buildings == nil) then
+		s_ambient_buildings = EGroup_Create("eg_ai_ambient")
+		EntityQuery_GetAmbientBuildings(s_ambient_buildings)
+	end
+
+	-- get existing spawner building positions (list should be small)
+	local spawner_pos = {}
+
+	if (s_spawners == nil) then
+		s_spawners = EGroup_Create("eg_ai_spawners")
+	end
+	
+	EGroup_Clear(s_spawners)
+	-- make this query team-based?
+	AIProduction_GetSpawnerBuildings_Team(s_selfplayer, s_spawners)
+	
+	local num_existing_ambient_occupied = 0
+
+	count = EGroup_CountSpawned(s_spawners)
+	-- add spawner positions to a list & count existing upgraded buildings
+	for i=1, count do
+		local spawner_entity = EGroup_GetSpawnedEntityAt(s_spawners, i)
+		table.insert(spawner_pos, Entity_GetPosition(spawner_entity))
+		
+		if (EntityQuery_IsAmbientConverted(spawner_entity)) then
+			num_existing_ambient_occupied = num_existing_ambient_occupied + 1
+		end
+	end	
+
+	if (num_existing_ambient_occupied >= s_personality.occupy_max_active) then
+		--strategy_tech_purchase.trace("Occupy:Reached ambient occupation limit:"..num_existing_ambient_occupied)
+		return
+	end
+	
+	-- filter static world list by the ones we can actually occupy
+	-- (due to constraints like holds,owners,relative distances etc)
+	local ambient_buildings = {}
+	local count = EGroup_CountSpawned(s_ambient_buildings)
+	--strategy_tech_purchase.trace("Occupy:There are "..count.." spawned static ambient buildings, " .. num_existing_ambient_occupied .. " occupied.")
+	
+	local dbgTooCloseCount = 0
+	local dbgTooLowHealthCount = 0
+	
+	local numFoundSoFar = 0
+	local maxPanels = 0	
+	
+	-- return pos between 0 and num_choices-1
+	local random_startpos = AI_RandMax(count)
+	
+	for i=1, count do
+		local current_index = random_startpos+i
+		-- loop around check
+		if (current_index > count) then
+			current_index = current_index - count
+		end
+		
+		local ambient_entity = EGroup_GetSpawnedEntityAt(s_ambient_buildings, current_index)
+		
+		if (AIProduction_CanOccupy(s_selfplayer, ambient_entity)) then
+			local valid = true
+			
+			-- check health
+			local ambient_entity_health = Entity_GetHealthPercentage(ambient_entity)
+			if (ambient_entity_health < 0.75) then
+				dbgTooLowHealthCount = dbgTooLowHealthCount + 1
+				--strategy_tech_purchase.trace("Occupy:Building has low health: "..ambient_entity_health .. " [".. BP_GetName(Entity_GetBlueprint(ambient_entity)).."]")
+				valid = false
+			end
+
+			if (valid) then
+				-- check proximity to spawners
+				local pos = Entity_GetPosition(ambient_entity)
+				-- check vicinity to existing spawner buildings
+				for s=1, table.getn(spawner_pos) do
+					if (World_DistancePointToPoint(spawner_pos[s], pos) < s_personality.occupy_near_spawner_limit) then
+						--strategy_tech_purchase.trace("Occupy:Building too close to a spawner: "..BP_GetName(Entity_GetBlueprint(ambient_entity)))
+	
+						-- near a spawner building, reject
+						valid = false
+						dbgTooCloseCount = dbgTooCloseCount + 1
+						break
+					end
+				end
+			end
+
+			if (valid) then
+				-- add it to the list
+				table.insert(ambient_buildings, ambient_entity)
+				--strategy_tech_purchase.trace("Occupy:Chose an ambient building: "..BP_GetName(Entity_GetBlueprint(ambient_entity)))
+				
+				numFoundSoFar = numFoundSoFar + 1
+				
+				maxPanels = math.max(maxPanels, Entity_GetTotalPanelCount(ambient_entity))
+				
+				-- only consider 10
+				if numFoundSoFar >= 10 then
+					break
+				end
+			end
+		end
+	end
+
+	local numUseful = table.getn(ambient_buildings)
+	if (numUseful < 1) then
+		--strategy_tech_purchase.trace("Occupy:No suitable candidate at this time (too-close count:"..dbgTooCloseCount..", low-health count:" .. dbgTooLowHealthCount .. ")")
+		return
+	--else
+		--strategy_tech_purchase.trace("Occupy:Number of use-able ambient buildings to choose from: " .. numUseful)
+	end
+	
+	-- go through list and assign initial priority based on location near center and other spawners
+	if sk_priority_range == nil then
+		sk_priority_range = 10.0
+	end
+	
+	if sk_BonusWithinDistFromCentre == nil then
+		sk_BonusWithinDistFromCentre = 0.125*math.max(World_GetWidth(), World_GetLength())
+	end
+	
+	local highest_entity = nil	
+	local highest_priority = -10.0
+
+	for idx, ent in pairs(ambient_buildings) do
+		-- start off at zero priority
+		local priority = 0
+		
+		-- cache this building's position
+		local pos = Entity_GetPosition(ent)
+		
+		-- we may need to add comparisons to actual map width & height if this is not sufficient
+		-- near middle on any axis (this won't be close to home base due to occupy_near_spawner_limit check)
+		if (math.abs(pos.x) < sk_BonusWithinDistFromCentre) or (math.abs(pos.z) < sk_BonusWithinDistFromCentre) then
+			-- this building is near the center, up the priority 20%
+			priority = priority + 0.2*sk_priority_range
+		end
+		
+		-- want bigger structures
+		local panelScore = Entity_GetUndestroyedPanelCount(ent)/maxPanels
+		priority = priority + panelScore*0.3*sk_priority_range
+		
+		-- add a random factor
+		local randomScore = AI_RandRange(0.0, 1.0)
+		priority = priority + randomScore*0.1*sk_priority_range
+		
+		-- could also loop over capture points here & up the priority of buildings near certain points
+		-- however it involves a lot of comparisons and may not be worth the processing
+
+
+		-- keep track of highest
+		if (highest_entity == nil) or (priority > highest_priority) then
+			highest_entity = ent
+			highest_priority = priority
+		end
+	end
+
+	local ambient_upgrade_pbg = AIProduction_GetOccupationUpgrade(highest_entity)
+
+	if (ambient_upgrade_pbg == nil) then
+		--strategy_tech_purchase.trace("Occupy:Could not find an upgrade for chosen ambient building")
+		return
+	end	
+
+	-- consider the ETA
+	local occupyCost = AIPlayer_GetProductionCost(s_self_modplayer, PITEM_Upgrade, ambient_upgrade_pbg)
+
+	local eta = GetETAFromCost(occupyCost, availableResources);
+	
+	if (eta < s_eta_production_wait_time) then
+		-- offset for demand?
+		local demandVal = AI_RandRange(0, 2)
+		
+		-- add it to the demand	
+		--strategy_tech_purchase.trace("Occupy:Adding demand:"..demandVal)
+		
+		s_techDemand[ ambient_upgrade_pbg ] = {demand=demandVal, buildstyle = nil, demand_type = DEMAND_Occupy, entity = highest_entity}
+	--else
+		--strategy_tech_purchase.trace("Occupy:Waiting on ETA, have "..eta.." and require "..s_eta_production_wait_time)
+	end
+end
+
+function HighestTechDemand()
+	local best_pbg = nil
+	local highest_demand_tbl = {demand=-100, buildstyle=nil, demand_type = nil}
+
+	for pbg,demTbl in pairs(s_techDemand) do
+		if (pbg) then
+			-- other considerations?
+			if (demTbl.demand > highest_demand_tbl.demand) then
+				best_pbg = pbg
+				highest_demand_tbl = demTbl
+			end
+		end
+	end
+	
+	return best_pbg, highest_demand_tbl
+end
+
+function strategy_tech_purchase.do_purchase(availableResources)
+	--strategy_tech_purchase.trace_clear()
+
+	--strategy_tech_purchase.trace("[StrategyTechPurchase]")
+	
+	AIProfile_Marker2("AITechPurchase")
+	
+	-- determine what building/ tech we should get next
+	-- go through each option and choose the one with the highest demand
+	
+	-- if we have builders and our demand for teching up is large enough then lets
+	-- see what we should purchase next, we may want to include
+	
+	-- reset tech demand
+	s_techDemand = {}
+	
+	-- is base under attack? if it is we should not build here, unless.. we don't have a spawner or we don't have any military to deal with it (then do as we use to)
+	--if (cache.threat_at_base > 10 and (cache.spawner_count > 0 or cache.military_value > cache.threat_at_base/2)) then
+		--strategy_tech_purchase.trace("No tech building because we are underattack:")
+		--return
+	--end
+	
+	CalculateTechETA()
+	
+	MilitaryStructureDemand()
+	UpgradeDemand()
+	
+	-- occupying building is turned on/off randomly
+	if s_try_occupy then
+		OccupyBuildingDemand()
+	end
+	
+	-- rule: make sure to have buildings so we can build more and better units.
+	-- should look at our resource rates, num engineers, economy, and military to determine what
+	-- buildings to make (if we are low on munitions then the support_center doesn't make too much sense,
+	-- if we are low on fuel then the pools don't make much sense)
+
+	local pbg, demandTbl = HighestTechDemand()
+	if pbg then
+		--strategy_tech_purchase.trace("Highest demand:"..BP_GetName(pbg) .." Demand:".. demandTbl.demand .. " Demand-Type:" .. demandTbl.demand_type);
+		local unitCost
+		if demandTbl.demand_type == DEMAND_Building then
+			unitCost = AIPlayer_GetStructureCost(s_self_modplayer, pbg)
+		elseif demandTbl.demand_type == DEMAND_Upgrade then
+			unitCost = AIPlayer_GetProductionCost(s_self_modplayer, PITEM_Upgrade, pbg)
+		elseif demandTbl.demand_type == DEMAND_Occupy then
+			-- pbg is the upgrade that will result in an occupied building
+			unitCost = AIPlayer_GetProductionCost(s_self_modplayer, PITEM_Upgrade, pbg)
+		end
+
+		-- determine if this can purchase this item
+		if not ResourceAmount_Has(availableResources, unitCost) then
+			--strategy_tech_purchase.trace("Not enough moola - locking resources!")
+			return false, unitCost
+		end
+		
+		if demandTbl.demand_type == DEMAND_Upgrade then
+			-- this checks all the production-channels and counts all the requests in each of these channels
+			-- this returns the min-number of items in all of these channels
+			--local prevReq = PBG_GetNumRequestsForProducer(s_selfplayer, PITEM_Upgrade, pbg, DEFAULT_HERO_ID)
+			
+			--if (prevReq > 0) then
+				--strategy_tech_purchase.trace("Stalling upgrade because of lack of production channels:"..BP_GetName(pbg))
+				--return false, unitCost
+			--end
+		elseif demandTbl.demand_type == DEMAND_Occupy then
+			if demandTbl.entity == nil then
+				--strategy_tech_purchase.trace("Cannot request building occupation, entity not known!")
+				return false, unitCost
+			end
+		end
+		
+		-- request
+		if demandTbl.demand_type == DEMAND_Building then
+			Request_Construction(s_selfplayer, TGROUP_Tech, TPRIORITY_Tech, pbg, demandTbl.buildstyle)
+		elseif demandTbl.demand_type == DEMAND_Upgrade then
+			Request_Production(s_selfplayer, TGROUP_Tech, TPRIORITY_Tech, PITEM_Upgrade, pbg, DEFAULT_HERO_ID)
+		elseif demandTbl.demand_type == DEMAND_Occupy then
+			Request_Occupy(s_selfplayer, TGROUP_Tech, TPRIORITY_Tech, demandTbl.entity)
+		end
+		return true, unitCost
+	end
+	return false
+end

@@ -1,0 +1,164 @@
+strategy_resourcing = {}
+
+--------------------------------------------------------------------------------
+
+function strategy_resourcing.trace(msg)
+	local ticks = World_GetGameTime() * 8
+	-- pipe this out also
+	msg = "[" .. ticks .. "]" .. msg
+
+	aitrace_ext("Resource_Strategy", msg)
+end
+
+function strategy_resourcing.trace_clear()
+	aitraceclear_ext("Resource_Strategy")
+end
+
+--------------------------------------------------------------------------------
+
+strategy_resourcing.init = function()
+	s_capture_pts_wanted = 0
+end
+
+--------------------------------------------------------------------------------
+	
+strategy_resourcing.calculate_capture_priorities = function()
+	--strategy_resourcing.trace("<calculate_capture_priorities>")
+	RankCapturePoints(1.0, nil, 1.0, 1.0)
+end
+
+function ResourceStats()
+	-- run rules each frame and determine what resourcing actions should be added/ removed
+	--strategy_resourcing.trace("StratPtsToCapture:"..cache.total_pts_to_capture)
+	--strategy_resourcing.trace("SecuredPts:"..cache.total_pts_secured.." / "..cache.total_pts_owned)
+	
+	-- current amount of resources (in proxy) (doesn't account for requests)
+	--strategy_resourcing.trace("Resources:"..res_to_str(AIResource_GetCurrentResources(s_selfplayer)))
+	
+	-- rates per minute
+	--strategy_resourcing.trace("ResourceRate:"..res_to_str(ResourceAmount_Mult(AIResource_GetCurrentResourceRate(s_selfplayer), 60)))
+end
+
+function CalcCurrentMaxCapturePercentage()
+	local curMaxPercent = s_personality.default_percentage_to_capture
+	
+	-- check for percentage growth
+	if s_personality.capture_percentage_growth_start_time > 0 and s_personality.capture_percentage_growth_per_min > 0 then
+		local secondsPastCapTime = World_GetGameTime() - s_personality.capture_percentage_growth_start_time
+		--strategy_resourcing.trace("secondsPastCapTime:"..secondsPastCapTime)
+		--strategy_resourcing.trace("capture_percentage_growth_start_time:"..s_personality.capture_percentage_growth_start_time)
+		if (secondsPastCapTime > 0) then
+			local percentGrowth = s_personality.capture_percentage_growth_per_min * secondsPastCapTime/60
+			
+			curMaxPercent = curMaxPercent + percentGrowth
+			--strategy_resourcing.trace("MaxCapGrowth:"..curMaxPercent.." Percent:"..curMaxPercent.." Growth:"..percentGrowth)
+		end
+
+		-- cap based on personality
+		if curMaxPercent > s_personality.max_percentage_to_capture then
+			curMaxPercent = s_personality.max_percentage_to_capture
+		end
+	end
+
+	--strategy_resourcing.trace("MaxCapturePercentage:"..curMaxPercent)
+	return curMaxPercent
+end
+
+function CreateCaptureTasks(capture_high_demand, groupID, group_priority)
+	local maxed_out = false
+	local capture_high_task = Task_CountInGroup(s_selfplayer, groupID)
+	
+	-- the total pts owned plus planned to be owned
+	local pts_total_owned = cache.total_pts_owned-- + capture_high_task
+	
+	--strategy_resourcing.trace("CaptureInitialDemand:"..capture_high_demand.." CaptureTasks:"..capture_high_task.." Total:"..pts_total_owned)
+	
+	--
+	local calc_max_percentage = CalcCurrentMaxCapturePercentage()
+	
+	-- determine if there is a hard max to the number of points we want
+	local pts_world_max = math.floor(calc_max_percentage * cache.all_capture_pts_total)
+	--strategy_resourcing.trace("PointCap:"..pts_world_max)
+	
+	local pts_wanted = cache.total_pts_to_capture
+	if pts_total_owned+pts_wanted > pts_world_max then
+		pts_wanted = pts_world_max - pts_total_owned
+	end
+	--strategy_resourcing.trace("PointsWanted:"..pts_wanted)
+	
+	-- cache this value to be used by unit purchasing
+	s_capture_pts_wanted = pts_wanted
+	
+	if pts_wanted <= capture_high_demand then
+		capture_high_demand = pts_wanted
+		--strategy_resourcing.trace("DemandReducedByMapCap:"..capture_high_demand)
+		maxed_out = true
+	end
+	
+	-- make sure we are under the personality max-setting
+	if capture_high_demand > s_personality.max_num_capturers then
+		capture_high_demand = s_personality.max_num_capturers
+		--strategy_resourcing.trace("DemandReducedFromCaptureCap:"..capture_high_demand)
+	end
+	
+	-- make sure we are under the personality max-setting
+	if capture_high_demand > capture_points_available then
+		capture_high_demand = capture_points_available
+		--strategy_resourcing.trace("DemandReducedFromCaptureCap:"..capture_high_demand)
+	end
+	
+	-- clear inactive groups each frame
+	if capture_high_task > capture_high_demand then
+		--strategy_resourcing.trace("Killing some inactive capture tasks! ")
+		Task_KillInactiveTasksInGroup(s_selfplayer, groupID)
+	end
+	
+	-- recalc after da killin' of da tasks
+	capture_high_task = Task_CountInGroup(s_selfplayer, groupID)
+
+	if capture_high_task < capture_high_demand then
+		--strategy_resourcing.trace("Adding new capture task to groupID:"..groupID)
+		
+		local captureOrderParams = {
+			mult_dist_to_capturer	= 7.5,
+			score_inertia			= 1.7,
+			mult_random				= 0,
+		}
+		
+		Request_Capture(s_selfplayer, groupID, group_priority, captureOrderParams);
+	end
+	
+	return maxed_out
+end
+
+--------------------------------------------------------------------------------
+--
+	
+strategy_resourcing.execute = function()
+	--strategy_resourcing.trace_clear()
+	
+	-- check to see if this is enabled
+	if s_components[COMPONENT_Resourcing]==false then
+		--aipoptrace()
+		return
+	end
+	
+	ResourceStats()
+	
+	-- nothing to capture
+	if cache.total_pts_to_capture == 0 then
+		--strategy_resourcing.trace("Nothing to capture")
+		return
+	end
+
+	local maxedout = CreateCaptureTasks(cache.engineer_count, TGROUP_CaptureHigh, TPRIORITY_CaptureHigh)
+	
+	if maxedout==false and World_GetGameTime() > 1000 then
+		local demandedCaptureTasks = AIResource_GetNumCapturers(s_selfplayer)
+		demandedCaptureTasks = demandedCaptureTasks - cache.engineer_count
+		
+		if demandedCaptureTasks > 0 then
+			CreateCaptureTasks(demandedCaptureTasks, TGROUP_CaptureLow, TPRIORITY_CaptureLow)
+		end
+	end
+end

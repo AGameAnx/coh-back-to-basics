@@ -1,0 +1,344 @@
+-----------------------------
+-- AI Budget System
+--
+--  The AI has a series
+
+ai_budget = {}
+
+-- this is the number of times the AI will attempt to run the budget each frame (this only happens when it has lots of money)
+kMaxTimesToPurchasePerFrame = 25
+kRenormalizeValue = 1500
+
+-----------------------------------------------
+
+function ai_budget.trace(msg)
+	local ticks = World_GetGameTime() * 8
+	-- pipe this out also
+	msg = "[" .. ticks .. "]" .. msg
+
+	aitrace_ext("AI_Budget", msg)
+end
+
+function ai_budget.trace_clear()
+	aitraceclear_ext("AI_Budget")
+end
+
+-- initialize the budget system
+function ai_budget:init()
+	--print("BudgetInitialized")
+	--ai_budget.trace("BudgetInitialized")
+	self.lastResource = Stats_ResGathered(s_self_modplayer)
+	self.budget_list = {}
+end
+
+-- add a new budgetgroup and optionally set its starting weight
+-- the purchase callback looks like so:  didPurchase, neededResources = cb(availableResources)
+function ai_budget:add(budgetgroup, purchase_CB, starting_weight, uses_munitions, max_purchases_per_run)
+	--print("Budget:Add:"..budgetgroup)
+	--ai_budget.trace("Budget:Add:"..budgetgroup)
+	
+	local w = 0
+	if (starting_weight and type(starting_weight) == "number") then
+		w = starting_weight
+	end
+	
+	self.budget_list[budgetgroup] = { weighting = w, currentTotal = 0, purchase_func = purchase_CB, munition_only = uses_munitions, purchase_count = 0, max_purchase = max_purchases_per_run }
+end
+
+function ai_budget:remove(budgetgroup)
+	--ai_budget.trace("Budget:Remove:"..budgetgroup)
+	
+	-- removes the given budget
+	self.budget_list[budgetgroup] = nil
+end
+
+-- sets a specific budget to specified weight (best to do all budgets at one time)
+function ai_budget:setweight(budgetgroup, new_weight)
+	if not self.budget_list then self:init() end
+	
+	if self.budget_list[budgetgroup] then
+		local oldweights = self:normalized_table()
+		-- set new weight
+		self.budget_list[budgetgroup].weighting = new_weight
+		
+		local newweights = self:normalized_table()
+		local totals = self:totalweights()
+		
+		for k,v in pairs(self.budget_list) do
+			local weight_change = (newweights[k] - oldweights[k]) * totals
+			self.budget_list[k].currentTotal = self.budget_list[k].currentTotal + weight_change
+		end
+	else
+		dbAssert(0); --("setweight called for a non-existant budget")
+	end
+end
+
+-- gets a specific budgets weight
+function ai_budget:getweight(budgetgroup)
+	if (self.budget_list[budgetgroup]) then
+		return self.budget_list[budgetgroup].weighting
+	end
+	return 0
+end
+
+-- gets a specific budgets current total
+function ai_budget:gettotal(budgetgroup)
+	if (self.budget_list[budgetgroup]) then
+		return self.budget_list[budgetgroup].currentTotal
+	end
+	return 0
+end
+
+function ai_budget:cleartotal(budgetgroup)
+	if (self.budget_list[budgetgroup]) then
+		self.budget_list[budgetgroup].currentTotal = 0
+	else
+		dbAssert(0); --("cleartotal called for a non-existant budget")
+	end
+end
+
+function ai_budget:clearall()
+	for k,v in pairs(self.budget_list) do
+		v.currentTotal = 0
+	end
+	-- this redistributes all current resources to the existing budgets
+	self:simulate_pre()
+end
+
+-- dump budget info and print
+function ai_budget:dump()
+	if (self.budget_list == nil) then
+		--print("ai_budget - DUMP: empty budget list")
+		--ai_budget.trace("ai_budget - DUMP: empty budget list")
+		return
+	end
+	for k,v in pairs(self.budget_list) do
+		local text = string.format(k.." Weight:%.2f Total:%.1f", v.weighting, v.currentTotal)
+		
+		--print(text)
+		--ai_budget.trace(text)
+	end
+end
+
+-- determines the total weights of all the budget groups
+function ai_budget:totalweights()
+	local total = 0
+	for k,v in pairs(self.budget_list) do
+		total = total + v.weighting
+	end
+	return total
+end
+
+-- determines what percentage each budget group is of the total weight of all budget groups
+-- returns a table 1:1 with the budget group table
+function ai_budget:normalized_table()
+	local totalweight = self:totalweights();
+	if (totalweight == 0) then
+		--print("WARNING: ai_budget:totalweight = 0!")
+		return nil
+	end
+
+	local t = {}
+	local i = 1
+	for k,v in pairs(self.budget_list) do
+		t[k] = v.weighting / totalweight
+	end
+	
+	return t
+end
+
+
+-- add new resources that will be distrubuted to each budget based on their current weights
+function ai_budget:add_resources(new_resources, only_budget)
+	if (self.budget_list == nil) then self:init() end
+	
+	-- zero out unused fields
+	new_resources.action = 0
+	new_resources.command = 0
+	
+	local sumRes = ResourceAmount_Sum(new_resources)
+	
+	-- determine the percentage of the total weighting each budget has
+	local budget_weights = self:normalized_table();
+	
+	-- if only budget is passed in then this budget is the only one that gets the money
+	if (only_budget and self.budget_list[only_budget]) then
+		local budget_ref = self.budget_list[only_budget]
+		
+		-- add ALL of the incoming money to this one budget
+		budget_ref.currentTotal = budget_ref.currentTotal + sumRes
+		
+		local text = string.format(only_budget.." NewTotal:%.1f Added:%.1f", budget_ref.currentTotal, sumRes)
+		--ai_budget.trace(text)
+		return
+	end
+	
+	local max_value = -100000
+	
+	-- divy up the new resources to each budget bucket
+	for k,v in pairs(budget_weights) do
+		local w = budget_weights[k]
+		self.budget_list[k].currentTotal = self.budget_list[k].currentTotal + w*sumRes
+		
+		local text = string.format(k.." Weight:%.2f Total:%.1f", w, self.budget_list[k].currentTotal)
+		--ai_budget.trace(text)
+		
+		if (self.budget_list[k].currentTotal > max_value) then
+			max_value = self.budget_list[k].currentTotal
+		end
+	end
+	
+	-- divide the budgets by two
+	if (max_value > kRenormalizeValue) then
+		local curTotal = self:totalweights()
+		
+		local cur_budget_weights = self:normalized_table();
+		for k,v in pairs(budget_weights) do
+			self.budget_list[k].currentTotal = cur_budget_weights[k] * curTotal * 0.5
+		end
+	end
+end
+
+-- subtract resources for the given budget group
+function ai_budget:sub_resources(budgetgroup, resources)
+	dbAssert(self.budget_list[budgetgroup] ~= nil)
+	if (self.budget_list[budgetgroup]) then
+		
+		local sumRes = ResourceAmount_Sum(resources)
+		
+		self.budget_list[budgetgroup].currentTotal = self.budget_list[budgetgroup].currentTotal - sumRes
+		
+	end
+end
+
+-- update the budgets for the first time to account for the money
+-- that is currently available
+function ai_budget:simulate_pre()
+	local curentResources = AIResource_GetCurrentResources(s_selfplayer)
+	
+	-- divy these resources equally to each budget
+	self:add_resources(curentResources)
+end
+
+-- called on every frame and does the distribution of resources
+function ai_budget:update()
+	local resGathered = Stats_ResGathered(s_self_modplayer)
+	
+	if not self.lastResource then
+		self:init()
+	end
+	
+	--ai_budget.trace("Gathered:"..res_to_str(resGathered))
+	
+	local newResources = ResourceAmount_Subtract(resGathered, self.lastResource)
+
+	-- divy these resources equally to each budget
+	self:add_resources(newResources)
+	
+	-- remember the last known gathered resource value
+	self.lastResource = resGathered
+end
+
+function ai_budget:do_purchases(do_munitions_only)
+	--ai_budget.trace_clear()
+	
+	--ai_budget.trace("< RUNNING BUDGET SYSTEM >")
+	--ai_budget.trace("---------------------------------")
+	
+	local resInActiveTasks = Task_CountCost(s_selfplayer, false)
+	--ai_budget.trace("ResInTasks:"..res_to_str(resInActiveTasks))
+	
+	-- reset purchase count for each budget
+	for kb,vb in pairs(self.budget_list) do
+		vb.purchase_count = 0
+	end
+	
+	-- run the budget calcs up to X times per frame (in case we have lots of money)
+	local maxRunsPerFrame=kMaxTimesToPurchasePerFrame
+	
+	while(maxRunsPerFrame > 0 and self:internal_do_purchases(resInActiveTasks, do_munitions_only)) do
+		resInActiveTasks = Task_CountCost(s_selfplayer, false)
+		--ai_budget.trace("ResInTasks:"..res_to_str(resInActiveTasks))
+		
+		maxRunsPerFrame = maxRunsPerFrame-1
+	end
+	
+	--ai_budget.trace("---------------------------------")
+end
+
+-- called every purchase tick, this goes through each budget from the one with the highest
+-- budget value and lets them have a chance to purchase items
+function ai_budget:internal_do_purchases(usedUpResourcesFromTaskList, do_munitions_only)
+	--ai_budget.trace("-----------BUDGET RUN INTERVAL: Munitions:"..tostring(do_munitions_only).."-------------")
+	
+	-- create new table to be sorted (so we don't affect the original table)
+	local t = {}
+	local count = 0
+	for kb,vb in pairs(self.budget_list) do
+		count = count+1
+		t[count] = {kb, vb.currentTotal}
+	end
+	
+	-- sort the budgets
+	table.sort(t, function(a,b) return (a[2] > b[2]) end)
+	
+	-- process the budgets in the order specified by t, but only when the total is great than zero
+	
+	-- get the starting resources the budgets have available to it
+	local locked_resources = AIResource_GetCurrentResources(s_selfplayer)
+	
+	-- update the amount of resources we really have (since we have to count the money we already virtually spent)
+	locked_resources = ResourceAmount_Subtract(locked_resources, usedUpResourcesFromTaskList)
+	
+	--CustomDebug.Clear()
+	for k,v in pairs(t) do
+		local budget_id = v[1]
+		--CustomDebug.Print("budget: "..budget_id)
+		local budget = self.budget_list[ budget_id ]
+		if (budget.max_purchase==nil or budget.purchase_count < budget.max_purchase) then
+			-- only process muntion only budgets
+			if (budget.munition_only == false or do_munitions_only) then
+				--aipushtrace(string.format("%s BVal:%.1f", budget_id, v[2]))
+				
+				--ai_budget.trace("---Processing Budget "..budget_id.." ResAvail:"..res_to_str(locked_resources).." ---")
+				
+				dbAssert(budget.purchase_func ~= nil);
+				
+				-- run this budgets purchase function
+				local did_purchase, used_resources = budget.purchase_func(locked_resources, budget.purchase_count)
+				--CustomDebug.Print("  DidPurchase: "..tostring(did_purchase))
+				if (did_purchase) then
+					--ai_budget.trace(k.." DidPurchase:"..tostring(did_purchase))
+					budget.purchase_count = budget.purchase_count + 1
+				--else
+					--ai_budget.trace(k.." DidPurchase: nil")
+				end
+				
+				-- if anyone buys something than exit
+				if (did_purchase and used_resources) then
+					--ai_budget.trace(k.." Purchased something!!")
+					-- update the budget
+					self:sub_resources(budget_id, used_resources)
+					
+					--aipoptrace()
+					return true
+				end
+				
+				-- add the resources wanted by this budget as locked
+				if (used_resources) then
+					--CustomDebug.Print("  Used resources")
+					locked_resources = ResourceAmount_Subtract(locked_resources, used_resources)
+					locked_resources = ResourceAmount_ClampToZero(locked_resources)
+				end
+				
+				--aipoptrace()
+			end
+		--else
+			--CustomDebug.Print("...Skipping budget because its hit max purchase limit")
+			--ai_budget.trace("Skipping budget "..budget_id.." because its hit max purchase limit")
+		end
+	end
+	
+	-- no purchase was made -
+	return false
+end

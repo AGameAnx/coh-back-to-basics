@@ -1,0 +1,86 @@
+CustomDebug = {
+	Enabled = true,
+	DisplayTime = 25,
+	MessagesToDisplay = 30,
+	OverwriteOnOverflow = true,
+	UpdateTicks = 0.1,
+	Offset = {0.005,0.005},
+	Colour = {192,255,255},
+	Darken = true,
+	MaxPercentageToDarken = 0.35,
+	
+	Print = function(Message)
+		if CustomDebug.TotalMessages >= CustomDebug.MessagesToDisplay and CustomDebug.OverwriteOnOverflow then
+			for i=CustomDebug.MessagesToDisplay,CustomDebug.TotalMessages do
+				CustomDebug.MessageQueue[i] = nil
+				CustomDebug.TotalMessages = CustomDebug.TotalMessages - 1
+			end
+		end
+		for i=CustomDebug.TotalMessages,1,-1 do
+			CustomDebug.MessageQueue[i+1] = CustomDebug.MessageQueue[i]
+		end
+		CustomDebug.MessageQueue[1] = {Message, 0}
+		CustomDebug.TotalMessages = CustomDebug.TotalMessages + 1
+		CustomDebug.Update(true)
+	end,
+	
+	Clear = function()
+		CustomDebug.TotalMessages = 0
+		CustomDebug.MessageQueue = {}
+	end,
+	
+	TotalMessages = 0,
+	MessageQueue = {},
+	
+	RemoveTopMessage = function()
+		CustomDebug.MessageQueue[CustomDebug.TotalMessages] = nil
+		CustomDebug.TotalMessages = CustomDebug.TotalMessages - 1
+	end,
+	
+	Update = function(dontMoveTime)
+		dr_clear("aicustomdebug"..s_selfplayerid)
+		if CustomDebug.Enabled and CustomDebug.TotalMessages > 0 then
+			for i = CustomDebug.TotalMessages, math.max(CustomDebug.TotalMessages - CustomDebug.MessagesToDisplay, 1), -1 do
+				local lightness
+				if CustomDebug.Darken then
+					lightness = 1-CustomDebug.MaxPercentageToDarken/CustomDebug.DisplayTime*CustomDebug.MessageQueue[i][2]
+				else
+					lightness = 1
+				end
+				dr_text2d("aicustomdebug"..s_selfplayerid,
+					CustomDebug.Offset[1] + 0.25 * (s_selfplayerid - 1000),
+					CustomDebug.Offset[2] + (CustomDebug.TotalMessages-i+1)*s_debug_display_height,
+					CustomDebug.MessageQueue[i][1],
+					math.ceil(CustomDebug.Colour[1]*lightness), math.ceil(CustomDebug.Colour[2]*lightness), math.ceil(CustomDebug.Colour[3]*lightness))
+				
+				if not dontMoveTime then
+					CustomDebug.MessageQueue[i][2] = CustomDebug.MessageQueue[i][2] + 1
+				end
+			end
+			
+			while CustomDebug.TotalMessages > 0 and CustomDebug.MessageQueue[CustomDebug.TotalMessages][2] >= CustomDebug.DisplayTime do
+				CustomDebug.RemoveTopMessage()
+			end
+		end
+	end,
+	
+	Init = function()
+		for px=1000,1008 do
+			dr_clear("aicustomdebug"..px)
+			dr_clear("aicustomdebug2"..px)
+		end
+		
+		dr_setdisplay("aicustomdebug"..s_selfplayerid, true)
+		dr_setdisplay("aicustomdebug2"..s_selfplayerid, true)
+		dr_setautoclear("aicustomdebug"..s_selfplayerid, false)
+		dr_setautoclear("aicustomdebug2"..s_selfplayerid, false)
+		
+		TimeRule_AddInterval(CustomDebug.Update, CustomDebug.UpdateTicks, 0)
+	end
+}
+
+function BP_GetFilename(pbg)
+	local name = BP_GetName(pbg)
+	local index = string.len(name)-string.find(string.reverse(name), "\\", 1, true)
+	return string.sub(name, index+2)
+end

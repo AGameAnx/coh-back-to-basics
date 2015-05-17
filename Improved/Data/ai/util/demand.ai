@@ -1,0 +1,713 @@
+
+--? @group Command
+
+s_demand_filter_canproduce = true
+
+s_squad_demand = {}
+s_class_demand = {}
+s_anti_class_demand = {}
+
+k_building_classID = AI_GetUnitClassID("aiclass_structure")+1
+k_infantry_classID = AI_GetUnitClassID("aiclass_infantry")+1
+k_light_vehicle_classID = AI_GetUnitClassID("aiclass_light_vehicle")+1
+k_tank_classID = AI_GetUnitClassID("aiclass_heavy_vehicle")+1
+k_medium_classID = AI_GetUnitClassID("aiclass_medium_vehicle")+1
+
+k_unit_class_count = AI_GetUnitClassCount()
+k_unit_class = {}
+for uci=0, (k_unit_class_count-1) do
+	k_unit_class[uci] = AI_GetUnitClassAt(uci)
+end
+
+------------------------------------------------------------------------------------------------------------
+-- these tables are used by the demand system to adjust the demand for particular classes
+s_enemy_demand_class_mult = {1,1,1,1,1}
+s_enemy_demand_class_mult[k_building_classID] = 1
+s_enemy_demand_class_mult[k_tank_classID] = 1.45
+s_enemy_demand_class_mult[k_medium_classID] = 1.35
+
+s_enemy_demand_class_base = {0,0,0,0,0}
+s_enemy_demand_class_base[k_building_classID] = -5
+s_enemy_demand_class_base[k_medium_classID] = 1
+
+last_enemy_class_rating = {0,0,0,0,0}
+last_enemy_anticlass_rating = {0,0,0,0,0}
+last_self_class_rating = {0,0,0,0,0}
+last_self_anticlass_rating = {0,0,0,0,0}
+
+------------------------------------------------------------------------------------------------------------
+-- list of the different types of purchases (used with SetSquadDemand function)
+PURCHASETYPE_SPAWN = 0
+PURCHASETYPE_ABILITY = 1
+PURCHASETYPE_REINFORCE = 2
+PURCHASETYPE_SPAWNHERO = 3
+
+-- hero id default
+DEFAULT_HERO_ID = 0
+
+function ResetDemand()
+	s_class_demand = {}
+	s_anti_class_demand = {}
+	s_squad_demand = {}
+	
+	for i = 0, k_unit_class_count - 1 do
+		s_class_demand[ i ] = 0
+		s_anti_class_demand[ i ] = 0
+	end
+end
+
+--? @shortdesc Sets the final demand for this squad
+--? @args PropertyBagGroupID sbpid, Number demand, Number id
+--? @result Void
+function SetSquadDemand(sbpid, demandvar, purchase_type, id)
+	-- heroes have additional id because there could be multiple heroes with same sbpid
+	if (id == nil) then
+		id = DEFAULT_HERO_ID
+	end
+	
+	if (s_squad_demand[ sbpid ] == nil) then
+		s_squad_demand[ sbpid ] = {}
+	end
+	
+	s_squad_demand[ sbpid ][ id ] = { demand = demandvar, purchaseType = purchase_type}
+end
+
+--? @shortdesc Gets the final demand for this squad
+--? @args PropertyBagGroupID sbpid, Number id
+--? @result Number the demand for this squad
+function GetSquadDemand(sbpid, id)
+	-- heroes have additional id because there could be multiple heroes with same sbpid
+	if (id ~= nil) then
+		id = DEFAULT_HERO_ID
+	end
+	
+	local demand = s_squad_demand[ sbpid ][ id ].demand;
+	
+	if(demand == nil) then
+		return 0
+	else
+		return demand
+	end
+end
+
+--? @shortdesc Return the squad with the highest demand
+--? @args
+--? @result Returns the best squad-pbg and its demand
+function HighestSquadDemand(demand_variance)
+	local choice_list = {}
+	local counter=0
+
+	-- convert this table to be indexed
+	for pbg,entry_tbl in pairs(s_squad_demand) do
+		for id,data_tbl in pairs(entry_tbl) do
+			counter = counter + 1
+			choice_list[counter] = {pbg, id, data_tbl.demand, data_tbl.purchaseType}
+		end
+	end
+	if counter == 0 then
+		--strategy_unit_purchase.trace("HighestSquadDemand: no choices found!")
+		return nil
+	end
+	
+	--strategy_unit_purchase.trace("------------------------------------")
+	--strategy_unit_purchase.trace("<HighestSquadDemand> TableSize:"..counter)
+	
+	-- sort it
+	table.sort(choice_list, function(a,b) return a[3]>b[3] end)
+	
+	-- get the best and first item in the list
+	local best_choice = choice_list[1]
+	
+	local highest_demand = best_choice[3]
+	
+	if (demand_variance == nil) then
+		demand_variance = 0
+	end
+	
+	--strategy_unit_purchase.trace("Demand Variance %:"..demand_variance)
+	local demand_dec_range = highest_demand * demand_variance
+	
+	-- determine the range determined by the passed in variance
+	local min_variance_range = highest_demand - demand_dec_range
+	min_variance_range = math.max(min_variance_range, 0)
+	
+	--strategy_unit_purchase.trace("Demand Range:"..min_variance_range.."->"..highest_demand)
+	
+	local outchoicelist = {}
+	
+	--strategy_unit_purchase.trace("Best units to purchase list:")
+	local num_choices=0
+	-- lets determine how many of these units are within
+	-- our demand variance range
+	for index,choice in pairs(choice_list) do
+		if (choice[3] >= min_variance_range) then
+			num_choices = num_choices+1
+			outchoicelist[num_choices] = choice
+			--strategy_unit_purchase.trace("   "..BP_GetName(choice[1]))
+		else
+			break
+		end
+	end
+	
+	return outchoicelist
+end
+
+function IncClassDemand(class, inc)
+	if (s_class_demand[class] ~= nil) then
+		s_class_demand[class] = s_class_demand[class] + inc
+	else
+		s_class_demand[class] = inc
+	end
+end
+
+function GetClassDemand(class)
+	if (s_class_demand[ class ]) then
+		return s_class_demand[ class ]
+	else
+		return 1
+	end
+end
+
+
+
+function IncAntiClassDemand(class, inc)
+	if (s_anti_class_demand[class]) then
+		s_anti_class_demand[class] = s_anti_class_demand[class] + inc
+	else
+		s_anti_class_demand[class] = inc
+	end
+end
+
+
+function GetAntiClassDemand(class)
+	if (s_anti_class_demand[ class ]) then
+		return s_anti_class_demand[ class ]
+	else
+		return 1
+	end
+end
+
+-- utility function that determines the amount of time it will take to get the passed in resources
+-- returns ETA, mpETA, fuelETA
+function GetETAFromCost(resCost, availableResources)
+	-- determine how much resources we need to buy this item
+	local needRes
+	if (availableResources) then
+		needRes = availableResources
+	else
+		needRes = AIResource_GetCurrentResources(s_selfplayer)
+	end
+	
+	local resRate = AIResource_GetCurrentResourceRate(s_selfplayer)
+	
+	-- the amount more resources we need
+	needRes = ResourceAmount_Subtract(resCost, needRes)
+	
+	-- if need a resource - determine how much time given current rates it will take to get it
+	local timemp = 0
+	if (needRes.manpower > 0) then
+		local rr = resRate.manpower
+		if (rr == 0) then
+			timemp = 11111
+		else
+			timemp = needRes.manpower / (resRate.manpower)
+		end
+	end
+	local timemun = 0
+	if (needRes.munition > 0) then
+		local rr = resRate.munition
+		if (rr == 0) then
+			timemun = 11111
+		else
+			timemun = needRes.munition / (resRate.munition)
+		end
+	end
+	local timefuel = 0
+	if (needRes.fuel > 0) then
+		local rr = resRate.fuel
+		if (rr == 0) then
+			timefuel = 11111
+		else
+			timefuel = needRes.fuel / (resRate.fuel)
+		end
+	end
+	
+	-- return the largest of these three values
+	return math.max(timemp, math.max(timemun, timefuel)), timemp, timefuel
+end
+
+-- determine the ETA for this squadblueprint
+function GetUnitETA(pbg, id, availableResources)
+	-- get cost of this item
+	local unitRes = SquadStats_GetCost(AI_GetPlayer(), pbg, id)
+	
+	-- determine its ETA given current rates and money
+	return GetETAFromCost(unitRes, availableResources)
+end
+
+function GetStructureETA(pbg, availableResources)
+	local resCost = AIPlayer_GetStructureCost(s_self_modplayer, pbg)
+	
+	return GetETAFromCost(resCost, availableResources);
+end
+
+function GetProductionETA(production_type, pbg, availableResources)
+	local resCost = AIPlayer_GetProductionCost(s_self_modplayer, production_type, pbg)
+	local costtext = res_to_str(resCost)
+	return GetETAFromCost(resCost, availableResources);
+end
+
+function Demand_GetTotalSelfClassRating(classID)
+	-- returns the alive + produced + requested class rating of this AI player
+	return PlayerStats_GetTotalSquadClassRating(s_self_modplayer, classID) + Task_GetInTaskClassRating(s_selfplayer, classID)
+end
+
+function Demand_GetTotalSelfAntiClassRating(classID)
+	-- returns the alive + produced + requested class rating of this AI player
+	return PlayerStats_GetTotalSquadAntiClassRating(s_self_modplayer, classID) + Task_GetInTaskAntiClassRating(s_selfplayer, classID)
+end
+
+function Demand_GetTotalEnemyPlusHistoryAntiClassRating(enemy_id, classID)
+	local historyrating = PlayerStats_GetTotalHistoryAntiClassRating(enemy_id, classID)
+	--strategy_unit_purchase.trace("HistoryAntiClassRating for class ("..classID..")"..historyrating)
+	return PlayerStats_GetTotalSquadAntiClassRating(enemy_id, classID) + historyrating
+end
+
+---------------------------------------------------------------------------
+--
+---------------------------------------------------------------------------
+
+function Demand_UpdateAIClassRatings()
+	--strategy_unit_purchase.trace("---<Demand_UpdateAIClassRatings>")
+	
+	local closest_enemy = AIPlayer_GetClosestEnemy(s_selfplayer)
+	
+	-- this goes through all the active/inactive tasks that effect the class ratings and counts them in
+	Task_CalcInTaskCombatRating(s_selfplayer)
+	
+	local str = string.format("|%.3f|%.3f|%.3f|%.3f|%.3f|", s_enemy_demand_class_mult[1], s_enemy_demand_class_mult[2], s_enemy_demand_class_mult[3], s_enemy_demand_class_mult[4], s_enemy_demand_class_mult[5])
+	--strategy_unit_purchase.trace("s_enemy_demand_class_mult:"..str)
+
+	if (state_analysis ~= nil) then
+		local str = string.format("|%.3f|%.3f|%.3f|%.3f|%.3f|", state_analysis.self_demand_class_base_value[1], state_analysis.self_demand_class_base_value[2], state_analysis.self_demand_class_base_value[3], state_analysis.self_demand_class_base_value[4], state_analysis.self_demand_class_base_value[5])
+		--strategy_unit_purchase.trace("self_demand_class_base_value:"..str)
+	end
+	
+	Demand_EnemyClassDemand(closest_enemy)
+	Demand_EnemyAntiClassDemand(closest_enemy)
+	
+	Demand_Normalize()
+end
+
+
+-- Demand value will be normalized so that it is an rate between 0.5 and 1.5
+function Demand_Normalize()
+	--strategy_unit_purchase.trace("------------------------------------")
+	--strategy_unit_purchase.trace("<Demand_Normalize>")
+	
+	local strfrmt = "|%.3f|%.3f|%.3f|%.3f|%.3f|"
+	
+	--strategy_unit_purchase.trace(string.format("Calculated Class:"..strfrmt, s_class_demand[0], s_class_demand[1], s_class_demand[2], s_class_demand[3], s_class_demand[4]))
+	--strategy_unit_purchase.trace(string.format("Calculated AntiClass:"..strfrmt, s_anti_class_demand[0], s_anti_class_demand[1], s_anti_class_demand[2], s_anti_class_demand[3], s_anti_class_demand[4]))
+	
+	local maxvalue = -10000
+		
+	for cid=0, k_unit_class_count-1 do
+		if (s_class_demand[cid] > maxvalue) then
+			maxvalue = s_class_demand[cid]
+		end
+		if (s_anti_class_demand[cid] > maxvalue) then
+			maxvalue = s_anti_class_demand[cid]
+		end
+	end
+
+	if maxvalue ~=0 then
+	
+		for cid=0, k_unit_class_count-1 do
+			s_class_demand[cid] = s_class_demand[cid]/maxvalue + 0.5
+			s_anti_class_demand[cid] = s_anti_class_demand[cid]/maxvalue + 0,5
+		end
+	
+	end
+	
+	--strategy_unit_purchase.trace(string.format("Normalized Class:"..strfrmt, s_class_demand[0], s_class_demand[1], s_class_demand[2], s_class_demand[3], s_class_demand[4]))
+	--strategy_unit_purchase.trace(string.format("Normalized AntiClass:"..strfrmt, s_anti_class_demand[0], s_anti_class_demand[1], s_anti_class_demand[2], s_anti_class_demand[3], s_anti_class_demand[4]))
+end
+
+---------------------------------------------------------------------------
+--
+
+function Demand_EnemyClassDemand(enemy_id)
+	--strategy_unit_purchase.trace("------------------------------------")
+	--strategy_unit_purchase.trace("------<Demand_EnemyClassDemand>")
+	
+	local minvalue=100000
+	local class_temp = {}
+	
+	local enemyClassRatingTxt = "Enemy Class Rating: | "
+	local selfAntiClassRatingTxt = "Self AntiClass Rating: | "
+	local acIncTxt = "Demand increase for anticlass: | "
+	
+	for cid=0, k_unit_class_count-1 do
+		-- increase class value ratio and decrease anticlass ratio to balance out the bloated anticlass ratings
+		local classval = 1.5 * PlayerStats_GetTotalClassRating(enemy_id, cid) * s_enemy_demand_class_mult[cid+1]
+		last_enemy_class_rating[cid+1] = classval + s_enemy_demand_class_base[cid+1]
+		enemyClassRatingTxt = enemyClassRatingTxt..string.format("%.1f|", classval)
+		
+		local self_anticlass = 0.5 * Demand_GetTotalSelfAntiClassRating(cid)
+		last_self_anticlass_rating[cid+1] = self_anticlass
+		selfAntiClassRatingTxt = selfAntiClassRatingTxt..string.format("%.1f|", self_anticlass)
+		
+		-- how much class is left after we apply our anticlass
+		classval = classval - self_anticlass
+		
+		-- anti-class should not be negative
+		if (classval < 0) then
+			classval = 0
+		end
+		
+		if (classval < minvalue) then
+			minvalue = classval
+		end
+		
+		class_temp[cid] = classval
+	end
+	
+	--strategy_unit_purchase.trace(enemyClassRatingTxt)
+	--strategy_unit_purchase.trace(selfAntiClassRatingTxt)
+	
+	for cid=0, k_unit_class_count-1 do
+		local newvalue = (class_temp[cid] - minvalue) * s_enemy_demand_class_mult[cid+1]
+	
+		acIncTxt = acIncTxt..string.format("%.1f|", newvalue)
+		
+		IncAntiClassDemand(cid, newvalue)
+	end
+	
+	--strategy_unit_purchase.trace(acIncTxt)
+end
+
+function Demand_EnemyAntiClassDemand(enemy_id)
+	--strategy_unit_purchase.trace("------------------------------------")
+	--strategy_unit_purchase.trace("------<Demand_EnemyAntiClassDemand>")
+	
+	local minvalue=100000
+	local class_temp = {}
+	
+	local enemyACTxt = "Enemy AntiClass Rating: | "
+	local selfClassTxt = "Self Class Rating: | "
+	local dmdIncTxt = "Demand increase for class: | "
+	
+	for cid=0, k_unit_class_count-1 do
+		local anticlassval = Demand_GetTotalEnemyPlusHistoryAntiClassRating(enemy_id, cid) --* s_enemy_demand_class_mult[cid+1]
+		enemyACTxt = enemyACTxt..string.format("%.1f|", anticlassval)
+		last_enemy_anticlass_rating[cid+1] = anticlassval
+		
+		local classval = Demand_GetTotalSelfClassRating(cid) + state_analysis.self_demand_class_base_value[cid+1]
+		selfClassTxt = selfClassTxt..string.format("%.1f|", classval)
+		last_self_class_rating[cid+1] = classval
+		
+		-- self class val
+		local selfClassDemand = -anticlassval + classval
+		
+		-- if we have a class advantage - press it, but don't go crazy
+		if (selfClassDemand > 0) then
+			selfClassDemand = selfClassDemand*0.1
+		end
+		
+		if (selfClassDemand < minvalue) then
+			minvalue = selfClassDemand
+		end
+		
+		class_temp[cid] = selfClassDemand
+	end
+	
+	--strategy_unit_purchase.trace(enemyACTxt)
+	--strategy_unit_purchase.trace(selfClassTxt)
+	
+	for cid=0, k_unit_class_count-1 do
+	
+		local newvalue = (class_temp[cid] - minvalue) --* s_enemy_demand_class_mult[cid+1]
+	
+		dmdIncTxt = dmdIncTxt..string.format("%.1f|", newvalue)
+		
+		IncClassDemand(cid, newvalue)
+	end
+	
+	--strategy_unit_purchase.trace(dmdIncTxt)
+end
+
+--------------------------------------------------------------------------------------------
+-- Take the AI demands and determine how the passed in Squad rates (return a demand value)
+
+-- Determine how this units class rating compares to the AIplayers anticlass wants/needs
+function SquadClassDemand(pbg)
+	-- Class Demand
+	local unit_class_demand = 0
+	-- get the class demand this AI player wants
+	local class_demand = GetClassDemand(SquadStats_GetClass(pbg))
+	
+	if class_demand > 0 then
+		unit_class_demand = SquadStats_GetClassRating(pbg) * class_demand
+	else
+		-- this still increases demand for units >15 classratings
+		unit_class_demand = (15-SquadStats_GetClassRating(pbg)) * class_demand
+	end
+	
+	-- print("SquadClassDemand for: " .. BP_GetName(pbg) .. " class demand(".. class_demand .. ") class rating(" .. SquadStats_GetClassRating(pbg) .. ")")	
+
+	return unit_class_demand
+end
+
+-- Determine the how this units anti-class rating compare to the AIplayers anticlass wants/needs
+function SquadAntiClassDemand(pbg)
+--	strategy_unit_purchase.trace(BP_GetName(pbg))
+	local anti_class_demand = 0
+	for class = 0, k_unit_class_count - 1 do
+		local arating = SquadStats_GetAntiClassRating(pbg, class) * GetAntiClassDemand(class)
+		anti_class_demand = anti_class_demand + arating
+		
+--		local str = string.format("[%d]. %.2f = %.2f * %.2f", class, arating, SquadStats_GetAntiClassRating(pbg, class), GetAntiClassDemand(class))
+--		strategy_unit_purchase.trace(str)
+	end
+	
+	-- divide overall rating by the number of classes
+--	anti_class_demand = anti_class_demand / k_unit_class_count
+
+	return anti_class_demand
+end
+
+-- takes the class/anticlass totals to how this unit maps to the needs of this AI
+function CalcSquadDemand(pbg)
+	-- Class Demand
+	local class_demand = SquadClassDemand(pbg)
+	-- AntiClass Demand
+	local anti_class_demand = SquadAntiClassDemand(pbg)
+	
+	--print("CalcDemand for: " .. BP_GetName(pbg) .. " class demand(".. class_demand .. ") anti-class demand(" .. anti_class_demand .. ")")
+	
+	return class_demand + anti_class_demand
+end
+
+--------------------------------------------------------------------------------------------
+-- Determine total demand given a cummulative rating and anti_rating scores
+--  ratings are a table starting 0->k_unit_class_count-1
+
+function SquadClassDemandFromRating(rating_tbl)
+	local unit_class_demand = 0
+	for class = 0, k_unit_class_count - 1 do
+		if (rating_tbl[class]) then
+						
+			-- get the class demand this AI player wants
+			local class_demand = GetClassDemand(class)
+			-- get the rating from the table
+			local class_rating = rating_tbl[class]
+			-- cummulate the demand
+			if class_demand > 0 then
+				unit_class_demand = unit_class_demand + class_rating * class_demand
+			else
+				-- this still increases demand for units >15 classratings
+				unit_class_demand = unit_class_demand + (15-class_rating) * class_demand
+			end
+		end
+	end
+	return unit_class_demand
+end
+
+-- Determine the how this units anti-class rating compare to the AIplayers anticlass wants/needs
+function SquadAntiClassDemandFromRating(anti_rating_tbl)
+	local anti_class_demand = 0
+	for class = 0, k_unit_class_count - 1 do
+		
+		local anti_class_rating = anti_rating_tbl[class]
+		
+		anti_class_demand = anti_class_demand + anti_class_rating * GetAntiClassDemand(class)
+	end
+	anti_class_demand = anti_class_demand / k_unit_class_count
+
+	return anti_class_demand
+end
+
+-- takes the class/anticlass totals to how this unit maps to the needs of this AI
+function CalcSquadDemandFromRating(rating_tbl, anti_rating_tbl)
+	-- Class Demand
+	local class_demand = SquadClassDemandFromRating(rating_tbl)
+	-- AntiClass Demand
+	local anti_class_demand = SquadAntiClassDemandFromRating(anti_rating_tbl)
+	
+	return class_demand + anti_class_demand, class_demand, anti_class_demand
+end
+
+
+-----------------------------------
+-- DEMAND DEBUG
+
+function GetAIDemandsString()
+	return string.format("Demands: Class(%.1f,%.1f,%.1f,%.1f,%.1f) AntiClass(%.1f,%.1f,%.1f,%.1f,%.1f) CaptureMult(%.0f)",
+		GetClassDemand(0),GetClassDemand(1),GetClassDemand(2),GetClassDemand(3), GetClassDemand(4),
+		GetAntiClassDemand(0),GetAntiClassDemand(1),GetAntiClassDemand(2),GetAntiClassDemand(3),GetAntiClassDemand(4),
+		GetCapturerDemandMult())
+end
+
+function CreateRatingsString(name, rating_tbl, anti_rating_tbl)
+	return string.format("%s: Class(%.0f,%.0f,%.0f,%.0f,%.0f) AntiClass(%.0f,%.0f,%.0f,%.0f,%.0f)",
+		name, rating_tbl[1],rating_tbl[2],rating_tbl[3],rating_tbl[4],rating_tbl[5],
+		anti_rating_tbl[1],anti_rating_tbl[2],anti_rating_tbl[3],anti_rating_tbl[4],anti_rating_tbl[5])
+end
+
+function GetAIClassNameString()
+	local text = "ClassNames:"
+	for k=0, k_unit_class_count-1 do
+		text = text.." | "..AI_GetUnitClassAt(k)
+	end
+	return text
+end
+
+function PrintSquadDemands(production_type, yval)
+	local xval = 0.05
+	local xval_prev = xval
+	
+	local ystep = 0.025
+	
+	local tab = 0.08
+	
+	local taboffsetNAME = 2.8
+	local taboffsetCLASS = 1.3
+	local taboffsetPRDC = 1.5
+
+	-- print demands for each squad
+	local buildableTotal = AIProduction_GetProductionItemCount(s_selfplayer, production_type)
+	for i=0, buildableTotal-1 do
+		local pbg = AIProduction_GetProductionItemPBGAt(s_selfplayer, production_type, i)
+		local id = AIProduction_GetProductionItemIDAt(s_selfplayer, production_type, i)
+		
+		local canproduceever = 0
+		if (AIProduction_CanProduce(s_selfplayer, production_type, pbg, id)) then
+			canproduceever = 1
+		end
+		
+		if (canproduceever == 1 or s_demand_filter_canproduce==false) then
+		
+			local canproducenow = 0
+			if (AIProduction_CanProduceNow(s_selfplayer, production_type, pbg, id)) then
+				canproducenow = 10
+			end
+			
+			xval = xval_prev
+			yval = yval + ystep
+	
+			local pbgname = BP_GetName(pbg)
+			local a,b = string.find(pbgname, "sbps\\races\\")
+			if (b) then
+				pbgname = string.sub(pbgname, b+1)
+			end
+			
+			local a,b = string.find(pbgname, "\\")
+			while (b ~= nil) do
+			
+				pbgname = string.sub(pbgname, b+1)
+				a,b = string.find(pbgname, "\\")
+				
+			end
+			
+			-- Name
+			DebugPrint(xval, yval, pbgname)
+			xval = xval + tab * taboffsetNAME
+			
+			-- Class
+			local classname = string.format("%s", k_unit_class[SquadStats_GetClass(pbg)])
+			local a,b = string.find(classname, "aiclass_")
+			if (b) then
+				classname = string.sub(classname, b+1)
+			end
+			
+			DebugPrint(xval, yval, classname)
+			xval = xval + tab*taboffsetCLASS
+			
+			-- Class demand
+			DebugPrint(xval, yval, string.format("%.1f(%.1f x %.0f)", SquadClassDemand(pbg), GetClassDemand(SquadStats_GetClass(pbg)), SquadStats_GetClassRating(pbg)))
+			xval = xval + tab
+	
+			-- AntiClass demand
+			DebugPrint(xval, yval, string.format("%.1f", SquadAntiClassDemand(pbg)))
+			xval = xval + tab
+	
+			-- Squad demand
+			DebugPrint(xval, yval, string.format("%.1f", CalcSquadDemand(pbg)))
+			xval = xval + tab
+			
+			-- CanProduce
+			DebugPrint(xval, yval, string.format("%.0f / %.0f", canproducenow, canproduceever))
+			xval = xval + tab*taboffsetPRDC
+			
+			-- Buildticks
+			DebugPrint(xval, yval, string.format("%.0f", SquadStats_GetBuildTicks(AI_GetPlayer(), pbg, DEFAULT_HERO_ID) / 8))
+			xval = xval + tab
+			
+			-- ETA
+			DebugPrint(xval, yval, string.format("%.0f", GetUnitETA(pbg, DEFAULT_HERO_ID)))
+			xval = xval + tab
+			
+			-- Prereq Info
+		end
+	end
+	return yval
+end
+
+function PrintDemands()
+	local	xval	= 0.05
+	local 	xval_prev = xval
+	
+	local	yval	= s_debug_display_height
+	local   ystep	= 0.025
+
+	--display which player I'm currently debugging
+	DebugPrint(xval, yval-ystep*0.5, "Debugging Player "..s_selfplayerid.." (Build Demands)")
+	yval = yval + ystep * 0.5
+	
+	DebugPrint(xval, yval+ystep*0.5, CreateRatingsString("Enemy", last_enemy_class_rating, last_enemy_anticlass_rating))
+	DebugPrint(xval, yval+ystep*1.5, CreateRatingsString("Self", last_self_class_rating, last_self_anticlass_rating))
+	DebugPrint(xval, yval+ystep*2.5, GetAIDemandsString())
+	DebugPrint(xval, yval+ystep*3.5, GetAIClassNameString())
+	yval = yval + ystep*5
+	
+	local tab = 0.08
+	
+	local taboffsetNAME = 2.8
+	local taboffsetCLASS = 1.3
+	local taboffsetPRDC = 1.5
+	
+	--RATINGS
+	DebugPrint(xval, yval, "PBGName")
+	xval = xval + tab*taboffsetNAME
+	
+	DebugPrint(xval, yval, "Class")
+	xval = xval + tab*taboffsetCLASS
+	
+	DebugPrint(xval, yval, "ClsDmd")
+	xval = xval + tab
+	
+	DebugPrint(xval, yval, "AntiDmd")
+	xval = xval + tab
+	
+	DebugPrint(xval, yval, "Total")
+	xval = xval + tab
+	
+	DebugPrint(xval, yval, "Prd Now/Ever")
+	xval = xval + tab*taboffsetPRDC
+
+	DebugPrint(xval, yval, "BuildTime")
+	xval = xval + tab
+	
+	DebugPrint(xval, yval, "ETA")
+	xval = xval + tab
+	
+	--DebugPrint(xval, yval, "Pre-reqs")
+
+	yval = yval + ystep
+
+	--for squad_type_stats in ai_manager.stats:GetSquadTypeStats(ai_manager.ai_player:GetPlayerRace()) do
+	
+	yval = PrintSquadDemands(PITEM_Spawn, yval)
+	PrintSquadDemands(PITEM_SpawnHero, yval)
+end

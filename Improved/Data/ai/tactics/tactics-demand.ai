@@ -1,0 +1,108 @@
+-- situational demand functions
+-- return 'some' demand range between 0-100 depending on state
+
+function CountEnemySquads(squads)
+	local count = 0
+	for i=1,table.getn(squads) do
+		if is_enemy_squad(squads[i]) then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+-- returns a demand based on whether or not we can find a nearby target (deals separately with entities & squads)
+function TacticDemand_NearTarget(squad, near_entities, near_squads, pred_ent, pred_squads)
+	if near_entities ~= nil and pred_ent ~= nil then
+		if pred_ent(squad, near_entities) then
+			return s_demand_increment
+		end
+	end
+	
+	if near_squads ~= nil and pred_squads ~= nil then
+		if pred_squads(squad, near_squads) then
+			return s_demand_increment
+		end
+	end
+	
+	-- nothing to target
+	return -s_demand_increment
+end
+
+-- returns a demand based on a simple boolean predicate on the squad only
+function TacticDemand_Boolean(squad, pred, attrib)
+	if attrib == nil then attrib = {} end
+	if pred(squad, unpack(attrib)) then
+		return s_demand_increment
+	end
+	return -s_demand_increment
+end
+
+function TacticDemand_NearEnemySquad_NonVehicle(squad,near_entities,near_squads)
+	return TacticDemand_NearTarget(squad,nil,near_squads,nil,SquadTargetFilter_FirstEnemyNonVehicle)
+end
+
+function TacticDemand_NearEnemySquad_NonVehicle(squad,near_entities,near_squads)
+	return TacticDemand_NearTarget(squad,nil,near_squads,nil,SquadTargetFilter_FirstEnemyNonVehicle)
+end
+
+function TacticDemand_NearEnemySquad_Vehicle(squad, near_entities,near_squads)
+	return TacticDemand_NearTarget(squad,nil,near_squads,nil,SquadTargetFilter_FirstEnemyVehicle)
+end
+
+function TacticDemand_NearEnemy(squad,near_entities,near_squads)
+	return TacticDemand_NearTarget(squad,near_entities,near_squads,EntityTargetFilter_FirstEnemy,SquadTargetFilter_FirstEnemy)
+end
+
+function TacticDemand_NearEnemySquad(squad,near_entities,near_squads)
+	return TacticDemand_NearTarget(squad,nil,near_squads,nil,SquadTargetFilter_FirstEnemy)
+end
+
+function TacticDemand_Not_NearEnemySquad(squad,near_entities,near_squads)
+	return -TacticDemand_NearTarget(squad,nil,near_squads,nil,SquadTargetFilter_FirstEnemy)
+end
+
+function TacticDemand_NearEnemyEntity(squad,near_entities,near_squads)
+	return TacticDemand_NearTarget(squad,near_entities,nil,EntityTargetFilter_FirstEnemy,nil)
+end
+
+function TacticDemand_NearEnemyStructure(squad,near_entities,near_squads)
+	return TacticDemand_NearTarget(squad,near_entities,nil,EntityTargetFilter_FirstEnemyStructure,nil)
+end
+
+function TacticDemand_NearEnemyClump(squad,near_entities,near_squads)
+	return TacticDemand_Boolean(squad, have_clumps)
+end
+
+function TacticDemand_Not_NearEnemyClump_ShortRange(squad,near_entities,near_squads)
+	return -TacticDemand_Boolean(squad, have_clumps_near)
+end
+
+function TacticDemand_NearEnemyClump_ShortRange(squad,near_entities,near_squads)
+	return TacticDemand_Boolean(squad, have_clumps_near)
+end
+
+function TacticDemand_BeingAttacked(squad,near_e,near_s)
+	return TacticDemand_Boolean(squad, TacticFilter_IsBeingAttacked)
+end
+
+function TacticDemand_IsShooting(squad,near_e,near_s)
+	return TacticDemand_Boolean(squad, TacticFilter_IsShooting)+CountEnemySquads(near_s)-2
+end
+
+function TacticDemand_InCombat(squad,near_e,near_s)
+	return TacticDemand_Boolean(squad, TacticFilter_InCombat)
+end
+
+function TacticDemand_LowHealth(squad,near_e,near_s)
+	return TacticDemand_Boolean(squad, TacticFilter_HealthLow)
+end
+
+function TacticDemand_LowHealth_MedicalKit(squad,near_e,near_s)
+	-- do not waste medic kit ability on cheap engineers
+	if (TacticFilter_IsSquadEngineer(squad)) then
+		return -s_demand_increment
+	end
+	
+	return TacticDemand_Boolean(squad, TacticFilter_HealthLow)
+end

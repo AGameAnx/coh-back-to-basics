@@ -1,0 +1,20 @@
+-- Tactics
+
+-- how far to look back when checking if we've taken a shot or been shot at
+s_CombatHistoryTicks = 4 * 8
+s_LowHealthPercentage = 0.85
+s_LowHealthPercentageVehicle = 0.99
+s_NearClumpDistanceCap = 150
+s_NearClumpDistanceCap_Small = 35
+s_ObstructionSearchRadius = 80
+
+s_demand_increment = 2
+
+import('tactics/tactics-util.ai')
+import('tactics/tactics-player.ai')
+import('tactics/tactics-squadtargetfilters.ai')
+import('tactics/tactics-entitytargetfilters.ai')
+import('tactics/tactics-positiontargetfilters.ai')
+import('tactics/tactics-filters.ai')
+import('tactics/tactics-demand.ai')
+import('tactics/tactics-specialabilities.ai')

@@ -1,0 +1,166 @@
+---------------------------------------------------------------------
+-- cache.ai
+--
+--  This file is the place to put all vars that get calculated many times
+--  every frame. This calculates them once so they can be used
+--  on this frame.
+--
+
+cache = {}
+cache.military_scale = { -- increasing these might make other races too defensive vs changed race and changed race too aggressive vs other races
+	[TRACE_ALLIES] = 1.2,
+	[TRACE_AXIS] = 0.8,
+	[TRACE_ALLIES_COMMONWEALTH] = 1.075,
+	[TRACE_AXIS_PANZER_ELITE] = 1.02,
+}
+
+function cache.trace(msg)
+	local ticks = World_GetGameTime() * 8
+	-- pipe this out also
+	msg = "[" .. ticks .. "]" .. msg
+
+	aitrace_ext("Cache", msg)
+end
+
+function cache.trace_clear()
+	aitraceclear_ext("Cache")
+end
+
+-- calc VPs after game starts because the SCAR rules aren't run until pre-sim so we must wait
+cache.simulate_pre = function()
+	cache.vp_total = AIResource_GetVictoryPointTotal(s_selfplayer)
+	
+	-- this is all the points in the world including VP
+	cache.all_capture_pts_total = AIResource_GetCapturePointsTotal(s_selfplayer)
+	cache.all_resource_pts_total = cache.all_capture_pts_total - cache.vp_total
+	
+	cache.max_vp_tickets = 0
+	if (cache.vp_total > 0) then
+		cache.max_vp_tickets = WinCondition_GetMaxVPTickets()
+	end
+	
+	--aitrace(string.format("VP(%d) All(%d) Tickets(%d)", cache.vp_total, cache.all_capture_pts_total, cache.max_vp_tickets))
+end
+
+cache.init = function()
+	---------------------------------------------------
+	-- counts the types of other players in the game
+	
+	cache.num_allies = -1 -- to ignore self
+	cache.num_enemies = 0
+	
+	local pcount = World_GetPlayerCount()
+	for i=1,pcount do
+		local player = World_GetPlayerAt(i)
+		if (Player_IsAlive(player)) then
+			if (Player_GetTeam(player) == s_self_team) then
+				cache.num_allies = cache.num_allies + 1
+			else
+				cache.num_enemies = cache.num_enemies + 1
+			end
+		end
+	end
+	
+	--aitrace("NumAllies:"..cache.num_allies)
+	--aitrace("NumEnemies:"..cache.num_enemies)
+end
+
+-- this caches a bunch of data that gets used every frame and should be cached instead to avoid recalculating
+-- all variables that are cached within this function are prepended with cache.***
+cache.perframe_data = function()
+	--cache.trace_clear()
+	
+	--cache.trace("<Caching Per Frame Data>")
+	
+	-----------------------------------------
+	-- tech cache
+	-- these counts include future requests
+	cache.spawner_count = Util_SpawnerCount()
+	cache.spawner_tier1_count = Util_SpawnerTier1Count()
+	cache.spawner_tier2_count = Util_SpawnerTier2Count()
+	
+	--cache.trace("Caching SpawnerCount:"..cache.spawner_count)
+	--cache.trace("Caching SpawnerT1Count:"..cache.spawner_tier1_count)
+	--cache.trace("Caching SpawnerT2Count:"..cache.spawner_tier2_count)
+	
+	-----------------------------------------
+	-- military cache
+	
+	local team_value = 0
+	local enemy_value = 0
+	for i=1,World_GetPlayerCount() do
+		local player = World_GetPlayerAt(i)
+		local team = Player_GetTeam(player)
+		if team == s_self_team then
+			team_value = team_value + GetPlayerArmyRating(player)--[[ArmyEval_PlayerScalarVal(player)]]*cache.military_scale[Player_GetRaceName(player)]
+		else
+			enemy_value = enemy_value + GetPlayerArmyRating(player)--[[ArmyEval_PlayerScalarVal(player)]]*cache.military_scale[Player_GetRaceName(player)]
+		end
+	end
+	
+	cache.military_value = GetPlayerArmyRating(s_self_modplayer)--ArmyEval_PlayerScalarVal(s_self_modplayer)
+	cache.military_team_diff = team_value - enemy_value
+	if enemy_value > 0 then
+		cache.military_percent_value = team_value / enemy_value
+	else
+		cache.military_percent_value = team_value
+	end
+	
+	--[[CustomDebug.Clear()
+	CustomDebug.Print("team_value:"..string.format('%.2f', team_value))
+	CustomDebug.Print("enemy_value:"..string.format('%.2f', enemy_value))
+	CustomDebug.Print("cache.military_value:"..string.format('%.2f', cache.military_value))
+	CustomDebug.Print("cache.military_team_diff:"..string.format('%.2f', cache.military_team_diff))
+	CustomDebug.Print("cache.military_percent_value:"..string.format('%.2f', cache.military_percent_value))]]
+	
+	--cache.trace("cache.military_value:"..cache.military_value)
+	--cache.trace("cache.military_team_diff:"..cache.military_team_diff)
+	--cache.trace("cache.military_percent_value:"..cache.military_percent_value)
+	
+	cache.engineer_all_count = UtilPBG_CountTotal(s_engineer)
+	-- this gets the real engineers minus those that are in progress
+	cache.engineer_count = UtilPBG_CountAlive(s_engineer)
+	-- this gets all the really spawned military units
+	cache.military_count = AIResource_GetNumMilitaryUnits(s_selfplayer)
+	-- this is spawned military units (not including engineers)
+	cache.military_non_engineer_count = cache.military_count - cache.engineer_count
+	
+	--cache.trace("cache.engineer_count:"..cache.engineer_count)
+	--cache.trace("cache.military_count:"..cache.military_count)
+	--cache.trace("cache.military_non_engineer_count:"..cache.military_non_engineer_count)
+	
+	-----------------------------------------
+	-- resourcing cache
+	
+	cache.total_pts_to_capture = Capture_GetNumPriorityCapturePoints(s_selfplayer)  -- points with priority
+	cache.total_pts_owned = AIResource_GetNumOwnedCapturePoints(s_selfplayer)
+	cache.total_pts_secured = AIResource_GetNumSecuredCapturePoints(s_selfplayer)
+	--cache.trace("cache.total_pts_to_capture:"..cache.total_pts_to_capture)
+	--cache.trace("cache.total_pts_owned:"..cache.total_pts_owned)
+	--cache.trace("cache.total_pts_secured:"..cache.total_pts_secured)
+	
+	if (cache.vp_total > 0) then
+		cache.vp_owned_self = AIResource_GetVictoryPointsOwnedBy(s_selfplayer, s_self_team)
+		cache.vp_owned_enemy = AIResource_GetVictoryPointsOwnedBy(s_selfplayer, 1-s_self_team)
+	end
+	
+	--
+	
+	cache.percentage_pts_captured = 0
+	if (cache.all_resource_pts_total>0) then
+		cache.percentage_pts_captured = cache.total_pts_owned/cache.all_resource_pts_total
+	end
+	--cache.trace("Percent captured:"..cache.percentage_pts_captured)
+	
+	sg_soldiers = AIPlayer_GetSoldierSquads(s_selfplayer)
+	cache.infantry_count = SGroup_Count(sg_soldiers)
+	
+	--cache.trace("soldiersCount:"..cache.infantry_count)
+
+	sg_vehicles = AIPlayer_GetVehicleSquads(s_selfplayer)
+	cache.vehicle_count = SGroup_Count(sg_vehicles)
+	--cache.trace("vehiclesCount:"..cache.vehicle_count)
+	
+	cache.threat_at_base = AIPlayer_ThreatAtBase(s_selfplayer)
+	--cache.trace("base underattack threat:"..cache.threat_at_base)
+end

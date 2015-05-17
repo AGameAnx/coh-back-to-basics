@@ -1,0 +1,28 @@
+-- overrides of the defaults
+s_personality.name = "Hard Personality"
+
+s_personality.fallback_chance = 1.0
+
+s_personality.ability_avoidance_percentage = 100
+s_personality.demand_variance = 0.15
+
+s_personality.max_engineers = 3
+s_personality.max_engineers_with_teammates = 3
+
+s_personality.defensiveness = 0.1
+s_personality.vp_aggressiveness = 0.8
+s_personality.max_secured_pts = 4
+s_personality.max_percentage_to_capture = 1
+s_personality.max_percentage_vp_wanted = 1
+s_personality.vp_ticker_warning_level = 125
+
+s_personality.tankmove_tactic_enabled = true
+
+s_personality.use_military_strength_percentage_cap = false
+
+s_personality.eta_unit_wait_time = 40
+s_personality.eta_production_wait_time = 5
+s_personality.eta_structure_wait_time = 320
+s_personality.eta_squadaddon_wait_time = 3
+
+s_personality.threat_aggressiveness = 0.07

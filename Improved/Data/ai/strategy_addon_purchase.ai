@@ -1,0 +1,159 @@
+import("util/demand.ai")
+import("rules_addon_purchase.ai")
+
+strategy_addon_purchase = {}
+
+s_eta_squadaddon_wait_time = 45
+s_min_squadaddon_demand_required = -15
+
+--------------------------------------------------------------------------------
+
+function strategy_addon_purchase.trace(msg)
+
+	local ticks = World_GetGameTime() * 8
+	-- pipe this out also
+	msg = "[" .. ticks .. "]" .. msg
+
+	aitrace_ext("Addon_Purchase_Strategy", msg)
+end
+
+function strategy_addon_purchase.trace_clear()
+
+	aitraceclear_ext("Addon_Purchase_Strategy")
+
+end
+
+strategy_addon_purchase.init = function()
+	--print("strategy_addon_purchase.init called");
+	
+	if (s_current_race == TRACE_ALLIES) then
+		s_addon_demand_offset_func = AlliesSquadAddonUpgradeRules
+	elseif (s_current_race == TRACE_AXIS) then
+		s_addon_demand_offset_func = AxisSquadAddonUpgradeRules
+	elseif (s_current_race == TRACE_ALLIES_COMMONWEALTH) then
+		s_addon_demand_offset_func = AlliesCWSquadAddonUpgradeRules
+	elseif (s_current_race == TRACE_AXIS_PANZER_ELITE) then
+		s_addon_demand_offset_func = AxisPESquadAddonUpgradeRules
+	else
+		error("Player has invalid race "..s_current_race)
+	end
+	
+	s_eta_squadaddon_wait_time = s_personality.eta_squadaddon_wait_time
+	s_min_squadaddon_demand_required = s_personality.eta_squadaddon_wait_time
+end
+
+s_addonDemand = {}
+
+function HighestAddonDemand()
+	local best_pbg = nil
+	local highest_demand_tbl = {demand=-100000, buildstyle=nil}
+	for pbg,demTbl in pairs(s_addonDemand) do
+		if (pbg and demTbl.demand > highest_demand_tbl.demand) then
+			best_pbg = pbg
+			highest_demand_tbl = demTbl
+		end
+	end
+	return best_pbg, highest_demand_tbl
+end
+
+function UpgradeDemandFromRating(upgradePBG)
+	local class_rating = {}
+	local anti_class_rating = {}
+	for classid=0, k_unit_class_count-1 do
+		class_rating[classid] = AIUpgrade_GetClassRating(upgradePBG, classid)
+		anti_class_rating[classid] = AIUpgrade_GetAntiClassRating(upgradePBG, classid)
+	end
+	return CalcSquadDemandFromRating(class_rating, anti_class_rating)
+end
+
+function UpdateDemand()
+	local ucount = AIProduction_GetProductionItemCount(s_selfplayer, PITEM_SquadUpgrade) - 1
+	for i=0, ucount do
+		local upgradePBG = AIProduction_GetProductionItemPBGAt(s_selfplayer, PITEM_SquadUpgrade, i)
+		
+		-- determine how many of these have been requested already
+		local upgCount = Task_CountPBG(s_selfplayer, upgradePBG)
+		local canProduce = AIProduction_CanProduce(s_selfplayer, PITEM_SquadUpgrade, upgradePBG, DEFAULT_HERO_ID)
+		
+		-- extract info about this upgrade, does it match our demands/ strategies
+		if (s_ignore_addons[ BP_GetID(upgradePBG) ] == nil and upgCount==0 and canProduce) then
+			--strategy_addon_purchase.trace("AddonList"..i..":"..BP_GetName(upgradePBG))
+			
+			local productionETA = GetProductionETA(PITEM_SquadUpgrade, upgradePBG)
+			
+			if (productionETA < s_eta_squadaddon_wait_time) then
+				-- decrease demand by how many we already have
+				local totalCount = PBG_GetCount(s_selfplayer, upgradePBG)
+				
+				-- TODO: add demand based on what this squad item will give a unit
+				-- some squad items the AI should ignore (eg. minesweepers?)
+				
+				local newdemand = AI_RandRange(0,5)
+				
+				local rating_demand = UpgradeDemandFromRating(upgradePBG)
+				--strategy_addon_purchase.trace("BaseUpgradeDemand:"..newdemand.." RatingDemand:"..rating_demand)
+				
+				local totalDemand = newdemand + rating_demand
+				
+				local demandoffset = 0
+				if (s_addon_demand_offset_func) then
+					demandoffset = s_addon_demand_offset_func(upgradePBG, totalDemand)
+					--strategy_addon_purchase.trace("Addon demand offset:"..demandoffset)
+				end
+				
+				totalDemand = totalDemand + demandoffset
+				
+				--strategy_addon_purchase.trace("Addon demand:"..totalDemand)
+				
+				if totalDemand >= s_min_squadaddon_demand_required then
+					s_addonDemand[ upgradePBG ] = {demand=totalDemand}
+				end
+			--else
+				--strategy_addon_purchase.trace("Addon Rejected By ETA:"..productionETA.." needed "..s_eta_squadaddon_wait_time)
+			end
+		end
+	end
+end
+
+function strategy_addon_purchase.do_purchase(availableResources)
+	--strategy_addon_purchase.trace_clear()
+	
+	--strategy_addon_purchase.trace("Addon Purchase Strategy")
+	-- determine what addons we can purchase depending on the units we have available in the world
+	-- possibly we want to mix the demands for these with the units, and determine if this will
+	-- be more beneficial to have a better unit vs more SquadStats_GetAntiClassRating
+	
+	-- I'd imagine as we approach the unit cap, our demand for addons would increase
+	
+	-- Some units are only good with their addon (possibly we can create some units in batches; unit+addon) and add these
+	-- purchases together as one (my guess is that if this is the case, it should be redesigned)
+	
+	-- reset tech demand
+	s_addonDemand = {}
+	UpdateDemand()
+	
+	local pbg, demandTbl = HighestAddonDemand()
+
+	if (pbg ~= nil) then
+		--strategy_addon_purchase.trace("Highest demand:"..BP_GetName(pbg).." Demand:"..demandTbl.demand);
+		
+		-- only want to request X number of addons
+		local upgradeCost = AIPlayer_GetProductionCost(s_self_modplayer, PITEM_SquadUpgrade, pbg)
+		
+		-- determine if this can purchase this item
+		if (not ResourceAmount_Has(availableResources, upgradeCost)) then
+			return false, upgradeCost
+		end
+		
+		if (AIProduction_CanProduceNow(s_selfplayer, PITEM_SquadUpgrade, pbg, DEFAULT_HERO_ID)) then
+			--strategy_addon_purchase.trace("Producing:"..BP_GetName(pbg))
+			Request_Production(s_selfplayer, TGROUP_AddOns, TPRIORITY_AddOns, PITEM_SquadUpgrade, pbg, DEFAULT_HERO_ID)
+			
+			return true, upgradeCost
+		--else
+			--strategy_addon_purchase.trace("Addon could not be produced at this moment - skipping")
+		end
+	end
+	return false
+end
+

@@ -1,0 +1,362 @@
+
+local playerRatingCache = {}
+function ClearPlayerRatingCache()
+	playerRatingCache = {}
+end
+function GetPlayerArmyRating(player)
+	if playerRatingCache[player] then
+		return playerRatingCache[player]
+	end
+	local result = 0
+	local squads = Player_GetSquads(player)
+	for i=1,SGroup_CountSpawned(squads) do
+		local squad = SGroup_GetSpawnedSquadAt(squads, i)
+		result = Squad_GetHealthMax(squad)/(150+math.min(150, math.max(1, Squad_GetMax(squad)/3)*150))
+	end
+	playerRatingCache[player] = result
+	return result
+end
+
+--? @group ArmyEval
+--? @shortdesc Compares two players to each other and returns how much greater the first is over the second
+--? @extdesc
+--? @result Rating table
+--? @args PlayerID playera, PlayerID playerb
+function ArmyEval_ComparePlayers(playera, playerb)
+	
+	local class_a = {0,0,0,0,0}
+	local class_b = {0,0,0,0,0}
+	local class_a_sub_b = {0,0,0,0,0}
+	
+	local classcount = AI_GetUnitClassCount()
+	
+	-- Class
+	for ci=1,classcount do
+		-- determine what playera's class rating becomes after playerb applies their anticlass ratings
+		class_a[ci] = math.max(PlayerStats_GetTotalSquadClassRating(playera, ci-1) - PlayerStats_GetTotalSquadAntiClassRating(playerb, ci-1), 0)
+		
+		-- determine what playerb's class rating becomes after playera applies their anticlass ratings
+		class_b[ci] = math.max(PlayerStats_GetTotalSquadClassRating(playerb, ci-1) - PlayerStats_GetTotalSquadAntiClassRating(playera, ci-1), 0)
+		
+		-- determine who has greater values in each catergory
+		class_a_sub_b[ci] = class_a[ci] - class_b[ci]
+	end
+	
+	return class_a_sub_b
+end
+
+--? @group ArmyEval_CompareTeams
+--? @shortdesc Compares the teama vs teamb
+--? @extdesc
+--? @result Rating table
+--? @args Number teama, Number teamb
+function ArmyEval_CompareTeams(teama, teamb)
+	
+	local team_class = {[teama] = {0,0,0,0,0}, [teamb] = {0,0,0,0,0}}
+	local team_anti_class = {[teama] = {0,0,0,0,0}, [teamb] = {0,0,0,0,0}}
+	
+	local classcount = AI_GetUnitClassCount()
+	
+	local totalplayers = World_GetPlayerCount()
+	for i=1, totalplayers do
+			
+		local player = World_GetPlayerAt(i)
+		
+		local teamid = Player_GetTeam(player)
+		
+		if (teamid == teama or teamid == teamb) then
+		
+			for ci=1,classcount do
+				team_class[teamid][ci] = team_class[teamid][ci] + PlayerStats_GetTotalSquadClassRating(player, ci-1)
+				team_anti_class[teamid][ci] = team_anti_class[teamid][ci] + PlayerStats_GetTotalSquadAntiClassRating(player, ci-1)
+			end
+		
+		end
+		
+	end
+	
+	local class_a = {0,0,0,0,0}
+	local class_b = {0,0,0,0,0}
+	local class_a_sub_b = {0,0,0,0,0}
+	
+	-- Class
+	for ci=1,classcount do
+		-- determine what playera's class rating becomes after playerb applies their anticlass ratings
+		class_a[ci] = math.max(team_class[teama][ci] - team_anti_class[teamb][ci], 0)
+		
+		-- determine what playerb's class rating becomes after playera applies their anticlass ratings
+		class_b[ci] = math.max(team_class[teamb][ci] - team_anti_class[teama][ci], 0)
+		
+		-- determine who has greater values in each catergory
+		class_a_sub_b[ci] = class_a[ci] - class_b[ci]
+	end
+	
+	return class_a_sub_b
+end
+
+-- returns the how the AI team compares to the enemy team (negative means AI is losing)
+--[[function ArmyEval_AITeamVsEnemyValue()
+	local ai_team = Player_GetTeam(AI_GetPlayer())
+	local team_compare_tbl = ArmyEval_CompareTeams(ai_team, 1-ai_team)
+	
+	local total = 0
+	if (team_compare_tbl) then
+	
+		local classcount = AI_GetUnitClassCount()
+		
+		for ci=1, classcount do
+			total = total + team_compare_tbl[ci]
+		end
+	end
+	
+	return total
+end]]
+
+function ArmyEval_AITeamVsEnemyComparison()
+	local team_value = 0
+	local enemy_value = 0
+	for i=1,World_GetPlayerCount() do
+		local player = World_GetPlayerAt(i)
+		local team = Player_GetTeam(player)
+		if team == s_self_team then
+			team_value = team_value + ArmyEval_PlayerScalarVal(player)
+		else
+			enemy_value = enemy_value + ArmyEval_PlayerScalarVal(player)
+		end
+	end
+	return team_value / enemy_value
+end
+
+-- sums up all the classvalues for the given player
+function ArmyEval_PlayerScalarVal(playera)
+	local total = 0
+	local classcount = AI_GetUnitClassCount()
+	for ci=1,classcount do
+		total = total + PlayerStats_GetTotalSquadClassRating(playera, ci-1)
+	end
+	return total
+end
+
+-- this returns a series of numbers representing how much better the AI is than his enemies (negative means he's worse)
+function ArmyEval_VsEnemyRatings()
+
+	local retTbl = {}
+	local count = 1
+	local classcount = AI_GetUnitClassCount()
+
+	local totalplayers = World_GetPlayerCount()
+	for i=1, totalplayers do
+			
+		local player = World_GetPlayerAt(i)
+		
+		-- make sure this player is not on the same team
+		if (Player_GetTeam(player) ~= s_self_team) then
+						
+			local compare_tbl = ArmyEval_ComparePlayers(AI_GetPlayer(), player)
+			
+			local total = 0
+			for ci=1, classcount do
+				total = total + compare_tbl[ci]
+			end
+			
+			retTbl[count] = {player, total}
+			count = count + 1
+		end
+	end
+
+	return retTbl
+end
+
+-- this returns two tables, the first is the class-ratings and it represents the enemies total class valuies, the second table is for anti-class values
+function ArmyEval_TotalEnemyRatings()
+
+	local class_tbl = {0,0,0,0,0}
+	local anti_class_tbl = {0,0,0,0,0}
+
+	local classcount = AI_GetUnitClassCount()
+
+	local totalplayers = World_GetPlayerCount()
+	for i=1, totalplayers do
+			
+		local player = World_GetPlayerAt(i)
+		
+		-- make sure this player is not on the same team
+		if (Player_GetTeam(player) ~= s_self_team) then
+		
+			for ci=1, classcount do
+				class_tbl[ci] = class_tbl[ci] + PlayerStats_GetTotalSquadClassRating(player, ci-1)
+				anti_class_tbl[ci] = anti_class_tbl[ci] + PlayerStats_GetTotalSquadAntiClassRating(player, ci-1)
+			end
+
+		end
+	end
+
+	return class_tbl, anti_class_tbl
+end
+
+-- this finds the class rating this is the highest given all the enemies
+function ArmyEval_MaxEnemyClassRating()
+
+	local class_tbl = ArmyEval_TotalEnemyRatings()
+	
+	local max_rating = -1000
+	local max_class_id = 0
+	
+	local classcount = AI_GetUnitClassCount()
+	for ci=1, classcount do
+		if (class_tbl[i] > max_rating) then
+			max_rating = class_tbl[i]
+			max_class_id = i
+		end
+	end
+	
+	return max_class_id, max_rating
+	
+end
+
+
+-- this function returns the lowest rating difference between the AI and his enemies
+-- eg1. AI has rating of 20, enemy1 has 18 and enemy2 has 5, this function would return 2
+-- eg2. if AI has value of 20 and enemy1 has 15 and enemy2 is 30 then this returns -10, the lowest value
+function ArmyEval_LowestEnemyDifferential()
+
+	local lowest_total = 1000000
+	
+	-- returns a list of {player*, total} tables
+	local compareTbl = ArmyEval_VsEnemyRatings()
+	local best
+	
+	for k,v in pairs(compareTbl) do
+		
+		if (v[2] < lowest_total) then
+			lowest_total = v[2]
+			best = v
+		end
+	end
+
+	return lowest_total
+end
+
+-- this prints out each army and their ratings and antiratings + evaluation vs other players
+function ArmyEval_Debug()
+	
+	local	xval	= 0.01
+	local 	xval_prev = xval
+	
+	local	yval	= s_debug_display_height
+	local 	ystep	= 0.025
+
+	--display which player I'm currently debugging
+	DebugPrint(xval, yval - ystep, "Army Comparison")
+	yval = yval + ystep * 0.5
+	
+	local tab = 0.1
+	
+	--RATINGS
+	DebugPrint(xval, yval, "PlayerID")
+	xval = xval + tab
+	
+	local classcount = AI_GetUnitClassCount()
+	for ci=0, (classcount-1) do
+		local classname = AI_GetUnitClassAt(ci)
+		local bi,be = string.find(classname, "aiclass_")
+		if (be) then
+			classname = string.sub(classname, be+1)
+		end
+		DebugPrint(xval, yval, classname)
+		xval = xval + tab
+	end
+	
+	for ci=0, (classcount-1) do
+		local classname = AI_GetUnitClassAt(ci)
+		local bi,be = string.find(classname, "aiclass_")
+		if (be) then
+			classname = string.sub(classname, be+1)
+		end
+		DebugPrint(xval, yval, "anti_"..classname)
+		xval = xval + tab
+	end
+		
+	yval = yval + ystep
+	
+	local totalplayers = World_GetPlayerCount()
+	for i=1, totalplayers do
+			
+			xval = xval_prev
+			yval = yval + ystep
+	
+			local player = World_GetPlayerAt(i)
+			
+			local playerstr = tostring(Player_GetID(player))
+			
+			if (Player_GetID(player) == AI_GetPlayerID()) then
+				playerstr = playerstr.."(AI)"
+			end
+			
+			-- Name
+			DebugPrint(xval, yval, playerstr)
+			xval = xval + tab
+			
+			-- Class
+			for ci=0, (classcount-1) do
+				local temp = string.format("%.2f", PlayerStats_GetTotalSquadClassRating(player, ci))
+				DebugPrint(xval, yval, temp)
+				xval = xval + tab
+			end
+			
+			-- AntiClass
+			for ci=0, (classcount-1) do
+				local temp = string.format("%.2f", PlayerStats_GetTotalSquadAntiClassRating(player, ci))
+				DebugPrint(xval, yval, temp)
+				xval = xval + tab
+			end
+	end
+	
+	local selfscalar = ArmyEval_PlayerScalarVal(s_self_modplayer)
+	
+	yval = yval + ystep*2
+	
+	-- compare local player against each of these players
+	local totalplayers = World_GetPlayerCount()
+	for i=1, totalplayers do
+			
+			xval = xval_prev
+			yval = yval + ystep
+	
+			local player = World_GetPlayerAt(i)
+			
+			-- make sure this player is not the local AI
+			if (Player_GetID(player) ~= AI_GetPlayerID()) then
+							
+				local compare_tbl = ArmyEval_ComparePlayers(AI_GetPlayer(), player)
+				
+				-- Name
+				DebugPrint(xval, yval, "VS:"..tostring(Player_GetID(player)))
+				xval = xval + tab
+							
+				-- Class
+				for ci=1, classcount do
+					local temp = string.format("%.2f", compare_tbl[ci])
+					DebugPrint(xval, yval, temp)
+					xval = xval + tab
+				end
+				
+				local total = 0
+				for ci=1, classcount do
+					total = total + compare_tbl[ci]
+				end
+				
+				local percent_diff = 0
+				if (selfscalar ~= 0) then
+					percent_diff = total / selfscalar
+				end
+				
+				-- Total / Percentage
+				local tempz = string.format("%.2f (%.1f%%)", total, percent_diff*100)
+				DebugPrint(xval, yval, "Total:"..tempz)
+				xval = xval + tab
+					
+			end
+	end
+	
+end

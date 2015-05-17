@@ -1,0 +1,118 @@
+
+-- define what we consider 'core' spawners (these could be marked in the AE instead, but we'd have to scan for these first)
+allies_spawner = {EBP.ALLIES.BARRACKS, EBP.ALLIES.ARMORY, EBP.ALLIES.MOTORPOOL, EBP.ALLIES.TANK_DEPOT}
+axis_spawner = {EBP.AXIS.QUARTERS, EBP.AXIS.COMMAND, EBP.AXIS.ARMORY, EBP.AXIS.BARRACKS}
+
+-- TODO: refine these lists
+
+allies_cw_spawner = {SBP.CW.HQ, SBP.CW.ARMOUR_HQ, SBP.CW.INFANTRY_HQ, EBP.CW.GLIDER_HQ}
+axis_pe_spawner = {EBP.ELITE.PANZERJAGER, EBP.ELITE.LOGISTIK, EBP.ELITE.KAMPFGRUPPE, EBP.ELITE.PANZER_ARTILLERIE}
+
+--
+allies_tier1_spawner = {EBP.ALLIES.BARRACKS, EBP.ALLIES.ARMORY}
+allies_tier2_spawner = {EBP.ALLIES.MOTORPOOL, EBP.ALLIES.TANK_DEPOT}
+
+axis_tier1_spawner = {EBP.AXIS.QUARTERS, EBP.AXIS.BARRACKS}
+axis_tier2_spawner = {EBP.AXIS.COMMAND, EBP.AXIS.ARMORY}
+
+allies_cw_tier1_spawner = {SBP.CW.HQ}
+allies_cw_tier2_spawner = {SBP.CW.INFANTRY_HQ, SBP.CW.ARMOUR_HQ}
+
+axis_pe_tier1_spawner = {EBP.ELITE.PANZERJAGER,EBP.ELITE.LOGISTIK}
+axis_pe_tier2_spawner = {EBP.ELITE.KAMPFGRUPPE,EBP.ELITE.PANZER_ARTILLERIE}
+
+function _spawncountaliveproduced(tbl)
+
+	local count = 0
+
+	for k,v in pairs(tbl) do
+		count = count + UtilPBG_CountAliveOrProduced(v)
+	end
+	
+	return count
+	
+end
+
+function _spawnalivecount(tbl)
+
+	local count = 0
+	
+	for k,v in pairs(tbl) do
+		count = count + UtilPBG_CountAlive(v)
+	end
+	
+	return count
+	
+end
+
+function _spawnrequestcount(tbl)
+
+	local count = 0
+	
+	for k,v in pairs(tbl) do
+		count = count + Task_CountPBG(s_selfplayer, v)
+	end
+	
+end
+
+function _chooseBasedOnRace(alliesChoice, axisChoice, alliesCWChoice, axisPEChoice)
+
+	if (s_current_race == TRACE_ALLIES) then
+		return alliesChoice
+	elseif (s_current_race == TRACE_AXIS) then
+		return axisChoice
+	elseif (s_current_race == TRACE_ALLIES_COMMONWEALTH) then
+		return alliesCWChoice
+	elseif (s_current_race == TRACE_AXIS_PANZER_ELITE) then
+		return axisPEChoice
+	else
+		error("Player has invalid race ".. s_current_race)
+	end
+
+end
+
+-- counts the number of main spawners (includes ones in progress) THIS COULD BE CACHED IN CODE (with the rest of the PBGs)
+function Util_SpawnerCount()
+	
+	local t = _chooseBasedOnRace(allies_spawner, axis_spawner, allies_cw_spawner, axis_pe_spawner)
+	
+	return _spawncountaliveproduced(t)
+end
+
+-- counts the number of main spawners (includes ones in progress) THIS COULD BE CACHED IN CODE (with the rest of the PBGs)
+function Util_SpawnerRequestCount()
+	
+	local t = _chooseBasedOnRace(allies_spawner, axis_spawner, allies_cw_spawner, axis_pe_spawner)
+
+	return _spawnrequestcount(t)
+	
+end
+
+function Util_SpawnerTier1Count()
+
+	local t = _chooseBasedOnRace(allies_tier1_spawner, axis_tier1_spawner, allies_cw_tier1_spawner, axis_pe_tier1_spawner)
+	
+	return _spawncountaliveproduced(t)
+end
+
+function Util_SpawnerTier1RequestCount()
+
+	local t = _chooseBasedOnRace(allies_tier1_spawner, axis_tier1_spawner, allies_cw_tier1_spawner, axis_pe_tier1_spawner)
+
+	return _spawnrequestcount(t)
+end
+
+function Util_SpawnerTier2Count()
+
+	local t = _chooseBasedOnRace(allies_tier2_spawner, axis_tier2_spawner, allies_cw_tier2_spawner, axis_pe_tier2_spawner)
+
+	return _spawncountaliveproduced(t)
+end
+
+function Util_SpawnerTier2RequestCount()
+
+	local t = _chooseBasedOnRace(allies_tier2_spawner, axis_tier2_spawner, allies_cw_tier2_spawner, axis_pe_tier2_spawner)
+	
+	return _spawnrequestcount(t)
+end
+

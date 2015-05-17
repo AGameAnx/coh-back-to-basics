@@ -1,0 +1,375 @@
+--
+-- This file is responsible for purchasing secure/defence structures
+--
+
+strategy_defence_purchase = {}
+
+function strategy_defence_purchase.trace(msg)
+	local ticks = World_GetGameTime() * 8
+	-- pipe this out also
+	msg = "[" .. ticks .. "]" .. msg
+
+	aitrace_ext("Defence_Purchase_Strategy", msg)
+end
+
+function strategy_defence_purchase.trace_clear()
+	aitraceclear_ext("Defence_Purchase_Strategy")
+end
+
+-----------------------------------------------
+-- SECURING BUILDINGS
+s_securing_structures_allied = {
+	{pbg = EBP.ALLIES.OBSERVATION_POST, buildstyle=BS_Secure, demand_type = DEMAND_Building},
+}
+
+-- CW secures through mobile trucks... will need to revisit
+s_securing_structures_allied_cw = {
+}
+
+s_securing_structures_axis = {
+	{pbg = EBP.AXIS.OBSERVATION_POST, buildstyle=BS_Secure, demand_type = DEMAND_Building },
+}
+
+-- Panzer Elite secures through half-tracks (223s).. will need to revisit
+s_securing_structures_axis_pe = {
+}
+
+
+function HasInfantry()
+	return (cache.infantry_count and cache.infantry_count > 4)
+end
+
+function AllBunkersUpgraded() -- this is not done properly!
+	local num_bunkers = UtilPBG_CountAlive(EBP.AXIS.BUNKER)
+	local num_upgrades = UtilPBG_CountAliveOrProduced(UPG.AXIS.GREN_MG42) + UtilPBG_CountAliveOrProduced(UPG.AXIS.BUNKER_REPAIR) + UtilPBG_CountAliveOrProduced(UPG.AXIS.BUNKER_REPAIR)
+	--strategy_defence_purchase.trace("UpgradeRule: NumBunkers:"..num_bunkers.." Upgrades:"..num_upgrades)
+	return num_bunkers <= num_upgrades
+end
+
+-----------------------------------------------
+-- DEFEND BUILDINGS
+
+-- demand shouldn't be lower than -10
+
+s_defend_structures_allied = {
+	--{pbg = EBP.ALLIES.MINES, buildstyle=BS_Mines, demand_type = DEMAND_Building, demand_pref=0 },
+	
+	--{pbg = EBP.ALLIES.FOXHOLE, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=0, demand_decrease=2, limit=2 },
+	{pbg = EBP.ALLIES.MG_NEST_AIRBORNE, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=1.5, demand_decrease=1, limit=2 },
+	{pbg = EBP.ALLIES.MG_NEST, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=1.5, demand_decrease=0.75, limit=3 },
+	{pbg = EBP.ALLIES.MEDIC_STATION, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=2, condition_func = HasInfantry, limit=3, demand_decrease=1 },
+	{pbg = EBP.ALLIES.HOWITZER, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=25, limit=3, demand_decrease=15 },
+	{pbg = EBP.ALLIES.TRIAGE, buildstyle=BS_NearBase, demand_type = DEMAND_Building, demand_pref=40, condition_func = HasInfantry, limit=1},
+}
+
+s_defend_structures_axis = {
+	--{pbg = EBP.AXIS.MINES, buildstyle=BS_Mines, demand_type = DEMAND_Building, demand_pref=0 },
+	
+	{pbg = EBP.AXIS.BUNKER, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=1, demand_decrease=1, limit=4--[[, condition_func = AllBunkersUpgraded]] },
+	{pbg = EBP.AXIS.MORTAR_81MM_NEST, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=3, demand_decrease=2, limit=2 },
+	{pbg = EBP.AXIS.PAK38_NEST, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=3, demand_decrease=2, limit=2 },
+	{pbg = EBP.AXIS.FLAK_88_NEST, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=14, limit=1 },
+	{pbg = EBP.AXIS.LEFH_NEST, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=38, demand_decrease=10, limit=2 }
+}
+
+s_defend_structures_allied_cw = {
+	--{pbg = EBP.CW.MINES, buildstyle=BS_Mines, demand_type = DEMAND_Building, demand_pref=0 },
+	
+	--{pbg = EBP.CW.SLITTRENCH_NEST, buildstyle=BS_Defend, demand_pref=3, demand_type = DEMAND_Building, limit=3 },
+	{pbg = EBP.CW.MG_NEST, buildstyle=BS_Defend, demand_pref=7, demand_type = DEMAND_Building, limit=2, demand_decrease=5 },
+	{pbg = EBP.CW.MORTAR_NEST, buildstyle=BS_Defend, demand_pref=2, demand_type = DEMAND_Building, limit=1, demand_decrease=2 },
+	{pbg = EBP.CW.HOWITZER_NEST, buildstyle=BS_Defend, demand_pref=25, demand_type = DEMAND_Building, limit=3, demand_decrease=15 },
+	{pbg = EBP.CW.BOFORS_NEST, buildstyle=BS_Defend, demand_pref=5, demand_type = DEMAND_Building, limit=2, demand_decrease=5 },
+	{pbg = EBP.CW.ANTITANK_NEST, buildstyle=BS_Defend, demand_pref=7, demand_type = DEMAND_Building, limit=2, demand_decrease=5 },
+	{pbg = EBP.CW.CASUALTY_CLEARING, buildstyle=BS_Defend, demand_pref=8, demand_type = DEMAND_Building, limit=2, demand_decrease=5 },
+}
+
+s_defend_structures_axis_pe = {
+	--{pbg = EBP.ELITE.MINE_TELLER, buildstyle=BS_Mines, demand_type = DEMAND_Building, demand_pref=1, demand_pref=0 },
+	
+	{pbg = EBP.ELITE.MG42_NEST, buildstyle=BS_Defend, demand_type = DEMAND_Building, limit=2, demand_decrease=4 },
+	{pbg = EBP.ELITE.FLAKVIERLING_NEST, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=1, limit=2 },
+	{pbg = EBP.ELITE.HOWITZER_88_NEST, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=25, limit=3, demand_decrease=15 },
+	{pbg = EBP.ELITE.FLAK_88_NEST, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=14, limit=2, demand_decrease=7 },
+	
+	{pbg = EBP.ELITE.BRUTE_FORCE_CENTER, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=3, limit=1 }
+}
+
+-----------------------------------------------
+-- INIT TECH PURCHASE SYSTEM
+
+function strategy_defence_purchase.init()
+	--print("strategy_defence_purchase.init")
+	
+	if (s_current_race == TRACE_ALLIES) then
+		s_securing_structures = s_securing_structures_allied
+		s_defend_structures = s_defend_structures_allied
+		
+		s_special_techtree_rules = Allied_SpecialTechBuildingRules
+		s_special_upgrade_rules = Allied_SpecialUpgradeRules
+		
+		s_enemy_barbwire = EBP.AXIS.BARBED_WIRE
+		
+	elseif (s_current_race == TRACE_AXIS) then
+		s_securing_structures = s_securing_structures_axis
+		s_defend_structures = s_defend_structures_axis
+		
+		s_special_techtree_rules = Axis_SpecialTechBuildingRules
+		s_special_upgrade_rules = Axis_SpecialUpgradeRules
+		
+		s_enemy_barbwire = EBP.ALLIES.BARBED_WIRE
+		
+	elseif (s_current_race == TRACE_AXIS_PANZER_ELITE) then
+		s_securing_structures = s_securing_structures_axis_pe
+		s_defend_structures = s_defend_structures_axis_pe
+		
+		s_special_techtree_rules = AxisPE_SpecialTechBuildingRules
+		s_special_upgrade_rules = AxisPE_SpecialUpgradeRules
+		
+		s_enemy_barbwire = EBP.ALLIES.BARBED_WIRE
+		
+	elseif (s_current_race == TRACE_ALLIES_COMMONWEALTH) then
+		s_securing_structures = s_securing_structures_allied_cw
+		s_defend_structures = s_defend_structures_allied_cw
+		
+		s_special_techtree_rules = AlliedCW_SpecialTechBuildingRules
+		s_special_upgrade_rules = AlliedCW_SpecialUpgradeRules
+		
+		s_enemy_barbwire = EBP.AXIS.BARBED_WIRE	
+		
+	else
+		error("Player has invalid race "..s_current_race)
+	end
+	
+	s_eta_structure_wait_time = s_personality.eta_structure_wait_time
+	s_eta_production_wait_time = s_personality.eta_production_wait_time
+end
+
+function Util_CountDefendRequests()
+	local count = 0
+	for k,v in pairs(s_defend_structures) do
+		count = count + Task_CountPBG(s_selfplayer, v.pbg)
+	end
+	return count
+end
+function Util_CountSecureRequests()
+	local count = 0
+	for k,v in pairs(s_securing_structures) do
+		count = count + Task_CountPBG(s_selfplayer, v.pbg)
+	end
+	return count
+end
+
+securing_maxSecureRequests = 2
+defend_maxDefendRequests = 5
+
+-- rules for dealing with the demand for securing structures
+function SecuringStructureDemand()
+	-- is securing disabled?
+	if (s_components[COMPONENT_Securing] == false) then
+		--strategy_defence_purchase.trace("Securing Component Disabled!")
+		return
+	end
+
+	local secureRequests = Util_CountSecureRequests()
+	--strategy_defence_purchase.trace("SecureReq:"..secureRequests)
+	if (secureRequests >= securing_maxSecureRequests) then
+		--strategy_defence_purchase.trace("Reached secure request limit of:"..securing_maxSecureRequests)
+		return
+	end
+	
+	-- determine how many points we have minus the number we have secured
+	local ptsOwned = AIResource_GetNumOwnedCapturePoints(s_selfplayer)
+	local ptsSecured = AIResource_GetNumSecuredCapturePoints(s_selfplayer) + secureRequests
+	--strategy_defence_purchase.trace("PtsOwned:"..ptsOwned)
+	--strategy_defence_purchase.trace("PtsSecured:"..ptsSecured)
+	
+	-- as the percentage of points we have secured increases, our demand should decrease
+	local numToSecure = ptsOwned - ptsSecured
+	
+	if (numToSecure == 0) then
+		strategy_defence_purchase.trace("Securing: Nothing to secure")
+		return
+	end
+	
+	if (ptsOwned < s_personality.min_captured_pts_before_securing) then
+		--strategy_defence_purchase.trace("Personality states we need to capture "..s_personality.min_captured_pts_before_securing.." before securing!")
+		return
+	end
+	
+	if (ptsSecured >= s_personality.max_secured_pts) then
+		--strategy_defence_purchase.trace("Personality states max secured points is "..s_personality.max_secured_pts)
+		return
+	end
+	
+	-- of the points that are not secured, are there any worth securing?
+	-- go through each and determine which are worth of securing
+	
+	-- determine if we can build these buildings
+	for i=1, table.getn(s_securing_structures) do
+		local structure = s_securing_structures[i]
+		if (structure and structure.pbg) then
+			if (Construction_CanConstruct(s_selfplayer, structure.pbg)) then
+			
+				local structureETA = GetStructureETA(structure.pbg)
+				--strategy_defence_purchase.trace("CAN CONSTRUCT SECURE:"..BP_GetName(structure.pbg).. " ETA:"..structureETA)
+				
+				if (structureETA < s_eta_structure_wait_time) then
+					local demand = s_personality.secure_structure_demand + AI_RandRange(1, s_personality.secure_structure_demand_rand)
+					
+					demand = demand * numToSecure / s_personality.min_captured_pts_before_securing
+					
+					s_techDemand[structure.pbg] = {demand=demand, buildstyle = structure.buildstyle, demand_type = DEMAND_Building}
+				end
+			--else
+				--strategy_defence_purchase.trace("CANNOT CONSTRUCT SECURE:"..BP_GetName(structure.pbg))
+			end
+		end
+	end
+end
+
+function DefenceStructureDemand()
+	-- is securing disabled?
+	if (s_components[COMPONENT_BuildStructures] == false) then
+		--strategy_defence_purchase.trace("Defence/BuildStructures Component Disabled!")
+		return
+	end
+	
+	local defendRequests = Util_CountDefendRequests()
+	--strategy_defence_purchase.trace("DefendReq:"..defendRequests)
+	if s_current_race == TRACE_ALLIES_COMMONWEALTH then
+		if defendRequests >= defend_maxDefendRequests+1 then
+			--strategy_defence_purchase.trace("Reached defend request limit of:"..defend_maxDefendRequests)
+			return
+		end
+	else
+		if defendRequests >= defend_maxDefendRequests then
+			--strategy_defence_purchase.trace("Reached defend request limit of:"..defend_maxDefendRequests)
+			return
+		elseif military_attackPercentage >= 1 then
+			--strategy_defence_purchase.trace("Attack percentage is 1 - turning off defence structures")
+			return
+		end
+	end
+	
+	
+	local ptsOwned = AIResource_GetNumOwnedCapturePoints(s_selfplayer)
+	if ptsOwned < 4 then
+		--strategy_defence_purchase.trace("DefendRule:Waiting to at least own 2 capture points:"..ptsOwned)
+		return
+	end
+	
+	-- determine if we can build these buildings
+	for i=1, table.getn(s_defend_structures) do
+		local structure = s_defend_structures[i]
+		if (structure and structure.pbg) then
+			local hit_limit_cap = false
+			local counttotal = UtilPBG_CountTotal(structure.pbg)
+			if (structure.limit and counttotal >= structure.limit) then
+				--strategy_defence_purchase.trace("HitLimitCap:"..BP_GetName(structure.pbg).." Limit:"..structure.limit.." Count:"..counttotal)
+				hit_limit_cap = true
+			end
+			
+			if (hit_limit_cap == false and Construction_CanConstruct(s_selfplayer, structure.pbg)) then
+				local structureETA = GetStructureETA(structure.pbg)
+				
+				if (structureETA < s_eta_structure_wait_time) then
+					local newdemand = 10
+					
+					-- check condition for this structure
+					if (structure.condition_func==nil or structure.condition_func()) then
+						if (structure.demand_pref) then
+							newdemand = newdemand + structure.demand_pref
+						end
+						if (structure.demand_decrease) then
+							newdemand = newdemand - structure.demand_decrease*counttotal
+						end
+						if (structure.buildstyle == BS_Mines) then
+							newdemand = newdemand + s_personality.mine_preference_demand
+						end
+						s_techDemand[structure.pbg] = {demand=newdemand, buildstyle = structure.buildstyle, demand_type = DEMAND_Building}
+					end
+					--strategy_defence_purchase.trace(string.format("CAN CONSTRUCT DEFEND: %s ETA: %.1f Demand: %.1f", BP_GetName(structure.pbg), structureETA, newdemand))
+				--else
+					--strategy_defence_purchase.trace(string.format("CAN CONSTRUCT DEFEND BUT HIGH ETA: %s ETA: %.1f", BP_GetName(structure.pbg), structureETA))
+				end
+			--else
+				--strategy_defence_purchase.trace("CANNOT CONSTRUCT DEFEND:"..BP_GetName(structure.pbg))
+			end
+		end
+	end
+end
+
+function HighestTechDemand()
+	local best_pbg = nil
+	local highest_demand_tbl = {demand=-100, buildstyle=nil, demand_type = nil}
+
+	for pbg,demTbl in pairs(s_techDemand) do
+		if (pbg) then
+			-- other considerations (?)
+			if (demTbl.demand > highest_demand_tbl.demand) then
+				best_pbg = pbg
+				highest_demand_tbl = demTbl
+			end
+		end
+	end
+	
+	return best_pbg, highest_demand_tbl
+end
+
+function strategy_defence_purchase.do_purchase(availableResources)
+	--strategy_defence_purchase.trace_clear()
+	--strategy_defence_purchase.trace("<StrategySecurePurchase>")
+	
+	--CustomDebug.Clear()
+	--CustomDebug.Print("Purchasing defences... (time: "..string.format("%2.2fm", World_GetGameTime()/60)..")")
+	--CustomDebug.Print(string.format("  available resources: %s", res_to_str(availableResources)))
+	
+	AIProfile_Marker4("AIDefencePurchase")
+	
+	-- determine what building/ tech we should get next
+	-- go through each option and choose the one with the highest demand
+	
+	-- if we have builders and our demand for teching up is large enough then lets
+	-- see what we should purchase next, we may want to include
+	
+	-- reset tech demand
+	s_techDemand = {}
+	
+	SecuringStructureDemand()
+	DefenceStructureDemand()
+	
+	local pbg, demandTbl = HighestTechDemand()
+	
+	if (pbg) then
+		--CustomDebug.Print("  best choice: "..BP_GetName(pbg).." demand:"..demandTbl.demand)
+		--strategy_defence_purchase.trace("Highest demand:"..BP_GetName(pbg).." Demand:"..demandTbl.demand);
+		
+		local unitCost = AIPlayer_GetStructureCost(s_self_modplayer, pbg)
+		--CustomDebug.Print(string.format("  cost: %s", res_to_str(unitCost)))
+		
+		-- determine if this can purchase this item
+		if (not ResourceAmount_Has(availableResources, unitCost)) then
+			--CustomDebug.Print("  > No resources!")
+			return false, unitCost
+		end
+		
+		--CustomDebug.Print("  >>> Purchased!")
+		-- check to see if this is a securing building
+		if (demandTbl.buildstyle == BS_Secure) then
+			local secure_params = {
+				score_manpower = 0.0,
+				score_munition = 1.2,
+				score_fuel = 1.5,
+				mult_dist_to_home = 2.75,
+				mult_dist_to_enemy = -10.0,
+				mult_random = 0.1,
+			}
+			Request_Secure(s_selfplayer, TGROUP_DefenceSecure, TPRIORITY_DefenceSecure, pbg, secure_params)
+		else
+			Request_Construction(s_selfplayer, TGROUP_DefenceSecure, TPRIORITY_DefenceSecure, pbg, demandTbl.buildstyle)
+		end
+		return true, unitCost
+	end
+	return false
+end

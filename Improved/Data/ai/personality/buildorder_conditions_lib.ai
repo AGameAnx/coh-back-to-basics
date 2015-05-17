@@ -1,0 +1,64 @@
+-----------------------------------------------------------
+-- List of condition functions that are used
+-- by the buildorders. Each condition returns a number between
+-- 0-10, if a single buildorder condition returns a negative
+-- number it will reject that buildorder for the current game
+--
+
+-- Add this condition if the buildorder prefers larger maps
+function PreferLargeMap()
+	return 10
+end
+
+-- Add this condition if the buildorder prefers smaller maps
+function PreferSmallMap()
+	return 10
+end
+
+-- Add this condition to buildorder if you only want it to be used in VPGames
+function OnlyUseInVPGame()
+	local vp_total = cache.vp_total
+	if (vp_total and vp_total>0) then
+		return 10
+	end
+	return -1
+end
+
+function OnlyDeathmatch()
+	local res = AIResource_GetCurrentResources(s_selfplayer)
+	if (res.manpower > 1500) then
+		return 10
+	end
+	
+	return -1
+end
+
+-- AD_Easy, AD_Standard, AD_Hard, AD_Hardest
+function OnInThisLevel(param)
+
+	local ff = function()
+		if (AIPlayer_GetDifficultyLevel(s_selfplayer) == param) then
+			return 10
+		end
+		return -1
+	end
+
+	return ff
+	
+end
+
+function NotOnInThisLevel(param)
+
+	local ff = function()
+		if (AIPlayer_GetDifficultyLevel(s_selfplayer) == param) then
+			return -1
+		end
+		return 10
+	end
+
+	return ff
+	
+end
+
+
+-- Others we can add... Aggressive vs Defensive or other personality preferences

@@ -1,0 +1,260 @@
+
+
+-- All debug-related functionality
+
+
+-- clear debug channels (should be elsewhere)
+for px=1000, 1008 do
+	dr_clear("aidebug"..px)
+end
+
+s_debug_enabled = true
+s_printsummary = false
+s_printdemands = false
+s_printarmyeval = false
+s_debug_display_height = 0.02
+
+s_print_unit_purchase_strategy = false
+s_print_tech_purchase_strategy = false
+s_print_defence_purchase_strategy = false
+s_print_addon_purchase_strategy = false
+s_print_military_strategy = false
+s_print_resourcing_strategy = false
+s_print_build_order_strategy = false
+s_print_command_tree_strategy = false
+s_print_ai_budget = false
+s_print_player_abilities = false
+s_print_state_analysis = false
+s_print_cache = false
+s_print_personality = false
+
+if AI_IsRTM() then
+	s_debug_enabled = false
+end
+
+-- Print a summary of this AI's state
+function PrintSummary()
+
+	if not s_debug_enabled then
+		return
+	end
+
+	local xval	= 0.05
+	local yval	= s_debug_display_height
+	local ystep	= 0.02
+
+	local tab = 0.065
+	
+	if (s_print_unit_purchase_strategy) then
+		yval = aitracedump_ext("Unit_Purchase_Strategy", xval, yval, ystep)
+	end
+	
+	if (s_print_tech_purchase_strategy) then
+		yval = yval + ystep * 2
+		yval = aitracedump_ext("Tech_Purchase_Strategy", xval, yval, ystep)
+	end
+	
+	if (s_print_defence_purchase_strategy) then
+		yval = yval + ystep * 2
+		yval = aitracedump_ext("Defence_Purchase_Strategy", xval, yval, ystep)
+	end
+	
+	if (s_print_addon_purchase_strategy) then
+		yval = yval + ystep * 2
+		yval = aitracedump_ext("Addon_Purchase_Strategy", xval, yval, ystep)
+	end
+	
+	if (s_print_military_strategy) then
+		yval = yval + ystep * 2
+		yval = aitracedump_ext("Military_Strategy", xval, yval, ystep)
+		yval = yval + ystep * 2
+		yval = aitracedump_ext("DefendPoint_Ranking", xval, yval, ystep)
+	end
+	
+	if (s_print_resourcing_strategy) then
+		yval = yval + ystep * 2
+		yval = aitracedump_ext("Resource_Strategy", xval, yval, ystep)
+		yval = yval + ystep * 2
+		yval = aitracedump_ext("CapturePoint_Ranking", xval, yval, ystep)
+	end
+	
+	if (s_print_build_order_strategy) then
+		yval = yval + ystep * 2
+		yval = aitracedump_ext("Build_Order_Strategy", xval, yval, ystep)
+	end
+	
+	if (s_print_command_tree_strategy) then
+		yval = yval + ystep * 2
+		yval = aitracedump_ext("Command_Tree_Strategy", xval, yval, ystep)
+	end
+
+	if (s_print_ai_budget) then
+		yval = yval + ystep * 2
+		yval = aitracedump_ext("AI_Budget", xval, yval, ystep)
+	end
+	
+	if (s_print_player_abilities) then
+		yval = yval + ystep * 2
+		yval = aitracedump_ext("Player_Abilities", xval, yval, ystep)
+	end
+	
+	if (s_print_state_analysis) then
+		yval = yval + ystep * 2
+		yval = aitracedump_ext("State_Analysis", xval, yval, ystep)
+	end
+	
+	if (s_print_cache) then
+		yval = yval + ystep * 2
+		yval = aitracedump_ext("Cache", xval, yval, ystep)
+	end
+	
+	if (s_print_personality) then
+		yval = yval + ystep * 2
+		yval = aitracedump_ext("Personality", xval, yval, ystep)
+	end
+	
+end
+
+function DebugPrint(x, y, text)
+	if not s_debug_enabled then
+		return
+	end
+	-- the selected color of the text:
+	local colour = {255,255,192}
+	
+	dr_text2d("aidebug"..s_selfplayerid, x, y, text, colour[1], colour[2], colour[3])
+end
+
+-- Show all debug information for this AI (2D and 3D displays)
+function DebugDisplay()
+	dr_setautoclear("aidebug"..s_selfplayerid, 0)
+	
+	-- do display if enabled
+	if(s_debug_enabled == false) then return end
+	
+	dr_clear("aidebug"..s_selfplayerid)
+
+	-- show different items based on which debug flags are enabled
+	if (s_printsummary==true) then PrintSummary() end
+	if (s_printdemands==true) then PrintDemands() end
+	if (s_printarmyeval==true) then ArmyEval_Debug() end
+	
+	db_table(g_locals)
+	g_locals = {}
+end
+
+function DebugScrollDown()
+	s_debug_display_height = s_debug_display_height - 0.12
+	DebugDisplay()
+end
+
+
+function DebugScrollUp()
+	s_debug_display_height = s_debug_display_height + 0.12
+	DebugDisplay()
+end
+
+------------------------------------------------------
+
+function print_table(tbl, tabstr)
+	if (tabstr) then
+		tabstr = tabstr.."--"
+	else
+		tabstr = "+-"
+	end
+	
+	function print_entry(a,b)
+		if (type(b) == "table" and b ~= _G) then
+			print_table(b, tabstr)
+		elseif (type(b) ~= "function") then
+			print(tabstr..a..":"..tostring(b))
+		end
+	end
+	
+	table.foreach(tbl, print_entry)
+end
+
+function print_G()
+	print_table(_G)
+end
+
+function print_locals()
+	print("--DUMPINGLOCALS--")
+	local index = 1
+	repeat
+		a,b = debug.getlocal(2,index)
+		if b then
+			print(a,b)
+			if (type(b) == "table") then
+				print_table(b)
+			end
+		end
+		index = index + 1
+	until b == nil
+	print("------------------")
+end
+
+g_locals = {}
+
+function get_local_tbl(level)
+	-- insert the function name this is from
+	table.insert(g_locals, debug.getinfo(3, "n").name)
+	
+	local index = 1
+	repeat
+		a,b = debug.getlocal(level,index)
+		if (b) then
+			if (type(b) == "table") then
+				table.insert(g_locals, {a,b})
+			else
+				local txt = a.." = "..tostring(b)
+				table.insert(g_locals, txt)
+			end
+		end
+		index = index + 1
+	until b == nil
+end
+
+function db_table(tbl, tabstr)
+	if (tabstr) then
+		tabstr = tabstr.."--"
+	else
+		tabstr = "+-"
+		db_y = s_debug_display_height + 0.04
+	end
+	
+	function print_entry(a,b)
+		if (type(b) == "table" and b ~= _G) then
+			db_table(b, tabstr, db_y)
+		elseif (type(b) ~= "function") then
+			local txt = tabstr..a.." : "..tostring(b)
+			DebugPrint(0.6, db_y, txt)
+			db_y = db_y + 0.025
+		end
+	end
+	table.foreach(tbl, print_entry)
+end
+
+function db()
+	-- get and store a bunch of local vars
+	get_local_tbl(3)
+end
+
+-- temp: this is an example of how to get a bunch of info from lua
+function dinfo()
+	local t = debug.getinfo(3)
+	
+	print("--DEBUG INFO--")
+	if (t.name) then
+		print("name:"..t.name)	
+	end
+	print("namewhat:"..t.namewhat)
+	print("what:"..t.what)
+	print("src:"..t.source)
+	print("line:"..t.currentline)
+	--print("nups:"..t.nups)
+	--print("linedef:"..t.linedefined) -- line the function is defined
+	--print("shortscr:"..t.short_src)
+	print("----------------")
+end
+

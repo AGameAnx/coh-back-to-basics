@@ -1,0 +1,377 @@
+------------------------------------------------------------------------
+-- Rules For The Tech(structure/upgrade/occupied-building) Purchasing
+--
+--
+
+s_RANDOM_RULES_PURCHASE1 = AI_RandMax(15) -- Higher rand means t3 rush
+s_RANDOM_RULES_PURCHASE2 = AI_RandMax(10) -- Higher rand means t4 rush
+
+-------------------------------------------------------
+-- Table of Panzer Elite base buildings used by some function to be named
+EliteBaseTable = { EBP.ELITE.LOGISTIK, EBP.ELITE.KAMPFGRUPPE, EBP.ELITE.PANZERJAGER, EBP.ELITE.PANZER_ARTILLERIE }
+--EliteBaseBuiltTable = {}
+
+-----------------------------------------------
+-- RACE SPECIFIC RULES FOR TECH PURCHASING
+
+function Allied_SpecialTechBuildingRules(tech_pbg)
+	if tech_pbg == nil then
+		return DEMAND_NeverBuild
+	end
+	
+	-- if we have a good fuel economy - don't build this building
+	local curResources = AIResource_GetCurrentResources(s_selfplayer)
+	local resRate = AIResource_GetCurrentResourceRate(s_selfplayer)
+	local strongFuel = resRate.fuel*60 > 14 or curResources.fuel > 55
+	local strongerFuel = resRate.fuel*60 > 16 or curResources.fuel > 70
+	local fuelFloat = math.max(0, curResources.fuel - 60) / 10
+	
+	if (tech_pbg == EBP.ALLIES.QUARTER_MASTER) then -- Supply Yard
+		if (cache.spawner_count>0) then
+			local result = 0
+			if (strongFuel) then
+				result = result + 5
+			end
+			return result + math.min(5, cache.infantry_count*2.5-13) - s_RANDOM_RULES_PURCHASE1
+		end
+	--[[elseif (tech_pbg == EBP.ALLIES.BARRACKS) then
+		-- if we have any spawners, alive+produced
+		if (cache.spawner_count>0) then
+			if (UtilPBG_CountAliveOrProduced(EBP.ALLIES.QUARTER_MASTER) > 0) then
+				-- if we have a good fuel economy - don't build this building
+				if (strongFuel) then
+					--strategy_tech_purchase.trace("     Dont build barrack again since we have strong enough fuel")
+					return DEMAND_NeverBuild
+				end
+				
+				if (cache.military_value < 10) then
+					-- have quarter master but not much fuel
+					return -20
+				end
+			end
+			--strategy_tech_purchase.trace("     Too many spawners rejecting barracks")
+			return DEMAND_NeverBuild -- for now
+		end]]
+	elseif (tech_pbg == EBP.ALLIES.ARMORY) then -- Weapon Support Center
+		local result = 0
+		if (UtilPBG_CountAliveOrProduced(EBP.ALLIES.QUARTER_MASTER) > 0) then
+			result = result + math.min(World_GetGameTime()-250, -4)
+		end
+		if (UtilPBG_CountAliveOrProduced(EBP.ALLIES.MOTORPOOL) > 0) then
+			result = result + math.min(World_GetGameTime()/2-220, 0)
+		end
+		if (cache.spawner_count>0) then
+			result = result + math.min(5, cache.infantry_count*1.35-10)
+		end
+		return result - s_RANDOM_RULES_PURCHASE1*6 + s_RANDOM_RULES_PURCHASE2*3+1
+	elseif (tech_pbg == EBP.ALLIES.MOTORPOOL) then
+		local result = 0
+		if (cache.spawner_tier2_count > 0 or strongerFuel) then
+			result = result + math.min(World_GetGameTime()/15-220, 0)/10 - 40
+		end
+		if (strongFuel) then
+			return result + s_RANDOM_RULES_PURCHASE1*3 - s_RANDOM_RULES_PURCHASE2*4 - 15
+		end
+		return DEMAND_NeverBuild
+	elseif (tech_pbg == EBP.ALLIES.TANK_DEPOT) then
+		-- if we are here, we have a quartermaster
+		
+		-- should add a timer here so we don't just jump and do this immediately
+		if (s_tankpool_timer==nil) then
+			-- initialize timer - to when we will consider this phase
+			s_tankpool_timer = World_GetGameTime() + 100 + AI_RandMax(s_personality.tankdepot_random_wait_time)
+		end
+		if (World_GetGameTime() < s_tankpool_timer) then
+			--strategy_tech_purchase.trace("     TankDepot demand timer is stalling this tankdepot, waiting:"..(s_tankpool_timer-World_GetGameTime()))
+			return DEMAND_NeverBuild
+		end
+		
+		-- if we have a bad fuel economy - don't build this building
+		if not strongerFuel then
+			--strategy_tech_purchase.trace("     We have bad fuel rate. Do not build the tank depot")
+			return -20
+		end
+		
+		-- are there any rules to be added here to
+		if (cache.spawner_tier1_count > 0) then
+			-- if we have the other motorpool, we should make sure we have
+			-- a bunch of good units available
+			return -35
+		end
+		
+		return s_RANDOM_RULES_PURCHASE2*4-6
+	end
+	return 0
+end
+
+function AlliedCW_SpecialTechBuildingRules(tech_pbg)
+	if tech_pbg == nil then
+		return DEMAND_NeverBuild
+	end
+	
+	return 0
+end
+
+function Axis_SpecialTechBuildingRules(tech_pbg)
+	if tech_pbg == nil then
+		return DEMAND_NeverBuild
+	end
+	
+	local curResources = AIResource_GetCurrentResources(s_selfplayer)
+	local resRate = AIResource_GetCurrentResourceRate(s_selfplayer)
+	local strongFuel = resRate.fuel*60 > 14 or curResources.fuel > 55
+	local strongerFuel = resRate.fuel*60 > 16 or curResources.fuel > 70
+	local fuelFloat = math.max(0, curResources.fuel - 60) / 5
+	
+	local result = 0
+	if tech_pbg == EBP.AXIS.KAMPFKRAFT then
+		if cache.spawner_count < 2 then
+			return DEMAND_NeverBuild
+		end
+		result = result + math.min(0, cache.infantry_count*4.5+math.min(0, World_GetGameTime()/30-120)-35)
+	elseif tech_pbg == EBP.AXIS.QUARTERS then
+		if cache.spawner_count>0 then
+			if strongerFuel then
+				result = result - 10
+			end
+		end
+		result = result + 15
+	elseif tech_pbg == EBP.AXIS.BARRACKS then
+		if cache.spawner_tier2_count>0 then
+			result = result - 15
+		end
+		result = result + 35
+	elseif tech_pbg == EBP.AXIS.ARMORY then
+		if cache.spawner_tier2_count > 0 or not strongFuel then
+			result = result - 30
+		end
+		result = result + s_RANDOM_RULES_PURCHASE1*2 - s_RANDOM_RULES_PURCHASE2*15 - 10 + fuelFloat + math.min(20, World_GetGameTime()/35-5)
+	elseif tech_pbg == EBP.AXIS.COMMAND then
+		if not strongerFuel then
+			result = result - 30
+		end
+		result = result + s_RANDOM_RULES_PURCHASE2*5 - s_RANDOM_RULES_PURCHASE1*3 - 10 + fuelFloat + math.min(10, World_GetGameTime()/35-15)
+	end
+	return result
+end
+
+function AxisPE_SpecialTechBuildingRules(tech_pbg)
+	if tech_pbg == nil then
+		return DEMAND_NeverBuild
+	end
+	local buildingCount = 0
+	for i=1,table.getn(EliteBaseTable) do
+		buildingCount = buildingCount + UtilPBG_CountAliveOrProduced(EliteBaseTable[i])
+	end
+	return math.max(0, 25-math.sqrt(buildingCount*250)+math.sqrt(math.max(0, World_GetGameTime()/10-10)))
+end
+
+
+-----------------------------------------------
+-- RACE SPECIFIC RULES FOR UPGRADE PURCHASING
+
+function Allied_SpecialUpgradeRules(upgrade_pbg)
+	if upgrade_pbg == nil then return DEMAND_NeverBuild end
+	
+	local curResources = AIResource_GetCurrentResources(s_selfplayer)
+	local resRate = AIResource_GetCurrentResourceRate(s_selfplayer)
+	
+	local fuelRate
+	--if UtilPBG_CountTotal(UPG.ALLIES.RESOURCE_UPGRADE3) then
+		fuelRate = resRate.fuel*60
+	--else
+	--	fuelRate = resRate.fuel*60/0.6
+	--end
+	
+	local timeRule = math.min(-math.sqrt(math.max(1700-World_GetGameTime(), 0)), -5)
+	if (upgrade_pbg == UPG.ALLIES.STICKY_BOMB) then
+		return timeRule+3
+	elseif (upgrade_pbg == UPG.ALLIES.DEMOLITION) then
+		return DEMAND_NeverBuild
+	elseif (upgrade_pbg == UPG.ALLIES.ENGINEER_THOMPSON) then
+		return -25+UtilPBG_CountAliveOrProduced(SBP.ALLIES.ENGINEER)*4+timeRule
+	elseif (upgrade_pbg == UPG.ALLIES.RESOURCE_UPGRADE1) then
+		if (fuelRate > 16 or curResources.fuel > 55) then
+			return math.max(cache.infantry_count*1.15-s_RANDOM_RULES_PURCHASE1/5-s_RANDOM_RULES_PURCHASE2/5 + 20 + curResources.fuel/20, timeRule*0.75-4)
+		end
+		return DEMAND_NeverBuild
+	elseif (upgrade_pbg == UPG.ALLIES.RESOURCE_UPGRADE2) then
+		if (fuelRate > 19 or curResources.fuel > 90) then
+			return math.max(cache.infantry_count*1.35-s_RANDOM_RULES_PURCHASE2/5+2 + curResources.fuel/30, timeRule*0.65-6)
+		end
+		return DEMAND_NeverBuild
+		
+		-- Togglable resourcing upgrade
+	elseif (upgrade_pbg == UPG.ALLIES.RESOURCE_UPGRADE3) then
+		if (fuelRate > 21 and cache.infantry_count > 6) or (cache.infantry_count >= 8 and fuelRate > 18) or (cache.infantry_count >= 10 and fuelRate > 14) or (cache.infantry_count >= 12) then
+			return 100
+		end
+		return DEMAND_NeverBuild
+	elseif (upgrade_pbg == UPG.ALLIES.RESOURCE_UPGRADE3_OFF) then
+		if (fuelRate < 14 and cache.infantry_count < 12) or cache.infantry_count <= 6 then
+			return 100
+		end
+		return DEMAND_NeverBuild
+	
+	elseif (upgrade_pbg == UPG.ALLIES.SMOKE_SCREEN) then
+		local tank_count = UtilPBG_CountAliveOrProduced(SBP.ALLIES.SHERMAN) + UtilPBG_CountAliveOrProduced(SBP.ALLIES.SHERMAN_76MM)
+		if (tank_count > 0) then
+			return math.min(tank_count*5-25, 0)
+		end
+		return DEMAND_NeverBuild
+	elseif (upgrade_pbg == UPG.ALLIES.GUN_76MM) then
+		local tank_count = UtilPBG_CountAliveOrProduced(SBP.ALLIES.SHERMAN) + UtilPBG_CountAliveOrProduced(SBP.ALLIES.SHERMAN_76MM)
+		return math.min(tank_count*10-35+World_GetGameTime()/150, -1)+tank_count
+	end
+	return timeRule
+end
+
+function AlliedCW_SpecialUpgradeRules(upgrade_pbg)
+	if upgrade_pbg == nil then
+		return DEMAND_NeverBuild
+	end
+	
+	--aitrace("*---* " .. BP_GetID(upgrade_pbg) .. ": AlliedCW_SpecialUpgradeRules: " .. BP_GetName(upgrade_pbg))
+	--aitrace("*---* " .. BP_GetID(UPG.CW.ENABLE_MOBILE_HQ) .. ": UPG.CW.ENABLE_MOBILE_HQ: " .. BP_GetName(UPG.CW.ENABLE_MOBILE_HQ))
+	
+	if (upgrade_pbg == UPG.CW.HULL_DOWN) then
+		return DEMAND_NeverBuild
+	elseif (upgrade_pbg == UPG.CW.MOBILEHQ) or (upgrade_pbg == UPG.CW.ENABLE_MOBILE_HQ) then
+		-- managed by mobile truck task
+		return DEMAND_NeverBuild
+	end
+	return math.min(-math.sqrt(math.max(800-World_GetGameTime(), 0)), 0)
+end
+
+function Axis_SpecialUpgradeRules(upgrade_pbg)
+	if upgrade_pbg == nil then
+		return DEMAND_NeverBuild
+	end
+	local curResources = AIResource_GetCurrentResources(s_selfplayer)
+	local resRate = AIResource_GetCurrentResourceRate(s_selfplayer)
+	
+	local result = 0
+	
+	if upgrade_pbg == UPG.AXIS.BUNKER_REPAIR then
+		result = result + math.min(cache.vehicle_count*3-5, 4)
+	elseif upgrade_pbg == UPG.AXIS.BUNKER_MG42 then
+		result = result + math.min(2*UtilPBG_CountAlive(EBP.AXIS.BUNKER)-1, 4)
+	elseif upgrade_pbg == UPG.AXIS.BUNKER_MED then
+		result = result + 4
+	elseif upgrade_pbg == UPG.AXIS.PHASE2 then
+		result = result + 10
+	elseif upgrade_pbg == UPG.AXIS.PHASE3 then
+		if cache.spawner_count < 2 then
+			result = result - 30 -- don't want to build this if we don't have t2
+		end
+		result = result + s_RANDOM_RULES_PURCHASE1*5 - 15 + math.min(10, World_GetGameTime()/35-10)
+	elseif upgrade_pbg == UPG.AXIS.PHASE4 then
+		if s_phase4_timer==nil then
+			-- initialize timer - to when we will consider this phase
+			s_phase4_timer = World_GetGameTime() + 350 + AI_RandMax(s_personality.phase4_random_wait_time)
+		end
+		
+		if World_GetGameTime() < s_phase4_timer then
+			--strategy_tech_purchase.trace("     Phase demand timer is stalling this phase4 upgrade, waiting:"..s_phase4_timer - World_GetGameTime() )
+			return DEMAND_NeverBuild
+		end
+		
+		result = result - s_RANDOM_RULES_PURCHASE1*2 + s_RANDOM_RULES_PURCHASE2*7 - 10 + math.min(10, World_GetGameTime()/35-15)
+	elseif upgrade_pbg == UPG.AXIS.ARMOUR_SKIRTS then
+		if UtilPBG_CountAliveOrProduced(EBP.AXIS.COMMAND) == 0 then
+			return DEMAND_NeverBuild
+		end
+	--[[elseif (upgrade_pbg == UPG.AXIS.VETERANCY.INFANTRY1 or
+			upgrade_pbg == UPG.AXIS.VETERANCY.INFANTRY2 or
+			upgrade_pbg == UPG.AXIS.VETERANCY.INFANTRY3 or
+			upgrade_pbg == UPG.AXIS.VETERANCY.SUPPORT_INF1 or
+			upgrade_pbg == UPG.AXIS.VETERANCY.SUPPORT_INF2 or
+			upgrade_pbg == UPG.AXIS.VETERANCY.SUPPORT_INF3) then
+			
+		if (resRate.fuel*60 < 24) then
+			--strategy_tech_purchase.trace("     Fuel Economy is not good enough to do infantry and support inf veterancy upgrades")
+			return DEMAND_NeverBuild
+		end
+			
+		if (upgrade_pbg == UPG.AXIS.VETERANCY.INFANTRY3 or
+			upgrade_pbg == UPG.AXIS.VETERANCY.SUPPORT_INF3) then
+			if (resRate.fuel*60 < 34) then
+				--strategy_tech_purchase.trace("     Fuel Economy is not good enough to do advanced infantry and support inf veterancy upgrades")
+				return DEMAND_NeverBuild
+			end
+		end
+		
+		if (cache.infantry_count < 6) then
+			strategy_tech_purchase.trace("     Not enough infantry to consider infantry veterancy upgrades")
+			return DEMAND_NeverBuild	
+		end
+		
+		--strategy_tech_purchase.trace("     infantry_veterancy_demand:"..s_personality.axis_quarter_master_infantry_veterancy_demand)
+		
+		-- need at least 7 infantry to increase likeliness to build the upgrade
+		local demand = (7 - cache.infantry_count) * 2 + s_personality.axis_quarter_master_infantry_veterancy_demand
+		
+	elseif (upgrade_pbg == UPG.AXIS.VETERANCY.VEHICLE1 or
+			upgrade_pbg == UPG.AXIS.VETERANCY.VEHICLE2 or
+			upgrade_pbg == UPG.AXIS.VETERANCY.VEHICLE3 or
+			upgrade_pbg == UPG.AXIS.VETERANCY.TANK1 or
+			upgrade_pbg == UPG.AXIS.VETERANCY.TANK2 or
+			upgrade_pbg == UPG.AXIS.VETERANCY.TANK3) then
+			
+		if (resRate.fuel*60 < 25) then
+			--strategy_tech_purchase.trace("     Fuel Economy is not good enough to do tank and vehicle veterancy upgrades")
+			return DEMAND_NeverBuild
+		end
+		
+		if (upgrade_pbg == UPG.AXIS.VETERANCY.VEHICLE3 or
+			upgrade_pbg == UPG.AXIS.VETERANCY.TANK3) then
+			if (resRate.fuel*60 < 34) then
+				--strategy_tech_purchase.trace("     Fuel Economy is not good enough to do advanced infantry and support inf veterancy upgrades")
+				return DEMAND_NeverBuild
+			end
+		end
+		
+		if (cache.vehicle_count < 3) then
+			--strategy_tech_purchase.trace("     Not enough vehicles to consider tank and vehicles veterancy upgrades")
+			return DEMAND_NeverBuild	
+		end
+		
+		--strategy_tech_purchase.trace("     vehicle_veterancy_demand:"..s_personality.axis_quarter_master_vehicle_veterancy_demand)
+
+		-- need at least 5 infantry to increase likeliness to build the upgrade
+		local demand = (3 - cache.vehicle_count) * 2 + s_personality.axis_quarter_master_vehicle_veterancy_demand]]
+	else
+		result = result + math.min(-2*math.sqrt(math.max(800-World_GetGameTime()/1.25, 0)), 0)
+	end
+	
+	return result
+end
+
+function AxisPE_SpecialUpgradeRules(upgrade_pbg)
+	if upgrade_pbg == nil then return DEMAND_NeverBuild end
+	
+	--local curResources = AIResource_GetCurrentResources(s_selfplayer)
+	--local resRate = AIResource_GetCurrentResourceRate(s_selfplayer)
+	
+	local result = 0
+	
+	if upgrade_pbg == UPG.ELITE.PANZER_ARTILLERIE then -- gebaude_heavy_arms_upgrade
+		result = result - 5
+	elseif upgrade_pbg == UPG.ELITE.PANZERJAGER then -- gebaude_light_arms_upgrade
+		result = result - 10
+	elseif upgrade_pbg == UPG.ELITE.LOGISTIK then -- struktur_capital_upgrade
+		result = result - 14
+	elseif upgrade_pbg == UPG.ELITE.KAMPFGRUPPE then -- struktur_armaments_upgrade
+		result = result - 20
+	--elseif (upgrade_pbg == UPG.ELITE.ADVANCED_REPAIR) then
+	--	return math.min(cache.vehicle_count*35-155, 0)
+	--elseif (upgrade_pbg == UPG.ELITE.INCENDIARY_GRENADE) then
+		--return math.min(cache.infantry_count*2-120, -5)
+	--elseif (upgrade_pbg == UPG.ELITE.DEFENSIVE_OPS) then
+	--	return math.min(cache.infantry_count*10-155, -2)
+	else
+		result = result - 35
+	end
+	
+	return result + math.sqrt(World_GetGameTime())
+end

@@ -1,0 +1,140 @@
+-- tactic position target filters
+--   return a position, or a position with all coords set to COORD_INVALID
+--   NOTE: please don't go farther than misc_taskAP distance from the squad's anchor pos
+--        (this will cause weird oscillations - no time to fix it properly by enforcing this)
+
+function PositionTargetFilter_TrivialAccept(squad)
+	return AISquad_GetAnchorPos(squad)
+end
+
+function PositionTacticFilter_AtHomeBase(caster)
+	return AIPlayer_GetHomePosition(s_self_modplayer)
+end
+
+function PositionTargetFilter_Cover(squad)
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+	
+	-- get the task anchor pos
+	local pos = AISquad_GetAnchorPos(squad)
+	
+	-- get the cover pos, this function returns the anchor pos if it couldn't find cover
+	local posCover = Squad_FindCoverCompareCurrent(sim_squad, AISquad_GetAnchorPos(squad), misc_taskAP, 2.5*misc_taskAP, true)
+	
+	-- if it found cover that is at least 2 m away
+	if World_DistanceSquaredPointToPoint(pos, posCover) > 4.0 then	
+		local oldPosThreatLevel = AISquad_ThreatLevelToSquad(s_selfplayer, squad, pos)
+		local newPosThreatLevel = AISquad_ThreatLevelToSquad(s_selfplayer, squad, posCover)
+		local threatDiff = newPosThreatLevel - oldPosThreatLevel
+		if (threatDiff < 1) then -- make sure this position is still safe (otherwise ignore it)
+			--if not AIPlayer_IsFireConePosition(s_selfplayer, posCover) then -- never move into someones arc of fire
+				-- never move closer to any of your targets
+				if not AISquad_IsPosWithinDistOfAttackTarget(squad, posCover, 25) then
+					return posCover
+				end
+			--end
+		end
+	end
+	
+	-- else return error
+	return World_Pos(COORD_INVALID, COORD_INVALID, COORD_INVALID)
+end
+
+--------------------------------------------------------
+-- tactic update checking
+-- these functions are used to determine if the current active tactic is still doing the right thing
+
+function TacticUpdateCheck_Tank(squad, targetPos)
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+
+	if (sim_squad == nil) then
+		return false
+	end
+
+	local target_squad = SquadQuery_GetAnySquadCombatTarget(sim_squad)
+	
+	if (target_squad == nil or not SquadQuery_IsVehicle(target_squad)) then
+		-- no longer targeting a tank
+		return false
+	end	
+
+	-- if our target position is no longer behind our target tank then cancel
+	return not PointIsInFrontOfSquad(targetPos, target_squad)
+end
+function PositionTargetFilter_Tank(squad)
+	-- get current target
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+
+	if (sim_squad == nil) then
+		return World_Pos(COORD_INVALID, COORD_INVALID, COORD_INVALID)
+	end
+
+	local target_squad = SquadQuery_GetAnySquadCombatTarget(sim_squad)
+	
+	-- for now, only do maneuvering against other vehicle squads
+	if (target_squad == nil or not SquadQuery_IsVehicle(target_squad)) then
+		return Squad_GetPosition(sim_squad)	-- pass back the current position
+	end
+
+	-- now choose a position that will get us a rear shot on our current target
+	local targetHeading = Squad_GetHeading(target_squad)
+	local targetPos = Squad_GetPosition(target_squad)
+	
+	-- some small distance away (could potentially use current distance from target)
+	local magic_mult = misc_taskAP
+	targetPos.x = targetPos.x - magic_mult * targetHeading.x
+	targetPos.z = targetPos.z - magic_mult * targetHeading.z
+	
+	return targetPos
+end
+
+function PositionTargetFilter_MobileArtilleryRetreat(squad)
+	--local sim_squad = AISquad_ConvertToSimSquad(squad)
+
+	--if (sim_squad == nil) then
+		return World_Pos(COORD_INVALID, COORD_INVALID, COORD_INVALID)
+	--end
+
+	--[[local targetPos = AIPlayer_GetHomePosition(s_self_modplayer)
+	local curPos = Squad_GetPosition(sim_squad)
+	
+	local target = World_Pos(targetPos.x-curPos.x, targetPos.y-curPos.y, targetPos.z-curPos.z)
+	local targetVectorLen = math.sqrt(target.x*target.x+target.y*target.y+target.z*target.z)
+	if targetVectorLen > misc_taskAP then
+		target.x = target.x / targetVectorLen * misc_taskAP / 2 + curPos.x
+		target.y = target.y / targetVectorLen * misc_taskAP / 2 + curPos.y
+		target.z = target.z / targetVectorLen * misc_taskAP / 2 + curPos.z
+	else
+		target = curPos
+	end
+	
+	return target]]
+end
+
+function PositionTargetFilter_TeamWeapon(squad)
+	return World_Pos(COORD_INVALID, COORD_INVALID, COORD_INVALID)
+end
+
+function PositionTargetFilter_ATGun(squad)
+	-- if the AT gun is being shot and its not shooting at anything, possibly it should move to attack the target,
+	-- unless ofcourse its too strong, then it should retreat (which should be handled in its task)
+end
+
+function PositionTargetFilter_BestClump(squad)
+	local i = AIPlayer_GetBestClumpIdx(s_selfplayer, squad, s_NearClumpDistanceCap)
+	
+	if i < 0 then
+		return World_Pos(COORD_INVALID, COORD_INVALID, COORD_INVALID)
+	end
+
+	return AIPlayer_GetClumpPosition(s_selfplayer,i)
+end
+
+function PositionTargetFilter_BestClump_Near(squad)
+	local i = AIPlayer_GetBestClumpIdx(s_selfplayer, squad, s_NearClumpDistanceCap_Small)
+	
+	if i < 0 then
+		return World_Pos(COORD_INVALID, COORD_INVALID, COORD_INVALID)
+	end
+
+	return AIPlayer_GetClumpPosition(s_selfplayer,i)
+end

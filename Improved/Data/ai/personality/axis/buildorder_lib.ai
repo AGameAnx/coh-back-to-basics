@@ -1,0 +1,97 @@
+
+axis_buildorder = {
+	
+	{
+		name = "Standard opening",
+		vp_mult = 0.5,
+		fuel_mult = 1.15,
+		tags = {},
+		list = {
+			{"building", EBP.AXIS.QUARTERS, maxlimit = 1, bs_style = BS_NearBase },
+			{"produce", PITEM_Spawn, SBP.AXIS.VOLKSGRENADIER, maxlimit = 2 },
+			{"produce", PITEM_Spawn, SBP.AXIS.HEAVYMG, maxlimit = 2 },
+			{"produce", PITEM_Spawn, SBP.AXIS.VOLKSGRENADIER, maxlimit = 2 },
+		},
+	},
+	
+	--[[{
+		name = "Sniper Build",
+		fuel_mult = 0.75,
+		mt_mult = 0.75,
+		vp_mult = 0.5,
+		tags = {},
+		list = {
+			{"building", EBP.AXIS.QUARTERS, maxlimit = 1, bs_style = BS_NearBase },
+			{"produce", PITEM_Spawn, SBP.AXIS.PIONEER, maxlimit = 3 },
+			{"produce", PITEM_Spawn, SBP.AXIS.VOLKSGRENADIER, maxlimit = 2 },
+			{"produce", PITEM_Spawn, SBP.AXIS.VOLKSGRENADIER, maxlimit = 2 },
+			{"produce", PITEM_Spawn, SBP.AXIS.SNIPER, maxlimit = 1 },
+		},
+	},
+	
+	{
+		name = "Three pioneers",
+		vp_mult = 0.5,
+		fuel_mult = 1.15,
+		tags = {},
+		list = {
+			{"building", EBP.AXIS.QUARTERS, maxlimit = 1, bs_style = BS_NearBase },
+			{"produce", PITEM_Spawn, SBP.AXIS.PIONEER, maxlimit = 3 },
+			{"produce", PITEM_Spawn, SBP.AXIS.VOLKSGRENADIER, maxlimit = 2 },
+			{"produce", PITEM_Spawn, SBP.AXIS.PIONEER, maxlimit = 3 },
+			{"produce", PITEM_Spawn, SBP.AXIS.VOLKSGRENADIER, maxlimit = 2 },
+		},
+	},]]
+	
+	{
+		name = "Double volks",
+		vp_mult = 0.5,
+		fuel_mult = 1.25,
+		tags = {},
+		list = {
+			{"building", EBP.AXIS.QUARTERS, maxlimit = 1, bs_style = BS_NearBase },
+			{"produce", PITEM_Spawn, SBP.AXIS.VOLKSGRENADIER, maxlimit = 2 },
+			{"produce", PITEM_Spawn, SBP.AXIS.VOLKSGRENADIER, maxlimit = 2 },
+		},
+	},
+	
+	--[[{
+		name = "Two pioneers, then HMG",
+		fuel_mult = 0.75,
+		vp_mult = 0.5,
+		tags = {},
+		list = {
+			{"building", EBP.AXIS.QUARTERS, maxlimit = 1, bs_style = BS_NearBase },
+			{"produce", PITEM_Spawn, SBP.AXIS.PIONEER, maxlimit = 4 },
+			{"produce", PITEM_Spawn, SBP.AXIS.HEAVYMG, maxlimit = 2 },
+			{"produce", PITEM_Spawn, SBP.AXIS.VOLKSGRENADIER, maxlimit = 2 },
+		},
+	},]]
+	
+	--[[{
+		name = "Motorcycle",
+		tags = {"vpgame","small map"},
+		vp_mult = 1.5,
+		list = {
+			{"produce", PITEM_Spawn, SBP.AXIS.PIONEER, maxlimit = 6 },
+			{"building", EBP.AXIS.QUARTERS, maxlimit = 1, bs_style = BS_NearBase },
+			{"produce", PITEM_Spawn, SBP.AXIS.VOLKSGRENADIER, maxlimit = 2 },
+			{"produce", PITEM_Spawn, SBP.AXIS.MOTORCYCLE, maxlimit = 2 },
+		},
+	},]]
+	
+	--[[{
+		name = "VP Rush and HMG",
+		tags = {"vpgame","small map"},
+		vp_mult = 1.5,
+		list = {
+			{"produce", PITEM_Spawn, SBP.AXIS.PIONEER, maxlimit = 6 },
+			{"produce", PITEM_Spawn, SBP.AXIS.PIONEER, maxlimit = 6 },
+			{"building", EBP.AXIS.QUARTERS, maxlimit = 1, bs_style = BS_NearBase },
+			{"produce", PITEM_Spawn, SBP.AXIS.HEAVYMG, maxlimit = 2 },
+			{"produce", PITEM_Spawn, SBP.AXIS.HEAVYMG, maxlimit = 2 },
+		},
+	}]]
+	
+}
+

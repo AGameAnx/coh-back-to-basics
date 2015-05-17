@@ -1,0 +1,371 @@
+state_analysis = {}
+
+state_analysis.enable_military_unit_building = true
+state_analysis.start_attack_time = 0
+state_analysis.long_map_ratio = 0.75
+
+function state_analysis.trace(msg)
+	local ticks = World_GetGameTime() * 8
+	-- pipe this out also
+	msg = "[" .. ticks .. "]" .. msg
+
+	aitrace_ext("State_Analysis", msg)
+end
+
+function state_analysis.trace_clear()
+	aitraceclear_ext("State_Analysis")
+end
+
+state_analysis.init = function()
+	if World_GetWidth() > World_GetLength() then
+		state_analysis.long_map_ratio = World_GetWidth()/World_GetLength() - 0.25
+	else
+		state_analysis.long_map_ratio = World_GetLength()/World_GetWidth() - 0.25
+	end
+	
+	state_analysis.start_attack_time = s_personality.start_attack_time + AI_RandRange(0,s_personality.start_attack_time_variance)
+	--print("AI Start AttackTime:"..state_analysis.start_attack_time)
+
+	-- set the other percentages
+	military_advanceRatingPercentage				= s_personality.advance_percentage
+	military_fallbackRatingPercentage				= s_personality.fallback_percentage
+	military_fallbackHealthPercentage				= s_personality.fallback_health_percentage
+	military_fallbackCapacityPercentage				= s_personality.fallback_capacity_percentage
+	military_fallbackChance							= s_personality.fallback_chance
+	military_fallbackChanceReevaluateTicks			= s_personality.fallback_chance_reevaluate_ticks
+	military_fallbackHealthPercentageAlways			= s_personality.fallback_health_percentage_always
+	military_retreatCapacityPercentage				= s_personality.retreat_capacity_percentage
+	military_retreatPinnedOrSuppressedPercentage	= s_personality.retreat_suppressed_percentage
+	military_retreatChance							= s_personality.retreat_chance
+	military_retreatChanceReevaluateTicks			= s_personality.retreat_chance_reevaluate_ticks
+
+	targetChoice_fuelPoint 							= s_personality.importance_fuelPoint
+	targetChoice_victoryPoint 						= s_personality.importance_victoryPoint
+	targetChoice_munitionPoint 						= s_personality.importance_munitionPoint
+	targetChoice_defence 							= s_personality.importance_defence
+	targetChoice_nullPoint 							= s_personality.importance_nullPoint
+	targetChoice_hq 								= s_personality.importance_hq
+	targetChoice_spawner 							= s_personality.importance_spawner
+	
+	state_analysis.defensiveness					= s_personality.defensiveness
+	state_analysis.self_demand_class_base_value 	= s_personality.self_demand_class_base_value
+	state_analysis.budget_levels 					= {
+		units = s_personality.budget_levels.units,
+		tech = s_personality.budget_levels.tech,
+		addon = s_personality.budget_levels.addon,
+		secure = s_personality.budget_levels.secure,
+		playerability = s_personality.budget_levels.playerability,
+		squadability = s_personality.budget_levels.squadability
+	}
+end
+
+state_analysis.update = function()
+	--state_analysis.trace_clear()
+	
+	state_analysis.recalculate_budgets()
+	state_analysis.recalculate_target_choice_importance()
+	state_analysis.recalculate_attackpercentage()
+	state_analysis.update_military_value_cap()
+end
+
+-- update the military cap - used in easy and normal
+state_analysis.update_military_value_cap = function()
+	--state_analysis.trace("")
+	--state_analysis.trace("<update_military_value_cap>")
+	
+	state_analysis.enable_military_unit_building = true
+	
+	if (s_personality.min_military_value_start < 0) then
+		--state_analysis.trace("no military value cap")
+		return
+	end
+	
+	-- what military_value do we need before we start disabling purchasing
+	local min_military_value = s_personality.min_military_value_start
+	--state_analysis.trace("start min_military_value:"..min_military_value)
+	
+	local time_past_start = World_GetGameTime() - state_analysis.start_attack_time
+	-- has the attack-time elapsed
+	if (time_past_start > 0) then
+		local increment = (s_personality.min_military_value_increment_per_minute*time_past_start/60)
+		min_military_value = min_military_value + increment
+		--state_analysis.trace("new min_military_value:"..min_military_value.." mins:"..time_past_start/60)
+	end
+
+	if (cache.military_value < min_military_value) then
+		--state_analysis.trace("No need to disable - since AI is below min military value")
+		return
+	end
+	
+	--state_analysis.trace("cache.military_percent_value = "..cache.military_percent_value)
+	--state_analysis.trace("glue_military_percentage = "..s_personality.glue_military_percentage)
+	-- if we are above the min military value we should disable only if we are beating the AI by a certain percentage
+	if (s_personality.glue_military_percentage ~= 0 and s_personality.glue_military_percentage<10 and cache.military_percent_value > s_personality.glue_military_percentage) then
+		--state_analysis.trace("Disabling the AI military production.")
+		state_analysis.enable_military_unit_building = false
+	end
+end
+
+-- this will update the budget percentages based on many game factors (economy, military, current funds, etc)
+state_analysis.recalculate_budgets = function()
+	--state_analysis.trace("")
+	--state_analysis.trace("<recalculate_budgets>")
+	
+	----------------------------------------------------------------------
+	-- USE THE CALCULATES TO DETERMINE CHANGES IN BUDGET/PRIORITIES/ETC
+	
+	local increase_tech = 5
+
+	-- if we have at least 3 military units...
+	if (cache.military_non_engineer_count >= 2) then
+		-- if he has no spawners, increase tech
+		if (cache.spawner_count == 0) then
+			increase_tech = 5
+		elseif (cache.spawner_tier1_count > 0 and cache.spawner_tier2_count == 0) then
+			increase_tech = 4
+		elseif (cache.spawner_tier2_count > 0 and cache.spawner_tier1_count == 0) then
+			increase_tech = 3
+		elseif (cache.spawner_tier1_count > 0 and cache.spawner_tier2_count > 0) then
+			increase_tech = 2
+		elseif (cache.spawner_count > 3 or (s_current_race == TRACE_ALLIES_COMMONWEALTH and cache.spawner_count >= 3)) then
+			increase_tech = 1 -- we have a few spawners of both tiers
+		end
+	end
+	
+	--state_analysis.trace("cache.spawner_count: "..cache.spawner_count)
+	--state_analysis.trace("cache.spawner_tier1_count: "..cache.spawner_tier1_count)
+	--state_analysis.trace("cache.spawner_tier2_count: "..cache.spawner_tier2_count)
+	
+	local curResources = AIResource_GetCurrentResources(s_selfplayer)
+	
+	local underAttack = "false"
+	local unit_budget
+	if (cache.threat_at_base > 2) then
+		underAttack = "true"
+		
+		-- only consider top units to build
+		strategy_unit_purchase.s_demand_variance = 0.10
+		state_analysis.defensiveness = 0
+		-- focus fully on building units to protect the base
+		unit_budget = state_analysis.budget_levels.units[increase_tech]*2
+	else
+		strategy_unit_purchase.s_demand_variance = s_personality.demand_variance
+		unit_budget = state_analysis.budget_levels.units[increase_tech]
+		
+		local curpopcap = AIResource_GetCurrentPopulation(s_selfplayer, CT_Personnel)
+		local maxpopcap = AIResource_GetMaxPopulation(s_selfplayer, CT_Personnel)
+		
+		local popcapRatio = curpopcap/(maxpopcap+1)
+		
+		state_analysis.defensiveness = s_personality.defensiveness * (popcapRatio+(1-popcapRatio)*(1-military_attackPercentage*1.1))
+	end
+	
+	--state_analysis.trace("Base_under_attack: "..underAttack)
+	--state_analysis.trace("increase_tech level:"..increase_tech)
+	--state_analysis.trace("defensiveness:"..state_analysis.defensiveness)
+	
+	ai_budget:setweight("BUDGET_Units", unit_budget)
+	local fuelMult = 1
+	--if curResources.manpower > 50 and curResources.fuel > 15 then
+	--	fuelMult = fuelMult * math.sqrt(math.max(curResources.fuel/math.max(curResources.manpower, 0.1)*s_personality.tech_good_fuel_ratio_modifier, 0.75))
+	--end
+	ai_budget:setweight("BUDGET_Tech", state_analysis.budget_levels.tech[increase_tech] * fuelMult + math.max(0, curResources.fuel/10-1))
+	ai_budget:setweight("BUDGET_AddOn", state_analysis.budget_levels.addon[increase_tech])
+	
+	local secureBudget = state_analysis.budget_levels.secure[increase_tech]*state_analysis.long_map_ratio
+	if secureBudget ~= 0 then
+		secureBudget = secureBudget + s_personality.defensiveness_budget_increase*state_analysis.defensiveness
+	end
+	
+	ai_budget:setweight("BUDGET_Secure", secureBudget)
+	ai_budget:setweight("BUDGET_PlayerAbility", state_analysis.budget_levels.playerability[increase_tech])
+	ai_budget:setweight("BUDGET_SquadAbility", state_analysis.budget_levels.squadability[increase_tech])
+	
+	--[[CustomDebug.Clear()
+	CustomDebug.Print("Budgets:")
+	CustomDebug.Print("BUDGET_Secure  "..ai_budget:getweight("BUDGET_Secure"))
+	CustomDebug.Print("BUDGET_Units  "..ai_budget:getweight("BUDGET_Units"))
+	CustomDebug.Print("BUDGET_Tech  "..ai_budget:getweight("BUDGET_Tech"))
+	CustomDebug.Print("BUDGET_AddOn  "..ai_budget:getweight("BUDGET_AddOn"))
+	CustomDebug.Print("BUDGET_PlayerAbility  "..ai_budget:getweight("BUDGET_PlayerAbility"))
+	CustomDebug.Print("BUDGET_SquadAbility  "..ai_budget:getweight("BUDGET_SquadAbility"))]]
+	
+	--[[state_analysis.trace("BUDGET_Secure  "..ai_budget:getweight("BUDGET_Secure"))
+	state_analysis.trace("BUDGET_Units  "..ai_budget:getweight("BUDGET_Units"))
+	state_analysis.trace("BUDGET_Tech  "..ai_budget:getweight("BUDGET_Tech"))
+	state_analysis.trace("BUDGET_AddOn  "..ai_budget:getweight("BUDGET_AddOn"))
+	state_analysis.trace("BUDGET_PlayerAbility  "..ai_budget:getweight("BUDGET_PlayerAbility"))
+	state_analysis.trace("BUDGET_SquadAbility  "..ai_budget:getweight("BUDGET_SquadAbility"))]]
+	
+	-- apply designer override budget weights
+	AddDesignerBudgetWeights()
+end
+
+state_analysis.recalculate_target_choice_importance = function()
+	--state_analysis.trace("")
+	--state_analysis.trace("<recalculate_target_choice_importance>")
+	if cache.vp_total > 0 then
+		local selfTickers = WinCondition_GetVPTickets(s_self_team)
+		local enemyTickers = WinCondition_GetVPTickets(1-s_self_team)
+		
+		--[[local minticker = math.min(selfTickers, enemyTickers)
+		local ticker_warning_level = s_personality.vp_ticker_warning_level
+		if (minticker < ticker_warning_level) then
+			local multvp = (ticker_warning_level-minticker) / ticker_warning_level
+			
+			targetChoice_victoryPoint = s_personality.importance_victoryPoint + multvp*30
+			--state_analysis.trace("targetChoice_victoryPoint:"..targetChoice_victoryPoint)
+		else]]
+			local vp_wanted = math.floor(cache.vp_total * s_personality.max_percentage_vp_wanted)
+			--state_analysis.trace("VP-Wanted:"..vp_wanted)
+			
+			-- if we own more than 65% of the world then increase our want for VP
+			if (cache.percentage_pts_captured > 0.65) then
+				vp_wanted = cache.vp_total
+				state_analysis.trace("VP-LimitIncreased Because AI Owns tons of territory")
+			end
+			
+			if cache.vp_owned_self < vp_wanted then
+				local vp_score = s_personality.vp_aggressiveness * s_personality.importance_victoryPoint
+				
+				local vp_offset = -2
+				local difftickers = enemyTickers - selfTickers
+				local diffticker_warning = math.min(cache.max_vp_tickets*0.75, 500*0.75)
+				if selfTickers < diffticker_warning then
+					local dangerPointIncrease = 22*(diffticker_warning-selfTickers)/diffticker_warning
+					local percentagePointsOwned = cache.vp_owned_self/cache.vp_total
+					vp_offset = vp_offset + 5*math.max(0, (0.5-percentagePointsOwned))
+					if percentagePointsOwned < 0.5 then
+						vp_offset = vp_offset + dangerPointIncrease/math.max(percentagePointsOwned, 0.25)
+					else
+						vp_offset = vp_offset + dangerPointIncrease*(1-percentagePointsOwned/0.8)
+					end
+					vp_offset = vp_offset + 5*math.max(diffticker_warning-difftickers*2, -0.15)/diffticker_warning
+				end
+				
+				--state_analysis.trace("Setting VP-importance to:"..vp_score + vp_offset)
+				
+				targetChoice_victoryPoint = vp_score + vp_offset
+			else
+				targetChoice_victoryPoint = -1
+			end
+		--end
+	end
+	
+	-- change hq and spawner importance if base is under attack
+	if cache.threat_at_base > 2 then
+		targetChoice_hq      = 80
+		targetChoice_spawner = 80
+	else
+		targetChoice_hq      = s_personality.importance_hq
+		targetChoice_spawner = s_personality.importance_spawner
+	end
+	
+	
+	--[[state_analysis.trace(string.format("[Importance] targetChoice_fuelPoint: %.1f", targetChoice_fuelPoint))
+	state_analysis.trace(string.format("[Importance] targetChoice_victoryPoint: %.1f", targetChoice_victoryPoint))
+	state_analysis.trace(string.format("[Importance] targetChoice_munitionPoint: %.1f", targetChoice_munitionPoint))
+	state_analysis.trace(string.format("[Importance] targetChoice_defence: %.1f", targetChoice_defence))
+	state_analysis.trace(string.format("[Importance] targetChoice_nullPoint: %.1f", targetChoice_nullPoint))
+	state_analysis.trace(string.format("[Importance] targetChoice_hq: %.1f", targetChoice_hq))
+	state_analysis.trace(string.format("[Importance] targetChoice_spawner: %.1f", targetChoice_spawner))]]
+end
+
+state_analysis.recalculate_attackpercentage = function()
+	--state_analysis.trace("")
+	--state_analysis.trace("<recalculate_attackpercentage>")
+	
+	--[[local cap_attack_percentage = 1
+	if (cache.threat_at_base > 5) then
+		-- cap attack percentage [0.05,1]
+		cap_attack_percentage = math.max(100-cache.threat_at_base, 5)/100
+		--state_analysis.trace("capping attack percentage when base underattack:"..cap_attack_percentage)
+	end]]
+	
+	-- VP rules trump other rules
+	--[[if (cache.vp_total > 0) then
+	
+		local selfTickers = WinCondition_GetVPTickets(s_self_team)
+		local enemyTickers = WinCondition_GetVPTickets(1-s_self_team)
+		
+		local minticker = math.min(selfTickers, enemyTickers)
+		local ticker_warning_level = s_personality.vp_ticker_warning_level
+		if (minticker < ticker_warning_level) then
+			
+			local multvp = (ticker_warning_level-minticker) / ticker_warning_level -- [0,1]
+			--state_analysis.trace("multvp:"..multvp)
+			local attackPercentage = 0.6 + multvp*0.4
+			--state_analysis.trace("start-attack-percentage:"..attackPercentage)
+			
+			if (cache.vp_owned_self > cache.vp_owned_enemy) then
+				--state_analysis.trace("AI has more VP - switch to defence")
+				attackPercentage = 1-attackPercentage
+			end
+			
+			--state_analysis.trace("Setting attackpercengtage to:"..attackPercentage)
+			
+			if (attackPercentage > cap_attack_percentage) then
+				attackPercentage = cap_attack_percentage
+				--state_analysis.trace("underattack capping attackpercentage to "..cap_attack_percentage)
+			end
+			
+			military_attackPercentage = attackPercentage
+			
+			return
+		end
+		
+	end]]
+	
+	local attackTimeDiff = World_GetGameTime() - state_analysis.start_attack_time
+	
+	-- once this time is above zero then we start upping the attack percentage (zero on hard, large time in easy/normal)
+	if attackTimeDiff < 0 then
+		--state_analysis.trace("Attack-Disabled until ".. (state_analysis.start_attack_time - World_GetGameTime()) .. " ticks")
+		military_attackPercentage = 0
+	else
+		--state_analysis.trace("Attack-At-Default")
+		local new_attack_percentage = s_personality.default_attack_percentage
+		
+		--state_analysis.trace("default attack percentage:"..new_attack_percentage)
+		
+		if s_personality.attack_percentage_increment_per_minute > 0 then
+			-- escalate attack percentage based on a timer
+			new_attack_percentage = math.max(0, math.min(s_personality.max_attack_percentage, new_attack_percentage + s_personality.attack_percentage_increment_per_minute * attackTimeDiff/60))
+			--state_analysis.trace("time escalated attack percentage:"..new_attack_percentage)
+		end
+		
+		-- escalate attack percentage based on a winning force
+		--CustomDebug.Clear()
+		--CustomDebug.Print("Calculating attack percentage...")
+		--CustomDebug.Print(string.format("  pts captured %%: %.3f", cache.percentage_pts_captured))
+		--CustomDebug.Print(string.format("  military %% value: %.3f", cache.military_percent_value))
+		
+		local norm_military_val = (state_analysis.long_map_ratio+0.05) * ((cache.military_percent_value-0.525) + (0.5-cache.percentage_pts_captured/math.max(1, 3.5-World_GetGameTime()/250))*1.65 + math.max(0, 0.55-World_GetGameTime()/550))
+		--if cache.percentage_pts_captured > 0.7 and cache.military_percent_value < 0.7 then norm_military_val = norm_military_val - 0.45 end
+		
+		if norm_military_val < 0.5 then
+			norm_military_val = norm_military_val - 0.3*math.max(0, math.min(1, 1-(norm_military_val-0.4)*10))
+		else
+			norm_military_val = norm_military_val / (0.75 + 0.25*math.max(0, math.min(1, (1-norm_military_val)*2)))
+		end
+		norm_military_val = norm_military_val - (0.3 - math.min(0.3, math.abs(World_GetWidth() - World_GetLength()))) -- adjust for long map ratio
+		
+		--CustomDebug.Print("--")
+		
+		--CustomDebug.Print(string.format("  norm: %.3f", norm_military_val))
+		
+		new_attack_percentage = math.min(s_personality.max_attack_percentage, math.max(s_personality.default_attack_percentage,
+			new_attack_percentage + norm_military_val*(s_personality.max_attack_percentage-new_attack_percentage)
+		))
+		
+		--CustomDebug.Print(string.format("    => %.3f", new_attack_percentage))
+		
+		--[[if (new_attack_percentage > cap_attack_percentage) then
+			new_attack_percentage = cap_attack_percentage
+			--state_analysis.trace("underattack capping attackpercentage to "..cap_attack_percentage)
+		end]]
+		
+		--state_analysis.trace("setting attack-percentage to "..new_attack_percentage)
+		military_attackPercentage = new_attack_percentage
+	end
+end

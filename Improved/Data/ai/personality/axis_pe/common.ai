@@ -1,0 +1,4 @@
+
+s_personality.budget_levels.units = {45, 35, 35, 40, 30}
+s_personality.budget_levels.tech = {10, 25, 25, 30, 10}
+s_personality.budget_levels.secure = {35, 15, 2, 2, 2}

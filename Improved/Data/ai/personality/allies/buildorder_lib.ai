@@ -1,0 +1,52 @@
+allied_buildorder = {
+	{
+		name = "Barracks with Riflemen",
+		vp_mult = 0.5,
+		fuel_mult = 1.1,
+		mt_mult = 1,
+		list = {
+			{"produce", PITEM_Spawn, SBP.ALLIES.ENGINEER},
+			{"building", EBP.ALLIES.BARRACKS, maxlimit = 1, bs_style = BS_NearBase},
+			{"produce", PITEM_Spawn, SBP.ALLIES.RIFLEMEN},
+			{"produce", PITEM_Spawn, SBP.ALLIES.RIFLEMEN},
+			{"produce", PITEM_Spawn, SBP.ALLIES.RIFLEMEN},
+		}
+	},
+	{
+		name = "Barracks with Riflemen",
+		vp_mult = 0.5,
+		fuel_mult = 1.1,
+		mt_mult = 1,
+		list = {
+			{"building", EBP.ALLIES.BARRACKS, maxlimit = 1, bs_style = BS_NearBase},
+			{"produce", PITEM_Spawn, SBP.ALLIES.RIFLEMEN},
+			{"produce", PITEM_Spawn, SBP.ALLIES.RIFLEMEN},
+			{"produce", PITEM_Spawn, SBP.ALLIES.RIFLEMEN},
+		}
+	},
+	--[[{
+		name = "Min Engineers and Barracks",
+		vp_mult = 0.5,
+		fuel_mult = 1,
+		mt_mult = 1,
+		list = {
+			{"building", EBP.ALLIES.BARRACKS, maxlimit = 1, bs_style = BS_NearBase},
+			{"produce", PITEM_Spawn, SBP.ALLIES.RIFLEMEN},
+			{"produce", PITEM_Spawn, SBP.ALLIES.RIFLEMEN},
+		}
+	},]]
+	--[[{
+		name = "Fast capping",
+		vp_mult = 0.5,
+		fuel_mult = 1.2,
+		mt_mult = 1.1,
+		list = {
+			{"produce", PITEM_Spawn, SBP.ALLIES.ENGINEER},
+			{"building", EBP.ALLIES.BARRACKS, maxlimit = 1, bs_style = BS_NearBase},
+			{"produce", PITEM_Spawn, SBP.ALLIES.RIFLEMEN},
+			{"produce", PITEM_Spawn, SBP.ALLIES.ENGINEER},
+			{"produce", PITEM_Spawn, SBP.ALLIES.RIFLEMEN},
+			{"building", EBP.ALLIES.OBSERVATION_POST, maxlimit = 1 , bs_style = BS_Secure},
+		}
+	}]]
+}

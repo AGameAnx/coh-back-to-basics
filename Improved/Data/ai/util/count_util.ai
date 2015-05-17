@@ -1,0 +1,59 @@
+
+
+--- list of all the counting functions and some helpers
+
+-- This returns the number of this pbg alive AND being produced (also counts those already sent over the network, or in-proxy)
+-- PBG_GetCount(s_selfplayer, pbg)
+
+-- This returns the number of inactive requested tasks for this pbg. These are not alive or being produced yet.
+-- Task_CountActivePBG(s_selfplayer, pbg, false)
+
+-- This returns the number of 'active' tasks for this pbg. These PBGs are going to be in production very shortly.
+-- Task_CountActivePBG(s_selfplayer, pbg, true)
+
+-- Returns the number of alive units in the world
+function UtilPBG_CountAlive(pbg)
+	if (pbg == nil) then
+		return 0
+	end
+	local alive_produced = PBG_GetCount(s_selfplayer, pbg)
+	
+	return alive_produced-- - being_produced
+end
+
+-- Returns the number of alive and in production (task is ON)
+-- This is often used when looking at units/upgrades for purchasing a different unit (eg. build barracks if we have zero quartermasters alive or being produced)
+function UtilPBG_CountAliveOrProduced(pbg)
+
+	if (pbg == nil) then
+		return 0
+	end
+	local alive_produced = PBG_GetCount(s_selfplayer, pbg)
+	local being_produced = Task_CountActivePBG(s_selfplayer, pbg, true)
+	
+	return alive_produced + being_produced
+end
+
+-- Returns only the units that are being requested at this time but not in production (are OFF)
+function UtilPBG_CountBeingRequested(pbg)
+
+	if (pbg == nil) then
+		return 0
+	end
+	
+	local being_requested = Task_CountActivePBG(s_selfplayer, pbg, false)
+	
+	return being_requested
+end
+
+function UtilPBG_CountTotal(pbg)
+
+	if (pbg == nil) then
+		return 0
+	end
+	
+	local alive_produced = PBG_GetCount(s_selfplayer, pbg)
+	local all_tasks = Task_CountActivePBG(s_selfplayer, pbg, nil)
+	
+	return alive_produced + all_tasks
+end

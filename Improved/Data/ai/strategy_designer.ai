@@ -1,0 +1,123 @@
+import("util/demand.ai")
+
+s_designer_demand_enabled = false
+s_designer_demand_table = {}
+s_designer_class_pref = {}
+s_designer_anticlass_pref = {}
+s_designer_budget_weight = {}
+
+-- constants
+VALUE_PROMOTE_BUILD = 200000
+
+function CalcDesignerDemand()
+	
+	-- demand the one with the smallest demand value (we will increment value of each sbp that gets chosen)
+	local sbp
+	
+	local count=1
+	local sorttable = {}
+	for k,v in pairs(s_designer_demand_table) do
+		sorttable[count] = {k,v[1],v[2]}
+		count = count+1
+	end
+	
+	-- sort from lowest to highest
+	table.sort(sorttable, function(a,b) return a[2] < b[2] end)
+	
+	-- go through the list and choose the first unit we can produce
+	for k,v in pairs(sorttable) do
+		sbp = v[1]
+		--aitrace("DesignerPBG:"..BP_GetName(sbp).." Demand:"..v[2].." Inc:"..v[3])
+		if AIProduction_CanProduce(s_selfplayer, PITEM_Spawn, sbp, DEFAULT_HERO_ID) then
+			break
+		end
+	end
+	
+	--no wanted squads
+	if(sbp == nil) then
+		return
+	end
+	
+	--aitrace("CalcDesignerDemand:"..BP_GetName(sbp))
+	
+	-- you REALLY want to build this
+	SetSquadDemand(sbp, VALUE_PROMOTE_BUILD, PURCHASETYPE_SPAWN, DEFAULT_HERO_ID)
+	
+	return sbp
+end
+
+function DesignerDemandChosen(sbp)
+	-- increment after being chosen (could put this on an event upon success of build)
+	s_designer_demand_table[sbp][1] = s_designer_demand_table[sbp][1] + s_designer_demand_table[sbp][2]
+end
+
+function SetDesignerSquadDemand(pbg, starting_demand, increment)
+	-- can't use designer class preferences in this case
+	--self:ResetClassPreferences()
+	s_designer_demand_table[pbg] = { starting_demand, increment }
+	s_designer_demand_enabled = true
+end
+
+function ClearDesignerBuildDemand()
+	s_designer_demand_table = {}
+	s_designer_demand_enabled = false
+end
+
+function SetDesignerClassPreference(class_type, value)
+	s_designer_class_pref[class_type] = value
+	s_designer_demand_enabled = true
+end
+
+function SetDesignerAntiClassPreference(class_type, value)
+	s_designer_anticlass_pref[class_type] = value
+	s_designer_demand_enabled = true
+end
+
+function ClearDesignerPreferences()
+	s_designer_class_pref = {}
+	s_designer_anticlass_pref = {}
+	s_designer_demand_enabled = false
+end
+
+-- add the designer preferences to the overall class demand
+function AddDesignerPreferences()
+	--aitrace("Adding Designer Prefs")
+	for ck,cv in pairs(s_designer_class_pref) do
+		IncClassDemand(ck, cv)
+	end
+	for ack,acv in pairs(s_designer_anticlass_pref) do
+		IncAntiClassDemand(ack, acv)
+	end
+end
+
+function SetDesignerBudgetWeight(budgetname, weight)
+	if (ai_budget==nil or ai_budget.budget_list==nil) then
+		error("Budget system not initialized!")
+		return
+	end
+	if (ai_budget.budget_list[budgetname] == nil) then
+		error("Specified budget name does not exist:"..budgetname)
+		return
+	end
+	
+	s_designer_budget_weight[budgetname] = weight
+end
+
+function ClearDesignerBudgetWeights()
+	s_designer_budget_weight = {}
+end
+
+function ClearDesignerBudgetTotal(budgetname)
+	ai_budget:cleartotal(budgetname)
+end
+
+function ClearDesignerBudgetTotals()
+	ai_budget:clearall()
+end
+
+-- applies all the override budgets, done every frame when we recalculate the budgets
+function AddDesignerBudgetWeights()
+	for k,v in pairs(s_designer_budget_weight) do
+		ai_budget:setweight(k, v)
+	end
+end

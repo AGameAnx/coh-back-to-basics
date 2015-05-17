@@ -1,0 +1,51 @@
+-- tactic squad target filters
+--   return a squad, or nil
+
+function SquadTargetFilter_TrivialAccept(squad, target_squads)
+	return SGroup_GetSpawnedSquadAt(target_squads, 1)
+end
+
+function SquadTargetFilter_FirstEnemyHMG(squad, target_squads)
+	return get_first_enemy_hmg_squad(target_squads)	
+end
+
+function SquadTargetFilter_FirstEnemy(squad, target_squads)
+	return get_first_enemy_squad(target_squads)	
+end
+
+function SquadTargetFilter_FirstEnemyVehicle(squad, target_squads)
+	return get_first_enemy_squad_vehicle(target_squads)
+end
+
+function SquadTargetFilter_FirstEnemyNonVehicle(squad, target_squads)
+	return get_first_enemy_squad_filter(target_squads, is_not_vehicle)
+end
+
+function SquadTargetFilter_FirstFriendlyVehicle(squad, target_squads)
+	return get_first_friendly_squad_filter(target_squads, is_low_health_vehicle)
+end
+
+function SquadTargetFilter_FirstFriendlyVehicle_LowHealth(squad, target_squads)
+	return get_first_friendly_squad_filter(target_squads, is_low_health_vehicle)
+end
+
+function SquadTargetFilter_FirstFriendlyNonVehicle(squad, target_squads)
+	return get_first_friendly_squad_filter(target_squads, is_not_vehicle)
+end
+
+function SquadTargetFilter_FirstFriendlyVehicle_LowHealth_PE(squad, target_squads)
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+	
+	-- squad is in combat?
+	local squadincombat = Squad_IsAttacking(sim_squad, 5) or Squad_IsUnderAttack(sim_squad, 5)
+	if squadincombat then return nil end
+
+	local count = SGroup_CountSpawned(target_squads)
+	for i=1,count do
+		local target_squad = SGroup_GetSpawnedSquadAt(target_squads, i)
+		if is_friendly_squad(target_squad) and is_low_health_vehicle(target_squad) then
+			return target_squad
+		end
+	end
+	return nil
+end

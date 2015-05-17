@@ -1,0 +1,757 @@
+
+--
+-- This file is responsible for prioritizing and purchasing all units.
+--
+
+
+import("util/demand.ai")
+import("rules_unit_purchase.ai")
+
+strategy_unit_purchase = {}
+
+-- cache engineer demand for external access
+s_capturerMult = 1
+s_eta_unit_wait_time = 60
+s_reinforce_wait_time = 5
+k_reinforce_mult = 100
+k_manpowerFuelDemandScale = 5
+
+function strategy_unit_purchase.trace(msg)
+	local ticks = World_GetGameTime()
+	-- pipe this out also
+	msg = "[" .. ticks .. "]" .. msg
+
+	aitrace_ext("Unit_Purchase_Strategy", msg)
+	--CustomDebug.Print(msg)
+end
+
+function strategy_unit_purchase.trace_clear()
+	aitraceclear_ext("Unit_Purchase_Strategy")
+end
+
+function strategy_unit_purchase.init()
+	--print("strategy_unit_purchase.init")
+	
+	if s_current_race == TRACE_ALLIES then
+		s_unit_demand_offset_func = Allied_SpecialUnitDemand
+		s_unitability_demand_offset_func = Allied_SpecialUnitAbilityDemand
+		s_unit_purchase_limit = allied_purchase_limits
+	elseif s_current_race == TRACE_AXIS then
+		s_unit_demand_offset_func = Axis_SpecialUnitDemand
+		s_unitability_demand_offset_func = Axis_SpecialUnitAbilityDemand
+		s_unit_purchase_limit = axis_purchase_limits
+	elseif s_current_race == TRACE_AXIS_PANZER_ELITE then
+		s_unit_demand_offset_func = AxisPE_SpecialUnitDemand
+		s_unitability_demand_offset_func = AxisPE_SpecialUnitAbilityDemand
+		s_unit_purchase_limit = axis_pe_purchase_limits
+	elseif s_current_race == TRACE_ALLIES_COMMONWEALTH then
+		s_unit_demand_offset_func = AlliedCW_SpecialUnitDemand
+		s_unitability_demand_offset_func = AlliedCW_SpecialUnitAbilityDemand
+		s_unit_purchase_limit = allied_cw_purchase_limits
+	else
+		error("Player has invalid race "..s_current_race)
+	end
+	
+	-- stored off so this can be overriden by scar
+	strategy_unit_purchase.s_demand_variance = s_personality.demand_variance
+	s_eta_unit_wait_time = s_personality.eta_unit_wait_time
+end
+
+function AccumulateReinforceDemand(availableResources)
+	--strategy_unit_purchase.trace("   <AccumulateReinforceDemand>")
+	
+	--[[local squads = Player_GetSquads(s_self_modplayer)
+	for i=1,SGroup_CountSpawned(squads) do
+		local squad = SGroup_GetSpawnedSquadAt(squads, i)
+		Squad_CanInstantReinforceNow(squad)
+		Squad_HasProductionQueue(squad)
+		Squad_GetProductionQueueSize(squad)
+		if Squad_CanInstantReinforceNow(squad) and Squad_HasProductionQueue(squad) and Squad_GetProductionQueueSize(squad) < 3 then
+			local squadpbg = Squad_GetBlueprint(squad)
+			SetSquadDemand(squadpbg, k_reinforce_mult, PURCHASETYPE_REINFORCE, DEFAULT_HERO_ID)
+		end
+	end]]
+	
+	-- run through all the squads that need reinforcements and see if they could use
+	-- a reinforcement - or we can allocate money to them
+	if AIProduction_AnyReinforcementsNeeded(s_selfplayer) and Task_CountProduction(s_selfplayer, PITEM_SquadReinforce) < 2 then
+		local reinforcecount = AIProduction_GetReinforcementSquadCount(s_selfplayer)
+		--strategy_unit_purchase.trace("   Units needing reinforcement:"..reinforcecount)
+		for i=0, reinforcecount-1 do
+			local reinforce_cost = AIProduction_GetReinforcementSquadCostAt(s_selfplayer, i)
+			
+			--strategy_unit_purchase.trace("   ReinforceCost:"..res_to_str(reinforce_cost))
+			
+			local eta = GetETAFromCost(reinforce_cost, availableResources)
+			if eta <= s_reinforce_wait_time then
+				local reinforce_ratings = {}
+				local reinforce_anti_ratings = {}
+				for ci=0, k_unit_class_count-1 do
+					reinforce_ratings[ci] = AIProduction_GetReinforcementSquadClassRatingAt(s_selfplayer, i, ci)
+					reinforce_anti_ratings[ci] = AIProduction_GetReinforcementSquadAntiClassRatingAt(s_selfplayer, i, ci)
+				end
+				
+				-- determine the demand for this unit
+				local demand = CalcSquadDemandFromRating(reinforce_ratings, reinforce_anti_ratings)
+				--strategy_unit_purchase.trace("   Reinforce demand before:"..demand.." after:"..demand*k_reinforce_mult)
+				
+				local squadpbg = AIProduction_GetReinforcementSquadPBGAt(s_selfplayer, i)
+				
+				SetSquadDemand(squadpbg, demand*k_reinforce_mult, PURCHASETYPE_REINFORCE, DEFAULT_HERO_ID)
+			end
+			
+		end
+	--else
+		--strategy_unit_purchase.trace("   Cannot reinforce right now. Reinforce task already exist or no squad to reinforce.")
+	end
+	
+	--strategy_unit_purchase.trace("   </AccumulateReinforceDemand>")
+end
+
+function CalculateSquadDemand(buildtype, availableResources)
+	--logPrint('--------------------------------------------------------------------------------')
+	--logPrint("Calculating Squad Demand")
+	--logPrint("")
+	
+	if buildtype == PITEM_Spawn then
+		--logPrint("  [PURCHASETYPE_SPAWN]")
+		purchasetype = PURCHASETYPE_SPAWN
+	elseif buildtype == PITEM_SpawnHero then
+		--logPrint("  [PURCHASETYPE_SPAWNHERO]")
+		purchasetype = PURCHASETYPE_SPAWNHERO
+	end
+	
+	local curResources = AIResource_GetCurrentResources(s_selfplayer)
+	local resRate = AIResource_GetCurrentResourceRate(s_selfplayer)
+	
+	-- go through each buildable squad for this AI and determine what its demand is given
+	-- this AIs class/anti-class needs are
+	local buildableTotal = AIProduction_GetProductionItemCount(s_selfplayer, buildtype)
+	for i=0, buildableTotal-1 do
+		local pbg = AIProduction_GetProductionItemPBGAt(s_selfplayer, buildtype, i)
+		local id = AIProduction_GetProductionItemIDAt(s_selfplayer, buildtype, i)
+		
+		local unitCost
+		if purchasetype==PURCHASETYPE_SPAWN then
+			unitCost = SquadStats_GetCost(s_self_modplayer, pbg, DEFAULT_HERO_ID)
+		elseif purchasetype==PURCHASETYPE_SPAWNHERO then
+			unitCost = SquadStats_GetCost(s_self_modplayer, pbg, id)
+		end
+		
+		--strategy_unit_purchase.trace("------")
+		-- if this unit is available then lets determine the demand for this unit
+		if AIProduction_CanProduce(s_selfplayer, buildtype, pbg, id) == true then
+			-- since we can produce this unit - lets determine this units demand
+			--logPrint(string.format("  [%s]", BP_GetName(pbg)))
+			
+			local class_rating = GetClassDemand(pbg)
+			--logPrint(string.format("    class_rating: %.2f", class_rating))
+			if class_rating < 0 then
+				return
+			end
+			
+			local demand = CalcSquadDemand(pbg)
+			if s_unit_demand_offset_func then
+				demand = demand + s_unit_demand_offset_func(pbg, demand)
+			end
+			
+			--logPrint(string.format("    demand: %.2f", demand))
+			if demand and demand >= -15 then
+				
+				-- ETA - how does the time factor into this unit
+				local eta, mpETA, fuelETA = GetUnitETA(pbg, id, availableResources)
+				
+				--strategy_unit_purchase.trace(string.format("   [%s]", BP_GetName(pbg)))
+				--strategy_unit_purchase.trace(string.format("   Demand:%.0f = ClassDmd:%.1f + AntiClsDmd:%.1f (Offset: %.0f, CapturerOffset: %.0f)", originalDemand, SquadClassDemand(pbg), SquadAntiClassDemand(pbg), demandoffset, capturerDemand))
+				
+				--local anti_class_demand_str = "AntiClassRating: |"
+				--for class = 0, k_unit_class_count - 1 do
+				--	anti_class_demand_str = anti_class_demand_str..string.format("%.1f|", SquadStats_GetAntiClassRating(pbg, class))
+				--end
+				--strategy_unit_purchase.trace(string.format("   ClassRating: %.1f ClassDemand: %.1f", SquadStats_GetClassRating(pbg), GetClassDemand(SquadStats_GetClass(pbg)))..anti_class_demand_str)
+				--strategy_unit_purchase.trace(string.format("   ETA:%.0f/%.0f MP-ETA:%.0f Fuel-ETA:%.0f", eta, s_eta_unit_wait_time, mpETA, fuelETA))
+				
+				local curAmount = UtilPBG_CountTotal(pbg)
+				local pbgid = BP_GetID(pbg)
+				
+				if not (s_unit_purchase_limit and s_unit_purchase_limit[ pbgid ] and curAmount >= s_unit_purchase_limit[ pbgid ]) then
+					local demandmult = 1
+					
+					-- add capturer demand (only if pbg can capture NOW)
+					if (PBG_CanCapture(s_selfplayer, pbg)) then
+						demandmult = demandmult * GetCapturerDemandMult()
+					end
+					
+					-- demand multiplier for reducing demand the more of the same unit that the player already have
+					demandmult = demandmult / math.sqrt(curAmount+1)
+					
+					-- s_eta_unit_wait_time is 0 when an unit is already being produced in the next frame
+					if eta > s_eta_unit_wait_time then
+						demandmult = demandmult * 0.45
+					elseif eta == 0 then
+						demandmult = demandmult * 1.15
+					end
+					
+					if demand >= 0 then
+						demand = demand * demandmult
+					else
+						demand = demand / demandmult
+					end
+					--strategy_unit_purchase.trace(string.format("   FinalDemand:%.0f (demand mult:%.3f)", demand, demandmult))
+					
+					if curResources.manpower > 100 and curResources.fuel > 10 then
+						if unitCost.fuel <= 5 then
+							demand = demand + k_manpowerFuelDemandScale * (math.sqrt(math.max(curResources.manpower/math.max(curResources.fuel, 0.1)*s_personality.unit_good_manpower_ratio_modifier, 0.5)) - 0.5)
+						else
+							demand = demand + k_manpowerFuelDemandScale * (math.sqrt(math.max(curResources.fuel/math.max(curResources.manpower, 0.1)*s_personality.unit_good_fuel_ratio_modifier, 0.5)) - 0.5)
+						end
+					end
+					
+					--logPrint(string.format("    FinalDemand: %.0f (demand mult: %.3f)", demand, demandmult))
+					SetSquadDemand(pbg, demand, purchasetype, id)
+				end
+			else
+				if not demand then
+					--logPrint("   Demand: false")
+				else
+					--logPrint(string.format("    LowDemand: %.0f", demand))
+				end
+			end
+		else
+			--logPrint(string.format("   [%s]", BP_GetName(pbg)))
+			--logPrint("   CAN_NOT_PRODUCE")
+		end
+		
+	end
+end
+
+function AccumulateDemand(availableResources, reinforce_only)
+	--strategy_unit_purchase.trace("------------------------------------")
+	--strategy_unit_purchase.trace("<AccumulateDemand>")
+	
+	-- check popcaps - if we are too high then no need to demand anything at all
+	--
+	local curpopcap = AIResource_GetCurrentPopulation(s_selfplayer, CT_Personnel)
+	local maxpopcap = AIResource_GetMaxPopulation(s_selfplayer, CT_Personnel)
+	
+	-- do reinforcement demand
+	AccumulateReinforceDemand(availableResources)
+	
+	-- since we are asked to only do reinforcements - skip the rest
+	if (reinforce_only) then
+		--strategy_unit_purchase.trace("Stop short because of reinforce_only flag")
+		return
+	end
+	
+	if curpopcap >= maxpopcap then
+		--strategy_unit_purchase.trace("Reached popcap - cannot produce units")
+		return
+	end
+	
+	-- do squad demand
+	--CustomDebug.Clear()
+	CalculateSquadDemand(PITEM_Spawn, availableResources)
+	CalculateSquadDemand(PITEM_SpawnHero, availableResources)
+	
+	-- List of all available player abilities
+	-- s_player_ability_list (defined in player_ability_defs.ai)
+	--   .munition_abilities - all the munition based abilities
+	--   .production_abilities - all the unit-purchase abilities
+	
+	--strategy_unit_purchase.trace("  <ProductionAbilities>")
+	
+	if s_player_ability_list and s_player_ability_list.production_abilities then
+		local tcount = table.getn(s_player_ability_list.munition_abilities)
+		--strategy_unit_purchase.trace("PlayerMunitionAbilityCount:"..tcount)
+	
+		tcount = table.getn(s_player_ability_list.production_abilities)
+		--strategy_unit_purchase.trace("PlayerProductionAbilityCount:"..tcount)
+		
+		if s_playerabilities_enabled and tcount > 0 then
+			-- go through each and determine the demands for each of the abilities
+			for k,abilityPBG in pairs(s_player_ability_list.production_abilities) do
+				--strategy_unit_purchase.trace("CheckingCanCast:"..BP_GetName(abilityPBG))
+				
+				if AIPlayer_CanPlayerCastAbility(s_selfplayer, abilityPBG) then
+					--strategy_unit_purchase.trace("  CanCast, now checking Demand...")
+					--strategy_unit_purchase.trace("  >>>>>--------------------------")
+	
+					local class_rating = {}
+					local anti_class_rating = {}
+					for classid=0, k_unit_class_count-1 do
+						class_rating[classid] = AIAbility_GetClassRating(abilityPBG, classid)
+						anti_class_rating[classid] = AIAbility_GetAntiClassRating(abilityPBG, classid)
+					end
+					
+					local demand = CalcSquadDemandFromRating(class_rating, anti_class_rating)
+					
+					local demandoffset = 0
+					if s_unitability_demand_offset_func then
+						demandoffset = s_unitability_demand_offset_func(abilityPBG, demand)
+						--strategy_unit_purchase.trace("unitability demand offset:"..demandoffset)
+					end
+					
+					local cost = AIAbility_GetCost(s_self_modplayer, abilityPBG)
+					
+					demand = demand + demandoffset
+					local eta = GetETAFromCost(cost, availableResources)
+					if eta > s_eta_unit_wait_time then
+						demand = demand * 0.45
+					end
+					--strategy_unit_purchase.trace(BP_GetName(abilityPBG).." Demand:"..math.floor(demand).." ETA:"..eta)
+					if demand>=0 then
+						SetSquadDemand(abilityPBG, demand, PURCHASETYPE_ABILITY, DEFAULT_HERO_ID)
+					end
+				end
+			end
+		end
+	end
+	
+end
+
+function CalcCapturerDemand()
+	--strategy_unit_purchase.trace("------------------------------------")
+	--strategy_unit_purchase.trace("<CalcCapturerDemand>")
+	
+	s_capturerMult = 1
+	
+	-- only ask for capture demand increases when we have are not losing by a ton
+	--if (cache.military_value > 15 and cache.military_percent_value < -0.3) then
+	--	strategy_unit_purchase.trace("Losing: giving no capturer mults")
+	--	return
+	--end
+	
+	local ptsWanted = s_capture_pts_wanted - Task_CountActive(s_selfplayer, TASK_Capture, false)
+	--strategy_unit_purchase.trace("PtsWanted(from resourcing):"..ptsWanted)
+
+	local curCapturers = AIResource_GetNumCapturers(s_selfplayer)
+	-- also need to know how many we have requested for
+	local capturerRequests = Task_CountCapturerPBG(s_selfplayer)
+	-- total capturers + requested
+	local totalCapturers = capturerRequests + curCapturers;
+	--strategy_unit_purchase.trace("Capturers: Cur:"..curCapturers.." Req:"..capturerRequests.." Total:"..totalCapturers)
+	
+	-- don't ask for more capturers then there are ptsWanted
+	local trueCapturerDemand = math.max(ptsWanted - totalCapturers, 0)
+	
+	--strategy_unit_purchase.trace("CapturerNeed:"..trueCapturerDemand)
+	if trueCapturerDemand <= 0 then
+		return
+	end
+	
+	-- this is default number we should aim for
+	local minCapturers = 1
+	local wantedCapturers = 2
+	local maxCapturers = 3
+	
+	if totalCapturers >= maxCapturers then
+		return -- early out
+	end
+	
+	-- 1. check if our base is under attack if we are the demands will change based on the attack
+	if cache.threat_at_base > 5 then
+		minCapturers = 0
+		wantedCapturers = 0
+		maxCapturers = 1
+	end
+	
+	local bonusdemand = trueCapturerDemand/40  -- adds .1 for every 4 more pts we want
+	--strategy_unit_purchase.trace("BonusDemandMult:"..bonusdemand)
+	local demand = 0
+	if totalCapturers  < minCapturers then
+		demand = 1.3 + bonusdemand
+	elseif totalCapturers < wantedCapturers then
+		demand = 1.2 + bonusdemand
+	elseif totalCapturers < maxCapturers then
+		demand = 1.1
+	end
+	
+	s_capturerMult = demand
+	--strategy_unit_purchase.trace("Capturer Demand Mult:"..demand)
+end
+
+function GetCapturerDemandMult()
+	return s_capturerMult
+end
+
+------------------------------------------------------
+-- Calculate the time we will wait for a unit we
+-- really want (sometimes we just don't have the time
+-- or the funds to get what we want)
+--
+function CalculateUnitETA(purchase_count)
+	--strategy_unit_purchase.trace("------------------------------------")
+	--strategy_unit_purchase.trace("<CalcUnitETA>")
+	
+	local offset_eta = 0
+	
+	-- if we have some military units then we have some safe-guard so we can increase
+	-- it slightly
+	if cache.military_non_engineer_count > 3 then
+		offset_eta = offset_eta + (cache.military_non_engineer_count-3)*5
+	end
+	-- if we have spawners (tech) then increase of wait time
+	if cache.spawner_tier1_count > 0 then
+		offset_eta = offset_eta + 5
+	end
+	if cache.spawner_tier2_count > 0 then
+		offset_eta = offset_eta + 7
+	end
+	
+	-- get the base rate from the personality file
+	s_eta_unit_wait_time = math.max(s_personality.eta_unit_wait_time + offset_eta, 0)
+	
+	--CustomDebug.Print(string.format("  max eta: %ds (def: %d, offset: %d)", s_eta_unit_wait_time, s_personality.eta_unit_wait_time, offset_eta))
+end
+
+function GetETAFromChoice(choice_entry, availableResources)
+	if choice_entry[3] == PURCHASETYPE_SPAWN or choice_entry[3] == PURCHASETYPE_SPAWNHERO then
+		return GetUnitETA(choice_entry[1], choice_entry[2], availableResources)
+	elseif choice_entry[3] == PURCHASETYPE_ABILITY then
+		local cost = AIAbility_GetCost(s_self_modplayer, choice_entry[1])
+		return GetETAFromCost(cost, availableResources)
+	end
+	
+	return 0
+	-- reinforcements ETA?
+end
+
+-- takes a table filled with chosen units, and this picks
+function ChooseBestAvailableUnitFromList(sorted_choices, availableResources)
+	--strategy_unit_purchase.trace("------------------------------------")
+	--strategy_unit_purchase.trace("<ChooseBestAvailableUnitFromList>")
+	
+	if sorted_choices==nil then
+		--strategy_unit_purchase.trace("Nothing to purchase!")
+		return nil
+	end
+	
+	local num_choices = table.getn(sorted_choices)
+	--strategy_unit_purchase.trace("Num Choices:"..num_choices)
+	
+	local sumDemand = 0
+	
+	-- debug display the sorted list
+	for k,v in pairs(sorted_choices) do
+		-- get this choice
+		local choice = sorted_choices[ k ]
+		
+		-- set readable vars
+		local pbg, id, demand, purchase_type = choice[1], choice[2], choice[3], choice[4]
+		
+		-- show the list
+		--strategy_unit_purchase.trace(string.format("   %d. [%s] Dmd:%.0f", k, BP_GetName(pbg), demand))
+	
+		-- add up all demands
+		sumDemand = sumDemand + demand
+	end
+	
+	if num_choices == 0 then
+		--strategy_unit_purchase.trace("Nothing to purchase!")
+		return nil
+	end
+	
+	local found_valid = false
+	-- initialize the best choice as the first one
+	local best_choice = sorted_choices[1]
+
+	local selection_count = 0
+	
+	-- only want to try and select up to 5 times for a best unit to build
+	while selection_count < 5 do
+		--
+		selection_count = selection_count + 1
+		--
+		local randDemand = AI_RandRange(0, sumDemand)
+		local curDemand = 0
+		local current_choice = 1
+	
+		--strategy_unit_purchase.trace(string.format("Selection[%d] sumDemand: %.1f randDemand: %.1f", selection_count, sumDemand, randDemand))
+	
+		for k,v in pairs(sorted_choices) do
+			-- get this choice
+			local choice = sorted_choices[ k ]
+			
+			-- set readable vars
+			local pbg, id, demand, purchase_type = choice[1], choice[2], choice[3], choice[4]
+
+			--
+			curDemand = curDemand + demand
+			
+			if curDemand > randDemand then
+				current_choice = k
+				--strategy_unit_purchase.trace("Trying choice: "..current_choice.." "..BP_GetName(pbg))
+				break
+			end
+		end
+		
+		-- get this choice
+		local choice = sorted_choices[ current_choice ]
+		
+		-- if requested, see if this item can be built immediately
+		local passedETATest = true
+		
+		if availableResources then
+			local eta = GetETAFromChoice(choice, availableResources)
+			if eta==nil or eta>0 then
+				passedETATest = false
+			end
+		end
+		
+		if passedETATest then
+			local prevReq = 0
+			-- look at pbgs that need a spawner
+			if choice[3] == PURCHASETYPE_SPAWN then
+				-- see if this choice is available
+				prevReq = PBG_GetNumRequestsForProducer(s_selfplayer, PITEM_Spawn, choice[1], choice[2])
+			elseif choice[3] == PURCHASETYPE_SPAWNHERO then
+				-- see if this choice is available
+				prevReq = PBG_GetNumRequestsForProducer(s_selfplayer, PITEM_SpawnHero, choice[1], choice[2])
+			end
+			
+			--strategy_unit_purchase.trace("Trying to purchase "..BP_GetName(choice[1]).."! Available:"..prevReq)
+			
+			-- if this choice has a place to be built, then lets build it
+			if prevReq==0 then
+				--strategy_unit_purchase.trace("Chose a free unit, index:"..current_choice)
+				best_choice = choice
+				found_valid = true
+				break
+			end
+		end
+	end
+	
+	return best_choice, found_valid
+end
+
+function FindZeroETAUnit(availableResources)
+	--strategy_unit_purchase.trace("------------------------------------")
+	--strategy_unit_purchase.trace("<FindZeroETAUnit>")
+	
+	-- generate a request for this unit if can be built
+	local sorted_choices = HighestSquadDemand(0.5)
+	
+	-- runs through the list of demanded units and finds one that can be built (not checking money)
+	local best_choice, is_valid = ChooseBestAvailableUnitFromList(sorted_choices, availableResources)
+	
+	-- see if found anything
+	if best_choice==nil or is_valid==false then
+		return
+	end
+	
+	return best_choice
+end
+
+function TryPurchaseUnitChoice(best_choice, availableResources)	
+	--strategy_unit_purchase.trace("------------------------------------")
+	
+	-- set readable vars
+	local pbg, id, demand, purchase_type = best_choice[1], best_choice[2], best_choice[3], best_choice[4]
+	if pbg then
+		--strategy_unit_purchase.trace("Highest demand:"..BP_GetName(pbg))
+		local unitCost
+		if purchase_type == nil then
+			error("PURCHASE TYPE HAS NOT BEEN DEFINED!! "..BP_GetName(pbg))
+		end
+		
+		if purchase_type==PURCHASETYPE_SPAWN then
+			unitCost = SquadStats_GetCost(s_self_modplayer, pbg, DEFAULT_HERO_ID)
+		elseif purchase_type==PURCHASETYPE_SPAWNHERO then
+			unitCost = SquadStats_GetCost(s_self_modplayer, pbg, id)
+		elseif purchase_type==PURCHASETYPE_ABILITY then
+			unitCost = AIAbility_GetCost(s_self_modplayer, pbg)
+		elseif purchase_type==PURCHASETYPE_REINFORCE then
+			unitCost = AIPlayer_GetProductionCost(s_self_modplayer, PITEM_SquadReinforce, pbg)
+		end
+		
+		-- determine if this can purchase this item
+		if not ResourceAmount_Has(availableResources, unitCost) then
+			--strategy_unit_purchase.trace("Stalling because of lack of moola("..BP_GetName(pbg)..") Demand:"..demand)
+			--strategy_unit_purchase.trace("Unit Cost: "..res_to_str(unitCost))
+			--strategy_unit_purchase.trace("Available Res: "..res_to_str(availableResources))
+			return false, unitCost
+		end
+		
+		-- do the following checks for ability spawned units
+		if purchase_type==PURCHASETYPE_ABILITY then
+			-- count number of abilities inactive
+			local taskCount = Task_CountActive(s_selfplayer, TASK_PlayerAbility, false)
+			-- only request one of these at a time
+			if taskCount>0 then
+				--strategy_unit_purchase.trace("PlayerAbility had already been purchased, skipping!")
+				return false, unitCost
+			end
+			
+			--strategy_unit_purchase.trace("Producing an ability-based unit("..BP_GetName(pbg)..") Demand:"..demand)
+			-- cast this ability which creates a request
+			
+			local casted = PlayerAbility_Cast(pbg)
+			return casted, unitCost
+		elseif purchase_type==PURCHASETYPE_REINFORCE then
+			
+			Request_Production(s_selfplayer, TGROUP_BuildUnits, TPRIORITY_BuildUnits+50, PITEM_SquadReinforce, pbg, DEFAULT_HERO_ID)
+			
+		elseif purchase_type==PURCHASETYPE_SPAWN then
+			-- get the number of producers available (with considering requests/queues) for the given pbg
+			local prevReq = PBG_GetNumRequestsForProducer(s_selfplayer, PITEM_Spawn, pbg, id)
+			
+			--strategy_unit_purchase.trace("MinimumFullChannels:"..prevReq)
+		
+			-- if there are no channels open - then stall this request
+			if prevReq > 0 then
+				--strategy_unit_purchase.trace("Stalling unitbuild because of lack of production channels("..BP_GetName(pbg)..") Demand:"..demand)
+				return false, unitCost
+			end
+	
+			--strategy_unit_purchase.trace("Producing a unit("..BP_GetName(pbg)..") Demand:"..demand)
+			Request_Production(s_selfplayer, TGROUP_BuildUnits, TPRIORITY_BuildUnits, PITEM_Spawn, pbg, 0)
+			--print("UnitPurchase: Produce:"..BP_GetName(pbg) )
+		elseif purchase_type==PURCHASETYPE_SPAWNHERO then
+			-- get the number of producers available (with considering requests/queues) for the given pbg
+			local prevReq = PBG_GetNumRequestsForProducer(s_selfplayer, PITEM_SpawnHero, pbg, id)
+			
+			--strategy_unit_purchase.trace("MinimumFullChannels:"..prevReq)
+			--strategy_unit_purchase.trace("Hero ID:"..id)
+		
+			-- if there are no channels open - then stall this request
+			if prevReq > 0 then
+				--strategy_unit_purchase.trace("Stalling unit build because of lack of production channels("..BP_GetName(pbg)..") Demand:"..demand)
+				return false, unitCost
+			end
+			
+			--strategy_unit_purchase.trace("Producing a unit("..BP_GetName(pbg)..") Demand:"..demand)
+			Request_Production(s_selfplayer, TGROUP_BuildUnits, TPRIORITY_BuildUnits, PITEM_SpawnHero, pbg, id)
+			--print("UnitPurchase: Produce:"..BP_GetName(pbg) )
+		end
+		
+		if s_designer_squad_chosen then
+			DesignerDemandChosen(s_designer_squad_chosen)
+		end
+		
+		return true, unitCost
+	end
+	return false, nil
+end
+
+-- purchase_count - is the number of times this frame we have purchased units (for when we have lots of money)
+function strategy_unit_purchase.do_purchase(availableResources, purchase_count)
+	--strategy_unit_purchase.trace_clear()
+	
+	--CustomDebug.Clear()
+	--CustomDebug.Print("Purchasing units...")
+	
+	-- check to see if this is enabled
+	if s_components[COMPONENT_BuildUnits]==false then
+		--strategy_unit_purchase.trace("SKIPPING - Build-Unit-Strategy COMPONENT")
+		--CustomDebug.Print("SKIPPING - Build-Unit-Strategy COMPONENT")
+		return false, nil
+	end
+	
+	AIProfile_Marker("AIUnitPurchase")
+	
+	GetPlayerSquadAndEntityCountsPreCache()
+	
+	local reinforce_only = false
+	-- is unit purchasing disabled because the AI has too many units? (check for engineers just in case)
+	if s_designer_demand_enabled == false and state_analysis.enable_military_unit_building==false then
+		--strategy_unit_purchase.trace("AI Has Too Many Units As Per Difficulty Level - REINFORCE ONLY")
+		reinforce_only = true
+	end
+	
+	--strategy_unit_purchase.trace("<availableResources> ResAvail: "..res_to_str(availableResources))
+	
+	if true == AI_IsMODCoHO() then
+		-- update player ability table (really this should sit somewhere that only ran once)
+		local commanderTree = AIPlayer_GetCOHOCommanderTree(s_self_modplayer)
+		--strategy_unit_purchase.trace("<PlayerAbilities> commander tree: "..commanderTree)
+	
+		--if (s_current_race == TRACE_AXIS) then
+		--	strategy_unit_purchase.trace("<PlayerAbilities> axis")
+		--else
+		--	strategy_unit_purchase.trace("<PlayerAbilities> allied")
+		--end
+	
+		s_player_ability_list = GetPlayerAbilityTable(s_current_race, commanderTree)
+	
+		if s_player_ability_list ~= nil then
+			local tcount = table.getn(s_player_ability_list.munition_abilities)
+			--strategy_unit_purchase.trace("   PlayerMunitionAbilityCount:"..tcount)	
+			
+			tcount = table.getn(s_player_ability_list.production_abilities)
+			--strategy_unit_purchase.trace("   PlayerProductionAbilityCount:"..tcount)	
+		end
+	end
+	
+	-- this determines the amount of time we will wait for the next best unit
+	CalculateUnitETA(purchase_count)
+	
+	-- reset the demand system - since we are going to start all over again
+	ResetDemand()
+	
+	-- if designer demand is enabled, we will use the values they have set
+	if s_designer_demand_enabled==true then
+		--strategy_unit_purchase.trace("<Designer Demand Enabled>")
+		
+		s_designer_squad_chosen = CalcDesignerDemand()
+		-- get info from designers/scar to determine the demand of units
+		-- if this returns nil, try the designer preferences
+		if (s_designer_squad_chosen==nil) then
+			-- this adds any designer preferences there are (for SP)
+			AddDesignerPreferences()
+			AccumulateDemand(availableResources)
+		end
+	else
+		--strategy_unit_purchase.trace("   ...Calculating demand from game-stateS")
+		
+		-- calculate demand based on the world state
+		Demand_UpdateAIClassRatings()
+		-- calc capturing and engineer demand values
+		CalcCapturerDemand()
+		-- this adds any designer preferences there are (for SP)
+		AddDesignerPreferences()
+		-- take all the demands (class, anti-class, preferences) and set the demand per squad
+		AccumulateDemand(availableResources, reinforce_only)
+	end
+	
+	--strategy_unit_purchase.trace("------------------------------------")
+	
+	-- generate a request for this unit if can be built
+	local sorted_choices = HighestSquadDemand(strategy_unit_purchase.s_demand_variance)
+	
+	-- runs through the list of demanded units and finds one that can be built (not checking money)
+	local best_choice = ChooseBestAvailableUnitFromList(sorted_choices)
+	
+	-- see if found anything
+	if best_choice==nil then
+		--CustomDebug.Print("  No best choice available!")
+		return false, nil
+	end
+	
+	--CustomDebug.Print(string.format("  best choice: [%s]", BP_GetName(best_choice[1])))
+	
+	-- tries to purchase the best choice, if not it locks the resources anyways
+	local purchased, cost = TryPurchaseUnitChoice(best_choice, availableResources)
+	--if cost then
+	--	CustomDebug.Print(string.format("  purchased: %s cost: %s", tostring(purchased), res_to_str(cost)))
+	--end
+	
+	-- if we didn't purchase anything but locked some money, and we have excess money, see if we can
+	-- buy anything with the leftovers
+	if purchased==false and cost then
+		--CustomDebug.Print("  > Trying to use up excess manpower")
+		local modifiedRes = ResourceAmount_Subtract(availableResources, cost)
+		if modifiedRes.manpower > 25 then
+			local best_choise = FindZeroETAUnit(modifiedRes)
+			--CustomDebug.Print(string.format("    zero eta best choice: [%s]", BP_GetName(best_choice[1])))
+			-- tries to purchase the best choice, if not it locks the resources anyways
+			local eta_purchase, eta_cost = TryPurchaseUnitChoice(best_choice, modifiedRes)
+			if eta_purchase and eta_cost then
+				local total_cost = ResourceAmount_Add(cost, eta_cost)
+				--CustomDebug.Print(string.format("    purchased zero eta. Total cost: [%s]", res_to_str(total_cost)))
+				return false, total_cost
+			end
+		end
+	end
+	
+	return purchased, cost
+end

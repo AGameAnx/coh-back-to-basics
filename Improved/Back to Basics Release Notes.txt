@@ -1,0 +1,1958 @@
+-------------------------------------------------------------
+Back to Basics v4.0
+-------------------------------------------------------------
+
+Global Balance Changes:
+- Significant changes made to tank, antitank and infantry antitank scatter. Ballistic weapon misses will look more realistic as opposed to firing far off target when the shot misses.
+- Significant fixes made to area of effect damage related to area of effect "accuracy". Previously there was a potential to not apply area of effect damage even on minimum radius. Area of effect will now always be applied correctly.
+- Area of effect damage and penetration profiles tuned down to make area of effect weapon effectiveness work as intended after the area of effect "accuracy" fix.
+- Tank area of effect profiles redone to make them less reliant on direct impacts and more on area of effect damage. This is also a change that works because and is highly related to scatter changes.
+- Anti-blob radius decreased from 10 to 6. The radius worked differently than originally expected, creating a bigger aura than intended.
+- Anti-blob should no longer affect squads who are inside of buildings, bunkers and halftracks. This does not include trenches.
+- Anti-Blob rebalanced; it gives a received suppression of 1.1, received accuracy of 1.02 and weapon accuracy of 0.925.
+- Significantly increased light cover effectiveness.
+- Slightly increased heavy cover effectiveness.
+- Starting resources increased.
+- Manpower income from HQs decreased.
+- Income from manpower points significantly decreased.
+- Removed manpower income from munition and fuel points.
+- Victory Point Control possibilities changed from 250/500/1000 to 500/650/800.
+- Fuel and Munition strategic point capture time redone:
+ * High 40s/35s -> 25s/20s
+ * Medium 30s/25s -> 20s/15s
+ * Low 20s/15s -> 15s/10s
+- Manpower strategic point revert time reduced from 15s to 10s
+- Mortar area of effect profile changes increasing their consistency:
+ * Reduced lethal range AoE damage radius.
+ * Reduced medium range AoE damage and radius.
+ * Increased maximum range AoE damage and radius.
+- Mortar Shell trajectory slightly improved.
+- Mortar effectiveness against bunkers doubled.
+- Heavy machine gun effectiveness vs suppressed units reduced.
+- Heavy machine gun teardown and setup times reduced.
+- Bolt-action and semi-automatic rifle range decreased from 53 to 42, and range table adjusted to 9/20/30/40.
+- Sub machine gun and assault rifle range table adjusted to 5/15/23/32.
+- Moving accuracy penalty of all small arms weapons decreased and normalized from 0.3-0.75 to 0.8.
+- Normalized min/max small arms damage. We felt that damage was too inconsistent, creating for very random performance of most weapons. Weapons should feel much more reliable in their prefered combat situations.
+- Sniper rifle range decreased from 63 to 48, and increased the cooldown between each shot from 8.5 to 9 seconds. Sniper Spam was a serious problem when playing pvp - being too cost-effective and too easily capable of hardcountering any infantry squad, Sniper Rifles have seen a decrease in rate of fire and now require to be closer to the action.
+- Units that have a camouflage ability will no longer receive a movement buff during camouflage once achieving a certain veterancy rank.
+- Fixed the range tables of all 20mm guns, to fall in line with the regular standard; the old range tables made the weapons unintendedly inconsistent on certain ranges. Now there is a consistent damage drop off on larger ranges.
+- Maximum population cap for all armies is now set to 125.
+- Base population cap for all armies increased by 10.
+- Demolition charges recharge time increased from 10 to 25 seconds.
+- Demolition charges munition cost decreased from 50 to 35. Due to the nature of Demolition Charges being difficult to use, there was no reason the cost was so steep.
+- Demolition charges damage multiplier against all building types increased from 1 to 1.5.
+- Goliath damage and area of effect tables equalized to demolition charges.
+- Hand-held infantry anti-tank weapons (Panzerschreck, M9 bazooka, M18 recoilless rifle and PIAT) target tables normalized.
+- Hand-held infantry anti-tank weapon reloading times standardized: Panzerschreck, bazooka and recoilless rifle reload now takes 8 seconds and PIAT reloads 7 seconds.
+- Reworked fuel upkeep to the values that were intended:
+ * King Tiger fuel upkeep increased from 0 to 6 per minute.
+ * Tiger fuel upkeep increased from 0 to 5 per minute.
+ * Panther, Jagdpanther, Churchill and M26 Pershing fuel upkeep increased from 0 to 4 per minute.
+ * Shermans, Panzer IV's, Cromwell, Firefly, Priest, Hummel, Ostwind, Wirblewind, Hetzer, Sturmgeschütz IV and Sturmhaubitze 42 fuel upkeep increased from 0 to 3 per minute.
+ * M10 Wolverine, M36 Jackson, M18 Hellcat, Marder III, Geschützwagen and Nashorn fuel upkeep increased from 0 to 2 per minute.
+ * M8 Greyhound, Sd.Kfz. 234 Puma, Hotckiss, Armored Car, Reconnaissance Halftrack, T17, Staghound, Kangaroo, Tetrach and Stuart fuel upkeep increased from 0 to 1 per minute.
+- Weapon crews inside emplacements received damage decreased by 50%.
+- Grenade recharge time increased from 15 to 20 seconds.
+- Grenade throwing range decreased from 25 to 20. The reason behind this is that it was too easy to use grenades in all situations, decreasing the effect of cover and defensive positions.
+- Fixed a bug where some grenade types would not be thrown at the combat slots of buildings; making them unreliable against larger building types.
+- Most infantry abilities can no longer be used once the squad is pinned, exceptions are for example Fire-Up, Assault and Sprint.
+- Medic Station Medics health decreased from 142 to 110.
+- Heroic Infantry armor now decreases received suppression by 20% as opposed to 50%.
+- Completely reworked critical hits to tanks:
+ *Frontal Armor Hits:
+  #100-40% hitpoints: 100% none
+  #40-5% hitpoints: 40% none 42% engine damage 10% detrack 8% gun damage
+  #5-0% hitpoints: 75% vehicle destroyed 25% out of control
+ *Rear Armor Hits:
+  #100-40% hitpoints: 90% none 10% engine damage
+  #40-5% hitpoints: 20% none 50% engine damage 15% engine destroyed 15% detrack
+  #5-0% hitpoints: 75% vehicle destroyed 25% out of control
+- Tracked down and fixed the remaining situations where the 5% health bug would appear.
+- Removed the Population Upkeep threshold for all nations, this value removed the upkeep of x amount of entities.
+- Panzerfaust base damage decreased from 275 to 200 and target tables fixed. The General performance versus vehicles should be like this:
+ *26% of a Sherman/Cromwell
+ *33% of a M10/M18/M36
+ *18% of a Pershing
+ *22% of a Churchill
+ *44% of a Stuart
+ *61%/41% of a M8/T17/Staghound
+ *53% of a M3 Halftrack
+ *86% of a Bren Carrier
+- The last member of any decrewed team weapon that can reinforce will now be killed. This is done to prevent team weapon duplicating exploit.
+- Significantly improved the effectiveness of Anti-Aircraft Weaponry, they are now much more capable of dealing with incoming aircraft. Multiple of these weapons can now have great air coverage, preventing air strikes from being called in near them.
+- Removed permanent 0.75 accuracy decrease due to how cover works from all vehicles.
+- Improved the way green cover works with vehicles.
+- Added light cover to hedgerows. This cover isn't directional, meaning that squads get an overall cover bonus when standing 'in' a hedgerow.
+- Decreased the time which infantry units need to go out of combat stance from 7 to 5 seconds.
+- Decreased the time which infantry units need to recover from suppression.
+- Added the missing 7th combat slot in slit trenches.
+- Decreased the impass area around the placement of buildings, making it easier to place all base buildings in smaller base sectors.
+- Normalized tank gun damage multipliers versus buildings and HQ trucks.
+- Grenades-type abilities can no longer be used while inside Halftracks.
+- All bridge hitpoints increased from 300 to 900.
+
+Commander Trees:
+
+- American Airborne Doctrine:
+ 	left: Paratroopers (3) > Paradropped Anti-Tank Gun (2) > Veteran Tactics (2)
+ 	right: Air Reconnaissance (1) > Strafing Run (2) > Thunderbolt 'Hellfire' Airstrike (3)
+ 	bottom: Glider Headquarters (3) > Supply Drops (2)
+
+- American Armor Company:
+	right: Raid (1) > War Machine (2) > Calliope (3)
+	left: Armored Infantry (2) > M4 'Assault' Sherman (3) > M36 Jackson Battlegroup (4)
+	bottom: Rapid Deployment (1) > Field Repairs (2)
+
+- Commonwealth Royal Canadian Artillery:
+	right: Supercharged Artillery Shells (2) > Counter Battery (2) > Ammunition Resupply (2)
+	left:  Canadian Infantry (2) > Mechanized Recon (2) > M7 Priest (4)
+	bottom: Forward Observation Officers (2) > Creeping Barrage (2)
+
+- Wehrmacht Defensive Doctrine:
+ 	left: Sturmpioneers (2) > Fortify the Perimeter (2) > 88mm FlaK 36 AT/AA (4)
+ 	right: For the Fatherland! (1) > Defensive Airburst Barrage (3) > 105mm leFH18 Howitzer (3)
+ 	bottom: Advanced Warning (1) > 280mm Rocket Artillery (2)
+
+- Panzer Elite Scorched Earth Tactics:
+	right: Scorched Earth (1) > Resource Redistribution (3) > Hummel (3)
+	left: Jägers (2) > Hetzer (3) > 88mm FlaK 36 Howitzer (2)
+	bottom: Demolition Experts (1) > Sector Artillery (3)
+
+- Panzer Elite Luftwaffe Tactics:
+	right: Luftwaffe Ground Forces (1) > Wirbelwind Flakpanzer (3) > 88mm FlaK 36 AT/AA (3)
+	left: Fallschirmjägers (3) > Rocket Run (2) > Henschel 'Panzerknacker' Overwatch (3)
+	bottom: Tank Awareness (1) > Butteryfly Bombs (2)
+
+- Panzer Elite Breakthrough Tactics:
+	right: Panzerfüsiliers (2) > APCR Shells (2) > Jagdpanther (4)
+	left: Situational Awareness (2) > Hotchkiss Light Tank (2) > Railway Artillery (2)
+	bottom: Teller Mines (1) > Infantry Anti-Tank Efforts (3)
+
+
+Graphics:
+- Redone nearly all weapon tracers.
+- Fixed some issues with new ground textures (mostly affects Langres).
+- Completely redone most of the in-game weapon craters.
+- Replaced the standard sandbag model with a higher detail version; this version is visually more appealing and looks good from all sides.
+- New explosion FX for the newly added Railway Artillery Barrage
+- New explosion FX for the Nebelwerfer and Walking Stuka.
+- Tank Gun explosion FX changed to better represent their caliber and explosive payload.
+
+User Interface and Language:
+- Added custom minimap symbols for Mortars and Medic type units.
+- Significantly improved descriptions of many units, upgrades and abilities.
+- Grenadier and Volksgrenadier icon and symbol improved to a higher quality (Volksgrenadiers are still the rank of Gefreiter, Grenadiers are the rank of Obergefreiter with multiple years of service).
+- Shocktroopers renamed to Panzerfüsiliers.
+- Panzerfüsiliers received new unit icon, symbol and portrait (their symbol is now the rank insignia of an Obergefreiter).
+- Gebirgsjägers renamed to Jägers, with new unit icon, symbol and portrait (the ones previously used for the Shocktroopers).
+- Opel Blitz Ambulance renamed to Ambulance.
+- Divert Supplies ability renamed to Radio Interception.
+- Airborne renamed to Paratroopers.
+- For the Fatherland received a new icon.
+- Command Squad symbol size decreased by around 25%.
+- Combat Medic symbol size decreased by around 50%.
+- Armored Infantry received a completely new unit icon, symbol and portrait (their symbol is now the rank insignia of a Corporal).
+- Fallschirmjäger symbol significantly improved.
+- Luftwaffe Ground Forces symbol placement fixed, to fit within the squad UI.
+- PIAT Commandos renamed to Tank Hunters.
+- Mortar Commandos renamed to Mortar Section.
+- HMG Commandos renamed to Heavy Machine Gun Team.
+- Panther 'Cuckoo' renamed to Panther.
+- Captured Panther Tank received a new call-in icon.
+- Highlanders received a new call-in icon.
+- Satchel Charge hotkey changed from L to S.
+- Airborne Assault Squad renamed to Pathfinders.
+- Pathfinders hotkey changed from A to P.
+- Waffen SS renamed to Obersoldaten.
+- Obersoldaten received new unit icon, symbol and portrait.
+- Knight's Cross Holders symbol improved.
+- Canadian Infantry received new unit icon, symbol and portrait.
+- Henschel Rocket Run received a new icon.
+
+Americans:
+- New Reward Unit: M18 Hellcat - Armed with the same M1A2 main gun, the M18 Hellcat is a more mobile but less armored tank destroyer than the M10 Wolverine. It can however be upgraded with a M2Hb .50cal Heavy Machine gun for increased effectiveness against infantry.
+- Sergeant default Weapon Damage Modifier towards infantry increased from 1.01 to 1.05. The Sergeant is quite an investment and we felt that it didn't fulfil its role properly against axis infantry-heavy tactics.
+- Browning .30cal Heavy Machine Sun Squad loadout redone:
+ * The crew now consists of 4 members.
+ * Each crew member costs 60 manpower as opposed to 80.
+ * Reinforce time reduced from 12 seconds to 7.5.
+- Browning .30cal Heavy Machine Gun arc of fire decreased from 120 to 100 degrees.
+- Significantly reduced combat medic healing effectiveness.
+- Machine Gun Emplacement arc of fire decreased from 120 degrees to 80 degrees.
+- Triage Center construction time decreased from 55 to 50 seconds.
+- Ranger upkeep increased from 2.4 to 2.5 manpower per minute per entity.
+- Decreased the amount of received manpower by Manpower Push from 800 to 500.
+- Command Squad Mortar Barrage salvo decreased from 10 to 8 shells.
+- Command Squad manpower cost decreased from 340 to 300.
+- Sergeant manpower cost reduced from 240 to 200.
+- Medic manpower cost increased from 120 to 150.
+- M8 Greyhound health increased from 240/360 to 260/390.
+- M8 Greyhound acceleration increased from 4.5 to 5.5 and Speed increased from 6.5 to 7.
+- T17 Armored Car health increased from 240/360 to 260/390.
+- T17 Armored Car acceleration increased from 4.5 to 5.5 and Speed increased from 6.5 to 7.
+- M3 Halftrack health decreased from 400 to 380.
+- Airborne Jeep capture distance increased from 2 to 10, to match the Commando Jeep and Kettenkrad.
+- M5 76mm Anti-Tank Gun reloading time decreased from 6/7 to 6/6 seconds.
+- M5 76mm Anti-Tank Gun manpower upkeep increased from 1.7 to 3.4 manpower/min and fuel upkeep increased from 0 to 3 fuel/min.
+- M5 76mm Anti-Tank Gun range increased from 59 to 62.
+- Armored Infantry reinforce time increased from 6 to 7 seconds.
+- Armored Infantry squad size increased from 4 to 5.
+- Armored Infantry entity health decreased from 100 to 90, increasing the squad health from 400 to 450.
+- Armored Infantry M1 Carbine DPS at long and distant range slightly increased.
+- Armored Infantry now have "Riflemen Elite" infantry armor.
+- Armored Infantry can now Sprint.
+- Decreased penetration values on distance for airborne recoilless rifles.
+- Thunderbolt 'Hellfire' Overwatch replaced with Thunderbolt 'Hellfire' Airstrike. This airstrike costs 160 munitions and calls in a single aircraft to a manually designated area.
+- P47 Thunderbolt M2Hb .50cal Heavy Machine Gun damage versus infantry decreased from 3x to 2x.
+- Strafing Run munition cost decreased from 150 to 125.
+- Self Repair recharge time increased from 45 to 120 seconds.
+- Self Repair repair speed decreased from 15 to 6.5 (same as Advanced Repair), duration increased from 20 to 40 seconds to repair a maximum of 260 hitpoints instead of the previous 300.
+- War Machine recharge time increased from 90 to 120 seconds.
+- M4 'Assault' Sherman main gun redesigned to be a much more comfortable unit to use while being less dominant per shot.
+- M4 'Assault Sherman' call-in cost changed from 500 manpower to 450 manpower and 70 fuel.
+- Machine Gun Emplacements can no longer hold infantry.
+- M1 57mm Anti-Tank Gun accuracy increased on long and distant ranges for more reliable performance.
+- M2Hb .50cal Heavy Machine Gun target tables fixed to no longer penetrate vehicles easily yet will now always 'penetrate' Infantry.
+- M3 Halftracks can no longer transport Heavy Machine Gun or Mortar Teams.
+- M3 Halftrack build time decreased from 40 to 35 seconds.
+- T34 Calliope weapon reworked to be more reliable against all targets. The rockets will never bounce on tank armor any more, but will work like artillery shells in regards to penetration and splash damage.
+- M36 Jackson main gun reloading time decreased from 7/7 to 6/6 seconds.
+- Significantly improved the effectiveness of the M18 Hellcat, M10 Wolverine, M36 Jackson, M26 Pershing and M4 'Easy Eight' Sherman versus Panthers, Tigers and King Tigers.
+- T34 Calliope call-in cost changed from 600 manpower to 500 manpower and 50 fuel.
+- M36 Jackson battlegroup call-in cost changed from 900 manpower to 900 manpower and 140 fuel.
+- M36 Jackson battlegroup is no longer limited to once per battle.
+- Combat group call-in cost changed from 650 manpower to 650 manpower and 60 fuel.
+- Combat group no longer comes with a Ranger squad.
+- Added a fix for the M10 and M36 misfire bug.
+- M10 Tank Destroyer cost increased from 300 manpower and 55 fuel to 360 manpower and 60 fuel.
+- M10 Tank Destroyer base damage decreased from 80/100 to 70/90.
+- M18 Hellcat base damage decreased from 80/100 to 70/90.
+- M18 Hellcat now has its own unique armor type which is a flat 20% weaker than that of the M10 Tank Destroyer, thus making it more vunerable against 20-40mm cannon fire.
+- Sticky bombs redesigned:
+  * Detonate time decreased from 4 to 3 seconds
+  * Range decreased for normal bombs and vet2 by 2 meters making it 17 and 22.
+  * Criticals applied on detonation now work as follows:
+    *Frontal Armor Hits:
+      #100-40% hitpoints: 95% engine damage 5% destroy secondary weapon (gunner killed)
+      #40-5% hitpoints: 40% engine damage 25% engine destroy 30% detrack 5% destroy secondary weapon (gunner killed)
+      #5-0% hitpoints: 75% vehicle destroyed 15% engine destroy
+    *Rear Armor Hits:
+      #100-40% hitpoints: 65% engine damage 15% engine destroy 20% detrack
+      #40-5% hitpoints: 25% engine damage 40% engine destroy 35% detrack
+      #5-0% hitpoints: 85% vehicle destroyed 15% engine destroy
+- Smoke Discharges have been fully animated, improving their performance and adding for a nice visual effect.
+- M2 60mm Mortar base damage increased from 50/65 to 55/65 to match all other mortars.
+- M26 Pershing weapon area of effect radius increased from 2 to 3.75. Area of effect profiles adjusted.
+- Command Squad bonuses towards Infantry changed:
+  *Veterancy 0 (Captain): Received Accuracy modifier 0.98, received Suppression modifier 0.9. (This basically means that the Captain cancels out Anti-Blob for up to 2 Infantry squads standing together)
+  *Veterancy 1 (Radio Operator): Increased Sight Range modifier of +5.
+  *veterancy 2 (Captain): Received Accuracy modifier 0.98, received Suppression modifier 0.9. (This basically means that the Captain cancels out Anti-Blob for up to 3 Infantry squads standing together)
+  *Veterancy 2 (Radio Operator): Increased Sight Range modifier +5. 
+  *Veterancy 3 (Captain): Received Accuracy modifier 0.98, received Suppression modifier 0.9. (This basically means that the Captain cancels out Anti-Blob for up to 4 Infantry squads standing together)
+- Medic station range changed to 65.
+- Riflemen health increased from 75 to 80.
+- Riflemen can no longer construct mines with Defensive Operations.
+- Riflemen reinforce cost increased from 27 to 28.
+- Paratrooper health increased from 78 to 82.
+- Ranger reinforce cost decreased from 45 to 42.
+- Ranger health increased from 75 to 80.
+- BAR effectiveness slightly reduced at range.
+- BAR suppressive fire effect increased by 150%.
+- Browning Automatic Rifle munition cost increased from 50 to 60.
+- Slightly increased effectiveness of garand rifles increasing effectiveness of airborne and basic riflemen.
+- Slightly increased effectiveness of ranger basic rifles.
+- Sherman accuracy slightly reduced, area of effect tables adjusted.
+- Glider Headquarters target type fixed and health halved, making them much more vulnerable as intended.
+- Glider Headquarters no longer heals by default, instead it now has a timed ability for 35 munitions.
+- Medic now has a Field Dressing ability which allows it to quickly heal up injured squads for 10 ammunition.
+- M1 Garand base damage increased from 24/26 to 27/29, decreasing the amount of shots it takes to kill infantry.
+- M1 Garand statistics generally improved and tuned to match the new damage model.
+- M1 Garand clip size fixed to 8 rounds.
+- M1 Carbine base damage increased from 15/17 to 23/25, decreasing the amount of shots it takes to kill infantry.
+- M1 Carbine statistics generally improved and tuned to match the new damage model.
+- M1 Carbine clip size fixed to 15 rounds.
+- M1918 Browning Automatic Rifle base damage increased from 10/12 to 26/28, decreasing the amount of shots it takes to kill infantry.
+- M1918 Browning Automatic Rifle  statistics generally improved and tuned to match the new damage model.
+- M1 Thompson base damage increased from 12/14 to 21/23, decreasing the amount of shots it takes to kill infantry.
+- M1 Thompson statistics generally improved and tuned to match the new damage model. This weapon is now designed as a high rate of fire and reasonably accurate sub-machine gun with a 30-round magazine.
+- M3 Grease Gun base damage increased from 8/9 to 20/22, decreasing the amount of shots it takes to kill infantry.
+- M3 Grease Gun statistics generally improved and tuned to match the new damage model. This weapon is now designed as a relatively low rate of fire and poorly accurate sub-machine gun with a 30-round magazine.
+- M1911 Colt damage increased from 15/15 to 20/22, decreasing the amount of shots it takes to kill infantry.
+- M1911 Colt statistics generally improved and tuned to match the new damage model.
+- M1917 Browning .30cal Heavy Machine Gun base damage increased from 21/23 to 27/29, decreasing the amount of shots it takes to kill infantry.
+- M1917 Browning .30cal Heavy Machine Gun statistics generally tuned to match the new damage model. This weapon is now designed as a medium-high rate of fire but accurate heavy machine gun with a 250-round magazine.
+- M1919A4 Browning .30cal Heavy Machine Gun base damage increased from 10/12 to 27/29, decreasing the amount of shots it takes to kill infantry.
+- M1919A4 Browning .30cal Heavy Machine Gun statistics generally tuned to match the new damage model. This weapon is now designed as a medium-high rate of fire but accurate heavy machine gun with a 100-round magazine.
+- Browning M2hb .50cal Heavy Machine Gun base damage increased from 18/20 to 30/32 decreasing the amount of shots it takes to kill infantry.
+- Browning M2hb .50cal Heavy Machine Gun statistics generally tuned to match the new damage model. This weapon is now designed as a low rate of fire but accurate heavy machine gun with a 100-round magazine.
+- Quad Mounted Browning M2hb .50cal Heavy Machine Gun base damage increased from 18/20 to 30/32 decreasing the amount of shots it takes to kill infantry.
+- Quad Mounted Browning M2hb .50cal Heavy Machine Gun statistics generally tuned to match the new damage model. This weapon is now designed as a high rate of fire and accurate heavy machine gun with 200-round magazines.
+
+Commonwealth:
+- Added a new ability to the Royal Canadian Artillery: Ammunition Resupply - For the cost of 150 manpower, 200 munitions is granted. Fuel income will be decreased by 50% for two minutes after the ability is triggered.
+- Redesigned Highlanders:
+  *Can now be upgraded with Boys Anti-Tank Rifles, Sten Sub-Machine Guns or Medical Packages.
+  *Entity health increased by 10%, from 100 to 110, increasing the squad health from 400 to 440.
+  *Can no longer construct Machine Gun and Mortar Emplacements (Construction options consist of: Slit Trenches, Mines, Sandbags, Tank Traps and Barbed Wire).
+  *Can no longer Repair.
+  *Call-in cost set to 380 manpower.
+- Redesigned Canadian Infantry:
+  *Can now be upgraded with Flamethrowers, Bren Light Machine Guns or PIATs.
+  *No longer have "Riflemen Elite" infantry armor.
+  *Can construct Barbed Wire, Sand Bags and Trenches.
+  *Can use Sprint, Button Vehicle or Ambush depending on squad specialization.
+  *Call-in cost set to 380 manpower.
+  *Can no longer plant Demolition Charges.
+- Vickers .303cal Heavy Machine Gun section statistics generally improved.
+- Vickers .303cal Heavy Machine Gun arc of fire decreased from 120 to 100 degrees.
+- Vehicles now properly share their veterancy with a nearby Command Tank, as intended. It turned out that previous veterancy changes disabled this feature, making the use of the Command Tank near vehicles nearly pointless.
+- Command Tank Creeping Smoke Barrage ability no longer requires the Royal Canadian Artillery commander tree, but now requires the Command Tank to have veterancy rank 1.
+- Command Tank can now capture territory sectors at a slow rate.
+- Command Tank bonus radius increased from 30 to 40, allowing for easier support without having to cluster vehicles.
+- Command Tank (1 available) bonuses towards vehicles and abilities changed:
+  *Veterancy 0: Weapon Reload Modifier 0.9, Sight Range Modifier +5
+  *Veterancy 1: Creeping Smoke Barrage
+  *Veterancy 2: Weapon Reload Modifier 0.9, Weapon Accuracy Modifier 1.1
+  *Veterancy 3: Weapon Reload Modifier 0.9, Weapon Accuracy Modifier 1.1
+- Command Tank mobility and hitpoints equalized to the Cromwell.
+- Commando Sniper health increased from 77 to 90 to match all other Snipers.
+- Fixed the problem where the player could have a total of three M7 Priests instead of two.
+- Commando Jeeps can now be deployed even when the Glider is in enemy territory.
+- Staghound health increased from 240/360 to 260/390.
+- Cromwell main gun reloading time increased from 5/5 to 6/6 seconds, to match the M4A4 Sherman.
+- Sherman Firefly main gun reloading time increased from 6/6 to 7/7 seconds.
+- Sherman Firefly fuel cost increased from 100 to 110.
+- Sherman Firefly coaxial machine gun removed.
+- 17-Pounder Anti-Tank Gun reloading time decreased from 6/7 to 6/6 seconds.
+- 17-Pounder Anti-Tank Gun range increased from 59 to 62.
+- Bren Carrier Self-Repair recharge time increased from 30 to 45 seconds.
+- Canadian Infantry hitpoints decreased from 115 to 100, decreasing the squad health from 460 to 440.
+- Kangaroo Carrier reinforce radius decreased by 33%, from 20 to 15.
+- Captain no longer highlights the sector in which he is present, making it more difficult for the enemy to locate the Captain.
+- Captain bonuses now correctly apply in any territory sector.
+- Captain (1 available) bonuses towards Infantry changed:
+  *Veterancy 0: Received Accuracy modifier 0.98, received Suppression modifier 0.9 (this basically means that the Captain cancels out Anti-Blob for up to 2 Infantry squads standing together).
+  *Veterancy 1: Infantry movement boost in the entire sector.
+  *Veterancy 2: Received Accuracy modifier 0.98, received Suppression modifier 0.9 (this basically means that the Captain cancels out Anti-Blob for up to 3 Infantry squads standing together).
+  *Veterancy 3: Received Accuracy modifier 0.98, received Suppression modifier 0.9 (this basically means that the Captain cancels out Anti-Blob for up to 4 Infantry squads standing together).
+- Captain bonuses towards Emplacements changed:
+  *Veterancy 0: Received damage modifier 0.85.
+  *Veterancy 1: Increased Sight Range modifier of +5.
+  *Veterancy 2: Received damage modifier 0.95.
+  *Veterancy 3: Received damage modifier 0.925.
+- Emplacement symbols are highlighted if they are in the same sector as the Captain, making it easier to see if they benefit or not.
+- Recon Element Flares removed completely.
+- Armor Command Truck manpwoer cost decreased from 205 to 200.
+- M7 Priest health increased from 480 to 500.
+- M7 Priest call-in cost changed from 625 manpower to 500 manpower and 50 fuel.
+- M7 Priest can no longer use Counter Battery.
+- M7 Priest can now exclusively use Overwatch Artillery when reaching veterancy rank 1.
+- 25 Pounder can no longer use Overwatch Artillery.
+- Kangaroo Carriers can no longer be deployed from the Armor Command Truck.
+- Heavy Machine Gun Emplacement hotkey changed from H to E.
+- Significantly improved the effectiveness of the Sherman Firefly versus Panthers, Tigers and King Tigers.
+- Churchill call-in cost changed from 600 manpower to 500 manpower and 90 fuel.
+- Panther Tank call-in cost changed from 700 manpower to 600 manpower and 140 fuel.
+- Sapper, Highlander and Canadian Infantry Lee Enfield DPS increased on medium and long ranges.
+- 40mm Bofors AA Gun slightly reworked; it will now fire two bursts of 4 shells with a delay of 3 seconds between each burst, and will undergo a 5 second reloading time after firing two bursts.
+- Sherman and Sherman Firely acceleration/deceleration increased from 2/4 to 2.4/4.7 and speed increased from 5.2 to 6.1, to simulate the more powerful engine in the M4A4 models compared to the American M4A3 models.
+- Sherman Smoke Dischargers substituted for a High-Explosive Shell. This ability, costing 75 munitions, fires a High-Explosive shell which has a bigger blast radius than the regular shell, also suppressing Infantry on impact. 
+- Machine Gun Emplacement arc of fire decreased from 120 to 80 degrees.
+- Commando .303cal Heavy Machine Gun arc of fire decreased from 120 to 100 degrees.
+- Staghound acceleration increased from 4 to 5.5 and Speed increased from 6.5 to 7.
+- Staghound fuel cost decreased from 35 to 30.
+- Boys Anti-Tank Rifle reliability against infantry targets increased.
+- Boys Anti-Tank Rifle clip size fixed to 5.
+- Boys Anti-Tank Rifle hotkey changed from R to A to not interfere with reinforcing.
+- Boys Anti-Tank Rifle penetration against heavy armor decreased.
+- PIAT projectile reworked to work like regular Infantry Anti-Tank weaponry to vastly improve the reliability of the weapon.
+- Tank Hunters are now equipped with 'Elite' Lee Enfield Rifles as opposed to Sten Sub-Machine Guns.
+- Tank Hunters can now use the PIAT ambush ability.
+- Commando Heavy Machine Gun Teams are now equiped with 'Elite' Lee Enfield Rifles as opposed to Sten Sub-Machine Guns.
+- Commando Mortar Sections are now equipped with 'Elite' Lee Enfield Rifles as opposed to Sten Sub-Machine Guns.
+- Hawker Typhoon .303cal Heavy Machine Gun damage versus infantry decreased from 3x to 2x.
+- Glider, Glider HQ and Tetrach Glider target type fixed and health halved, making them much more vulnerable as intended.
+- Air Force Overwatch radius decreased from 40 to 30, to be less dominating on smaller maps.
+- Air Force Overwatch munition cost decreased from 225 to 200.
+- Added a 30 radius UI circle to indicate where the Air Force Overwatch, making it easier to target it.
+- Typhoon Airstrike munition cost decreased from 175 to 160.
+- Casualty Clearing Station cost increased from 180 manpower and 15 fuel to 200 manpower and 20 fuel.
+- The amount of bodies required to respawn an Infantry Section at the Casualty Clearing Station increased from 6 to 8.
+- Canadian Infantry reinforce cost decreased from 45 to 40.
+- Redesigned the Churchill AVRE main gun to be a much more comfortable unit to use while being less dominant per shot.
+- Lee Enfield base damage increased from 24/26 to 27/29, decreasing the amount of shots it takes to kill axis infantry.
+- Lee Enfield statistics generally improved and tuned to match the new damage model.
+- Lee Enfield "Elite" base damage increased from 24/26 to 30/32, decreasing the amount of shots it takes to kill infantry.
+- Lee Enfield statistics generally improved and tuned to match the new damage model.
+- Lee Enfield clip size fixed to 10 rounds.
+- Sten Sub Machine Gun base damage increased from 8/9 to 20/22, decreasing the amount of shots it takes to kill infantry.
+- Sten Sub Machine Gun statistics generally improved and tuned to match the new damage model. This weapon is now designed as a medium rate of fire but reasonably accurate sub-machine gun with a 32-round magazine.
+- Bren Light Machine Gun base damage increased from 10/12 to 27/29, decreasing the amount of shots it takes to kill infantry.
+- Bren Light Machine Gun statistics generally tuned to match the new damage model. This weapon is now designed as a relatively low rate of fire but accurate light machine gun with a 30-round magazine.
+- Webley Revolver damage increased from 19/19 to 30/32, decreasing the amount of shots it takes to kill infantry.
+- Webley Revolver statistics generally improved and tuned to match the new damage model.
+- Vickers .303cal Heavy Machine Gun base damage increased from 21/23 to 27/29, decreasing the amount of shots it takes to kill infantry.
+- Vickers .303cal Heavy Machine Gun statistics generally tuned to match the new damage model. This weapon is now designed as a medium-high rate of fire but accurate heavy machine gun with a 250-round magazine.
+
+Wehrmacht:
+- New unit for Defensive Doctrine: Sturmpioneers - 4 man squad equiped with Kar98k rifles, bundled grenades, wire cutters, repair packs and the ability to Salvage Wrecks. Can be upgraded with STG44 Assault Rifles. Can also construct basic field defences.
+- New reward unit: King Tiger (Porsche Turret) - A King Tiger with the Porsche turret. This variant comes with a turret mounted MG42 Light Machine Gun instead of the Tank Commander, thus fielding much better anti-infantry capabilities but as a trade-off less view range and camouflage detection capabilities.
+- 50mm Pak38 Anti-Tank Gun substituted for the more powerful 75mm Pak 40 Anti-Tank Gun. The Pak40 performs like the Marder or Geschützwagen in terms of firepower, but compared to the Pak38 it also is more sluggish and fires slower. The design choice for this is that the 50mm Pak 38 never was designed to deal with heavier allied tanks, making it difficult to balance from a historical point of view.
+- Defensive Doctrine "Take Cover!" and "Fortify the Perimeter" merged into one. This upgrade now unlocks the 81mm Mortar Emplacement for the Pioneers, Slit Trenches for the Pioneers and Sturmpioneers, as well as the base building MG42's and finally a small reinforce radius for bunkers.
+- Fortify the Perimeter no longer increases the hitpoints of bunkers.
+- Pioneers can no longer Salvage wrecks for munitions; this ability is now exclusively available for the Sturmpioneers.
+- Blitzkrieg 'Raiders' will now properly affect Pioneers, Volksgrenadiers, Grenadiers, Stormtroopers and Knight's Cross Holders.
+- MG 42 maximum range slightly increased.
+- MG 42 long range accuracy slightly reduced.
+- Slightly increased effectiveness of volksgrenadiers basic rifles
+- Sturmgeschütz IV fuel cost increased from 55 to 65.
+- Sturmgeschütz IV acceleration decreased from 1.7 to 1.2, deceleration increased from 2 to 3, to match all other Panzer IV based vehicles.
+- Ambulance healing aura radius decreased from 25 to 20.
+- Ambulance health increased from 180 to 200.
+- Sd.Kfz. 234 Puma health increased from 370 to 400.
+- Sd.Kfz. 251 Halftrack health increased from 370 to 380.
+- Sd.Kfz. 251 Halftrack Flammenwerfer upgrade health bonus decreased from +30 to +20.
+- 88mm Flak 36 AT/AA reload time increased from 4/6 to 6/6 seconds.
+- 88mm Flak 36 AT/AA manpower upkeep decreased from 10.7 to 3.4 manpower/min.
+- 88mm Flak 36 AT/AA emplacement changed to the smaller Bofors emplacement version, allowing for easier placement.
+- Tiger main gun reloading time increased from 6/6 to 7/7 seconds.
+- King Tiger main gun reloading time increased from 6/6 to 7/7 seconds.
+- King Tiger call-in cost changed from 600 manpower to 870 manpower and 180 fuel.
+- King Tiger (Henschel) sight range increased from 45 to 55 and camouflage detection radius increased from 0 to 15 to simulate the bonus of the Tank Commander.
+- Panther fuel cost increased from 110 to 140.
+- Geschützwagen health increased from 550 to 600, to match the Marder III.
+- Geschützwagen main gun reloading time decreased from 6/7 to 6/6 seconds, to match the Marder III.
+- Panzer IV main gun reloading time increased from 5/5 to 6/6 seconds.
+- Panzer IV base damage increased from 60/80 to 70/90.
+- Panzer IV health increased from 700 to 860 hp.
+- Tiger Ace health decreased from 1600 to 1300, matching the regular Tiger. The vehicle having 3 very powerful abilities, as well as a vehicle bonus aura makes it already superior to the regular Tiger and having 300 more hitpoints made it slightly overpowered.
+- Tiger Ace reload time bonus towards nearby vehicles decreased from 0.85 to 0.9.
+- Tiger Ace Flank Speed acceleration decreased from 3 to 2 and maximum speed modifier decreased from 1.5 to 1.25.
+- Tiger Ace call-in cost changed from 700 manpower to 870 manpower and 180 fuel.
+- King Tiger health decreased from 1800 to 1600.
+- Fixed a bug where some tanks would not benefit completely from 'Veteran Tankers'.
+- Leutnant (1 available) bonuses towards Infantry changed:
+  *Veterancy 0: Supervise, Weapon Accuracy Modifier 1.1, Weapon Damage Modifier 1.1.
+  *Veterancy 1: Force Retreat.
+  *Veterancy 2: Weapon Damage Modifier 1.2.
+  *Veterancy 3: Received Veterancy Modifier 1.3.
+- Reworked Zeal (the bonuses stack, units affected by zeal are Volksgrenadiers, Grenadiers, Knights Cross Holders and Obersoldaten):
+  *Squad less than 4 members: Weapon Accuracy modifier 1.05; Received Damage modifier 0.95; Received Suppression modifier 0.85; Weapon Cooldown modifier 0.95.
+  *Squad less than 3 members: Weapon Accuracy modifier 1.05; Received Damage modifier 0.95; Received Suppression modifier 0.85; Weapon Cooldown modifier 0.95.
+  *Squad less than 2 members: Weapon Accuracy modifier 1.05; Received Damage modifier 0.95; Received Suppression modifier 0.85; Weapon Cooldown modifier 0.95.
+- Fixed a bug where Zeal would not properly apply after unlock.
+- Ambulance hotkey changed from O to A.
+- Knight's Cross Holders can no longer throw regular grenades; they never were intended to have this ability for a long time but still was present and interfered with the Panzerfaust ability.
+- Knight's Cross Holders can now use the Panzerfaust by default.
+- Assault hotkey changed from L to S.
+- 81mm Gr.34 Mortar Emplacement hotkey changed from M to E to no longer interfere with Mines.
+- 150mm Nebelwerfer no longer is affected by Veteran Infantry Training.
+- Kampfkraft Centre construction time decreased from 60 to 40 seconds to slightly increase its appeal early on.
+- Sturmhaubitze 42 main gun redesigned to be a much more comfortable unit to use while being less dominant per shot.
+- Sturmhaubitze call-in cost changed from 500 manpower to 450 manpower and 70 fuel.
+- Bunkers upgraded to Aid or Repair Stations can no longer hold Infantry.
+- Repair Station Pioneers health increased from 83 to 110.
+- Sd.Kfz. 251 Halftracks can no longer transport Heavy Machine Gun or Mortar Teams.
+- Sd.Kfz. 251 Halftrack fuel cost increased from 20 to 25.
+- Sd.Kfz. 251 Halftrack build time increased from 30 to 45 seconds.
+- Nebelwerfer and Wurfrahmen 40 Stuka Area of Effect .
+- Stormtrooper Kar98k effectiveness decreased on medium, long and distant ranges.
+- Stormtrooper reinforce cost decreased from 43 to 40.
+- Grenadier reinforce cost decreased from 38 to 35 manpower.
+- Bundled Grenade damage within the Area of Effect decreased.
+- Geschützwagen call-in cost changed from 500 manpower to 400 manpower and 40 fuel.
+- Obersoldaten call-in cost decreased from 400 to 380.
+- Obersoldaten can now construct Sandbags and Barbed Wire, as intended.
+- Obersoldaten reinforce cost decreased from 43 to 40.
+- Ostwind 37 mm Flak 43 slightly reworked: it will now fire two bursts of 4 shells with a delay of 4 seconds between each burst, and will undergo a 6 second reloading time after firing two bursts.
+- Defensive Mortar Barrage reworked into Defensive Airburst Barrage; a barrage which fires a total of 10 airburst shells. Very effective against light forces.
+- Bunker Machine Gun arc of fire decreased from 90 to 70 degrees.
+- MG42 Heavy Machine Gun arc of fire decreased from 120 to 90 degrees.
+- Tiger and Tiger Ace weapon damage slightly reduced. This slightly lowers randomness vs Shermans and Cromwells, making it a guaranteed 3 shot kill, as opposed to 50% 2 shot kill, 50% 3 shot.
+- Tiger and Tiger Ace weapon area of effect profile changed. Radius from 3 to 3.75. Weapon effectiveness is now generally increased against infantry.
+- Panzerschreck effectiveness (both accuracy and damage) vs light vehicles reduced.
+- Panzerschreck general scatter values decreased significantly.
+- Medic Bunker range changed to 75 meters.
+- Sturmgeschütz IV health increased from 500 to 700 hp.
+- Puma 20mm KwK38 base damage increased from 19/21 to 32/34.
+- Ostwind 37mm Flak 43 AoE values slightly improved and damage versus infantry increased from 1x to 1.5x.
+- Stuka Zu Fuss firing sound improved; it now sounds exactly like the Nebelwerfer. The reason behind this is that the Stuka is hard to predict, making it difficult to avoid or micro out of the barrage area. This distinctive sound will make it easier to realize a Stuka barrage has been fired.
+- Kar 98k clip size fixed to 5 rounds.
+- Volksgrenadier Kar 98k base damage increased from 24/26 to 26/28, decreasing the amount of shots it takes to kill infantry.
+- Volksgrenadier Kar 98k statistics generally improved and tune to match the new damage model.
+- Sturmgewehr 44 base damage increased from 15/17 to 21/23, decreasing the amount of shots it takes to kill infantry.
+- Sturmgewehr 44 statistics generally improved and tuned to match the new damage model. This weapon is now designed as a medium rate of fire but accurate assault rifle with a 30-round magazine.
+- MP 40 base damage increased from 11/13 to 20/22, decreasing the amount of shots it takes to kill infantry.
+- MP 40 statistics generally tuned to match the new damage model. This weapon is now designed as a relatively low rate of fire but reasonably accurate sub-machine gun with a 32-round magazine.
+- MG 42 Light Machine Gun base damage increased from 10/12 to 26/28, decreasing the amount of shots it takes to kill infantry.
+- MG 42 Light Machine Gun statistics generally tuned to match the new damage model. This weapon is now designed as a very high rate of fire, decently accurate light machine gun with a 50-round magazine.
+- MG42 Light Machine Gun upgrade munition cost increased from 50 to 60.
+- Luger P08 Pistol damage increased from 13/13 to 20/22, decreasing the amount of shots it takes to kill infantry.
+- Luger P08 Pistol statistics generally improved and tuned to match the new damage model.
+- MG 42 Heavy Machine Gun base damage increased from 18/20 to 26/28, decreasing the amount of shots it takes to kill infantry.
+- MG 42 Heavy Machine Gun statistics generally tuned to match the new damage model. This weapon is now designed as a very high rate of fire, decently accurate heavy machine gun with a 250-round magazine.
+- Improved Equipment cost decreased from 100 manpower and 25 fuel to 80 manpower and 20 fuel.
+
+Panzer Elite:
+- Tank Hunter Tactics renamed and reworked into Breakthrough Tactics, to decrease the specialization of the whole Commander Tree, increasing both its versatility and viability.
+- Added a new ability to Breakthrough Tactics: Flares - For 45 munition, flares will be dropped on a designated area to reveal any unit present in the area.
+- Added a new ability to Scorched Earth Tactics: Resource Redistribution - A toggled ability which boosts munition income at the cost of fuel income.
+- Added a new ability for the Reconnaissance Halftrack: "Spotting"; For a short period of time, the camouflage detection radius is doubled. This ability useful to deal with Snipers, as well as that the Armored Car as a clear choice over the Reconnaissance Halftrack due to it being faster and having the overdrive ability. This addition should make it a more interesting choice to go for.
+- Added the missing Squad Leader behavior for Panzer Grenadiers, Jägers, Fallschirmjägers and Luftwaffe Ground Forces.
+- Panzer Grenadiers can now build basic field defences (Barbed Wire/Sandbags) by default; using a separate construction menu.
+- Panzer Grenadiers are now responsible for the construction of the 88mm Flak 36 Howitzer, once unlocked in Scorched Earth Tactics. The idea behind this is to lessen the focus on Jägers throughout the whole commander tree, while increasing their frontline usefulness.
+- Panzer Grenadier Booby Trap setup time decreased from 15 to 7 seconds.
+- Panzer Grenadier reinforce cost decreased from 35 to 33 manpower.
+- Stuka Zu Fuss Incendiary Barrage recharge time increased by 128%; from 70 to 90 seconds.
+- Hummel traverse rate decreased from 35 to 30 to match all other Panzer IV based vehicles.
+- Hummel barrage salvo increased from 4 to 5 shells; barrage damage potential increased by 25%.
+- Hummel Howitzer barrages no longer are affected by Munitions Resupply, the reason for this is that all artillery units have an equal reloading time across the board, being able to permanently decrease can give big advantages.
+- Hummel health increased from 480 to 500.
+- Hummel call-in cost changed from 600 manpower to 500 manpower and 50 fuel.
+- Funkwagen 'Vampire' Halftrack camouflage detection radius increased from 9 to 10, and mine detection from 0 to 5.
+- Funkwagen 'Vampire' Halftrack Radio Interception camouflage detection bonus decreased from 30 to 20.
+- Jägers are now armed with four scopeless Gewehr 43 rifles instead of four MP40 SMG's. Scopeless G43's are great for all ranges; but best for close to medium range engagements.
+- Jägers call-in manpower cost increased from 260 to 340, and require 2 Command Points to unlock.
+- Jägers reinforce cost increased from 30 to 36, and reinforcing time increased from 6 to 7 seconds.
+- Jägers can now use Vital Shot.
+- Jägers can now use Fire-Up instead of Sprint.
+- Jägers entity health increased from 100 to 110, increasing the squad health from 400 to 440.
+- Jägers now have "Riflemen Elite" infantry armor.
+- Jägers now camouflage when in light or heavy cover.
+- Jägers can no longer construct of the Mortar Bunker, Pantherturm and 88mm Flak 36 Howitzer.
+- Panzerfüsilier health decreased from 113 to 95 per entity, lowering the squad health from 565 to 475.
+- Panzerfüsilier manpower cost decreased from 420 to 380 manpower.
+- Panzerfüsiliers Panzerschreck upgrade now requires the Kampfgruppe Kompanie Upgrade.
+- Panzerfüsiliers can now construct Barbed Wire and Sandbags.
+- Panzerfüsilier reinforce cost increased from 35 to 40.
+- Fallschirmjäger 'First Strike' bonuses removed, and tuned their camouflage revealing times.
+- Fallschirmjägers no longer camouflage automatically when in light or heavy cover.
+- Fallschirmjäger Infiltration manpower cost decreased from 420 to 400.
+- Fallschirmjägers can no longer construct trenches.
+- Fallschirmjägers can now construct Barbed Wire and Sandbags.
+- Fallschirmjäger reinforce cost increased from 34 to 36.
+- Luftwaffe Infantry can now lay mines.
+- Luftwaffe Infantry can now use Sprint by default.
+- Scout Car and Armored Car health decreased from 400 to 380.
+- Supply Halftrack health increased from 370 to 380.
+- Sd.Kfz. 250 Halftrack variants (Vampire, Infantry, Anti-Tank, Recon and Mortar) health decreased from 420 to 380.
+- Fixed and rebalanced the Flakvierling and Wirbelwind weapon tables, making them more effective when dealing with multiple infantry threats. There was a bug where Flakvierlings would not 'penetrate' infantry on medium and longer ranges, making them very inconsistent in battle. Generally, the Flakvierlings should be more reliable and consistent in performance.
+- 88mm Flak 36 AT/AA reloading time increased from 4/6 to 6/6 seconds.
+- 88mm Flak 36 AT/AA emplacement unintended manpower upkeep removed.
+- 88mm Flak 36 AT/AA manpower upkeep decreased from 10.7 to 3.4 manpower/min and fuel upkeep increased from 0 to 3 fuel/min, to be equal to the Wehrmacht version.
+- 20mm Flakvierling 38 manpower upkeep increased from 1.3 to 3.4 manpower/min and fuel upkeep increased from 0 to 2 fuel/min, to be equal to the 40mm Bofors AA Gun.
+- 20mm Flakvierling 38 emplacement unintended manpower upkeep removed.
+- Marder III main gun reloading time increased from 5/6 to 6/6 seconds.
+- Marder III APCR main gun reloading time increased from 4/4 to 6/6 seconds to match the standard shell; this was an unintended buff the Marder III received once aquiring APCR shells.
+- Anti-Tank Halftrack 37mm PaK 36 reloading time rebalanced from 4/5.5 to 4.5/4.5 seconds.
+- Medic Bunker can no longer deploy Goliaths
+- Medic Bunker self-repair removed.
+- Medic Bunker health decreased from 900 to 800 to match the Wehrmacht Bunker.
+- Medic Bunker can no longer hold Infantry.
+- Panzer IV main gun reloading time increased from 5/5 to 6/6 seconds.
+- Panzer IV Rapid Fire no longer gives an accuracy bonus.
+- Panzer IV Rapid Fire is now available from default.
+- Panzer IV Infantry Support Tank Rapid Fire reloading time is now decreased by 20% instead of 50%.
+- Henschel 'Panzerknacker' Overwatch recharge time increased from 120 to 180 seconds.
+- Henschel 'Panzerknacker' Overwatch duration decreased from 90 to 60 seconds.
+- Henschel 'Panzerknacker' Overwatch time between each passes changed from 5-10 seconds to 8 seconds flat.
+- Henschel 'Panzerknacker' Overwatch fight paths greatly improved; significantly increasing the change of hitting targetted vehicles.
+- Henschel 'Panzerknacker' Overwatch 75mm PaK 40 main gun greatly improved.
+- Added a 35 radius UI circle to indicate where the Henschel 'Panzerknacker' Overwatch, making it easier to target it.
+- Rocket Run munition cost decreased from 150 to 125.
+- Decreased standard grenade recharging time from 240 to 180 seconds.
+- Bundled Anti-Tank Grenade recharge time increased from 45 to 180 seconds to match all Panzer Elite grenade recharging times.
+- MG42 Heavy Machine Gun Emplacement hotkey changed from H to E.
+- Jagdpanther call-in cost changed from 700 manpower to 600 manpower and 110 fuel.
+- Hetzer call-in cost changed from 600 manpower to 340 manpower and 65 fuel.
+- Hetzer Spotting Scope upgrade no longer increases its weapon range; this was an unintended feature, munition cost decreased from 25 to 10 to match similar upgrades.
+- Hetzer can now use Ambush Lock-down. Ambush lock-down camouflages the vehicle and applies the following modifiers on the first shot: 2x weapon penetration; 2x accuracy and 1.25.
+- Hetzer health increased from 500 to 700 hp.
+- Wirblewind call-in cost changed from 480 manpower to 420 manpower and 60 fuel.
+- Hotchkiss call-in cost changed from 450 manpower to 350 manpower and 35 fuel.
+- Hotchkiss is now affected by APCR Shells, also visually upgrading its gun.
+- Hotchkiss health increased from 360 to 420.
+- Panther Battlegroup call-in cost changed from 1000 manpower to 900 manpower and 180 fuel.
+- Panther fuel cost increased from 110 to 140.
+- MG42 Heavy Machine Gun Emplacement arc of fire decreased from 120 to 80 degrees.
+- Panzer IV and Panzer IV Infantry Support Tank health increased from 760 to 860.
+- Sd.Kfz. 222 20mm KwK38 base damage increased from 19/21 to 32/34, significantly improving its DPS potential.
+- Sd.Kfz. 251/9 KwK38 base damage increased from 19/21 to 32/34, significantly improving its DPS potential.
+- Wirblewind 20mm Flakvierling 38 base damage increased from 19/21 to 32/34, with adjusted accuracy and cooldown to retain the same DPS potential.
+- 20mm Flakvierling 38 base damage increased from 19/21 to 32/34, with adjusted accuracy and cooldown to retain the same DPS potential.
+- Kettenkrad Booby Trap setup time decreased from 15 to 5 seconds.
+- Panzerschreck effectiveness (both accuracy and damage) vs light vehicles reduced.
+- Panzerschreck general scatter values decreased significantly.
+- Infantry can now capture territory from inside Infantry Halftracks.
+- Teller Mine base damage increased from 300 to 325 and target tables fixed. The General performance versus vehicles should be like this:
+ *65% of a Sherman/Cromwell
+ *74% of a M10 Wolverine/M18 Hellcat
+ *63% of a M36 Jackson
+ *44% of a M26 Pershing
+ *54% of a Churchill
+ *83% of a M5 Stuart
+ *100%/83% of a M8/T17/Staghound
+ *85% of a M3 Halftrack
+ *93% of a Bren Carrier
+- Veteran Sergeant sight radius bonus decreased from +3 to +2.
+- Situational Awareness sight radius bonus increased from +2 to +3.
+- Kar 98k clip size fixed to 5 rounds.
+- Scoped Gewehr 43 package munition cost increased from 50 to 60.
+- Scoped Gewehr 43 base damage increased from 22/24 to 27/29, decreasing the amount of shots it takes to kill infantry.
+- Scoped Gewehr 43 statistics generally improved and tuned to match the new damage model.
+- Gewehr 43 base damage increased from 22/24 to 27/29, decreasing the amount of shots it takes to kill infantry.
+- Gewehr 43 statistics generally improved and tuned to match the new damage model.
+- Gewehr 43 clip size fixed to 10 rounds.
+- Gewehr 43 Suppressive Volley reworked and rebalanced into a timed ability - similar to the BAR Suppressive Fire. It will now properly suppress infantry for a short period of time, giving the Panzer Elite an option to supress infantry pushes.
+- FG 42 base damage increased from 10/12 to 21/23, decreasing the amount of shots it takes to kill infantry.
+- FG 42 statistics generally improved and tuned to match the new damage model. This weapon is now designed as a high rate of fire but accurate assault rifle with a 20-round magazine.
+- Sturmgewehr 44 base damage increased from 15/17 to 21/23, decreasing the amount of shots it takes to kill infantry.
+- Sturmgewehr 44 statistics generally improved and tuned to match the new damage model. This weapon is now designed as a medium rate of fire but accurate assault rifle with a 30-round magazine.
+- MG 42 Light Machine Gun base damage increased from 10/12 to 27/29, decreasing the amount of shots it takes to kill infantry.
+- MG 42 Light Machine Gun statistics generally improved and tuned to match the new damage model. This weapon is now designed as a very high rate of fire, decently accurate light machine gun with a 50-round magazine.
+
+AI:
+- Significantly improved and switched around much of the unit purchase logic.
+- Overhauled much of Attack and Defend targets logic. Key new features include:
+ * Additional logic for moving units to corners of the map which weren't usually considered by the AI. This affects maps like Wolfheze most of all
+ * Improved AI spreading out across the map overall.
+ * Fixed an issue where AI would be too hesitant to advance onto enemy positions. This also massively improves the issue of it getting stuck on bridges.
+ * Fixed AI for maps where HQ are closer together than normal (like Etavaux)
+ * Further improved frontline forming and enemy encirclement by the AI.
+ * AI is now more likely to defend areas with its attacking units, making it not leave any holes in its frontline and also resulting in fewer unit clumps when attacking.
+ * AI will now consider targets distance from both friendly HQs instead of just its own.
+ * AI will now respond to threats near its base and in friendly territory much better.
+ * Improved defensive building placement.
+- AI will no longer idle for a number of seconds at the beginning of the game, it is initialized almost instantly.
+- Reduced instances where AI would get stuck and not do anything.
+- Reduced instances where AI would get stuck on bridges.
+- Made crucial improvements and fixes to AI capture logic:
+ * No more capturing under fire.
+ * Can now capture non-connected territory if it wants to.
+ * Reduced instances of the endless move-capture orders bug.
+- Difficulty settings adjusted and the resource bonuses have been reduced.
+- AI can now use reward units.
+- Significant improvements made to aicontrol script:
+ * Added many more types of units to aicontrol such as AT guns, mobile artillery, snipers.
+ * Redone much of the script to improve its usability and performance.
+ * Mobile artillery and mortars will now be forced to keep their distance from the enemy.
+ * Team weapons will now move back properly if they think they're in danger.
+ * Team weapons will now quickly retreat if the threat of the enemy close by is high enough.
+ * Team weapons will now rotate to fire at the enemy if they see a better target than they're facing at more often. This also fixes MGs facing at wrong direction and not trying to rotate.
+ * Across the board improvements in the different settings for all the team weapons.
+ * Redone most of the British HQ setup logic, improving performance and reducing bugs.
+ * Retreat is now handled through this file, retreat rules updated significantly.
+ * AT guns now have a completely different way to set up, only staying in the fight if they're fighting vehicles and retreating from infantry.
+ * Added a new behavior for units which makes them attack move towards the enemy at opportune moments rather than just seek cover and set up towards them. This is used for making snipers as deadly as possible.
+ * The way units seek retreat and setup direction is redone completely, taking friendly units into account and choosing setup direction more intelligently.
+ * Team weapons should no longer needlessly resetup right when the enemy enters their vicinity.
+ * The script will now slow down based on the number of units it needs to operate on. This significantly improves lategame performance.
+ * Significantly improved the way AI chooses artillery clump targets.
+ * Bypassed a weird scar error which would occur after certain campaign missions.
+- Added a brand new vehicle control script:
+ * Vehicles will now be forced to face the enemy properly.
+ * Vehicles will now retreat from danger properly.
+ * Vehicles will now move back to the HQ or to closest safe point when low on health or when they have critical damage.
+ * There are special rules for certain vehicles, altering their behavior based on the type of behavior you would expect from them (for example, sherman crocodile will start to keep its distance much later than normal unless there's enemy armor in its vicinity).
+- To go along with the new vehicle script, important improvements were made to repair unit purchase logic, increasing the number of pioneers and engineers AI builds proportionally to the number of friendly vehicles on the field.
+- Added weights to AI command tree choices - slightly improves randomness but also adds weights which make AI choose the trees more suitable for it slightly more often.
+- AI will no longer use follow on squads with team weapons.
+- Altered AI VP importance logic:
+ * Made AI more frantic about capturing victory points if it's about to lose, regardless of how many points the enemy has.
+ * AI should start paying attention to its victory points much sooner in the game.
+ * Significantly increased AI victory point importance increase on low victory point count.
+ * Victory point importance logic now reflects how many victory points AI needs to not bleed victory points. It should be much more aggressive if it has less points than it needs to stay even, and should play as usual when it's not bleeding points, or is bleeding the enemy.
+ * Changed the way the victory point importance accumulates due to AI having less victory points than the enemy.
+- Significantly improved weapon pick up logic.
+- Significantly improved team weapon capture logic.
+- Fixed one more possibility where AI could end up turning the 3rd level production on and off endlessly.
+- Decreased AI basic infantry building priority when it's close to popcap.
+- Retreat is now handled through a separate script, considering surrounding danger and strength of friendlies much better as well as retreating from buildings properly.
+- AI unit wait time increased, making AI purchase the exact units it needs instead of quickly spamming out cheaper ones. This was also required to let Axis AI build heavy armor after the cost increase.
+- AI will now build its first building near the HQ to reduce the walk time and build it as fast as possible.
+- Improved Panzer Elite building purchase logic.
+- Improved building enter logic.
+- Added a script which increases AI starting resources.
+- American AI will now build the motorpool even if there's a tank depot already in play. The demand decrease if there was a tank depot was too large.
+- American AI will rush t3 more often.
+- American AI will now sometimes choose to upgrade the supply yard instead of buying tech buildings and buy the first upgrade faster.
+- Improved advanced tanks upgrade purchase logic for American AI.
+- Improved grenade throw logic.
+- Revisited AI buildorders to update them to the new income and starting resources.
+- Significantly improved Axis AI tech choices.
+- Axis AI will now sometimes skip t3.
+- Adjusted the priority of buying puma upgun upgrade.
+- Further improvements made to how AI uses unit abilities. Biggest changes include:
+ * Grenades have had additional demand logic added so that they aren't thrown every time AI gets a target.
+ * Repair changes - pioneers and engineers will find repair targets on larger distances (this helps repair bridges and idle tanks that will be around due to new aicontrol script), PE infantry had its repair radius and priority reduced to prevent mass repairs that tended to happen too often.
+- AI will sometimes buy flamethrowers on engineers and pioneers again. The demand function was not working correctly.
+- Reduced the amount AI points that were automatically randomly removed for increased performance. Users might notice a performance hit, however this also significantly improves AI behavior when playing alone.
+- Improved the way PE AI buys upgrades and techs up.
+
+Maps:
+- Improved AI getting clumped up on northern Vire River Valley bridge.
+- Moved around many AI points on Vire River Valley.
+- New Map: Downtown (6) by TheSphinx (despite these following changes, all credits go to him)
+ *Added AI priority markers for increased AI performance.
+ *Removed certain splats (Parachutes)
+ *Moved and deleted many objects to allow for better passability of vehicles.
+ *Leveled Axis base area to ease the construction of base structures.
+ *Cleared Allied base area to ease the construction of base structures.
+ *Added the missing accessories to the Axis HQ's.
+ *Added one base MG to all players. 
+ *Disabled the Pantherturm. (note: this is a mod-specific object, meaning that you can't use this edited version of the map outside of Back to Basics)
+- Angoville:
+ * Replaced all high munitions points with medium munitions points
+ * Moved axis base base MG to prevent it from covering the fuel point.
+ * Slightly moved axis base fuel and munitions points.
+ * Slightly moved around and changed the ground elevation to fix some pathfinding issues near axis base
+- Lorraine:
+ * Moved the hedgerow near the graveyard to let vehicles pass through the opening in the trees.
+ * Moved some hedgerows near the road near to the graveyard allowing easier acces from western base.
+ * Created an additional entrance from the graveyard towards the church that only infantry can pass through.
+ * Moved the center house towards the north making it favor the eastern players less.
+ * Changed the overall layout of the middle of the map, added sandbags, moved the victory point slightly closer to the western base.
+ * Replaced a tall wall and added cover close to the center of the map towards the north-east side.
+ * Replaced a building that used to have only one exit towards eastern players. The building is now slightly damaged but can be entered and exited from both sides of the wall.
+ * Moved all base bunkers to make them work better with the mod and in general.
+ * Applied additional building damage to the building that can be entered near the eastern 2nd player's base.
+ * Completely redone all the AI markers on the map.
+ * Moved a munition point close to the western base towards the south of the map, redone its territory layout.
+ * Redone some territory layout on the south portion of the map to reduce the importance of the munition point that's close to the exit of eastern base.
+ * Improved some visuals near the south part of the map.
+ * Added an additional passage behind the buildings on the north side of the map.
+ * Improved impass zones near the eastern base elevated fuel.
+ * Added a feature that should not be missing from any map: a tractor.
+- 2p Duclair:
+ * Reworked AI marker positions
+ * Improved AI in general, it seemed to bug out a lot
+ * Moved and aligned a lot of floating objects
+ * Placed caps on non-capped fences
+ * Improved some splat visuals, added splats to empty craters or removed the craters
+ * Improved the ridiculous crater displacement
+ * Walls around the eastern base now have impass and work like proper walls as opposed to a bunch of separate objects
+ * Waves on water now move more slowly to make them look a bit more realistic
+
+Campaign:
+- Expert difficulty no longer grants enemy infantry 1.5x health.
+- Removed a lot of forced terrible AI behavior.
+- Disabled AIControl script in most missions to remove lag on some and improve scripted behaviors in general.
+- American campaign - Pershing is now properly locked out on missions prior to M15 Cornered Tiger.
+- Fixed an issue with engineers not being able to throw grenades on American M01 - Omaha beach.
+- American M02 - Vierville:
+ * Adjusted sight modifiers on players.
+ * Starting squads now spawn with 6 members.
+ * Officer at the bunker on the bottom right now has modifiers applied to it preventing it from dying too soon.
+ * Officer at the bunker will now react to enemies quicker.
+ * There will now be infantry by default near the officer at the bunker.
+ * Point capture time significantly decreased to reduce idle time when playing.
+ * Barn cinematic is triggered from a larger radius.
+ * Applied modifiers on aa emplacements to make them less deadly.
+ * Default Airborne squads have all been replaced by a special single player airborne squads with additional abilities and upgrades.
+ * Airborne squads that are pinned by flak emplacements now take 0.4 damage until rescued.
+ * Added heavy cover to protect the more exposed paratrooper squad that is taking fire from a flak emplacement.
+- American M03 - Carentan:
+ * Added a buildable medic to the church HQ.
+ * Added a medic to the starting squads.
+ * Replaced a lot of Fallschirmjagers with Luftwaffe.
+- American M04 - Carentan counterattack:
+ * Added a buildable medic to the church HQ.
+ * Slightly reduced the number of kills required to get the medal.
+- American M05 Redball express/Mounteborg:
+ * Dog company that's pinned in the courtyard will now do less damage to the enemy.
+ * The Panzer Group will arrive later to let the player actually be able to tech up before their arrival.
+ * Increased starting fuel.
+ * Made AI much more smart and responsive to threats, prepare for a real fight.
+ * Increased popcap.
+ * Increased unit line of sight.
+- Increased starting resources on American M08 - St. Fromond.
+- Rebalanced the Tiger Ace on American campaign's M14 - Autry. It is now exactly the same as the Blitzkrieg Tiger Ace, except for having a higher pool of hitpoints; 1600 as opposed to 1300.
+- Operation Market Garden fixes:
+ * Squad lock outs updated.
+ * M01 - Wolfheze Gliders: Increased the rate at which enemy paratroopers spawn.
+ * M02 - Wolfheze Attack: Lowered static resource income.
+ * Supply halftracks can now spawn goliaths in SP campaign exclusively. This is done to let the player blow up the bridge on M03 where there's no way to do it otherwise.
+ * M03 Oosterbeek now has a special script in place that will manually destroy the bridge since the damage from a single goliath is not enough.
+ * Best mission no longer throws an error when calliopes start to fire.
+ * Return to Valkenswaard mission no longer has mouse over tooltips for repairing wreckages since Bergetiger is no longer available in the mod.
+ * Arnhem mission tank reinforcements are now the correct Panzer Elite variants.
+- Liberation of Caen fixes:
+ * Squad and command tree lock outs updated.
+ * M01 Authie: Creeping barrage now unlocked properly.
+ * M02 Hill 112: bridge now gets properly destroyed after the explosion.
+ * M03 Carpiquet: Tetrarch glider is now properly unlocked.
+ * M03 Carpiquet: Enemy units now have slightly reduced sight radius.
+ * M07 Caen: The Crucible - The middle bridge will now properly get destroyed after explosives are detonated.
+ * M09 Bourguebus - Starting popcap increased slightly.
+ * M09 Bourguebus - Allied AI will now set up all its HQs.
+ * M09 Bourguebus - Jagdtigers that are in the city modifiers are no longer quite as crazy - 4x accuracy and damage (one shotting everything) to 2x.
+
+
+-------------------------------------------------------------
+Back to Basics v3.1 (March 24th 2013. rev 465)
+-------------------------------------------------------------
+
+Languages:
+- Fixed reported typos.
+- Improved unclear descriptions of units, abilities and upgrades.
+
+Global Balance Changes:
+- Turret Machine Guns firing arc decreased from 360° (180° to both sides) to 120° (60° to both sides). This makes it slightly easier to flank tanks and vehicles with a turret mounted Machine Gun.
+
+American:
+- Fixed a bug where the M4 'Assault' Sherman could not target Bunkers and other Structures.
+- Turret M2hb .50cal HMGs weapon tables fixed. This is a flat nerf for the weapon, as it had a way too high DPS at all ranges.
+- M2 60mm Mortar Setup time increased from 1.5s to 2.4s, to match all other mortars.
+- M26 Pershings come no longer with a Tank Commander by default. An upgrade which also gives the same modifiers as all Tank Commanders can now be purchased individually for each tank.
+
+Commonwealth:
+- Added a special Campaign-only Canadian Infantry squad to the Headquarters Command Truck, who can be deployed in certain missions. This squad is more similar to the Infantry Section:
+  * Three upgrades available: Flamethrower, Bren Light Machine Gun or a Boys AT Rifle.
+  * The ability to throw Grenades and Sprint.
+- Fixed a bug where the Tetrach was unable to fire its main gun after upgrading the Littlejohn Adapter.
+- Fixed the missing Flamethrower for the Canadian Infantry.
+- PIAT reliability at medium and long ranges has been increased.
+
+Wehrmacht:
+- Fixed a bug where the Sturmhaubitze 42 could not target Bunkers and other Structures.
+
+Panzer Elite:
+- 81mm Gr.34 Mortar Halftrack setup time increased from 2.2s to 2.4s, to match all other mortars.
+
+Campaign:
+- Liberation of Caen: M01 Authie
+  * Increased initial munition count to 600
+  * Decreased emplacement build time from 0.5 of original build time to 0.35
+- Liberation of Caen: M03 Carpiquet
+  * Fixed missing Canadian Infantry in the Headquarters Command Truck
+- Liberation of Caen: M04 Carpiquet: The Airfield
+  * Fixed missing Canadian Infantry in the Headquarters Command Truck
+
+AI:
+- Crucial AI attack priority logic improvements for Easy, Medium and Hard AI
+- Fixed an important bug where AI would stop controlling its units
+- AI reinforcing is now controlled manually through scar making AI not waste any time reinforcing its units
+- Improved heavy weapon setup logic
+- Improved early game attack logic slightly
+- Improved axis AI logic for purchasing pak38
+- Slightly improved AI artillery targeting logic (preventing AI from targeting single squads too often)
+- Decreased priority for some AI point types to prevent it from clumping units
+- Removed low priority markers from all the maps to prevent potential issues with them (they weren't placed properly)
+- Decreased Assault Sherman priority
+- Decreased Fuel bonuses
+- Increased Munition bonuses to match manpower bonuses
+- Slightly changed 3rd level of production purchase logic, eliminating the cases where the upgrade would switch back and forth
+
+-------------------------------------------------------------
+Back to Basics v3.0 (February 25th 2013. rev 457)
+-------------------------------------------------------------
+
+Global changes:
+- Fixed the Save Game function, the game will no longer Crash to Desktop when trying to load a saved game.
+- Fixed Tutorial and Performance Test not starting.
+- Cleaned up and optimized mod folders, reducing the overall mod size from 1.4GB to 1.0GB.
+- Added proper Hotkeys for a lot of units and abilities.
+- Off-map Artillery can no longer be casted directly on top of buildings.
+- Fixed a bug that Call-in abilities which have to spawn more than one unit only called in one or half the amount of intended units.
+- Fixed Selection Groups for all units.
+- Fixed a bug that Officers capable of following friendly squads could follow themselves.
+- Anti-Tank Guns, Mortars and Nebelwerfers can now be captured with up to 3 soldiers and reinforced to 4, like the original squad.
+- All basic defenses (Sandbags, Barbed Wire, Tank Traps and Roadblocks) now loose ownership when construction is complete.
+- Fixed water cover type tables
+
+Visual improvements:
+- Added custom high definition gruond textures. Credits for original textures go to Pfuscher. The textures used in the mod, however, have been hand picked and specular and normal maps have been heavily modified, to fit the original CoH feeling more while still providing additional detail and resolution.
+- Improved Local Ambient Occlusion shadows (LAO masks) for objects
+- Enabled LAO masks for all the faction units
+- Improved all grass textures
+- Improved all crater normal maps
+- Improved a few splat normal maps
+- Adjusted craters sizes depending on the shell/projectile size, to create a more diverse and realistic look.
+- Mortars now create proper craters like all other ballistic weapons.
+- Added new Tracer and Smoke Trail effects.
+- Fixed a bug where guns inside emplacements would float in the air.
+- Removed splats from Machine Gun Emplacements and Bunkers, which would show in the Fog of War.
+- Churchill Crocodile flame FX will now be above the ground instead of half burried.
+
+GUI:
+- Panzer Elite Defensive Emplacements got new icons and portraits.
+- Wehrmacht Defensive Emplacements got new icons and portraits.
+- New icons, symbols and portraits for Luftwaffe and Fallschirmjägers.
+- New symbols and portraits for Canadian Infantry and Highlanders.
+- Updated symbols for Panther and King Tiger.
+- Updated symbol and portrait for Sergeants
+- New symbol for the Tiger Ace.
+- New Symbol for the King Tiger.
+- New icons and portraits for all available Reward Units.
+- New icon for Jager Kommand Upgrade.
+- New symbol for the Sturmhaubitze 42.
+- New icons and symbols for PIAT Commandos, HMG Commandos, Mortar Commandos and the Commando Sniper.
+- Added Facing angles on direction setup for all Non-turreted vehicles.
+- Targeting circle of all standard Howitzer Barrage abilities will now increase in diameter depending on what range the howitzer is barraging.
+- When targeting the ability, off-map artillery barrages now show the correct area of effect range they have.
+- Artillery and Airstrike warnings redesigned and overhauled. Instead of dropped red smoke, there will be a yellow ring visible for 5 seconds to show where the barrage or airstrike is triggered. The idea behind this change is to fix the well known bug which sometimes won't show the smoke FX for players.
+
+Languages:
+- Improved descriptions for all Officer type units.
+- Improved descriptions of all units available, to show up-to-date and more detailed information.
+- Improved descriptions of all base buildings, to show correct information on what they contain.
+- Improved extra (yellow) help text of some units, to show more useful information on what units are useful for.
+- Improved and fixed descriptions of all Commander Trees and their upgrades.
+- Improved and fixed descriptions of spelling and grammar errors.
+- Replaced the tooltips which appear during the loading screen. They will now explain and hint the player about the gameplay changes in Back to Basics.
+
+AI:
+- Significantly improved AI script performance - it shouldn't slow down the game as much as it did before.
+- AI now handles unit priority from fuel/manpower ratio calculations differently. This majorly improves its spending and almost completely prevents it from floating resources.
+- AI Resource bonuses have been redistributed:
+  * Expert AI now has even more resource bonuses.
+  * Hard AI now has almost same resources as Expert AI had previously.
+  * Normal AI has more resources (between old Normal and Hard).
+- Completely redone AI attack logic:
+  * Greatly improved the way AI works on assymetrical maps with HQs closeby and a lot of important points to the side (like wolfheze and pointe du hoc).
+  * Fixed AI being too passive.
+  * Improved AIs decisions for holding back when it hasn't got enough units to attack.
+  * Makes AI attack decisions much more interesting in general. Expect to see lots of flanking and surrounding of your positions.
+  * Fixed reported errors for small maps.
+- Redone AI artillery target position choosing logic:
+  * Fixed wrong artillery/airstrike position console errors.
+  * Should fire mostly on visible units.
+  * Should almost never fire on empty areas of the map as it did before.
+- Improved AI defense logic and its defensive structure placement.
+- Improved ScAR controlled unit behavior:
+  * British HQ behavior seems to be in its sweet spot now.
+  * Significantly improved HMG behavior.
+- Improved Panzer Elite building purchase logic.
+- Slightly improved AI taking cover logic.
+- Reworked AI Victory Point priorities. Victory Point win condition was outright broken before, now fixed and working as intended.
+- Added a special retreating rule for when AI is reaching its population cap. This is supposed to address the issue of it having too many squads, which in term causes it to not be able to reinforce all/any of them and ultimately camp all of them in its base.
+- Improved AI threat detection for capture points - should capture under fire much less frequently.
+- Rewrote command tree random choices ensuring it works properly and more efficiently (didn't seem to do what it was supposed to do at all).
+- Improved AI's response to threats close to its HQ.
+- Fixed AI spamming stormtroopers.
+
+Commander Trees:
+
+- American Infantry Company:
+	right: Defensive Operations (1) > M5 76mm Anti-Tank Emplacement (2) > M2 105mm Howitzer Emplacement (4)
+	left: Rangers (3) > Off-Map Combat Group (3) > Manpower Push (2)
+	bottom: Rapid Response (1) > Howitzer Shoot (2)
+
+- American Airborne Company:
+	right: Air Reconnaissance (1) > Strafing Run (2) > Thunderbolt 'Hellfire' Overwatch (4)
+	left: Airborne Infantry (3) > Airborne Anti-Tank Gun (2) > Veteran Tactics (2)
+	bottom: Glider Headquarters (2) > Supply Drops (2)
+
+- American Armor Company:
+	right: Raid (1) > War Machine (2) > Calliope (3)
+	left: Armored Infantry (2) > M4 'Assault' Sherman (3) > Advanced Tank Destroyers (4)
+	bottom: Rapid Deployment (1) > Field Repairs (2)
+
+- Commonwealth Royal Scottish Engineers:
+	right: Highlanders (2) > Churchill (3) > Panther 'Cuckoo' (4)
+	left:  Improved Defenses (2) > Coated Optics (2) > Improved HQs (2)
+	bottom: Trench Securing (1) > Hull-Down (2)
+
+- Commonwealth Royal British Air Force:
+	right: Radio Triangulation (1) > Hawker Typhoon Airstrike (3) > Royal Air Force Overwatch (5)
+	left: Commandos (3) > Ultra Decryption (1) > Advanced Combat Training (2)
+	bottom: HQ Glider (1) > Tetrach Glider (2)
+
+- Commonwealth Royal Canadian Artillery:
+	right: Forward Observation Officers (2) > Overwatch Artillery (1) > Counter Battery (3)
+	left: Canadian Recon Element (3) > Creeping Barrage (2) > M7 Priest (3)
+	bottom: Canadian Infatry (2) > Supercharged Artillery Shells (2)
+
+- Wehrmacht Terror Doctrine:
+	left: Waffen SS (3) > Geschützwagen (2) > King Tiger (4)
+	right: Inpsired Assault (1) > Firestorm (2) > V1 Rocket (3)
+	bottom: Zeal (1) > Propaganda War (2)
+
+- Panzer Elite Scorched Earth Tactics:
+	right: Scorched Earth (1) > Hotchkiss Light Tank (3) > Hummel (4)
+	left: Gebirgsjägers (1) > Heavy Fortifications (3) > 88mm FlaK 36 Howitzer (2)
+	bottom: Demolition Experts (1) > Sector Artillery (3)
+
+- Panzer Elite Luftwaffe Tactics:
+	right: Luftwaffe Ground Forces (1) > Flakpanzer IV 'Wirblewind' (3) > 88mm FlaK 36 AT/AA (2)
+	left: Fallshirmjäger Infiltration (3) > Henschel Hs.129 Rocket Run (2) > Henschel 'PanzerKnacker' Support (3)
+	bottom:  Situational Awareness (1) >  Butterfly Mines (3)
+
+Maps:
+
+- Pointe du Hoc:
+  * Added an additional manpower point in the middle.
+  * Replaced Relic's Pointe duc Hoc bunkers with original ones used on the map.
+- Vire River Valley:
+  * Lowered the overall amount of munition income.
+  * Replaced the middle building to be more fair for both sides.
+  * Rearranged manpower points on the map.
+  * Slight rearrangements to munition points.
+  * Changed the total number of victory points to 3 and changed their layout.
+  * Fixed a lot of spline displacement profiles.
+  * Fixed a lot of ambiguity in map pathfinding.
+  * Added cover to middle and bottom parts of the map.
+  * Widened the middle passage in a way which will make it more difficult to cover it with a single MG and that allows additional flanking to the bottom of the map possibilities.
+  * Fixed bridge pathfinding errors (engineers being stuck at the bottom when tasked to repair).
+  * Improved a lot of terrain topology.
+  * Improved visuals near the houses of the bottom left side of the map.
+  * Rearranged a lot of AI markers to make AI flank to the sides more.
+  * Added a second version of the map which still has 4 Victory Points.
+
+Campaign:
+
+- Fixed flak vierling damage vs all infantry.
+- M01 D-Day:
+  * Decreased the effectiveness of the captured 88 gun (used to have quite insane modifiers, even allowing it to quickly snipe the other two 88s).
+- M02 Paradrop:
+  * Decreased overall income of the player
+  * Lowered damage multipliers for initial enemy units, it was a bit too difficult to assault the first position
+  * Increased base population cap
+  * Strategic point by the AA gun becomes neutral on AA gun destroyed in order to prevent too early firefights with the squads involved in the cinematic that follows next
+  * Slightly increased the radius inside which the barn cinematic triggers
+- M03 Carentan:
+  * Fixed AT gun retreating bug.
+- M04 Carentan Counterattack:
+  * Fixed mission ending prematurely due to the final condition being for destroying all StuGs and the map spawning only Marders - now checks for both types.
+  * Readjusted the amount of Marder IIIs and StuGs spawned - used to spawn too much marders and almost no stugs - now spawns both.
+  * Adjusted the amount of kills required to get the medal.
+  * Adjusted the flamethrower pioneer spawn counts.
+- M05 Redball Express:
+  * Increased initial resource amount to help withholding off initial stug attacks.
+  * Fixed Pershing being buildable.
+- M06 Cherbourg Assault:
+  * Fixed Pershing being buildable.
+  * Fixed offmap artillery not being unlocked.
+  * Adjusted command tree unlocks.
+  * Adjusted popcap.
+- M07 V2 Rocket:
+  * Added medic spawns.
+- M08 Artillery duel:
+  * Fixed Pershing being buildable.
+  * Increased AI popcap, resulting in more active units on the map.
+  * Slightly increased player popcap.
+  * Adjusted nebelwerfer damage.
+  * Removed firestorm from nebelwerfer barages.
+  * Made nebelwerfer barrages more accurate.
+  * Fixed a bug where single members left in nebelwerfer crew (not actually able to fire the nebel) wouldn't register as neutralized nebelwerfers.
+  * Adjusted other difficulty things.
+- M09 Hill 192:
+  * Fixed Pershing being buildable.
+
+Global balance changes:
+- General continuous improvements and balancing of the weapon and combat mechanics.
+- Reiteration of Infantry combat system. Quite drastic changes to wehrmacht weapon damage models.
+- Redesigned Mine Area of Effect damage and Target Tables, mines are now very likely to damage or destroy the engine or tracks on Medium and Heavy Vehicles with minimal damage, but deal medium to high damage and/or suppression towards Light Vehicles and Infantry. This makes mines how they were intended, to protect flanks, emplacements and cripple enemy advances.
+- Mines now have a 35% chance of blowing up the wheels of Halftracks and Armored Cars.
+- Equalized movement capabilities of all Sherman based vehicles (M4 Sherman, 'Crocodile', 'Easy Eight', 'Assault', Firefly, M7 Priest and Kangaroo).
+- Manpower Strategic Points income lowered from 8/13 to 6/10 manpower per minute (standard/secured).
+- Increased Grenade Projectile speed from 9 to 12.
+- Each Commander Tree takes 18 points to unlock.
+- Decreased damage that tank guns deal to emplacements from 2 to 1.5 times the initial damage.
+- Decreased accuracy that tank guns have to emplacements from 3 to 1 time the initial accuracy.
+- Lowered Single Shot weapon accuracy bonus against negative (red) cover from 1.15 to 1.05.
+- Removed Single Shot weapon damage bonus against negative (red) cover.
+- Rifles and Semi-Automatic Rifles accuracy multiplier on the move increased from 0.5 to 0.75.
+- Sherman based vehicles traverse decreased from 35 to 33.
+- Panzer IV based vehicles traverse rate decreased from 35 to 30.
+- Panther based vehicles traverse rate decreased from 30 to 25.
+- Pershing based vehicles traverse rate decreased from 30 to 25.
+- Hotchkiss based vehicles chassis traverse set to 30.
+- Panzer 38(t) based vehicles chassis movement parameters equalized.
+- Redesigned and fixed weapon tables of Turret, Coaxial and Hull Machine Guns mounted on vehicles, to be more in line with the Light Machine Gun Counterparts:
+  *Coaxial and hull MG42 Light Machine Guns on Axis vehicles deal half the DPS as the regular MG42 Light Machine Gun, with the range of Sub Machine Guns/Assault Rifles.
+  *Turret MG42 Light Machine Guns on Axis vehicles deal equal DPS as the regular MG42 Light Machine Gun with equal range.
+  *MG42 Light Machine Guns mounted on the Motorcycle and Schwimmwagen deals equal DPS as the regular MG42 Light Machine Gun with equal range, but does not suffer from accuracy penalties on the move.
+  *MG42 Light Machine Guns mounted on Axis Halftracks and Armored Cars are now equal to the regular MG42 Light Machine Gun.
+  *Coaxial and hull M1919a4/Besa Light Machine Guns mounted on Allied Tanks deals similar damage to that of the coaxial/hull MG42 Light Machine Gun, but is slightly better on long and worse on close range.
+  *Turret M2Hb .50cal Heavy Machine Guns mounted on the Allied tanks, armored cars and halftracks deals the highest DPS, higher than the MG42 Light Machine Gun, with equal range.
+  *M1919a4 Light Machine Guns mounted on the Jeep deals similar DPS to the regular MG42 Light Machine Gun with equal range, but is slightly better on long and worse on close range and does not suffer from accuracy penalties on the move.
+- Horizontal traverse speed of Anti-Tank Guns decreased. This change isn't highly notable, but should slightly increase the survivability of light vehicles.
+- Fixed some huge inconsistencies between different 20mm Flakvierling weapons. The Flakvierlings that the player will face in singleplayer missions will no longer obliterate anything that comes near them.
+- Redesigned Assault ability (for both Wehrmacht and American); The squad will now throw 1-2 grenades at the targeted unit and receives some good defensive modifiers, to help pushing into the enemy.
+- Assault ability munition costs decreased from 50 to 35.
+- Crews of emplaced weapons will now properly take damage in combat, making it much easier to break through emplacements, as the crew will die much faster than the emplacement does. This changes emplacement combat dramatically, as it will no longer require to completely destroy emplacements in order to disable them.
+- Grenades will now properly be thrown into emplacements, having high chances to kill crew members.
+- Dropzone scatter radius of paradrop abilities decreased from 30 to 10.
+- Tidied and fixed all veterancy points given when a unit dies or is destroyed; veterancy should now be received more equally across the four nations.
+- Tidied and fixed all command points given when a unit dies or is destroyed.
+- Equalized Sniper Rifle Statistics.
+- At veterancy 3, Snipers will now properly get Improved Camouflage; when camouflaged they will then move at a normal pace.
+
+American:
+- New reward unit: T17 Armoured Car, a Light Armoured Car replacing the M8 Greyhound when enabled. The T17 can be upgraded with a .50cal HMG. It is also capable of firing a Canister Shell, to deal with Infantry.
+- New unit: M18 Hellcat, buildable after Advanced Tank Destroyers is unlocked. It is a highly mobile tank destroyer that comes equipped with a powerful 76mm Anti-Tank Gun. Due to the use of HVAP ammunition, the gun has a higher chance to penetrate axis heavy tanks frontally than the M10 Wolverine has (the difference in global penetration is 0.01). It can be upgraded with a M2Hb .50cal HMG to deal with Infantry.
+- Removed M7 Priest from Infantry Company, thus removing the M7 Priest completely from the Americans.
+- Added Manpower Push to American Infantry Company, for 150 munitions you will be granted with 900 manpower, at the cost of 50% of your manpower income for 3 minutes.
+- Fixed a bug where Off-map Combat Group no longer would spawn the Rangers and Riflemen.
+- Fixed a bug where the 76mm Anti-Tank Gun could not use the AP Shells.
+- Fixed a bug where Medics would not heal other Medics.
+- Moved Assault Engineers upgrade from the Supply Yard to the Headquarters.
+- Moved Armor Skirts upgrade from the Supply Yard to the Motorpool.
+- Moved Defensive Smoke Screen and Advanced Tank Production from the Supply Yard to the Tank Depot.
+- Initial population cap increased from 45 to 55
+- Rifleman health decreased from 77 to 75, thus decreasing the squad health from 462 to 450.
+- Slightly lowered Area of Effect range of the M3 75mm Sherman gun.
+- m1911 Colt Pistol damage, accuracy and range tables improved and fixed.
+- M4 'Assault' Sherman can no longer fire on the move.
+- Command Squad can no longer use any kind of Victor Targeting.
+- M3 Grease Gun damage output has been decreased on all ranges.
+- Equalized the suppression Engineers receive, to be equal with Wehrmacht Pioneers.
+- Engineers can now also build Trenches after Defensive Operations is unlocked.
+- Engineers now need Assault Engineers to be upgraded to be able to use Grenades.
+- M36 Jackson now has its own selection group.
+- M26 Pershing crush type changed from Heavy to Medium. This means that the Pershing can no longer crush Hedges and Tank Traps. This is done to increase the importance of the Bulldozer upgrade available on the Shermans.
+- Improved the M26 Pershing movement and speed (increased acceleration, deceleration and top speed).
+- Calliope manpower Call-in cost increased from 500 to 600.
+- Calliope population cost increased from 10 to 12 to match all other Self-Propelled Artillery.
+- M1 57mm Anti-Tank Gun damage increased from 50/70 to 60/70.
+- M1 57mm Anti-Tank Gun 'AP Shell' ability weapon accuracy modifier increased from 1.5 to 5.
+- M1 57mm Anti-Tank Gun Crews are now armed with the M1911 Colt, instead of M3 Grease Guns.
+- M5 76mm Anti-Tank Emplacement fuel cost increased from 30 to 35.
+- M5 76mm Anti-Tank Gun reload time increased from 4/5 to 6/7 seconds.
+- M1917 Heavy Machine Gun and M2 60mm Mortar crews are now armed with a slightly weaker M1 Garand Rifle instead of M3 Grease Guns.
+- Airborne Infantry can no longer plant Demolition Charges.
+- Airborne Infantry can no longer construct M1917 Machine Gun Emplacments.
+- Airborne Infantry now are equipped with six M1 Garand rifles, instead of four M1 Garands, one M1 Carbine and a M1 Thompson Sub Machine Gun.
+- Assault Squad can now plant Demolition Charges.
+- Assault Squad can now only throw 'Assault' Grenades.
+- Medic Stations now require 7 casualties to spawn a Riflemen Squad.
+- Sergeants and the Command Squad now received shared veterancy from nearby Infantry Squads.
+- Renamed Staff Sergeant to Sergeant, for better and easier reference to the unit.
+- Sergeant (2 available) bonuses towards Infantry changed:
+  *Veterancy 0: Weapon Accuracy Modifier 1.05, Weapon Damage Modifier 1.01 
+  *Veterancy 1: Heroic Charge
+  *Veterancy 2: Weapon Damage Modifier 1.1, Received Veterancy Modifier 1.1
+  *Veterancy 3: Received Veterancy Modifier 1.2
+- Infantry Veterancy 3 Weapon Damage Modifier lowered from 1.25 to 1.15.
+- Heroic Charge now requires veterancy rank 1.
+- War Machine will now also replace the M4 Sherman 'Easy Eight', M4 'Assault' Sherman and M3 Halftrack.
+- M2a1 105mm Howitzer Emplacement can now use Air Detonation Barrage at veterancy 2.
+- M2a1 105mm Howitzer Emplacement can now use Bunker Buster Shell at veterancy 3.
+- Supply Yard Level 1 Production no longer increases the rate that Riflemen gain veterancy.
+- Supply Yard Level 2 Production no longer increases the rate that Riflemen gain veterancy.
+- Supply Yard Level 2 Production fuel cost decreased from 140 to 120.
+- Supply Yard Level 2 Production manpower upkeep modifier increased from 0.675 to 0.85.
+- Added Supply Yard Level 3 Production, a toggled Production level that can decrease the upkeep cost of troops by 25% at the cost only 50% fuel income while active.
+- Supply Yard Production levels reorganized:
+  *Level 1 Production: Decreases the Upkeep cost of your Troops by 20%.
+  *Level 2 Production: Decreases the Upkeep cost of your troops further by 25%.
+  *Level 3 Production: Decreases the Upkeep cost of your troops further by another 25%. But as long as it is turned ON, it will drain 50% of your fuel income.
+- M26 Pershing now also requires Improved Tank Production upgrade, just like the M4 'Easy Eight' Sherman.
+- M3 Halftrack upgraded to M16 .50cal Quad can no longer reinforce Infantry.
+- M16 Quad upgrade munition cost decreased from 100 to 75.
+- M8 Greyhound Mine Drop munition cost lowered from 50 to 35.
+- Medic Heal rate decreased from 0.15 to 0.09375.
+- Reworked Bombing Run into Thunderbolt 'Hellfire' Overwatch. Several P47 Thunderbolts will overwatch the designated area for a period of time, attacking visible enemy targets with powerful 5" High Explosive Rockets.
+- M8 Greyhound M2Hb .50cal Upgrade cost increased from 50 to 75 munitions to match all other turrent Machine Gun upgrades.
+- Smoke Discharges redesigned. The player now has to target the ability somewhere around the tank and the tank will then fire four Smoke Rounds to the targeted location.
+- Sherman Bulldozer munition cost decreased from 75 to 35.
+- Sherman Crab Mine Flail munition cost decreased from 75 to 50.
+- Off-map Combat Group manpower cost decreased from 800 to 650.
+- Off-map Combat Group will no longer call-in a T17 Armored Car, and an M10 Wolverine instead of the M18 Hellcat.
+- M1 Thompson SMG upgrade moved from the 2nd to the 1st upgrade slot.
+- Command Squad Off-map Mortar Strike recharge time increased from 30 to 60.
+- Command Squad now captures territory twice the default capture speed.
+- Command Squad bonuses are now applied in a 30 radius.
+- Command Squad bonuses towards Infantry changed:
+  *Veterancy 0 (Captain): Received Accuracy modifier 0.95, received Suppression modifier 0.9. (This basically means that the Captain cancels out Anti-Blob for up to 2 Infantry squads standing together)
+  *Veterancy 1 (Radio Operator): Increased Sight Range modifier of +5.
+  *veterancy 2 (Captain): Received Accuracy modifier 0.95, received Suppression modifier 0.9. (This basically means that the Captain cancels out Anti-Blob for up to 3 Infantry squads standing together)
+  *Veterancy 2 (Radio Operator): Increased Sight Range modifier +5. 
+  *Veterancy 3 (Captain): Received Accuracy modifier 0.95, received Suppression modifier 0.9. (This basically means that the Captain cancels out Anti-Blob for up to 4 Infantry squads standing together)
+- M9 Bazooka upgrade now requires the Supply Yard, instead of the Supply Yard OR Weapons Support Centre.
+- M18 Recoilless Rifle now uses its own projectile, instead of the same one as the M1 57mm Anti-Tank Gun, fixing the issue that the Recoilless Rifle would instantly hit its target.
+- Airborne Glider Headquarters heal rate decreased from 0.25 to 0.125.
+- Airborne Glider Headquarters heal radius increased from 15 to 20.
+- Airborne Glider Headquarters reinforce radius decreased from 25 to 20.
+- Motorpool reinforce radius increased from 0 to 20.
+- Tank Depot reinforce radius increased from 0 to 20.
+
+Commonwealth:
+- New reward unit: Sherman. Like the Cromwell, the M4A4 Sherman mates a 75mm gun with reasonable armor and good mobility. Can be upgraded with a Tank Commander to increase sight range, and can fire Smoke Dischargers to create a wall of smoke.
+- New reward unit: Staghound Armoured Car, a Light Armoured Car replacing the Stuart Light Tank when enabled. Less health than the Stuart Light Tank, The Staghound can be upgraded with Sandbags for extra health and a .50cal HMG. It can also lay mines to cover open flanks and cripple enemy assaults.
+- Canadian Infantry are redesigned. They now do suffer from the Movement Reduction Speed in neutral and enemy territory, but now instead they can use a Sprint Ability. In addition, they are armed with a more powerful version of the Lee Enfield Rifle, to indicate that Canadian Infantry are Heavy Shock Infantry. Their health is increased from 110 to 115, thus the squad health from 440 to 460. They still do come with a M2 Flamethrower and have the ability to throw grenades and construct trenches.
+- Highlanders are redesigned. They are now armed with a more powerful version of the Lee Enfield Rifle but no longer come with two Boys AT Rifles by default, they now can get them through an upgrade for 75 munitions. The Over Repair ability still comes by default, they have a basic construction menu and have the ability to throw Grenades.
+- Fixed a bug where Mortars and 25pdrs would loose their barrage ability when unlocking Victor Targetting.
+- Fixed a bug where 25pdrs could no longer use Counter Battery.
+- Fixed a bug that the Mortar Emplacement could not fire Mortar Smoke Barrages.
+- Fixed a bug that called in Field Support and Armored Command Trucks would not be able to move after reaching their initial destinantion.
+- Fixed a bug that Lieutenant bonuses would not stack when more than one Lieutenant was near an Infantry Squad.
+- Fixed a bug where Machine Gun Emplacements would not gain veterancy.
+- Fixed a rare bug that 25 Pounders activated for Counter Barrage would try to attack Henschel Hs.129 Attack Aircraft.
+- Reintroduced the vanilla style Truck Setup ability.
+- Initial population cap increased from 45 to 55.
+- Webley Revolver damage, accuracy and range tables improved and fixed.
+- Infantry Section, Sapper, Canadian Infantry and Highlander reinforce cost decreased from 46 to 40.
+- Smoke Rifle Grenades can now be used when the squad is entrenched or inside a building.
+- Sapper Demoltion Experts upgrade now gives the squad a camouflage detection radius as well as making them move at normal speed in enemy territory, as intended.
+- Canadian Infantry and Commandos now correctly benefit from the Lieutenant's bonuses.
+- Infantry can now also purchase upgrades near the Armored Command Truck.
+- Slightly lowered Area of Effect range of the Oqf 75mm Cromwell gun.
+- Slightly lowered Area of Effect range of the Qf 6pdr Churchill gun.
+- Kangaroo Carriers are now available for construction at the Armored Command Truck after being unlocked in the Royal Canadian Artillery Commander Tree.
+- Kangaroo hull Machine Gun will no longer target anything automatically.
+- All Commando Squads now have a unique selection group, making it easier to select multiple squads of a single kind.
+- Commandos can no longer be upgraded with the M9 Bazooka.
+- Commandos are no longer equiped with a Bren Mk.II Light Machine Gun.
+- Commandos now fully benefit from Lieutenant bonuses.
+- Commando reinforce costs decreased from 26 to 36.
+- Commando reinforce time modifiers decreased from 1.5x to 1x.
+- PIAT Commandos can now throw Grenades as intended, but can no longer plant Demolition Charges.
+- Mortar Commandos manpower cost decreased from 320 to 300.
+- HMG Commandos can now use Armour Piercing Rounds as intended.
+- Commando Jeep moved to the Glider Headquarters.
+- Canister Ammunition damage increased from 40/40 to 60/60.
+- Canister Ammunition range and accuracy tables fixed.
+- Churchill Population cost increased from 10 to 12.
+- Churchill health decreased from 1000 to 900.
+- The global mobility of Churchill Tanks has been decreased.
+- 320mm AVRE gun reload time increased from 10 to 12 seconds.
+- Casualty Clearing Stations now require 6 casualties to spawn an Infantry Section.
+- Lieutenant (3 available) bonuses towards Infantry changed:
+  *Veterancy 0: Weapon Accuracy Modifier 1.05, Weapon Damage Modifier 1.05
+  *Veterancy 1: Heroic Charge
+  *Veterancy 2: Weapon Damage Modifier 1.1
+  *Veterancy 3: Received Veterancy Modifier 1.1
+- Infantry Veterancy 3 Weapon Damage Modifier lowered from 1.25 to 1.15.
+- Heroic Charge now requires veterancy rank 1.
+- Hawker Typhoon Airstrike is now direction targetable and only 1 plane with .303cal Heavy Machine Guns and Anti-Tank rockets will attack the area.
+- Hawker Typhoon Airstrike cost lowered from 300 to 200 munitions.
+- Bren Carrier can move again while use Self-Repair.
+- Bren Carrier will take 1.5 times more damage while Self-Repair is active.
+- Bren Carrier Self-Repair now has a recharge time of 30 seconds.
+- Bren Carrier Self-Repair heal rate increased from 8 to 12.
+- Recon Element Marksman Shot munition cost increased from 25 to 35.
+- Recon Element Marksman Shot recharge time increased from 25 to 45 seconds.
+- 17pdr Anti-Tank Emplacement fuel cost increased from 25 to 35.
+- 17pdr Anti-Tank Gun firing arc decreased from 50/-50 to 30/-30, to match the M5 76mm Anti-Tank Gun.
+- 17pdr Anti-Tank Gun reload time increased from 4/5 to 6/7 seconds.
+- 17pdr APDS Shells munition cost decreased from 50 to 35.
+- 40mm Bofors Anti-Aircraft Gun fuel cost increased from 15 to 20.
+- Normalized the Anti-Air Capabilities of the 40mm Bofors Anti-Aircraft Gun.
+- Highlander Call-in manpower cost increased from 340 to 350.
+- Added 3 fuel/minute upkeep for the 17pdr Anti-Tank Gun.
+- Added 2 fuel/minute upkeep for he 40mm Bofors Anti-Aircraft Gun.
+- Panther 'Cuckoo' gun statistics fixed against Axis vehicles. The gun will perform similar to the 17pdr on the Firefly, but the Panther itself has a much higher survivability than the Firefly.
+- Foward Observation Officers Off-Map Artillery Strike recharge increased time from 30 to 60.
+- Captain now captures territory twice the default capture speed.
+- Captain bonuses are now applied in any territory sector.
+- Captain bonuses towards Infantry changed:
+  *Veterancy 0: Received Accuracy modifier 0.95, received Suppression modifier 0.9. (This basically means that the Captain cancels out Anti-Blob for up to 2 Infantry squads standing together)
+  *Veterancy 1: -
+  *Veterancy 2: Received Accuracy modifier 0.95, received Suppression modifier 0.9. (This basically means that the Captain cancels out Anti-Blob for up to 3 Infantry squads standing together)
+  *Veterancy 3: Received Accuracy modifier 0.95, received Suppression modifier 0.9. (This basically means that the Captain cancels out Anti-Blob for up to 4 Infantry squads standing together)
+- Captain bonuses towards Emplacements changed:
+  *Veterancy 0: Received damage modifier 0.85.
+  *Veterancy 1: -
+  *Veterancy 2: Received damage modifier 0.95.
+  *Veterancy 3: Received damage modifier 0.925.
+- Cromwell cost increased from 400/70 to 420/80 (manpower/fuel).
+- Sherman cost increased from 400/70 to 420/80 (manpower/fuel).
+- Sherman Firefly cost increased from 450/90 to 450/100 (manpower/fuel).
+- Casualty Clearing Station healing rate decreased from 0.25 to 0.0625.
+- 'Medical Supplies' reintroduced to the Casualty Clearing Station. For the cost of 35 munitions, squads which are in the proximity of the Casualty Clearing Station will heal four times faster while the ability is activated.
+- Casualty Clearing Station search radius decreased from 100 to 75, to match with all other Aid Stations.
+- Glider reinforce radius decreased from 25 to 20.
+- Glider Headquarters heal rate decreased from 0.25 to 0.125.
+- Glider Headquarters heal radius increased from 15 to 20.
+- Glider Headquarters reinforce radius decreased from 25 to 20.
+- Tetrach Glider manpower cost decreased from 450 to 300.
+- Infantry can now reinforce near the Tetrach Glider.
+- Infantry and Vehicles can now purchase upgrades nearby the Tetrach Glider.
+- Tetrach manpower cost decreased from 300 to 240.
+- Tetrach health decreased from 440 to 360.
+- Tetrach Little John Adapter redesigned: The upgrade will now increase the global penetration by 0.01 (just like the Hellcat over the Wolverine and the Panzer Elite APCR Shells).
+
+Wehrmacht:
+- New reward unit: Schwimmwagen. As a fast reconnaissance vehicle, the Schwimmwagen Type 166 can utilize its speed to mercilessly hunt down elusive Snipers. It costs 20 manpower more to produce, but in comparison to the Motorcycle, the Schwimmwagen can reverse.
+- Removed Jagdtiger from Terror Doctrine, thus removing the Jagdtiger completely.
+- Removed Waffen SS Command from Terror Doctrine, thus removing the Waffen SS Command completely.
+- Added 'Improved Equipment' to the Kampfkraft Centre. This upgrade will equip Pioneers and Volksgrenadiers with Grenades and Volksgrenadiers with Panzerfausts.
+- Fixed a bug that Blitzkrieg! would give double bonuses towards friendly vehicles.
+- Fixed a bug that the Geschützwagen accuracy tables were worse than the Marder III.
+- Fixed a bug that the Tiger Ace would turn the hull towards the direction it fired the Smoke Discharges.
+- P08 Luger Pistol damage, accuracy and range tables improved and fixed.
+- Medic Kit munition cost decreased from 20 to 15 munitions.
+- Medic Kit heal rate set to 0.15.
+- Sturmhaubitze 42 can no longer fire on the move.
+- Removed Barrage Ability from the Sturmhaubitze 42.
+- Pioneer MP40 damage output has been decreased on all ranges.
+- Pioneers now need Improved Equipment to be upgraded to be able to use Grenades.
+- All MP40 accuracy multipliers on the move have been slightly increased.
+- Panther traverse speed decreased from 35 to 30.
+- Aid Station Bunkers now require 5 casualties to spawn a Grenadier Squad.
+- Bunker Machine Gun, Aid Station and Repair upgrades no longer require the Skirmish Phase.
+- Bunker reinforce radius increased from 10 to 15, which is activated after 'Fortify the Perimeter' is unlocked.
+- The Leutnant now receives shared veterancy from nearby Infantry Squads.
+- Leutnant (1 available) bonuses towards Infantry changed:
+  *Veterancy 0: Supervise, Weapon Accuracy Modifier 1.15, Weapon Damage Modifier 1.03
+  *Veterancy 1: Force Retreat
+  *Veterancy 2: Weapon Damage Modifier 1.1
+  *Veterancy 3: Received Veterancy Modifier 1.3
+- Infantry Veterancy 3 Weapon Damage Modifier lowered from 1.25 to 1.15.
+- Leutnant can now use Force Retreat after Veterancy Rank 1 is achieved.
+- Leutnant Supervise ability no longer requires the Skirmish Phase.
+- The Leutnant no longer grants veterancy 1 from Veteran Infantry upgrade.
+- Fixed weapon tables of the 88mm FlaK36 AT/AA, to be equal to the Tiger but with better penetration and more range.
+- Waffen SS Infantry Call-in recharge time increased from 20 to 40 seconds.
+- 50mm PaK38 effectiveness against M10 Wolverines and M18 Hellcats increased.
+- 50mm PaK38 Crews are now armed with P08 Lugers instead of MP40 Sub Machine Guns.
+- Fixed Panzerfaust weapon tables, to be just as effective as an Anti-Tank Grenade.
+- Merged Volksgrenadier Grenade and Panzerfaust upgrades into 'Improved Equipement', which will unlock both the Grenade and Panzerfaust for the Volksgrenadiers.
+- Sd.Kfz. 251 Halftracks upgraded with Wurfrahmen 40 Stukas or Twin Flamethrowers can no longer reinforce Infantry.
+- Wurfrahmen 40" Stuka Rocket damage vs infantry types decreased from 0.75 to 0.6 times the initial damage.
+- Fixed Wurfrahmen 40" Stuka Rocket Area of Effect damage.
+- Wurfrahmen 40 Stuka and Nebelwerfer initial statistics equalized, but:
+  *Wurfrahmen 40 Stuka will deal more damage versus buildings and emplacements than the Nebelwerfer.
+  *Wurfrahmen 40 Stuka barrage range set to 125.
+  *Nebelwerfer will deal more damage versus Infantry than the Wurfrahmen 40 Stuka.
+  *Nebelwerfer barrage range set to 175.
+  *Both the Wurfrahmen 40 Stuka and Nebelwerfer deal equal damage to Vehicles.
+  *Both the Wurfrahmen 40 Stuka and Nebelwerfer Will no longer use a higher firing angle. It will now fire similar to Calliope.
+- Redesigned Tiger 812 'Tiki' into Tiger Ace with a new, more fitting texture. The statistics of the vehicle aren't changed.
+- MG42 Heavy Machine Gun and Gr.34 81mm Mortar Crews are now armed with the Volksgrenadier Kar98k instead of MP40 Sub Machine Guns.
+- Removed Sturmhaubitze accuracy penalty on lockdown.
+- At veterancy 3, Stormtroopers will now - besides their standard bonuses - receive Improved Camouflage. This will make them move at a normal pace when camouflaged.
+- Stormtrooper manpower Call-in cost increased from 375 to 400.
+- Waffen SS manpower Call-in cost increased from 400 to 425.
+- 88mm FlaK36 AT/AA Emplacement fuel cost decreased from 75 to 60.
+- 88mm FlaK36 AT/AA Emplacement population cost decreased from 11 to 8.
+- Added 3 fuel/minute upkeep for the 88mm FlaK36 AT/AA.
+- Removed 105mm leFH18 Howitzer Emplacement 50 munition cost, and set manpower cost to 400.
+- 81mm Gr.34 Mortar Emplacement manpower cost decreased from 320 to 280.
+- On-Map artillery will no longer fire a shell towards a V1 Rocket designated area.
+
+Panzer Elite:
+- New reward unit: Nashorn Tank Hunter. The nashorn is a lightly armored but powerful Tank Hunter, like the Marder III. However the Nashorn is armed with the more powerful 88mm PaK43 Anti-Tank Gun, dealing a higher alpha at the cost of rate of fire and mobility. Unlike the Marder III, the Nashorn cannot lockdown.
+- New unit: Panther, a Heavy Tank buildable at the Panzer Support Kommand for 600 manpower and 110 fuel, after Panther Support is unlocked. Can be upgraded with a Tank Commander and Armor Skirts.
+- New Building: Pantherturm, a Panther turret mounted on a strong bunker, creating an excellent anti-tank emplacement. Contructable by Gebirgsjägers after Heavy Fortifications.
+- Reintroduced Henschel Bombing Run as Henschel Hs.129 Rocket Run, a direction targetable airstrike which calls-in a Henschel Hs.129 Attack Bomber that will strafe the selected area with High-Explosive Rockets.
+- Removed Schwimmwagen from the Headquarters, thus removing the Schwimmwagen from the Panzer Elite.
+- Fixed a bug where the MG42 Heavy Machine Gun Team could exit the emplacement.
+- Fixed a bug where Fallshirmjägers could no longer spawn from ambient buildings.
+- Fixed a bug that Shocktroopers had critical type tp_infantry_heroic insted of tp_infantry.
+- Fixed a bug that Roadblocks would not grant Heavy Cover to Infantry.
+- Defensive Operations Healing Rate increased from 0.12 to 0.15.
+- Assault Grenadiers manpower cost decreased from 360 to 340.
+- Tank Busters manpower cost decreased from 360 to 340.
+- Added Pantherturm to the Gebirgjägers build menu, with a cost of 280 manpower and 45 fuel.
+- Mortar Bunker is no longer limited to 1.
+- Mortar Bunker now costs 260 manpower and 25 fuel.
+- Mortar Bunker and Pantherturm now require 'Heavy Fortifications' to be unlocked before the Gebirgsjägers can contruct them.
+- Infantry can no longer reinforce or resupply near Mortar Bunkers.
+- Medic Bunkers now require 5 casualties to spawn a Panzergrenadier Squad.
+- Redesigned and tidied Gebirgsjägers construction menu.
+- Gebirgsjägers can no longer use Advanced Repair.
+- Jagdpanther crush type changed from Heavy to Medium to match the Panther. This means that the Jagdpanther can no longer crush Hedges and Tank Traps.
+- Jagdpanther horizontal gun traverse angle decreased from -22/22 to -15/15, to be more align with the gun traverse animation.
+- Jagdpanther now has the same effective armor as Panthers upgraded with Armor Skirts.
+- Removed the timer of Bundled Anti-Tank Grenades; they will now detonate on impact.
+- Bundled Anti-Tank Grenade damage increased from 275/300 to 325/325.
+- Bundled Anti-Tank Grenade target tables fixed so that they do not deal full damage against Infantry.
+- Fixed and reworked 20mm Flakvierling weapon statistics.
+- Veteran Sergeant now grants +3 sight line to all Panzer Grenadier squads instead of +5.
+- Henschel Hs.129 75mm PaK40 scatter values decreased.
+- Henschel Hs.129 75mm PaK40 Anti-Tank Gun will now be more accurate due to less scatter and a tuned projectile, thus increasing the effectiveness of the Overwatch.
+- Henschel Hs.129 'Panzerknacker' Overwatch duration time increased from 65 to 90 seconds.
+- Incendiary Mortar Barrage damage over time decreased from 1.5 to 1.
+- Incendiary Mortar Barrage recharge time increased from 120 to 180 seconds.
+- Supply Halftrack can no longer repair itself or Buildings.
+- Panther Battlegroup reworked into Veteran Panther Support, a one time Call-in ability that deploys two Veteran 1 Panther Tanks, upgraded with Armor Skirts and a Tank Commander.
+- Incendiary Stuka Barrage damage over time decreased from 2.5 to 1.5.
+- Tank Busters reinforce cost increased from 33 to 35, to match Panzer Grenadiers.
+- Assault Grenadiers reinforce cost increased from 33 to 35, to match Panzer Grenadiers.
+- Marder III health increased from 550 to 600.
+- Increased Hetzer health from 500 to 600.
+- Panzer IV Infantry Support Tank 75mm KwK37 L/24 'Stubby' gun Area of Effect damage increased.
+- 75mm KwK37 L/24 'Stubby' gun projectile speed and acceleration increased from 45 to 90.
+- Luftwaffe Ground Forces are now armed with the same Kar98k Rifle as the Volksgrenadiers.
+- Supply Halftrack will now also recharge abilities at a faster rate of an allied Panzer Elite player.
+- Wurfrahmen 40" Stuka Incendiary Rockets Will no longer use a higher firing angle. It will now fire similar to Calliope.
+- Updated Group Zeal upgrade to completely even out penalties given by the antiblob mechanism. This means that after this upgrade is purchased, grouped Panzer Grenadier Squads are no longer affected by antiblob.
+- Updated Veteran Sergeant upgrade to make Panzer Grenadiers a bit tougher against suppression (from 0.95 to 0.9 received suppression) and damage (0.95 received damage). In addition, Veteran Sergeant still gives Panzer Grenadiers 1.25 received veterancy, to increase the rate veterancy is earned, and an extra 3 range of sight line.
+- Fallschirmjägers Hide ability swapped with Camouflage ability.
+- Fallschirmjägers receive at veterancy rank 3, as well as their standard bonuses, Improved Camouflage. This will make them move at a normal pace when camouflaged.
+- Set FG42 range tables to equal to rifle ranges with a damage between Assault Rifes and Light Machine Guns; the reason behind this is that the FG42 combines the firepower of an LMG with the portability of an Assault Rifle. This makes the FG42 a very unique weapon to use.
+- 88mm FlaK36 AT/AA Emplacement fuel cost decreased from 75 to 60.
+- Fixed 88mm FlaK36 range and weapon tables to be in line with other Artillery, and set damage to 225/250. The 88mm FlaK36 deals the lowest initial damage per shell of all howitzers but it therefore fires 7 shells per barrage with a lesser time between each shell.
+- Hummel Lockdown barrage range decreased from 250 to 240, to match the M7 Priest with Supercharged Artillery Shells.
+- Added a small delay between the activation and the first fired shell of Sector Artillery.
+- Sectory Artillery will now fire two shells per interval.
+- Sector Artillery duration time decreased from 130 to 120 seconds.
+- Funkwagen 'Vampire' Halftrack Off-map Mortar Strike recharge time increased from 30 to 60.
+- Funkwagen 'Vampire' Halftrack sight range increased from 45 to 55, to match Jeeps and Moo
+- Fallschirmjägers, Luftwaffe Ground Forces, Shocktroopers and Gebirgsjägers now properly resupply their abilities at the Supply Halftrack or Headquarters.
+- Throw Grenade ability recharge time increased from 25 to 240, to match the Throw Incendiary Grenade ability.
+- Throw Anti-Building Incendiary Grenade Incendiary animation will now disappear correctly at the same time the damage over time ends.
+- Removed Double Anti-Tank Grenade ability from Tank Destroyer Tactics.
+- Supply Halftrack build time increased from 30 to 40 seconds.
+- Field Craft now enables Infantry to capture while inside Infantry Halftracks.
+- APCR Shells redesigned; the upgrade will now increase the global penetration by 0.01. The affected vehicles: Light AT Halftrack, Marder III, Nashorn, Hetzer, Panzer IV, Panther and the Jagdpanther.
+- Light Anti-Tank Halftrack weapom tables redesigned, improved and fixed. The Light Anti-Tank Halftrack is now a very effective weapon against Armored Cars and Light Tanks.
+- Light Anti-Tank Halftrack fuel cost increased from 15 to 20.
+
+
+-------------------------------------------------------------
+Back to Basics: Battle of the Hedges v2.1    (June 15th 2012)
+-------------------------------------------------------------
+
+Global:
+- Fixed a bug where Grenades could not damage team weapon crews inside emplacements.
+- Fixed various invalid desciptions as well as giving them an overall improvement.
+- Victor Target range casting range increased from 45 to 50.
+
+AI:
+- Fixed a reported fatal scar error bug for Commonwealth HQ control script.
+
+GUI:
+- Added a new custom loading screen which in HD resolution (1920x1080).
+- Updated the Main Menu background to be HD resolution.
+
+Languages:
+- German, French, Spanish, Czech, Polish, Italian and Russian languages now completely swapped to English text, to include all new custom values.
+- Chinese translations added, thanks to Saukopf.
+
+Maps:
+- Fixed that Brinelle (4) would crash on load.
+
+American:
+- Fixed a bug where the Off-Map Combat Group would not drain enough population on call-in.
+- Fixed a bug where the Off-Map combat Group would spawn the T17 Armored Car and Infantry Squads simultaniously, instead of with a small delay between the units.
+- Fixed a bug where the M36 Jackson Battlegroup would spawn two Panthers simultaniously, instead of with a small delay between the vehicles.
+- Fixed a bug that when Armored Infantry was unlocked, all Light Vehicles granted the ability to capture strategic points.
+- Fixed a bug that Allied War Machine wasn't unlocked until the T34 Calliope Rocket Artilery also was unlocked.
+- M8 Greyhound Mine Drop cost decreased from 50 to 35 munitions.
+- T17 Armored Car Mine drop cost decreased from 50 to 35 munitions.
+
+Commonwealth:
+- Fixed a bug where Mortar Emplacements were able to throw grenades.
+- Fixed a bug where Artillery and Mortar Barrages would disappear when unlocking Victor Targetting.
+- Fixed armour type of the Panther 'Cuckoo'.
+- Smoke Rifle Grenade now costs 15 munition to be in line with all other Smoke Barrages.
+- Lowered the chance that Boys AT Rifles penetrate Tigers, King Tigers and Jagdtigers.
+- Staghound Mine Drop cost decreased from 50 to 35 munitions.
+- Removed Mortar Overwatch Barrage.
+- Fixed missing requirement for the Command Tank's Smoke Creeping Barrage, it now requires Forward Artillery Observers from the Royal Canadian Artillery, as intended.
+- Added missing reinforce radius to the Kangaroo Carrier.
+- Churchill AVRE can now auto search targets, being effective versus Infantry and Buildings.
+- Churchill AVRE "Fire 290mm Petard" ability can now exclusively be targeted on Buildings, but will destroy almost any building with a single shell.
+- Fire 290mm Petard ability cost increased from 25 to 100 munitions, and recharge set to 100 seconds.
+- Canadian Infantry can no longer construct Defenses, as intended.
+- Normalized Tetrach weapon to be equal to the Stuart Gun.
+- Normalized Tetrach Little John Adapter to be a littlebit more powerful than the normal gun, with a small area of effect explosion.
+- Boys AT Rifle target penetration values nerfed against medium and heavy tanks.
+
+Wehrmacht:
+- Fixed a bug where Motorcycles were too resistant to allied armored cars.
+- Fixed a bug where the 81mm Gr. 34 Mortar Emplacement could not be recrewed after the mortar was destroyed.
+- Panther Turret MG42 upgrade cost increased from 50 to 75 munitions, to match with all others.
+- Fixed a bug where Forced Retreat would not activate.
+- Increased Forced Retreat casting range from 25 to 40.
+- Inspired Assault no longer costs munitions to activate, and recharge time increased from 45 to 90 seconds.
+- Inspired Assault now also resets any suppression of the affected Infantry.
+
+Panzer Elite:
+- Fixed a bug where the Panther Battlegroup would spawn two Panthers simultaniously, instead of with a small delay between the vehicles.
+- Fixed a bug where the Scout Car got extreme suppression modifiers on lockdown.
+- Fixed a bug where Fallshirmjägers could not Infiltrate from buildings anymore.
+- Fixed a bug where Schimmwagens and Kettenkrads were too resistant to allied armored cars.
+- Fixed a bug where Fallshirmjägers would instantly camouflage after each shot and not reveal during combat; making them nearly invincible.
+- Fixed a bug that Overdrive on the Sd.Kfz. 222 Armored Car would drain fuel income when activated.
+- Mortar Bunker Barrage moved from slot 9 to slot 8.
+- Mortar Bunker Description fixed.
+- Added missing FG42 Assault Rifle, so that every squad member has one once upgraded.
+- Set FG42 range tables to be the same as rifle ranges; the reason behind this is that the FG42 combines the firepower of an LMG with the portability of an Assault Rifle. This makes the FG42 a very unique weapon to use.
+
+
+
+
+-------------------------------------------------------------
+Back to Basics: Battle of the Hedges v2.0     (June 6th 2012)
+-------------------------------------------------------------
+
+
+Global
+
+- Reworked Anti-Blob ability; it gives a received suppression of 1.1, received accuracy of 1.05 and weapon accuracy of 0.95.
+- Completely fixed 5% health bug.
+- Increased Maximum Camera Zoom out from 40 to 45.
+- Reworked FX, tracers and other bullet impacts are back with higher quality.
+- Infantry will often no longer jump out of cover (for the most part).
+- Decreased sight range on Stratigic Points from 10 to 4.
+- Manpower Strategic Points income increased from +3 to +8 per minute. If secured +13.
+- Bundled Grenade munition cost reduced from 50 to 35.
+- Fixed various overlapping hotkeys.
+- Infantry now get the munition recharge icon above their head when a Deuce and a Half or Opel Blitz is near.
+- Fixed that the engine critical hit could stack endlessly.
+- Reduced reload time for Rifle Grenades.
+- Increased emplacement survivability.
+- Decreased Anti-Tank Grenade damage vs buildings from 1x to 0.35x.
+- Fixed that weapons dropped from paradrops would be player owned - thus being able to fire.
+- Updated M7 Priest skin and fixed the animation on the tracks.
+- Increased M7 Priest speed/acceleration.
+- Infantry upgrades can now be purchased near bunkers.
+- Vehicle upgrades can now be purchased near repair bunkers.
+- Removed Sd.kfz. 251/22 Pakwagen reward unit.
+- Removed Tiger 131 reward unit.
+- Barbed Wire build time increased from 5 to 10.
+- Barbed Wire manpower cost increased from 0 to 3.
+- Tank Traps build time increased from 30 to 35.
+- Tank Tarps manpower cost increased from 0 to 5.
+- Sandbags build time increased from 12 to 17.
+- Sandbags manpower cost increased from 0 to 5.
+- Road Blocks build time increased from 20 to 35.
+- Road Blocks manpower cost increased from 0 to 10.
+- Slit Trench build time increased from 20 to 25.
+- Slit Trench manpower cost increased from 0 to 40.
+- Bunker build time increased from 60 to 90.
+- Increased build time of the 105mm leFH18 Emplacement and 88mm Flak 36 Howitzer to 120 to match with the American and Commonwealth.
+- Increased build time of Anti-Tank Gun Emplacements (75mm M5, 17 Pounder, 88mm Flak 36) from 60 to 100.
+- Increased build time of Medium Gun Emplacements (40mm Bofors, 20mm Flakvierling) to 90.
+- Increased build time of Support Weapon Emplacements (Mortars, Machine Guns) from 60 to 80.
+- Decreased accuracy and penetration on medium and long ranges for Infantry Anti-Tank Weapons (Panzerschreck, Bazooka, Recoilless Rifle, PIAT).
+- Increased accelleration for M10 Wolverine, M36 Jackson, M18 Hellcat and Cromwell.
+- Fixed that the Foxhole wouldn't turn neutral when finished construction.
+- Heavy Machine Guns do less damage and have less accuracy vs. heavy cover.
+- King Tiger and Jagdtiger and Jagdpanther fuel upkeep increased from 0 to 6 per minute.
+- Tiger fuel upkeep increased from 0 to 5 per minute.
+- Panther and Pershing fuel upkeep increased from 0 to 4 per minute.
+- Sherman, Panzer IV, Cromwell, Firefly, Priest, Hummel, Ostwind, Wirblewind, Hetzer, StuG IV and StuH 42 fuel upkeep increased from 0 to 3 per minute.
+- M10 Wolverine, M18 Hellcat, Marder III, Geschutzwagen and Nashorn fuel upkeep increased from 0 to 2 per minute.
+- M8 Greyhound, M8 Scott, Puma, Hotckiss, T17, Staghound, Tetrach and Stuart fuel upkeep increased from 0 to 1 per minute.
+- Decreased minimum range of tank guns from 5 to 0.
+- Lowered the cost of Mines from 25 to 15.
+- Lowered the cost of Teller Mines from 50 to 30.
+- Fixed invisible weapons for weapon teams.
+- Increased flying speed of most aircraft.
+- Fixed AT-gun vs AT-gun accuracy and damage.
+- Fixed a bug where Sniper Rifles would target vehicles on their own.
+- Tweaked all mortar area of effect damage on long (0.4 to 0.3) and distant (0.2 to 0.1) ranges.
+- Improved a lot of unit Descriptions to show correct information
+- Decreased Medic Station search radii from 150 to 100.
+- Decreased Repair Station search radius from 75 to 50.
+- Increased the health of all wrecks by 100%.
+- Reworked Area of Effect on all explosion weapons (Artillery, Mortars, Grenades, Mines, etc).
+- Satchel Charges damaged lowered from 400/600 to 300/300.
+- Goliath damage increased from 375/375 to 400/400.
+- Demolition Charges damage equalized to 400/400.
+- Smoke Mortar Barrages now cost 15 munitions to fire.
+- All Off-Map Artillery or Airstrikes now have a minimal of 120 seconds recharge time, with the exception of Air Recon and Fake Decoy Artillery, which have 60 seconds.
+- Reworked all Light Machine Guns to act as an all-range support weapon, instead of being super Sub Machine Guns.
+- Mortars can no longer endlessly destroy a vehicles engine.
+- Gliders will now be camouflaged when called in and remain camouflaged until detected.
+- All Kar98k Rifles now have the historical 5 clip magazine.
+
+Maps
+- Added special invisible AI markers to all of the available maps in Back to Basics. AI markers increase the overall performance of the AI on all maps, making it act more intelligent and thus giving a bigger challenge.
+- Added "Henstrand Flank" as a new 2 player map. Credits to PeeRiddle.
+- Added "Le Tremblot" as new 2 player map. Credits to PeeRiddle.
+- Added "Route D913" as new 2 player map. Credits to Playmobill.
+- Added "Graon" as new 2 player map. Credits to AverageJoe.
+- Added "Alencon" as new 2 player map. Credits to GarnierMcGarvey.
+- Added "Bieville Orne" as new 4 player map. Credits to TheSphinx.
+- Added "Bärenschanze" as new 4 player map. Credits to TheSphinx.
+- Added "Brinelle" as new 4 player map. Credits to Stazis.
+- Added "Bocage" as new 4 player map. Credits to Cam51.
+- Added "Blazing Lowland" as new 6 player map.
+- Added "Berlin 1945" as new 8 player map. Credits to Playmobill.
+
+Commander Trees
+
+- All Commander Trees cost a total of 18 Command Points to fully unlock.
+
+- Redesigned American Infantry Company:
+
+	right: Defensive Operations (1) > 76mm AT Emplacement (2) > m2a1 105mm Howitzer (3)
+	left: Rangers (3) > Off-Map Reinforcements (3) > M7 Priest (3)
+	bottom: Rapid Response (1) > Off-Map Artillery (2)
+
+- Redesigned American Armor Company:
+
+	right: Raid (1) > War Machine (2) > Calliope (3)
+	left: Armored Infantry (2) > M4 'Assault' Sherman (3) > M36 Jackson Battlegroup (4)
+	bottom: Rapid Deployment (1) > Field Repairs (2)
+
+- Redesigned Commonwealth  Royal Highlanders:
+
+	right: Staghound (3) > Churchill (2) > Panther 'Cuckoo' (3)
+	left: Highlanders (2) > Hull-Down (2) > Improved HQs (3)
+	bottom: Trench Securing (1) > Improved Defenses (2)
+
+- Redesigned Wehrmacht Defensive Doctrine Tree:
+
+	left: For the Fatherland! (1) > Fortify the Perimeter (2) > 88mm FlaK 36 AT/AA (4)
+	right: Advanced Warning (1) > Defensive Mortar Barrage (3) > 105mm leFH18 Howitzer (3)
+	bottom: Take Cover! (2) > 280mm Rocket Artillery (2)
+
+- Redesigned Wehrmacht Blitzkrieg Doctrine Tree:
+
+	left: Stormtroopers (2) > Assault Tank Support (3) > Tiger 812 "Tiki" (4)
+	right: Raiders (1) > Improved Supply Lines (2) > Veteran Tankers (3)
+	bottom: Assault (1) > Blitzkrieg! (2)
+
+- Redesigned Panzer Elite Luftwaffe:
+
+	right: Luftwaffe Ground Forces (1) > Flakpanzer IV 'Wirblewind' (3) > 88mm FlaK 36 AT/AA (2)
+	left: Fallshirmjägers (3) > Drache Drop-Off (2) > Henschel Anti-Tank Overwatch (3)
+	bottom: Butteryfly Mines (2) > Black Out (2)
+
+- Redesigned Panzer Elite Scorched Earth:
+
+	right: Scorched Earth (1) > Precision Artillery (2) > Hummel (4)
+	left: Gebirgsjägers (2) > Hotchkiss Light Tank (2) > 88mm FlaK 36 Howitzer (2)
+	bottom: Demolition Experts (1) > Sector Artillery (3)
+
+- Redesigned Panzer Elite Tank Destroyers:
+
+	right: Shocktroopers (2) > Hetzer (3) > Jagdpanther (4)
+	left: Teller Mines (1) > Panzer IV Self-Repair (3) > Double Infantry AT Efforts (2)
+	botom: Tank Awareness (1) > APCR Shells (2)
+
+
+
+American
+
+- American Weapon Teams are now armed with the M3 Grease Gun instead of the M1 Carbine.
+- M1 Carbine damage, accuracy and fire rate increased.
+- Logistic Engineers reworked to Armored Infantry with new GUI icons. Armored Infantry are armed with 4 M1 Carbines, can throw Grenades and Sticky Bombs as well as being able to use Advanced Repair, and come with nice new GUI icons.
+- War Machine now also affects the M8 Scott and M36 Jackson, and will also replace jeeps and Deuce and a Half's (but they don't count for the limit of 2 vehicles).
+- Decreased Pershing damage from 135/165 to 120/140.
+- Decreased M36 Jackson damage from 135/165 to 120/140.
+- Fixed the bug that American Machine Gun crews could throw grenades.
+- Increased American Machine Gun Nest damage, matching the mobile .30cal Machine Gun.
+- Decreased Calliope Call-in manpower cost from 650 to 600.
+- Decreased M1A1c 76mm Sherman upgrade fuel cost from 50 to 35.
+- Fixed the bug that T17's could not capture stragetic points.
+- Fixed selection groups for Staff Sergeant and Radio Operator.
+- Merged American Captain and Radio Operator into Command Squad, buildable from HQ for a cost of 300 manpower. The Command Squad gives increased sight range to nearby infantry, can call in a small mortar barrage, and use unique abilities depending on which Commander Tree you chose. Victor Targeting for the M7 Priest or T34 Calliope, or call off-map fighter bomber support.
+- American M7 Priest no longer has the mudguards.
+- Fixed M3a1 Halftrack combat slots; Infantry can now properly fire out of the Halftrack.
+- Increased M8 Greyhound health from 177 to 240.
+- M8 Greyhound Skirts upgrade multiplies health x1.5 instead of x2.
+- M8 Greyhounds can no longer upgrade Armor Skirts individually.
+- Added a new global upgrade to the Supply Yard, which gives all M8 Greyhounds Armor Skirts.
+- Motorpool now requires either the Barracks AND Weapons Support Center OR the Supply Yard.
+- Tank Depot now requires either the Supply Yard OR the Motorpool.
+- Increased Medic Station cost from 150 manpower to 170 manpower and 10 fuel.
+- Decreased American Machine Gun Emplacement cost from 240 manpower and 15 fuel to 150 manpower and 10 fuel.
+- Airborne Machine Gun Emplacement can now be build in enemy territory.
+- Airborne Machine Gun Emplacement manpower cost decreased from 300 to 200.
+- Increased M1 Garand accuracy on long/distant range from 0.22/0.18 to 0.28/0.2.
+- Decreased M1918 Browning Automatic Rifle damage from 14/17 to 10/12.
+- Decreased M5 76mm Anti-Tank Gun reload time from 10/12 to 4/5.
+- Off-Map Reinforcements now will always spawn a M18 Hellcat, T17 Armored Car and 2 Infantry Squads.
+- Lowered P47 Thunderbolt .50cal accuracy on all ranges from 1 to 0.1.
+- Fixed scatter values to match with vCoH on P47 Thunderbolt .50cal.
+- Fixed that the Assault squad would throw Axis Stielgranate 24 grenades during assault instead of mk2 grenades.
+- Fixed that Fire-Up didn't have negative modifiers at the end of the ability.
+- Airborne Infantry now reinforce 1.5 times slower (10.5 seconds).
+- M8 Greyhounds and T17 Armored Cars now prioritize light vehicles over infantry.
+- Lowered scatter radius of T34 Calliope.
+- Lowered Calliope damage from 80/100 to 75/75.
+- Increased Riflemen Health from 70 to 77.
+- Decreased Browning Automatic Rifle penetration vs. Panzer Elite light vehicles form 0.45 to 0.2.
+- Increased M1 Bazooka accuracy versus the Puma.
+- Airstrikes can no longer be called in simultaneously.
+- Limited Medic Stations to 3.
+- Fixed a bug where M8 and T17 couldn't penetrate the Hotchkiss.
+- Fixed a bug where the M4 Sherman couldn't penetrate the Hetzer.
+- Fixed an bug where Grendiers could still purchase a second upgrade after purchasing the first.
+- Decreased M1903 Springfield Sniper Rifle range from 73 to 72.
+- M2 60mm Mortar damage changed from 37.5/67.5 to 50/65.
+- Merged Engineer Thompson and Demolition Charge upgrades into Assault Engineers.
+- Increased Reinforcement Time of paradropped Anti-Tank Guns.
+- Decreased Priest M2a1 105mm Howitzer damage from 335/335 to 275/300 to match with the normal M2a1.
+- Bunker Buster ammunition should now always destroy bunkers as well as being able to fire in the Fog of War.
+- Fixed that Bunker Buster Ammunition would often miss it's target.
+- Decreased the Scatter of the M1 Bazooka.
+- Fixed a bug where the Bombing Run would often miss it's target.
+- Armored Infantry can no longer follow tanks.
+- Bazookas and Recoilless Rifles now have 15% chance to damage the engine of Halftracks which are at green health.
+- Moved Sherman Smoke and 76mm Sherman upgrade to Supply Yard.
+- Decreased reload time of the 37mm M8 Greyhound gun from 9/9 to 6/6.5, to match with all other 37mm guns.
+- Added M4 'Assault' Sherman, a Sherman mounted with a M4 105mm Howitzer, only available as call-in in the Armor Company Commander Tree.
+- Fixed a bug where the M18 Hellcat and M10 Wolverine could be selected through the Supply Yard shortcut.
+
+Commonwealth
+
+- Fixed the delay bug from Commonwealth Forward Officer Observers.
+- Commonwealth Mortar Barrage range increased from 90 to 100.
+- Commonwealth Supercharge Mortar Barrage range increased from 100 to 110.
+- Reworked Bren Light Machine Gun upgrade into Support Element; It will equip 1 Bren Light Machine Gun and 1 Boys Anti-Tank Rifle.
+- Reworked Rifle Grenade upgrade into Assault Element; it will equip 1 Rifle Grenadier and 1 Boys Anti-Tank Rifle.
+- Increased Infantry Section health from 74 to 83.
+- Increased Sapper health from 71 to 90.
+- Increased Lieutentant health from 77 to 103.
+- Increased Captain health from 77 to 103.
+- Highlanders come standard with the 2 Boys Anti-Tank Rifles.
+- Increased Commonwealth Machine Gun Nest health from 650 to 700.
+- Increased Vickers Machine Gun damage from 12/14 to 15/20, matching all other Machine Guns.
+- Fixed population cost for Kangaroo call-in.
+- Reverted Kangaroo Critical type to be armour, instead of Halftrack.
+- Fixed the bug that 25 Pounders could still fire regular barrages without recharge while Counter Battery was active.
+- Updated Churchill skin.
+- Updated stuart skin.
+- Lowered Churchill population from 14 to 10.
+- Lowered Churchill AVRE population from 14 to 8.
+- Added new Commando Jeep model; armed with a Bren Light Machine Gun and Twin Vickers K.
+- Fixed that Vickers Machine Gun Emplacement would turn another direction when finishing construction.
+- Increased Creeping Barrage damage from 125/125 to 200/250.
+- Decreased Boys AT Rifle damage from 55/65 to 45/55.
+- Fixed target tables from the Boys AT Rifle.
+- Increased scatter radius of Rifle Grenades from 7 to 10.
+- Decreased Rifle Grenades accuracy on long range from 1 to 0.5.
+- Fixed Smoke warnings from Typhoon Aistrike.
+- Decreased Commonwealth Lieutenant bonus modifiers; Accuracy from 1.15 to 1.05 and Damage from 1.15 to 1.05.
+- Decreased Commonwealth Lieutenant vet 2 bonus modifiers; Accuracy from 1.15 to 1.05 and Damage from 1.15 to 0.
+- Lowered Canadian Infantry squad size from 5 to 4.
+- Canadian Infantry can no longer purchase any upgrades, intsead they come with 1 M2 Flamethrower.
+- Canadian Infantry can no longer construct defenses.
+- Canadian Infantry health set to 110, with riflemen_elite infantry type.
+- Canadian Infantry no longer have slow movement speed in neutral or enemy territory.
+- Counter Battery fire cooldown increased from 10 to 20 seconds.
+- Counter Battery shots decreased from 3 to 2.
+- Countery Battery costs 100 munitions to activate.
+- Overwatch Battery costs 50 munitions to activate.
+- Increased Sten SMG accuracy on all ranges.
+- Fixed Sten SMG cooldown multiplier on distant range from 10 to 1.5.
+- Fixed that the Kangaroo Carrier could not capture strategic points when it's garrisoned.
+- Fixed Artillery modifiers against trench cover.
+- Fixed no damage from Typhoon strafing planes.
+- Increased FireFly health from 508 to 571, to match all shermans.
+- All gliders can now train squads in enemy territory.
+- Airstrikes can no longer be called in simultaneously.
+- Decreased Bren Carrier Self Repair heal rate from 8 to 6.
+- Bren Carrier can no longer move during Self-Repair.
+- Fixed a bug where Bren Carriers didn't take damage from rifle fire.
+- Fixed a bug where the Stuart couldn't penetrate the Hotchkiss.
+- Increased Sapper Health from 90 to 100.
+- Increased Tommy Health from 83 to 90.
+- Increased Rifle Grenade effectiveness against various cover types.
+- Fixed a bug where the Cromwell couldn't penetrate the Hetzer.
+- Normalized Lee Enfield Sniper Rifle statistics to match the Gewehr 43 and M1903 Springfield.
+- 3" Mortar damage changed from 37.5/67.5 to 55/65.
+- 3" Mortar Emplacement can now fire smoke barrages.
+- 3" Mortar Emplacement can no longer use counter battery and victor target.
+- Decreased Priest M2a1 105mm Howitzer damage from 335/335 to 275/300 to match with the normal M2a1.
+- Fixed a bug where PIAT Ambush overlapped the Grenade ability.
+- Fixed a bug where the Panther 'Cuckoo' would not penetrate axis vehicles.
+- Decreased Bren Light Machine Gun damage from 12/14 to 10/12.
+- Removed 6pdr Anti-Tank Gun from Field Support Truck.
+- Churchill can now be upgraded to either the Crocodile or the AVRE, as well with a Mine Plow.
+- Normalized the statistics of the 17pdr Firefly gun to match with the 17pdr anti-tank gun.
+- Fixed a bug where the Typhoon Airstrike would often miss it's target.
+- Cromwell Command Tank can no longer follow vehicles.
+- Lowered starting manpower from 460 to 390.
+
+Wehrmacht
+
+- New skins for all Infantry.
+- Reduced Bunker fuel cost from 20 to 10.
+- Lowered Wehrmacht Waffen SS Leutnant reinforce time.
+- Lowered Knights Cross Holders reinforce time.
+- Ostwind Accuracy long, medium and short range accuracy nerfed.
+- Increased Pak38 penetration vs. Pershing from 0.45 to 0.56.
+- Increased Panther penetration vs. Pershing from 0.56 to 0.66.
+- Firestorm Area of Effect radius decreased from 25 to 22.
+- Increased Delay time before Firestorm starts.
+- Fixed no-smoke bug on Firestorm.
+- Increased delay between each Firestorm rocket from 0.25/1.0 to 0.75/1.25.
+- Decreased Jagdtiger movement and rotation speed to match the King Tiger.
+- Increased camouflaged shots before revealing from Pak38 from 1 to 2.
+- Fixed that the Pak38 could not turn while camouflaged.
+- Increased Panzer IV penetration vs. Sherman armour from 0.5 to 0.9.
+- Lowered King Tiger health from 2360 to 1800.
+- Lowered Jagdtiger health from 2360 to 1800.
+- Volksgrenadiers can now throw grenades when upgraded in the KampfKraft Centre.
+- Updated Wehrmacht Sd.Kfz. 251 skin.
+- Sd.Kfz. 251 Walking Stuka upgrade requires Assault Phase instead of Battle Phase.
+- Sd.Kfz. 251 Flammenwerfer upgrade no longer requires Assault Phase.
+- Walking Stuka upgrade munition cost reduced from 150 to 100.
+- walking Stuka barrage munition cost reduced from 50 to 35.
+- Decreased 105mm StuH42 damage from 90/130 to 60/110.
+- Decreased StuH42 barrage range (normal/lockdown) from 100/200 to 75/125.
+- Decreased StuH42 weapon range from 100 to 75 with 20 minimum.
+- Increased Grenadier health from 95 to 110.
+- Increased Stormtrooper health from 113 to 115.
+- Increased Knights Cross Holders health from 107 to 115.
+- Decreased Wurfrahmen 40 damage from 350/350 to 130/180.
+- Decreased 150mm Nebelwerfer damage from 130/180 to 100/150.
+- Fixed 280mm Rocket Artillery vs. buildings.
+- Fixed 88mm KwK 36 and 75mm KwK 42 penetration values vs. Cromwell to match with the value against the Sherman.
+- Decreased Panzer IV fuel cost from 80 to 70.
+- Increased Flakpanzer IV "Ostwind" fuel cost from 50 to 60.
+- Waffen SS officer now has Inspired Assault as aura based ability for 50 munitions.
+- Fixed that Wehrmacht weapon teams couldn't use medical kits.
+- Increased Grenadier/Stormtrooper Kar98k damage from 20/30 to 22/35.
+- Increased Volksgrenadier Kar98k damage from 10/10 to 12/22.
+- Decreased Volksgrenadier Kar98k medium range accuracy from 0.55 to 0.53.
+- Decreased MG42 damage from 15/20 to 12/16.
+- King Tiger 88mm KwK36 L/71 gun damage lowered from 120/150 to 110/140.
+- Fixed Panther and Geschützwagen target tables versus allied vehicles.
+- Reworked Propaganda War; instead of retreating the targeted infantry it demoralizes them with powerful negative modifiers.
+- Fixed Gewehr 43 Sniper Rifle damage, target and range tables to match M1903 Springfield.
+- Renamed Waffen SS Officer into Waffen SS Command, consisting of a Hauptsturmführer and two Waffen SS Soldiers. Able to rout enemy troops, call in small mortar strikes and influences nearby Infantry with Inspired Assault.
+- Reworked Hauptmann into Leutnant, he supports nearby Infantry to make them fight more effectively. Can supervise buildings and Victor Target for Nebelwerfers.
+- Increased Volksgrenadier Kar98k damage from 12/22 to 15/25.
+- Geschützwagen Rapid Fire cost decreased from 50 to 35 munitions.
+- Geschützwagen Rapid Fire reload modifier Increased from 0.5 to 0.9.
+- Geschützwagen reload time increased from 5/6 to 6/7.
+- Waffen SS call-in cost increased from 400 to 475 manpower.
+- Upkeep of Grenadiers, Stormtroopers and Waffen SS increased from 1.3 to 2.4 manpower/minute.
+- Upkeep of all infantry increased from 1.3 to 1.6 manpower/minute.
+- Limited Medic Bunker upgrade to 3.
+- Limited Repair Bunker upgrade to 3.
+- Removed STG44 from Volksgrenadier, Stormtrooper and Grenadier squad leaders.
+- Decreased Waffen SS health from 113 to 95.2.
+- Fixed a bug where the STG44 upgrade for Stormtroopers required Assauly Phase instead of Skirmish Phase.
+- Decreased Gewehr 43 Sniper Rifle range from 73 to 72.
+- Decreased mp40 accuracy on long range from 0.13 to 0.11
+- Gr34 81mm Mortar damage changed from 40/70 to 55/65.
+- Decreased Reinforce Radius from Bunkers from 25 to 10.
+- Infantry can now only purchase upgrades near Bunkers after "Fortify the Perimeter".
+- Removed Flakpanzer IV 'Ostwind' from Assault Tank Support.
+- Stormtroopers now have Riflemen_Elite infantry armor.
+- Fixed a bug where Stuka rockets would scatter way more than intended.
+- Fixed Jagdtiger target tables.
+- Fixed a bug where "Take Cover!" in Defensive Doctrine would unlock bunker reinforcing as well as base building MG42's.
+- Lowered Panzer IV 75mm KwK40 Area of Effect range to be much less effective vs Infantry.
+- Decreased Knights Cross Holders health from 119 to 110.
+- Changed Knights Cross Holders type_critical_target from tp_infantry_heroic to tp_infantry, this fixed the bug that they could endlessly soak up damage and not die from sniper fire.
+- Fixed a bug where the StuG IV's projectile didn't come out of the barrel but spawned below the tank.
+- Increased Panzerfaust upgrade cost from 15 to 20 fuel.
+- Pumas will no longer attack aircraft.
+- Decreased turret/gun horizonal and vertical traverse speeds of the Flakpanzer IV 'Ostwind' from 75/75 to 35/35.
+- Sturmgeschütz IV health increased from 480 to 550.
+- Geschützwagen health increased from 408 to 550.
+- Tiger 812 'Tiki' force multiplier range decreased from 40 to 30 to match the Commonwealth Command Tank.
+
+Panzer Elite
+
+- New Skins for all Infantry.
+- Increased the cost of Panzergrenadiers from 255 to 300.
+- Increased Panzergrenadiers upkeep to match Wehrmacht Grenadiers.
+- Upkeep of all infantry increased from 1.3 to 1.6 manpower/minute.
+- Shocktroopers are harder to suppress.
+- Shocktroopers can no longer camouflage.
+- Shocktroopers can no longer throw incendiary grenades.
+- Brute Force Kommand STG44 upgrade cost reduced to 100 manpower and 75 munitions.
+- New symbol for Hummel and Nashorn.
+- Decreased Henschel Bomber Damage from 150/175 to 125/175.
+- Decreased Henschel Bomber scatter radius.
+- Fixed that the Sd.Kfz. 250/9 was much more powerfull than the Armored Car.
+- Lowered Jagdpanther Health from 1888 to 1500.
+- Increased Hummel speed/acceleration.
+- Increased Nashorn speed/acceleration.
+- Decreased Hummel traverse speed.
+- Decreased Nashorn traverse speed.
+- Fallshirmjägers can no longer capture stragetic points while hiding.
+- Fallshirmjägers can be spawned from buildings again.
+- Increased Panzer Grenadier health from 95 to 110.
+- Increased Fallschirmjägers health from 77 to 90.
+- Increased Luftwaffe Ground Forces health from 72 to 83.
+- Increased Gebirgsjägers health from 72 to 95.
+- Decreased Panzer Elite Group Zeal fuel cost from 40 to 30.
+- Reworked Group Zeal; it gives a recieved suppression of 0.9 and received accuracy of 0.95 (so it cancels out anti-blob for the most part).
+- Reworked Veteran Sergeant; it gives a received suppression of 0.95, received experience of 1.25 and increased line of sight of +5.
+- Decreased 20mm Flakvierling damage from 25/30 to 19/21.
+- Decreased Whirblewind damage from 25/30 to 19/21.
+- Decreased Flakvierling accuracy on medium and long range.
+- Decreased Whirblewind accuracy on medium and long range.
+- Increased Panzer Grenadier Kar98k damage from 20/30 to 22/35.
+- Decreased Sd.Kfz 250/1, 221, 222, 223 and 250/9 mg42 damage from 10/15 to 8/15.
+- Decreased Sd.Kfz 250/1, 221, 222, 223 and 250/9 mg42 accuracy on medium, long and distant ranges.
+- Added spawn animation for the Hetzer (credits go to Darkbladecr).
+- Removed damage and penetration modifiers from Marder Lockdown.
+- Decreased reload weapon modifiers on Marder Lockdown from 0.75 to 0.9
+- Fixed ACPR weapons for all vehicles to be more effective than standard.
+- Jagdpanther 88mm KwK36 L/71 gun damage lowered from 120/150 to 110/140.
+- Marder III 75mm L/70 gun damage lowered from 90/130 to 80/120.
+- Fixed Marder III target tables versus allied vehicles.
+- Lowered FG42 damage from 15/20 to 10/15.
+- Tank Destroyer APCR upgrade now also affects the Panzer IV.
+- Hotchkiss now comes standard with the Stuka upgrade applied.
+- Hotchkiss can now only fire Incendiary Stuka Barrages.
+- Normalized Nashorn weapon stats to match Jagdpanther.
+- Increased Nashorn reload time from 6/10 to 10/14, firing slower than the Jagdpanther.
+- Normalized Hummel target tables vs. vehicles.
+- Finetuned all anti-tank and tank guns vs. Whirblewind.
+- Increased Fallshirmjäger Anti-Building Grenade damage vs. emplacements.
+- Increased Whirblewind health to 708 to match Ostwind.
+- Decreased Healing rate on Supply Halftrack.
+- Decreased G43 damage from 22/26 to 20/24.
+- Decreased FG42 damage from 10/15 to 8/10.
+- Decreased Hetzer health from 856 to 500, to match the Sturmgeschütz IV.
+- Decreased APCR effectiveness.
+- Decreaed Teller Mine damage from 400/500 to 300/300.
+- Normalized Teller Mine target tables.
+- Gr34 81mm Mortar Halftrack damage changed from 37.5/70 to 50/65.
+- Fixed a bug where Fallshirmjägers coudn't be spawned from buildings anymore.
+- Supply Halftrack can no longer drop goliaths.
+- Vampire Halftrack will now camouflage when Resource Stealing is enabled.
+- Fixed a bug where Stuka rockets would scatter way more than intended.
+- Schwimmwagen is now standard buildable from the Headquarters.
+- Brute Force Kommand reworked into Mortar Bunker; it can no longer train Shocktroopers, Machine Gun Teams or Mortar Teams, nor can it purchase the available upgrades it had.
+- The Mortar Bunker now properly shows the yellow range circle on the minimap when placing it, as intended.
+- Gebirgsjägers can now construct the Mortar Bunker, Medic Bunkers, Machine Gun Nests, 88mm FlaK 36 Howitzers, Signal Disruptors, Mines, Barbed Wire and Sandbags.
+- Panzer Grenadiers can no longer construct the Brute Force Kommand.
+- Supply Halftrack can now only lay mines after Demolition Experts from Scorched Earth.
+- Panzer Jager Kommand can no longer build the Hetzer.
+- Nashorn and Bergetiger temporarily removed.
+- Shocktroopers can now throw Bundled Anti-Tank Grenades.
+- Shocktroopers can no longer construct Trenches.
+- Shocktroopers can be upgraded with either a Panzerschreck or a LMG42.
+- Shocktroopers are now also affected by Double Infantry AT Efforts.
+- Scout Car will now show the proper ghost prop when setting up.
+- Marder III Gun will now correctly be fixed after it has been repaired.
+- The engine covers of the Sd.Kfz. 250 series will now correctly be fixed after they have been repaired.
+- Incendiary Grenades now cost 20 munitions to throw.
+- Anti-Tank Grenades now cost 30 munitions to throw.
+- Supply Halftrack can no longer follow units.
+- G43 Suppressive Voley now works as intended.
+- Armored Cars and Recon Halftracks will no longer attack aircraft.
+- Decreased turret/gun horizonal and vertical traverse speeds of the Flakpanzer IV 'Wirblewind' from 75/75 to 35/35.
+- Marder III health increased from 502 to 550.
+
+AI:
+
+* Finally bridged the gap between AI and ScAR.
+  We're extremely happy and excited about this, as this particular thing allows custom control of any unit we want. This used to cause sync errors in multiplayer, but now it works. As far as our knowledge goes, Back to Basics is the only mod at the moment which is doing this. The only problem with adding new units to control is that it takes a lot of effort to properly program their behavior. Currently, there are two types of branches this script has for controlling two different types of units:
+- British HQ trucks. Vanilla HQs weren't very smart at all and could break AI’s behavior completely. This frustrating aspect of AI which left us out of modding British AI out of utter frustration with it is now finally fixed. And it's fixed pretty well - HQs will move away if they're under threat and they will setup on high income points properly.
+- Units which are meant to engage at range (and setup the weapon). Weapons like HMGs, mortars and tanks like marders won't suicide nearly as much anymore and setup in position properly, retreat from threats.
+* We've modified all of 1v1, 2v2 and 3v3 maps to make AI much smarter on them.
+  We've added around 60-90 markers per map which allows AI to properly evaluate the situation and even set up defenses there (as opposed to only being able to setup defenses near strategic points).
+* Drastically improved the targets.ai file.
+  This file is responsible for how AI chooses all kinds of its targets - what it attacks, captures and defends. Changes include:
+- Much earlier pushes in the beginning of the game.
+- AI will try to secure the middle of the map properly.
+- Almost never will you see random stray units behind your lines anymore, especially not running into your base MGs.
+- Not nearly as many suicides for defensive units like nebelwerfers and other mobile artillery (this however still remains to be fixed by the ScAR script which I've talked about above as it's impossible to fully control it otherwise).
+- AI will capture strategic points under fire much less frequently.
+- AI capture patterns are drastically improved.
+* Drastically improved the attack percentage evaluation.
+  This is also highly connected such calculations with targets.ai file. AI will become much more cautious in certain situations and generally feel more like a human player.
+- It will stop being crazily aggressive if it knows it has less units than the player.
+- It will become slightly less aggressive as it captures more territory. This fixes problems of it losing too many units before being able to kill the player (It will wait for bigger amounts of units to break the opponents while still constantly bombarding the positions and securing the territory around the enemy positions).
+- Early in the game this metric is modified to make AI attack more than it usually would, thus being more aggressive towards creating its initial front line.
+* A lot of ability usage fixes.
+  AI will use abilities like grenades, marksman shot, assault, and satchel charges much better and target them on things that the abilities are most effective against.
+* Fixed a bug where AI would keep spamming artillery on strategic points.
+  Apparently Relic thought that strategic points are tp_infantry so AI thought that strategic points were in fact infantry who stood still all game long, thus are best for bombarding.
+* Balanced munitions usage properly.
+  AI will rarely float a lot of munitions, however it will still save some for player abilities (off-map artillery) when it needs to.
+* Balanced fuel/manpower unit purchases properly
+  The economy of AI is dependant on the actual fuel/manpower ratio, preventing the floating of these resources. It's not directly influenced by this, however - other rules are more important and this is only a wildcard which fixes the inaccuracies.
+* Fixed unit reinforcing bug where AI would have a lot of units waiting to be reinforced at home.
+  This bug was caused by a different number of reasons - from being popcapped to waiting for a more expensive unit to buy.
+* Drastically improved unit retreat.
+  Relic's retreat rules were ridiculously simple. We had to come up with a bit of a tricky fix for this and added much more rules for retreating.
+* Fixed lieutenant, sergeant, medic and other leader AI.
+  These units will no longer sit in buildings all game long, suicide by trying to follow a unit which is all the way across the map or simply not retreating when close to enemy (this is still not 100% fixed but works much better).
+* Completely fixed unit call-ins.
+  They were already mostly fixed in 1.2. However we used a special script to control that. For some reason tank call-ins still used to bug out and AI would simply keep calling them in endlessly as soon as it got the resources which made it spam units like Geschutzwagen horribly. Now we're not using the script anymore, we found another way to fix it and now it works properly in all cases and this also slightly improved game performance. Added and improved the rules and priorities for all the call-ins.
+* AI will use cover better
+  Slightly improved the cover search tactic function.
+* AI will stay in buildings longer and more properly, enter them much more often.
+  Heavily improved building entering priority evaluation tactic rules.

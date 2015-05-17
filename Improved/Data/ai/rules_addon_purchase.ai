@@ -1,0 +1,86 @@
+
+---------------------------------------------------------------------------------
+-- list all the addons we never want to build - quicker to do this instead of using the demand override functions below
+s_ignore_addons = {}
+s_ignore_addons[BP_GetID(UPG.ALLIES.ENGINEER_MINESWEEPER)] = 1
+s_ignore_addons[BP_GetID(UPG.ALLIES.SHERMAN_CRAB)] = 1
+s_ignore_addons[BP_GetID(UPG.AXIS.PIONEER_MINESWEEPER)] = 1
+s_ignore_addons[BP_GetID(UPG.CW.DEMOLITIONS)] = 1
+s_ignore_addons[BP_GetID(UPG.CW.MOBILEHQ)] = 1
+s_ignore_addons[BP_GetID(UPG.CW.ENABLE_MOBILE_HQ)] = 1
+
+---------------------------------------------------------------------------------
+-- Rules for squad-addons
+
+-- generic - addons should decrease in demand as they increase in count
+function DefaultDemandOffset(upgradePBG, scale, timescale)
+	if scale == nil then scale = 1 end
+	if timescale == nil then timescale = 1 end
+	local resRate = AIResource_GetCurrentResourceRate(s_selfplayer)
+	local curResources = AIResource_GetCurrentResources(s_selfplayer)
+	return math.min(0, scale*(curResources.munition/15 + resRate.munition/8) - timescale*(math.sqrt(math.min(325, World_GetGameTime()/10))-20))
+end
+
+function AlliesSquadAddonUpgradeRules(upgradePBG, currentDemand)
+	local result = currentDemand
+	if upgradePBG == UPG.ALLIES.HALFTRACK_QUAD then
+		result = result + 50
+	elseif upgradePBG == UPG.ALLIES.RIFLEMEN_AT2 then
+		return result + DefaultDemandOffset(upgradePBG, 0.9)-2
+	elseif upgradePBG == UPG.ALLIES.RIFLEMEN_SMG then
+		return result + DefaultDemandOffset(upgradePBG, 1.1)-4
+	elseif upgradePBG == UPG.ALLIES.ENGINEER_FLAMETHROWER then
+		return result + DefaultDemandOffset(upgradePBG, 0.85, 0.9)-7
+	elseif upgradePBG == UPG.ALLIES.CROCODILE_BULLDOZER then
+		return DEMAND_NeverBuild
+	end
+	
+	return result + DefaultDemandOffset(upgradePBG)
+end
+
+function AxisSquadAddonUpgradeRules(upgradePBG, currentDemand)
+	local result = currentDemand
+	if upgradePBG == UPG.AXIS.HALFTRACK_FLAMETHROWER then
+		result = DEMAND_NeverBuild --result + 5
+	elseif upgradePBG == UPG.AXIS.HALFTRACK_STUKA then
+		result = result + 25
+	elseif upgradePBG == UPG.AXIS.PIONEER_FLAMETHROWER then
+		return result + DefaultDemandOffset(upgradePBG, 0.85, 0.5)-7
+	elseif upgradePBG == UPG.AXIS.PUMA_UPGUN then
+		return result + DefaultDemandOffset(upgradePBG, 0.55, 1.5)-25
+	end
+	return result + DefaultDemandOffset(upgradePBG)
+end
+
+function AlliesCWSquadAddonUpgradeRules(upgradePBG, currentDemand)
+	local result = currentDemand
+	if (upgrade_pbg == UPG.CW.RIFLE_GRENADE) or (upgrade_pbg == UPG.CW.BREN) then
+		local infantry_count = UtilPBG_CountAliveOrProduced(SBP.CW.TOMMIES)
+		-- the more infantry we have the more we want this upgrade
+		result = result + infantry_count*2
+		return result + DefaultDemandOffset(upgradePBG, 1.15)
+	elseif (upgrade_pbg == UPG.CW.BREN_CARRIER_MMG) then
+		result = result + 2
+		return result + DefaultDemandOffset(upgradePBG, 0.5)
+	elseif (upgradePBG == UPG.CW.PIAT) then
+		result = result + 7
+		return result + DefaultDemandOffset(upgradePBG, 1.1)
+	elseif (upgradePBG == UPG.CW.HQ_SPEED) then
+		result = result - 10	
+	elseif (upgradePBG == UPG.CW.HQ_ECONOMY_BONUS) then
+		result = result - 3
+	end
+	
+	return result + DefaultDemandOffset(upgradePBG)
+end
+
+function AxisPESquadAddonUpgradeRules(upgradePBG, currentDemand)
+	local result = currentDemand
+	if (upgradePBG == UPG.ELITE.PANZERSCHRECK or upgradePBG == UPG.ELITE.MP44) then
+		return result + DefaultDemandOffset(upgradePBG, 1.1)
+	elseif (upgradePBG == UPG.ELITE.G43) then
+		return result + DefaultDemandOffset(upgradePBG, 0.9)
+	end
+	
+	return result + DefaultDemandOffset(upgradePBG)
+end
