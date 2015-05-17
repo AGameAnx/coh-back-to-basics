@@ -5,7 +5,7 @@ s_personality.name = "Easy Personality"
 
 s_personality.start_attack_time = 60
 s_personality.start_attack_time_variance = 30
-s_personality.default_attack_percentage = 0.1
+s_personality.default_attack_percentage = 0.5
 s_personality.fallback_chance = 0.25
 s_personality.retreat_chance = 0.3
 s_personality.min_military_value_start = 40

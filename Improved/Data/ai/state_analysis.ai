@@ -335,12 +335,12 @@ state_analysis.recalculate_attackpercentage = function()
 		end
 		
 		-- escalate attack percentage based on a winning force
-		CustomDebug.Clear()
+		--CustomDebug.Clear()
 		--CustomDebug.Print("Calculating attack percentage...")
-		CustomDebug.Print(string.format("  pts captured %%: %.3f", cache.percentage_pts_captured))
-		CustomDebug.Print(string.format("  military %% value: %.3f", cache.military_percent_value))
+		--CustomDebug.Print(string.format("  pts captured %%: %.3f", cache.percentage_pts_captured))
+		--CustomDebug.Print(string.format("  military %% value: %.3f", cache.military_percent_value))
 		
-		local norm_military_val = (state_analysis.long_map_ratio+0.05) * ((cache.military_percent_value-0.525) + (0.5-cache.percentage_pts_captured)*1.15)
+		local norm_military_val = (state_analysis.long_map_ratio+0.05) * ((cache.military_percent_value-0.425) + (0.55-cache.percentage_pts_captured)*0.5)
 		--if cache.percentage_pts_captured > 0.7 and cache.military_percent_value < 0.7 then norm_military_val = norm_military_val - 0.45 end
 		
 		if norm_military_val < 0.5 then
@@ -350,15 +350,15 @@ state_analysis.recalculate_attackpercentage = function()
 		end
 		norm_military_val = norm_military_val - (0.3 - math.min(0.3, math.abs(World_GetWidth() - World_GetLength()))) -- adjust for long map ratio
 		
-		CustomDebug.Print("--")
+		--CustomDebug.Print("--")
 		
-		CustomDebug.Print(string.format("  norm: %.3f", norm_military_val))
+		--CustomDebug.Print(string.format("  norm: %.3f", norm_military_val))
 		
 		new_attack_percentage = math.min(1, math.min(s_personality.max_attack_percentage, math.max(s_personality.default_attack_percentage,
 			new_attack_percentage + norm_military_val*(s_personality.max_attack_percentage-new_attack_percentage)
 		)) + math.max(0, 0.55-World_GetGameTime()/550))
 		
-		CustomDebug.Print(string.format("    => %.3f", new_attack_percentage))
+		--CustomDebug.Print(string.format("    => %.3f", new_attack_percentage))
 		
 		--[[if (new_attack_percentage > cap_attack_percentage) then
 			new_attack_percentage = cap_attack_percentage

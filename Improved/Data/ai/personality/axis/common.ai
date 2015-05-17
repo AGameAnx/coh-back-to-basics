@@ -3,4 +3,5 @@ s_personality.budget_levels.units = {30, 30, 35, 30, 35}
 s_personality.budget_levels.tech = {35, 55, 55, 35, 15}
 s_personality.budget_levels.secure = {3, 3, 3, 2, 2}
 
-s_personality.max_attack_percentage = 0.75
+s_personality.default_attack_percentage = 0.45
+s_personality.max_attack_percentage = 0.8

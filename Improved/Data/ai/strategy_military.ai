@@ -29,6 +29,12 @@ end
 --------------------------------------------------------------------------------
 --
 
+strategy_military.calculate_military_priorities_attacktargets = function()
+	RankTargetsPrepass_AddAttackTargets()
+end
+strategy_military.calculate_military_priorities_defendtargets = function()
+	RankTargetsPrepass_AddDefendTargets()
+end
 strategy_military.calculate_military_priorities_prepass = function()
 	RankTargetsPrepass()
 end

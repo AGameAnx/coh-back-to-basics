@@ -1,3 +1,3 @@
 -- overrides of the defaults
 s_personality.name = "Standard Personality"
-s_personality.threat_aggressiveness = 0.25
+s_personality.threat_aggressiveness = 0.45

@@ -99,7 +99,8 @@ function strategy_command_tree:do_purchase()
 	end
 	
 	-- check to see if we have a commandpoint to spend
-	if AIResource_GetCurrentResources(s_selfplayer).command == 0 then
+	local commandResource = AIResource_GetCurrentResources(s_selfplayer).command
+	if commandResource == 0 then
 		--strategy_command_tree.trace("No command points to spend")
 		--aipoptrace()
 		return
@@ -111,8 +112,15 @@ function strategy_command_tree:do_purchase()
 	if self.prefIndexChosen then
 		local pref_tbl = s_personality.command_tree_pref_tbl.choices[self.prefIndexChosen]
 		if pref_tbl then
-			local prefcount = 0
 			local count = table.getn(pref_tbl)
+			if commandResource >= 5 then
+				CustomDebug.Print('ERROR: Command tree path reached 5 CP - invalid tech route! Path index: '..self.prefIndexChosen..', path upgrades:')
+				self.prefIndexChosen = nil
+				for i=1,count do
+					CustomDebug.Print('  '..BP_GetName(command_item))
+				end
+			end
+			local prefcount = 0
 			-- run through the choice table in order, making sure we have each
 			for i=1,count do
 				-- count the total number of these items, including those that have been requested but not active
@@ -139,13 +147,16 @@ function strategy_command_tree:do_purchase()
 			else
 				return
 			end
+		else
+			CustomDebug.Print('Command tree path error')
+			self.prefIndexChosen = nil
 		end
 	end
 	
 	if self.chosenTreeIdx ~= nil then
 		local ct_count = CommandTree_GetItemCount(s_selfplayer, self.chosenTreeIdx)-1
 		
-		for ci=0, ct_count do
+		for ci=0,ct_count do
 			local command_item = CommandTree_GetItemAt(s_selfplayer, self.chosenTreeIdx, ci)
 			if command_item ~= nil then			
 				--strategy_command_tree.trace("Chosing item from command tree:"..self.chosenTreeIdx)

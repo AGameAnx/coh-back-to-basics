@@ -45,8 +45,8 @@ s_personality =
 	start_attack_time = 0,                      -- when the AI will attack for the first time (minimum)
 	start_attack_time_variance = 0,             -- what random variation of time should be added to the start attack time
 
-	default_attack_percentage = 0.45,           -- when attacking what is the default percentage
-	max_attack_percentage = 0.85,               -- [0,1] what attack percentage do we never want to go over no matter what
+	default_attack_percentage = 0.55,           -- when attacking what is the default percentage
+	max_attack_percentage = 0.90,               -- [0,1] what attack percentage do we never want to go over no matter what
 	attack_percentage_increment_per_minute = 0, -- attack percentage increase each minute
 	advance_percentage = 0,                     -- how much more military we need to advance on an enemy
 

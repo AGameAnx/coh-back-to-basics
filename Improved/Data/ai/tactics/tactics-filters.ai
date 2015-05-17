@@ -41,10 +41,10 @@ end
 
 function TacticFilter_Avoid(squad)
 	-- should avoid this time?
-	return AI_RandRange(0,100) < s_personality.ability_avoidance_percentage
+	return AI_RandRange(0,100)/100 < s_personality.ability_avoidance_percentage
 end
 
-sk_timeBetweenMineDrops = 60*8
+sk_timeBetweenMineDrops = 120*8
 s_greyhoundmine_dropTimer = 0
 function TacticFilter_GreyhoundMine(squad)
 	-- use a timer to determine if we should drop another greyhound mine

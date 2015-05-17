@@ -69,10 +69,13 @@ local customAttackModifiers = {
 	[BP_GetName(SBP.CW.INFANTRY_HQ)] = 0.75,
 }
 
+local militaryPointRandom = {}
+local militaryPointRandomResetStep = 0
+
 local hqDistCache = {}
 local earlyGameTimeRule = 1
 local frontlineMapConstant = 0
-local baseMapConstant = -2.5
+local baseMapConstant = -4.5
 
 --------------------------------------------------------------------------------
 -- target ranking
@@ -246,10 +249,15 @@ function RankTargetsPrepass()
 	
 	earlyGameTimeRule = math.max(0, 1 - math.min(1, World_GetGameTime()/180-0.35)) * math.min(1, 0.5 + k_longMapRatio*2)
 	
-	earlyGameScore = 10*earlyGameTimeRule + k_longMapRatio*earlyGameTimeRule*5
+	earlyGameScore = 7*earlyGameTimeRule + k_longMapRatio*earlyGameTimeRule*50
 	earlyGameFrontlineMultiplier = (1 - earlyGameTimeRule) * math.min(1, (1+k_longMapRatio*2)*0.55+0.45)
 	earlyGameThreatMultiplier = math.max(-1, math.min(1, (0.55 - earlyGameTimeRule)/0.45))
 	
+	militaryPointRandomResetStep = militaryPointRandomResetStep + 1
+	if militaryPointRandomResetStep > 50 then
+		militaryPointRandomResetStep = 0
+		militaryPointRandom = {}
+	end
 	--CustomDebug.Clear()
 	--CustomDebug.Print('k_frontlineCoefficient: '..k_frontlineCoefficient)
 	--CustomDebug.Print('midMapMultiplier: '..midMapMultiplier)
@@ -298,6 +306,7 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend)
 	local result = 0
 	
 	local entity = Military_GetMilitaryPointEntity(militaryPoint)
+	local entityID = Entity_GetGameID(entity)
 	local entityPos = Entity_GetPosition(entity)
 	
 	local importance = Military_GetCombinedImportanceAtMilitaryPoint(s_selfplayer, militaryPoint) -- scale of 1 to 10ish
@@ -316,10 +325,11 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend)
 	local distFromAllHQs = 0
 	local minDistFromAllHQs = k_maxDist
 	local minDistFromFriendlyHQs = k_maxDist
-	if hqDistCache[militaryPoint] and hqDistCache[militaryPoint][1] < 10 then
-		hqDistCache[militaryPoint][1] = hqDistCache[militaryPoint][1] + 1
-		minDistFromAllHQs = hqDistCache[militaryPoint][2]
-		minDistFromFriendlyHQs = hqDistCache[militaryPoint][3]
+	if hqDistCache[entityID] and hqDistCache[entityID][1] < 10 then
+		hqDistCache[entityID][1] = hqDistCache[entityID][1] + 1
+		minDistFromAllHQs = hqDistCache[entityID][2]
+		distFromAllHQs = hqDistCache[entityID][3]
+		minDistFromFriendlyHQs = hqDistCache[entityID][4]
 	else
 		for i=1,k_friendlyHQCount do
 			local dist = World_DistancePointToPoint(entityPos, k_friendlyHQs[i])
@@ -341,7 +351,7 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend)
 		local hqCount = k_friendlyHQCount + k_enemyHQCount
 		minDistFromAllHQs = minDistFromAllHQs / k_maxDist / furthestPoint
 		distFromAllHQs = distFromAllHQs / hqCount / k_maxDist / furthestPoint
-		hqDistCache[militaryPoint] = {0, minDistFromAllHQs, distFromAllHQs}
+		hqDistCache[entityID] = {0, minDistFromAllHQs, distFromAllHQs, minDistFromFriendlyHQs}
 	end
 	
 	--[[local distFromAllHQsCoefficient
@@ -356,7 +366,7 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend)
 		0.15,
 		math.min(
 			1,
-			((minDistFromFriendlyHQs*1.15)/k_maxDist/furthestPoint - 0.22*(midMapMultiplier/5)) * (1 + midMapMultiplier/4) + (1 - k_longMapRatio*2)
+			((minDistFromFriendlyHQs*1.15)/k_maxDist/furthestPoint - 0.22*(midMapMultiplier/5)) * (1 + midMapMultiplier/4) + (1 - k_longMapRatio*1.75)
 		)*1.15 - 0.15
 	)
 	
@@ -474,7 +484,7 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend)
 		+ threatScore*earlyGameThreatMultiplier
 		+ (minDistFromAllHQs-0.25)*7*(1+midMapMultiplier/5)*math.max(-0.5, 3-k_longMapRatio*2.5)
 		+ 35*math.min(0, minDistFromAllHQs - 0.285 / (1 + midMapMultiplier / 5 + (1 - k_longMapRatio/2.5) * 2))
-		+ (Military_GetMilitaryPointDiceRoll(s_selfplayer, militaryPoint)*12 - 6)
+		--+ (Military_GetMilitaryPointDiceRoll(s_selfplayer, militaryPoint)*20 - 10)
 	
 	result = result
 		+ baseMapConstant
@@ -487,6 +497,13 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend)
 			* math.sqrt(minDistFromAllHQs/math.min(1, 0.5+(k_longMapRatio-0.5)/2)+0.2)
 			* math.max(0.2, math.min(1, distFromAllHQs/math.min(1, 0.5+(k_longMapRatio-0.5)/2)))
 			* customMultiplier
+	
+	if not militaryPointRandom[entityID] then
+		militaryPointRandom[entityID] = AI_RandMax(10) - 5
+	end
+	
+	result = result + militaryPointRandom[entityID]
+	
 	return math.min(10, math.max(0, result*3))
 end
 
@@ -498,6 +515,7 @@ function RankDefendTargets()
 	defend_point_ranking = {}
 	
 	-- for each player
+	local targetCount = 0
 	local playerCount = World_GetPlayerCount()
 	for i=1,playerCount do
 		local player = World_GetPlayerAt(i)
@@ -510,13 +528,17 @@ function RankDefendTargets()
 				local priority = Target_CalcDefendPriority(militaryPoint, false)
 				if priority > 0.0 then
 					-- cache the priority
-					local e = {	
+					local e = {
 						Point = militaryPoint,
 						PriorityValue = priority,
 						Neutral = false,
 					}
 					table.insert(defend_point_ranking, e)
 					Military_AddTarget(s_selfplayer, MTARGET_Defend, militaryPoint, 1+priority*2)
+					targetCount = targetCount + 1
+					if targetCount >= 10 then
+						break
+					end
 				end
 			end
 		end
@@ -607,28 +629,7 @@ function RankAttackTargets()
 	logPrint("--------------------------------------------------------------------------------------------")
 	logPrint("Ranking attack targets")]]
 	
-	for i=1,World_GetPlayerCount() do
-		local player = World_GetPlayerAt(i)
-		-- don't attack certain players
-		if Target_ShouldAttackPlayer(player) then
-			-- for each military point
-			local militaryPointCount = Military_GetMilitaryPointCount(s_selfplayer, player)
-			for j=0,militaryPointCount-1 do
-				local militaryPoint = Military_GetMilitaryPointAt(s_selfplayer, player, j)
-				local priority = Target_CalcAttackPriority(militaryPoint, false)
-				-- cache the priority
-				local e = {	
-					Point = militaryPoint,
-					PriorityValue = priority,
-					Neutral = false,
-				}
-				table.insert(attack_point_ranking, e)
-				if priority > 0.0 then
-					Military_AddTarget(s_selfplayer, MTARGET_Attack, militaryPoint, 1+priority*2)
-				end
-			end
-		end
-	end
+	local targetCount = 0
 	local neutralMilitaryPointCount = Military_GetNeutralMilitaryPointCount(s_selfplayer)
 	for i=0,neutralMilitaryPointCount-1 do
 		local militaryPoint = Military_GetNeutralMilitaryPointAt(s_selfplayer, i)
@@ -642,6 +643,38 @@ function RankAttackTargets()
 		table.insert(attack_point_ranking, e)
 		if priority > 0.0 then
 			Military_AddTarget(s_selfplayer, MTARGET_Attack, militaryPoint, 1+priority*2)
+			targetCount = targetCount + 1
+			if targetCount > 20 then
+				break
+			end
+		end
+	end
+	if targetCount < 15 then
+		for i=1,World_GetPlayerCount() do
+			local player = World_GetPlayerAt(i)
+			-- don't attack certain players
+			if Target_ShouldAttackPlayer(player) or Target_ShouldDefendPlayer(player) then
+				-- for each military point
+				local militaryPointCount = Military_GetMilitaryPointCount(s_selfplayer, player)
+				for j=0,militaryPointCount-1 do
+					local militaryPoint = Military_GetMilitaryPointAt(s_selfplayer, player, j)
+					local priority = Target_CalcAttackPriority(militaryPoint, false)
+					-- cache the priority
+					local e = {	
+						Point = militaryPoint,
+						PriorityValue = priority,
+						Neutral = false,
+					}
+					table.insert(attack_point_ranking, e)
+					if priority > 0.0 then
+						Military_AddTarget(s_selfplayer, MTARGET_Attack, militaryPoint, 1+priority*2)
+						targetCount = targetCount + 1
+						if targetCount >= 15 then
+							break
+						end
+					end
+				end
+			end
 		end
 	end
 	
@@ -924,7 +957,7 @@ function RankCapturePoints(vp_mult, vp_max, fuel_mult, mt_mult)
 		end
 	end]]
 	
-	if s_selfplayerid-999 == 2 then
+	--[[if s_selfplayerid-999 == 2 then
 		dr_clear("aicustomdebug2"..s_selfplayerid)
 		
 		local wWidth = World_GetWidth()
@@ -955,5 +988,5 @@ function RankCapturePoints(vp_mult, vp_max, fuel_mult, mt_mult)
 				end
 			end
 		end
-	end
+	end]]
 end

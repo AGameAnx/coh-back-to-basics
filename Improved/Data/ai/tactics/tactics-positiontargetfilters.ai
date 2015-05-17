@@ -17,15 +17,29 @@ function PositionTargetFilter_Cover(squad)
 	-- get the task anchor pos
 	local pos = AISquad_GetAnchorPos(squad)
 	
+	local targetSquad = SquadQuery_GetAnySquadCombatTarget(sim_squad)
+	if targetSquad then
+		local targetSquadPos = Squad_GetPosition(targetSquad)
+		local posDiff = World_Pos(targetSquadPos.x - pos.x, 0, targetSquadPos.z - pos.z)
+		local posDiffLength = math.sqrt(posDiff.x^2 + posDiff.z^2)
+		if posDiffLength > 0 then
+			posDiff.x = posDiff.x/posDiffLength
+			posDiff.z = posDiff.z/posDiffLength
+			
+			pos.x = pos.x + posDiff.x*7
+			pos.z = pos.z + posDiff.z*7
+		end
+	end
+	
 	-- get the cover pos, this function returns the anchor pos if it couldn't find cover
-	local posCover = Squad_FindCoverCompareCurrent(sim_squad, AISquad_GetAnchorPos(squad), misc_taskAP, 2.5*misc_taskAP, true)
+	local posCover = Squad_FindCoverCompareCurrent(sim_squad, pos, misc_taskAP, 2.5*misc_taskAP, true)
 	
 	-- if it found cover that is at least 2 m away
-	if World_DistanceSquaredPointToPoint(pos, posCover) > 4.0 then	
+	if World_DistanceSquaredPointToPoint(pos, posCover) > 2.0 then	
 		local oldPosThreatLevel = AISquad_ThreatLevelToSquad(s_selfplayer, squad, pos)
 		local newPosThreatLevel = AISquad_ThreatLevelToSquad(s_selfplayer, squad, posCover)
 		local threatDiff = newPosThreatLevel - oldPosThreatLevel
-		if (threatDiff < 1) then -- make sure this position is still safe (otherwise ignore it)
+		if threatDiff < 1 then -- make sure this position is still safe (otherwise ignore it)
 			--if not AIPlayer_IsFireConePosition(s_selfplayer, posCover) then -- never move into someones arc of fire
 				-- never move closer to any of your targets
 				if not AISquad_IsPosWithinDistOfAttackTarget(squad, posCover, 25) then
