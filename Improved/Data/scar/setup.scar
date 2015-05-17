@@ -1,0 +1,816 @@
+------------------------------------------------------------------------------------
+-- SetupUtil.scar
+-- (c) 2003 Relic Entertainment Inc.
+--
+-- Description:
+--		Contains helper functions for OnGameSetup function.  OnGameSetup
+--	is used for initializing the player settings (name, race, team etc)
+--
+-- Usage:
+--		Currently, the only function you need is Setup_Player( ).  This function
+--	is used to set a players settings all in one function.  The function returns
+--	you the playersId so you can store it in a global variable.
+--
+-- Example:
+--	function OnGameSetup( )
+--		g_player1 = Setup_Player(0, "PlayerDisplayName", "Allies", 1) 
+--		g_player2 = Setup_Player(1, "$20000", "Axis", 2)
+--		g_player3 = Setup_Player(2, "$20001", "Axis", 2)
+--	end
+--
+--		In the above example, g_player2 and g_player3 will be on the same team.
+--	The Setup_Player function takes care of setting all player relationships.
+--
+
+
+--? @group Setup
+
+--? @shortdesc Initializes the all of the players settings in one function and returns the playerID.
+--? @extdesc 
+--? In most cases you will call this function from OnGameSetup and store the returned playerId in  a global variable.  The player index should be in the range [1 , (numPlayers)].\n\n
+--? Valid player races: "Allied Airborne Company", "Allied Assault Company", "Allied Rifle Company", "Allied Tank Company", "Axis Armored Company","Axis Heavy Tank Company", "Axis Infantry Company","Axis Pioneer Company"\n\n
+--? Example:\n
+--?	function OnGameSetup( )\n
+--?	\tg_player1 = Setup_Player(0, "PlayerDisplayName", "Allied Assault Company", 1)\n
+--? \t-- g_player2 and g_player3 will be on the same team (allies)\n
+--? \tg_player2 = Setup_Player(1, "$20000", "Axis Infantry Company", 2)\n
+--? \tg_player3 = Setup_Player(2, "$20001", "Axis Infantry Company", 2)\n
+--? --? The team ID starts from one!!
+--?	end
+--? @args Integer playerIndex, LocString playerName, String playerRace, Integer team
+--? @result PlayerID
+function Setup_Player(playerIndex, playerName, playerRace, team)
+
+	-- translate race name
+	if (playerRace == "Allies Rifle Company") then
+		playerRace = "allies"
+	elseif (playerRace == "Axis Infantry Company") then
+		playerRace = "axis"
+	end
+
+	if (scartype(team) ~= ST_NUMBER or team < 1 ) then
+		fatal( "Setup_Player: team ID has to be a number starting from 1")
+	end
+	
+	-- accept raw strings for now... convert them to LocString
+	if (scartype(playerName) == ST_STRING) then
+		playerName = LOC(playerName)
+	end
+	
+	-- get player handle
+	local playerId = World_GetPlayerAt( playerIndex )
+	
+	-- set player name
+	Setup_SetPlayerName(playerId, playerName)
+	
+	-- changing race is not allowed (due to side effects of removing produciton queues and abilities)
+	-- but Setup_SetPlayerRace will give us an error if this happens
+	Setup_SetPlayerRace(playerId, World_GetRaceIndex(playerRace))
+		
+	-- start the index from 0
+	if ( team ~= TEAM_NEUTRAL ) then
+		team = team-1
+	end
+
+	-- mod
+	Setup_SetPlayerTeam(playerId, team)
+	
+	return playerId
+end
+
+--? @group Setup
+--? @shortdesc Sets up difficulty (currently: modifies entity health, and sets AI difficulty). You should pass in Game_GetSPDifficulty() as the difficulty.
+--? @extdesc You can optionally specify the race if the player is using squads different from his current race selection.
+--? @args PlayerID player[, Integer difficulty, string Race, Table infantry_mod, Table vehicle_mod, 
+function Setup_Difficulty(player, dif, race, infantry_mod, vehicle_mod)
+
+	local GetModifierTable = function(table_in, default_table)
+		-- if it's already valid, use it
+		if table_in ~= nil then
+			return table_in
+		end
+		
+		local localplayer = Game_GetLocalPlayer()
+		
+		-- find the right default table based on relationship to localplayer
+		if Player_GetID(player) == Player_GetID(localplayer) then
+			return default_table.self
+		else
+			local relationship = Player_GetRelationship(player, localplayer)
+			if relationship == R_ALLY or relationship == R_NEUTRAL then
+				return default_table.ally
+			elseif relationship == R_ENEMY then
+				return default_table.enemy
+			else
+				error("invalid player relationship " .. Player_GetID(player) .. " and " .. Player_GetID(localplayer))
+			end
+		end
+	end
+	
+	local ApplyHealthModifierToEBPs = function(health_mod, ebps, ebpprefix)
+		
+		local modvalue = Util_DifVar(health_mod, dif)
+		if modvalue == 1 then
+			return -- no point
+		end
+		
+		-- modify health for all specified entities
+		for j = 1, table.getn(ebps) do
+			
+			local filename = ebpprefix .. ebps[j]
+			local ebp = BP_GetEntityBlueprint(filename)
+			
+			local modifier = Modifier_Create(MAT_EntityType, "modifiers\\health_maximum_modifier.lua", MUT_Multiplication, false, modvalue, ebp)
+			Modifier_ApplyToPlayer(modifier, player)
+			
+		end
+	end
+	
+	
+	if dif == nil then
+		dif = Game_GetSPDifficulty()
+	end
+	
+	-- these get applied if optional params aren't present
+	local defaultInfantryHealthModifiers =
+	{
+		self =
+		{
+			3,
+			1.5,
+			1,
+			1,
+		},
+		
+		ally =
+		{
+			1,
+			1,
+			1,
+			1,
+		},
+		
+		enemy =
+		{
+			.6,
+			.8,
+			0.9,
+			1,
+		},
+	}
+	
+	local defaultVehicleHealthModifiers =
+	{
+		self =
+		{
+			2,
+			1.5,
+			1,
+			.8,
+		},
+		
+		ally =
+		{
+			1,
+			1,
+			1,
+			1,
+		},
+		
+		enemy =
+		{
+			.7,
+			.8,
+			1,
+			1,
+		},
+	}
+	
+	-- acquire default tables if necessary
+	infantry_mod = GetModifierTable(infantry_mod, defaultInfantryHealthModifiers)
+	vehicle_mod = GetModifierTable(vehicle_mod, defaultVehicleHealthModifiers)
+	
+	-- these tables define what effect difficulty has on the game. if you add anything in here, update the Scardoc comment
+	-- above so people know what this function is doing
+	local EBPs = {}
+	EBPs[TRACE_ALLIES] =
+	{
+		prefix = "EBPs/races/allies/",
+		infantry =
+		{
+			"soldiers/airborne_infantry.lua",
+			"soldiers/airborne_infantry_sp.lua",
+			"soldiers/airborne_sergeant_sp.lua",
+			"soldiers/engineer.lua",
+			"soldiers/infantry_rifleman.lua",
+			"soldiers/infantry_rifleman_sergeant.lua",
+			"soldiers/officer_lieutenant.lua",
+			"soldiers/ranger.lua",
+			"soldiers/sniper.lua",
+			"soldiers/weapon_crew.lua",
+			"soldiers/airborne_sergeant.lua",
+			"soldiers/infantry_rifleman_sergeant.lua",
+			"soldiers/mortar_gunner.lua",
+			"soldiers/repair_engineer.lua",
+			"soldiers/sniper_airborne.lua",
+			"soldiers/weapon_crew_howitzer.lua",
+			
+			--[[ CUSTOM FOR MISSION 01 ]]
+			"soldiers/infantry_rifleman_sp_m01.lua",
+			"soldiers/engineer_sp_m01.lua",
+		},
+		vehicles =
+		{
+			"vehicles/deuce_and_half_cckw_truck.lua",
+			"vehicles/m3_halftrack.lua",
+			"vehicles/m4_crocodile.lua",
+			"vehicles/m4_sherman.lua",
+			"vehicles/m4_sherman_calliope.lua",
+			"vehicles/m8_greyhound.lua",
+			"vehicles/m10_tank_destroyer.lua",
+			"vehicles/m26_pershing.lua",
+			
+			--[[ DLC1 ]]
+			"vehicles/t17_staghound_armoured_car.lua",
+		},
+	}
+	
+	EBPs[TRACE_AXIS] =
+	{
+		prefix = "EBPs/races/axis/",
+		infantry =
+		{
+			"soldiers/grenadier.lua",
+			"soldiers/pioneer.lua",
+			"soldiers/sniper.lua",
+			"soldiers/volksgrenadier.lua",
+			"soldiers/stormtrooper_grenadier.lua",
+			"soldiers/officer_leutnant.lua",
+			"soldiers/weapon_crew.lua",
+			"soldiers/knights_cross_holder.lua",
+			"soldiers/machine_gunner.lua",
+			"soldiers/mortar_gunner.lua",
+			"soldiers/repair_pioneer.lua",
+			"soldiers/weapon_crew_88.lua",
+			
+			--[[ CUSTOM FOR MISSION 01 ]]
+			"soldiers/machine_gunner_sp_m01_noautotarget",
+			
+			--[[ CUSTOM FOR DLC1 ]]
+			"soldiers/villers_bocage_shultz.lua",
+			"soldiers/villers_bocage_schroif.lua",
+			"soldiers/villers_bocage_litzke.lua",
+			"soldiers/villers_bocage_berndt.lua",
+			"soldiers/villers_bocage_voss.lua",
+		},
+		vehicles =
+		{
+			"vehicles/goliath_remote_controlled_bomb.lua",
+			"vehicles/motorcycle.lua",
+			"vehicles/ostwind_flak_panzer.lua",
+			"vehicles/panther.lua",
+			"vehicles/panzer_iv.lua",
+			"vehicles/sdkfz234_armoured_car.lua",
+			"vehicles/sdkfz_251_halftrack.lua",
+			"vehicles/stug_iv.lua",
+			"vehicles/tiger.lua",
+			"vehicles/tiger_ace.lua",
+			"vehicles/tiger_spg_ace.lua",
+			
+			--[[ DLC1 ]]
+			"vehicles/axis_schwimmwagen.lua",
+			
+			--[[ CUSTOM FOR DLC1 ]]
+			"vehicles/villers_bocage_tiger.lua",
+			"vehicles/villers_bocage_regular_tiger.lua",
+		},
+	}
+	
+	EBPs[TRACE_ALLIES_COMMONWEALTH] =
+	{
+		prefix = "EBPs/races/allies_commonwealth/",
+		infantry =
+		{
+			"soldiers/tommy.lua",
+			"soldiers/sapper.lua",
+			"soldiers/commando.lua",
+			"soldiers/officer_captain.lua",
+			"soldiers/officer_lieutenant.lua",
+			"soldiers/piper.lua",
+			"soldiers/weapon_crew.lua",
+			"soldiers/tommy_bagpiper.lua",
+			"soldiers/artillery_crew.lua",
+			"soldiers/machine_gun_crew.lua",
+			"soldiers/mortar_gunner.lua",
+		},
+		vehicles =
+		{
+			"vehicles/bren_carrier.lua",
+			"vehicles/bren_carrier_mg.lua",
+			"vehicles/churchill_tank.lua",
+			"vehicles/churchill_avre.lua",
+			"vehicles/churchill_crocodile.lua",
+			"vehicles/command_tank.lua",
+			"vehicles/cromwell_tank.lua",
+			"vehicles/priest.lua",
+			"vehicles/sherman_firefly_tank.lua",
+			"vehicles/stuart_light_tank.lua",
+			"vehicles/tetrarch_light_tank.lua",
+			"vehicles/commonwealth_jeep_sp.lua",
+			
+			--[[ DLC1 ]]
+			"vehicles/staghound_armoured_car.lua",
+		},
+	}
+	
+	EBPs[TRACE_AXIS_PANZER_ELITE] =
+	{
+		prefix = "ebps/races/axis_panzer_elite/",
+		infantry =
+		{
+			"soldiers/panzer_grenadier.lua",
+			"soldiers/fallshirmjager.lua",
+			"soldiers/fallshirmjager_leader.lua",
+			"soldiers/luftwaffe.lua",
+			"soldiers/luftwaffe_leader.lua",
+			"soldiers/officer.lua",
+			"soldiers/panzer_grenadier_elite.lua",
+			"soldiers/panzer_grenadier_leader.lua",
+			"soldiers/weapon_crew.lua",
+			"soldiers/weapon_flak_crew.lua",
+			
+			--[[ DLC1 ]]
+			"vehicles/panzer_elite_schwimmwagen.lua",			
+		},
+		vehicles =
+		{
+			"vehicles/222_light_armoured_car.lua",
+			"vehicles/223_light_armoured_car.lua",
+			"vehicles/250_light_halftrack.lua",
+			"vehicles/250_10_light_at.lua",
+			"vehicles/250_7_mortar.lua",
+			"vehicles/250_vampire.lua",
+			"vehicles/251_munitions_halftrack.lua",
+			"vehicles/bergetiger.lua",
+			"vehicles/hetzer.lua",
+			"vehicles/hummel.lua",
+			"vehicles/jagdpanther.lua",
+			"vehicles/marderiii.lua",
+			"vehicles/panzer_iv.lua",
+			"vehicles/panzer_iv_stubby.lua",
+			"vehicles/wirblewind.lua",
+		},
+	}
+	
+	-- if it's an AI player, set his difficulty to match the game difficulty
+	if AI_IsAIPlayer(player) then
+		AI_SetDifficulty(player, dif)
+	end
+	
+	local ebpTable
+	if race ~= nil then
+		ebpTable = EBPs[race]
+	else
+		ebpTable = EBPs[Player_GetRaceName(player)]
+	end
+	
+	if ebpTable == nil then
+		error("Setup_Difficulty: invalid race or missing difficulty table for player " .. Player_GetID(player) .. " of race " .. Player_GetRaceName(player))
+	end
+
+	ApplyHealthModifierToEBPs(infantry_mod, ebpTable.infantry, ebpTable.prefix)
+	ApplyHealthModifierToEBPs(vehicle_mod, ebpTable.vehicles, ebpTable.prefix)
+	
+end
+
+--? @group Util
+--? @shortdesc Takes in a table and chooses the right variable for the difficulty setting. 1-4 elements. Acquires current difficulty by default.
+--? @args Table difficultyVariables[, Integer difficulty]
+--? @result Variable
+function Util_DifVar(tablename, dif)
+
+	if scartype(tablename) ~= ST_TABLE then
+		fatal( "Util_DifVar: invalid table")
+	end
+	if dif == nil then
+		dif = Game_GetSPDifficulty()
+	end
+	local count = table.getn(tablename)
+	if count == 0 then
+		fatal( "Util_DifVar: table.getn cannot equal zero")
+	else
+		if (dif+1) > count then
+			return tablename[count]
+		else
+			return tablename[dif+1]
+		end
+	end
+	
+end
+
+--? @group Setup
+--? @shortdesc Refers to 'MissionPresets.scar' and allows for all missions to have preset data taken into account.
+--? @args Integer missionIDnum
+--? @result Void
+function Setup_MissionPreset(missionNum)
+	
+	if MISSIONS[missionNum] == nil then
+		print("Setup_MissionPreset: No PRESETS have been set for mission " ..missionNum)
+		return
+	end
+	
+	local presets = MISSIONS[missionNum].PRESETS
+	if presets.LETTERBOX ~= nil then
+		Game_Letterbox(presets.LETTERBOX, 0)
+	end
+	
+	if scartype(presets.NAME) == ST_NUMBER then
+		print(" ****************** STARTING MISSION: "..Loc_ToAnsi(presets.NAME).." ************************ ")	
+	end
+
+	if presets.BLACK ~= nil then
+		Game_FadeToBlack(presets.BLACK, 0)
+	end
+
+	-- mute the sound before the NIS plays
+	if presets.AMBIENT_MUTE ~= nil then
+		Util_MuteAmbientSound(presets.AMBIENT_MUTE)
+	end
+	-- load atmosphere file 
+	if type(presets.ATMOSPHERE) == "string" then
+		Game_LoadAtmosphere(presets.ATMOSPHERE, 0)
+	end
+	
+	if presets.RESOURCE_RATES ~= nil then
+		__t_preset_resource_id = {}
+		for k,v in pairs(presets.RESOURCE_RATES) do
+			local id = Modify_PlayerResourceRate(Game_GetLocalPlayer(), v.resource, v.scale_factor)
+			table.insert(__t_preset_resource_id, id)
+		end
+	end
+	
+	-- load mission specific resource monitor data
+	if scartype(presets.RESOURCE_MONITOR) == ST_TABLE then
+		__t_res_preset = {
+			current_scale 	= 0,
+			res_rate_id 	= false,
+			timer			= "__MONITOR RESOURCES FACTOR",
+			timer_amount	= 30,
+			t_factors		= {},
+		}
+	
+		Rule_AddInterval(__MonitorPlayerResourceRates, 1)
+		__t_res_preset.t_factors = presets.RESOURCE_MONITOR
+		__t_res_preset.res_rate_id = Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Manpower, 1) 
+	end
+	
+	-- instantiate campaign global modifiers
+	if presets.CAMPAIGN ~= nil then
+		if scartype(presets.CAMPAIGN.COMMANDER_TREE_COSTS) == ST_TABLE then
+			for k, v in pairs(presets.CAMPAIGN.COMMANDER_TREE_COSTS) do
+				Player_SetUpgradeCost(Game_GetLocalPlayer(), v.upgrade, 0, 0, 0, 0, v.cost)
+			end
+		end
+		
+		if presets.CAMPAIGN.RUN_ENTITY_COUNT == true
+		and not Game_IsRTM() then
+			Rule_AddInterval(_CountAvg_Track, 30)
+		end
+		
+		-- load resource monitor data if there is no mission specific resource monitoring
+		if presets.RESOURCE_MONITOR == nil
+		and presets.CAMPAIGN.RESOURCE_MONITOR ~= nil then
+		__t_res_preset = {
+			current_scale 	= 0,
+			res_rate_id 	= false,
+			timer			= "__MONITOR RESOURCES FACTOR",
+			timer_amount	= 30,
+			t_factors		= {},
+		}
+	
+		Rule_AddInterval(__MonitorPlayerResourceRates, 1)
+		__t_res_preset.t_factors = presets.CAMPAIGN.RESOURCE_MONITOR
+		__t_res_preset.res_rate_id = Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Manpower, 1) 
+		end
+		
+		if presets.CAMPAIGN.ALL_TRUCKS_PROVIDE_SUPPLY == true then
+			if Rule_Exists(__ManageCommonwealthTruckSupply) == false then
+				Rule_AddInterval(__ManageCommonwealthTruckSupply, 5)
+			end
+		end
+		
+	end
+	
+	-- use default veteran squads if necessary
+	if Player_HasPersistentSquadFile(Game_GetLocalPlayer()) ~= true and presets.PERSISTENT_SQUAD_FILE ~= false then
+		Player_LoadPersistentSquadsFromFile(Game_GetLocalPlayer(), presets.PERSISTENT_SQUAD_FILE)
+	end
+	
+	-- sound specific functions
+	local sound = MISSIONS[missionNum].SOUND
+	if sound.SPEECH_PATH ~= false then
+		Sound_PreCacheSinglePlayerSpeech( sound.SPEECH_PATH )
+	end
+	
+	if scartype(sound.UNIT_INTROS) == ST_TABLE then
+		__g_preset_unit_intro = sound.UNIT_INTROS
+		Rule_AddInterval(__UnitIntroductionSpeech, 2)
+	end
+	
+	if sound.STARTING_MUSIC ~= false then
+		Util_PlayMusic(sound.STARTING_MUSIC.path, sound.STARTING_MUSIC.fade, sound.STARTING_MUSIC.delay)
+	end
+	
+	if sound.AMBIENCE_PATH ~= false then
+		Sound_PlayStreamed(sound.AMBIENCE_PATH)
+	end
+	
+	local tech = MISSIONS[missionNum].TECH_TREE
+	if tech ~= nil then
+		-- prevent the player from recruiting specific squads
+		if scartype(tech.SQUAD_LOCK) == ST_TABLE then
+			for i=1,table.getn( tech.SQUAD_LOCK ) do
+				Player_SetSquadProductionAvailability( Game_GetLocalPlayer(), tech.SQUAD_LOCK[i], ITEM_REMOVED )
+			end
+		end
+
+		if scartype(tech.ENTITY_LOCK) == ST_TABLE then
+			for i=1,table.getn( tech.ENTITY_LOCK ) do
+				Player_SetEntityProductionAvailability( Game_GetLocalPlayer(), tech.ENTITY_LOCK[i], ITEM_REMOVED )
+			end
+		end
+		
+		if scartype(tech.LOCK_BUILD_MENU) == ST_TABLE then
+			for i=1, table.getn( tech.LOCK_BUILD_MENU ) do 
+				Player_SetConstructionMenuAvailability(Game_GetLocalPlayer(), tech.LOCK_BUILD_MENU[i], ITEM_LOCKED)
+			end
+			
+		end
+		
+		-- grant or disable various abilities for the player
+		if scartype(tech.ABILITY) == ST_TABLE then
+			if scartype(tech.ABILITY.LOCK) == ST_TABLE then
+				for i=1,table.getn( tech.ABILITY.LOCK ) do
+					Player_SetAbilityAvailability( Game_GetLocalPlayer(), tech.ABILITY.LOCK[i], ITEM_REMOVED )
+				end
+			end
+			
+			if scartype(tech.ABILITY.GRANT) == ST_TABLE then
+				for i=1,table.getn( tech.ABILITY.GRANT ) do
+					Player_SetAbilityAvailability( Game_GetLocalPlayer(), tech.ABILITY.GRANT[i], ITEM_UNLOCKED )
+				end
+			end
+		end
+		
+		-- grant or disable various abilities for the player
+		if scartype(tech.UPGRADE) == ST_TABLE then
+			if scartype(tech.UPGRADE.LOCK) == ST_TABLE then
+				for i=1,table.getn( tech.UPGRADE.LOCK ) do
+					Player_SetUpgradeAvailability( Game_GetLocalPlayer(), tech.UPGRADE.LOCK[i], ITEM_REMOVED )
+				end
+			end
+			
+			if scartype(tech.UPGRADE.GRANT) == ST_TABLE then
+				for i=1,table.getn( tech.UPGRADE.GRANT ) do
+					Cmd_InstantUpgrade( Game_GetLocalPlayer(), tech.UPGRADE.GRANT[i])
+				end
+			end
+		end
+		
+		-- set up any necessary items that are related to the Commander Tree
+		if tech.COMMANDER_TREE == false then
+			
+			Rule_Add(__DisableCompanyCommanderTree)
+			
+		elseif scartype(tech.COMMANDER_TREE) == ST_TABLE then
+			if type(tech.COMMANDER_TREE.MAX_POINTS) == "number" then
+				g_commandPointLimit = tech.COMMANDER_TREE.MAX_POINTS
+				g_commandPointMaxReached = false
+				Rule_AddInterval(Rule_CapCommandPoints, 1)
+			end
+			
+			-- you should not be able to lock and force a commander tree, they are mutually exclusive.
+			if tech.COMMANDER_TREE.FORCE ~= nil and tech.COMMANDER_TREE.FORCE ~= false then
+				UI_ForceCommanderTreeChoice(Game_GetLocalPlayer(), tech.COMMANDER_TREE.FORCE)
+			elseif scartype(tech.COMMANDER_TREE.LOCK) == ST_TABLE then
+				for i=1,table.getn( tech.COMMANDER_TREE.LOCK ) do
+					Player_SetUpgradeAvailability( Game_GetLocalPlayer(), tech.COMMANDER_TREE.LOCK[i], ITEM_LOCKED )
+				end
+			end
+			
+			if scartype(tech.COMMANDER_TREE.GRANT) == ST_TABLE then
+				for i=1,table.getn( tech.COMMANDER_TREE.GRANT ) do
+					Cmd_InstantUpgrade( Game_GetLocalPlayer(), tech.COMMANDER_TREE.GRANT[i])
+				end
+			end
+			
+			if scartype(tech.COMMANDER_TREE.LOCK) == ST_TABLE then
+				for i=1,table.getn( tech.COMMANDER_TREE.LOCK ) do
+					Player_SetUpgradeAvailability( Game_GetLocalPlayer(), tech.COMMANDER_TREE.LOCK[i], ITEM_LOCKED)
+				end
+			end
+			
+		end
+		
+	end
+	
+	-- for SP, make unknown the same as visited
+	FOW_SetUnknownIntensity(FOW_GetVisitedIntensity())
+	
+	local nis = MISSIONS[missionNum].NIS
+	if type(nis) == "table" then
+		if type(nis.OPENING) == "string" then
+			nis_load(nis.OPENING)
+		end
+		if type(nis.CLOSING) == "string" then
+			nis_load(nis.CLOSING)
+		end
+		
+		nis_setintransitiontime(0)
+		nis_setouttransitiontime(0)
+	end
+
+end
+
+-- loops through a table of unit introduction speeches, and finds
+-- out if the player has one selected then plays the appropriate speech
+-- and removes it from the table.
+function __UnitIntroductionSpeech()
+
+	if table.getn(__g_preset_unit_intro) == 0 then
+		Rule_RemoveMe()
+		return
+	end
+
+	sg_unit_intro = SGroup_CreateIfNotFound("sg_unit_intro")
+	
+	if Event_IsAnyRunning() == false then
+	
+		Misc_GetSelectedSquads(sg_unit_intro, false)
+		if not SGroup_IsEmpty(sg_unit_intro) then
+	
+			for k, v in pairs(__g_preset_unit_intro) do
+				
+				SGroup_Clear(sg_temp)
+				SGroup_AddGroup(sg_temp, sg_unit_intro)
+				SGroup_Filter(sg_temp, v.sbp, FILTER_KEEP)
+				
+				if not SGroup_IsEmpty(sg_temp) then
+					
+					Util_AutoAmbient(v.speech)
+					table.remove(__g_preset_unit_intro, k)
+					
+				end
+			
+			end
+		end
+		
+	end
+	
+end
+
+function __MonitorPlayerResourceRates()
+		
+	local pop = Player_GetCurrentPopulation(Game_GetLocalPlayer(), CT_Personnel)
+		
+	for k,v in pairs(__t_res_preset.t_factors) do 
+		if pop >= v.popLimit and pop <= v.popMax then
+			
+			-- slowly scale down the resources over time rather than immediately dropping the player's resources
+			-- running a timer to drop the amount by 0.01 every 30 seconds until the ideal limit has been reached.
+			if v.thisTier == true 
+			and __t_res_preset.current_scale > v.scale
+			and ( Timer_Exists( __t_res_preset.timer ) == false or Timer_GetRemaining( __t_res_preset.timer ) <= 0) then
+				
+				Modifier_Remove(__t_res_preset.res_rate_id)
+				__t_res_preset.current_scale = __t_res_preset.current_scale - 0.01
+				__t_res_preset.res_rate_id = Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Manpower, __t_res_preset.current_scale)
+--~ 				print("__MonitorPlayerResourceRates (Pop Cap: ("..pop.." Scale factor: "..__t_res_preset.current_scale..")")
+				Timer_Start( __t_res_preset.timer, __t_res_preset.timer_amount )
+				
+			elseif v.thisTier ~= true then
+				
+				Modifier_Remove(__t_res_preset.res_rate_id)
+				
+				-- if the scale factor is going up then immediately jump the player to the correct factor
+				-- so that they get the instant resource 
+				if v.scale >= __t_res_preset.current_scale then
+					
+					__t_res_preset.current_scale = v.scale
+--~ 					print("__MonitorPlayerResourceRates (Pop Cap: ("..pop.." Scale factor: "..__t_res_preset.current_scale..")")
+					__t_res_preset.res_rate_id = Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Manpower, v.scale)
+					
+				-- otherwise slowly reduce it over a period of time from the current scale factor, rather than 
+				-- instantly jumping them to the next rate.
+				else
+					
+					Modifier_Remove(__t_res_preset.res_rate_id)
+					__t_res_preset.current_scale = __t_res_preset.current_scale - 0.01
+					__t_res_preset.res_rate_id = Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Manpower, __t_res_preset.current_scale)
+--~ 					print("__MonitorPlayerResourceRates (Pop Cap: ("..pop.." Scale factor: "..__t_res_preset.current_scale..")")
+					Timer_Start( __t_res_preset.timer, __t_res_preset.timer_amount )
+					
+				end
+				
+				v.thisTier = true
+				
+			end
+			
+		else
+			v.thisTier = false
+		end
+		
+	end
+
+
+end
+
+function __DisableCompanyCommanderTree()
+
+	-- turn off action point kickers because CC menu is disabled
+	UI_EnableResourceTypeKicker(RT_Action, false)														
+	g_action_mod = Modify_PlayerResourceRate(player1, RT_Action, 0)
+	UI_BindingSetEnabled( "company_commander", false )
+	Rule_RemoveMe()
+
+end
+
+function __EnableCompanyCommanderTree()
+	
+	UI_EnableResourceTypeKicker(RT_Action, true)
+	if g_action_mod ~= nil then
+		Modifier_Remove(g_action_mod)
+	end
+	UI_BindingSetEnabled( "company_commander", true )
+
+end
+
+-- is called by the game. clears stuff in preparation for starting a counterattack mission.
+function __SetupCounterattack()
+
+	__g_IsCounterattack = true
+
+	print("__SetupCounterattack")
+	Rule_RemoveAll()
+	Game_SkipEvent()
+	
+	Player_ClearAvailabilities(player1)
+	Player_RevertChosenCommanderTree(player1)
+	__EnableCompanyCommanderTree()
+	Entity_ClearDemolitionCallbacks()
+	
+	StateMachine_RemoveAll()
+	TankCombat_RemoveAll()
+	HintPoint_RemoveAll()
+	
+	-- removing the command point capping rule
+	if Rule_Exists(Rule_CapCommandPoints) then
+		Rule_Remove(Rule_CapCommandPoints)
+	end
+	
+	-- fixing additional problems with the resource rates command points
+	if g_commandPoint_res_id ~= nil then
+		Modifier_Remove(g_commandPoint_res_id)
+		g_commandPoint_res_id = nil
+	end
+	
+	g_commandPointLimit = nil
+	g_commandPointMaxReached = false
+
+	-- remove any modifiers that might have been applied to the player's resource rates
+	if __t_res_preset and __t_res_preset.res_rate_id ~= nil then
+		Modifier_Remove(__t_res_preset.res_rate_id)
+	end
+	
+	-- removing the rule monitor player resources
+	if Rule_Exists(__MonitorPlayerResourceRates) then
+		Rule_Remove(__MonitorPlayerResourceRates)
+	end
+	
+	if scartype(__t_preset_resource_id) == ST_TABLE then
+		for i=1, table.getn(__t_preset_resource_id) do
+			Modifier_Remove(__t_preset_resource_id[i])
+		end
+	end
+	
+	if Rule_Exists(__UnitIntroductionSpeech) then
+		Rule_Remove(__UnitIntroductionSpeech)
+	end
+	
+	FOW_Enable(true)
+	
+	Player_ResetResource(Game_GetLocalPlayer(), RT_Command)
+	Player_ResetResource(Game_GetLocalPlayer(), RT_Action)
+	
+	-- restore control groups (saved in Game_EndSP)
+	if t_control_groups then
+		for i = 1, table.getn(t_control_groups) do
+			local ctrl = t_control_groups[i]
+			SGroup_CallSquadFunction(ctrl[1], Misc_SetSquadControlGroup, i - 1)
+			EGroup_CallEntityFunction(ctrl[2], Misc_SetEntityControlGroup, i - 1)
+		end
+	end
+	
+	World_ClearCasualties()
+	
+end

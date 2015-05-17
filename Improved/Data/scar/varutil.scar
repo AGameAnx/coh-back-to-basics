@@ -1,0 +1,193 @@
+--
+--[[ Variable Utilities ]]--
+-- 
+-- Coded by AGameAnx at 27-12-2008
+--
+
+-- returns a deep copy of the table t
+function Clone(t)
+	if scartype(t) == ST_TABLE then
+		local new = {}
+		local i, v = next(t)
+		while i do
+			if scartype(v) == ST_TABLE then
+				v = Clone(v)
+			end
+			new[i] = v
+			i, v = next(t, i)
+		end
+		return new
+	end
+	return t
+end
+
+-- finds a table index by it's value
+function FindIndexByValue(t,v)
+	local i,j
+	for i,j in pairs(t) do
+		if j == v then
+			return i
+		end
+	end
+	return nil
+end
+
+-- returns string instead of number of scartype
+function scartype_tostring(st)
+	if st == ST_NIL then
+		return "nil"
+	elseif st == ST_BOOLEAN then
+		return "boolean"
+	elseif st == ST_NUMBER then
+		return "number"
+	elseif st == ST_STRING then
+		return "string"
+	elseif st == ST_TABLE then
+		return "table"
+	elseif st == ST_FUNCTION then
+		return "function"
+	elseif st == ST_SCARPOS then
+		return "scarpos"
+	elseif st == ST_EGROUP then
+		return "egroup"
+	elseif st == ST_ENTITY then
+		return "entity"
+	elseif st == ST_SGROUP then
+		return "sgroup"
+	elseif st == ST_SQUAD then
+		return "squad"
+	elseif st == ST_TEAM then
+		return "team"
+	elseif st == ST_MARKER then
+		return "marker"
+	elseif st == ST_PBG then
+		return "pbg"
+	elseif st == ST_PLAYER then
+		return "player"
+	elseif st == ST_CONSTPLAYER then
+		return "constplayer"
+	elseif st == ST_AISQUAD then
+		return "aisquad"
+	elseif st == ST_AISTATSMILITARYPOINT then
+		return "aistatsmilitarypoint"
+	elseif st == ST_AIPLAYER then
+		return "aiplayer"
+	elseif st == ST_AICAPTUREPOINT then
+		return "aicapturepoint"
+	elseif st == ST_UNKNOWN  then
+		return "unknown"
+	end
+end
+
+-- returns basic information about any scartype variable
+function scarvar_getinfo(var)
+	local st = scartype(var)
+	if st == ST_NIL then
+		return "nil"
+	elseif st == ST_BOOLEAN then
+		return "boolean: "..tostring(var)
+	elseif st == ST_NUMBER then
+		return "number: "..string.format("%.3f", var)
+	elseif st == ST_STRING then
+		return "string: "..var
+	elseif st == ST_TABLE then
+		return "table (length: "..table.getn(var)..")"
+	elseif st == ST_FUNCTION then
+		return "function"
+	elseif st == ST_SCARPOS then
+		return "position {x: "..var.x.." y: "..var.y.." z: "..var.z.."}"
+	elseif st == ST_EGROUP then
+		return "egroup {name: "..EGroup_GetName(var).." count: "..EGroup_Count(var).."}"
+	elseif st == ST_ENTITY then
+		if Entity_IsAlive(var) then
+			return "entity {"..scarvar_getinfo(Entity_GetBlueprint(var)).." "..scarvar_getinfo(Entity_GetPosition(var)).."}"
+		else
+			return "entity {dead/destroyed}"
+		end
+	elseif st == ST_SGROUP then
+		return "sgroup {name: "..SGroup_GetName(var).." count: "..SGroup_Count(var).."}"
+	elseif st == ST_SQUAD then
+		if Squad_IsValid(Squad_GetGameID(var)) then
+			return "squad {"..scarvar_getinfo(Squad_GetBlueprint(var)).." "..scarvar_getinfo(Squad_GetPosition(var)).."}"
+		else
+			return "squad {dead/destroyed}"
+		end
+	elseif st == ST_TEAM then
+		return "team: "..tostring(var)
+	elseif st == ST_MARKER then
+		return "marker {name: "..Marker_GetName(var).." "..scarvar_getinfo(Marker_GetPosition(var)).." prox: "..Marker_GetProximityRadius(var).."}"
+	elseif st == ST_PBG then
+		return "pbg: "..BP_GetName(var)
+	elseif st == ST_PLAYER then
+		return "player: "..World_GetPlayerIndex(var)
+	elseif st == ST_CONSTPLAYER then
+		return "constplayer"
+	elseif st == ST_AISQUAD then
+		return "aisquad"
+	elseif st == ST_AISTATSMILITARYPOINT then
+		return "aistatsmilitarypoint"
+	elseif st == ST_AIPLAYER then
+		return "aiplayer"
+	elseif st == ST_AICAPTUREPOINT then
+		return "aicapturepoint"
+	elseif st == ST_UNKNOWN then
+		return "unknown"
+	end
+end
+
+-- dumps all the variable information to the console (don't supply level, unless you know what you're doing)
+function Dump(t, return_result, level)
+	local result = ""
+	if level == nil then
+		level = 0
+	end
+	local l = level
+	local sp = ""
+	local j
+	for j=1,l do
+		sp = sp.."\t"
+	end
+	if scartype(t) == ST_TABLE then
+		if return_result then
+			result = result..sp.."(type: "..type(t)..", scarinfo: "..scarvar_getinfo(t)..") = {\n"
+		else
+			print(sp.."(type: "..type(t)..", scarinfo: "..scarvar_getinfo(t)..") = {")
+		end
+		local i,v
+		for i,v in pairs(t) do
+			local ind
+			if scartype(i) ~= ST_NUMBER and scartype(i) ~= ST_STRING then
+				ind = scarvar_getinfo(i)
+			else
+				ind = tostring(i)
+			end
+			if scartype(v) == ST_TABLE then
+				if return_result then
+					result = result.."\t["..ind.."]\n"
+					result = result..Dump(v, true, level+2)
+					result = result..sp.."\t}\n"
+				else
+					print(sp.."\t["..ind.."]")
+					Dump(v, false, level+2)
+					print(sp.."\t}")
+				end
+			else
+				if return_result then
+					result = result..sp.."\t["..ind.."] = "..tostring(v).." (type: "..type(v)..", scarinfo: "..scarvar_getinfo(v)..")\n"
+				else
+					print(sp.."\t["..ind.."] = "..tostring(v).." (type: "..type(v)..", scarinfo: "..scarvar_getinfo(v)..")")
+				end
+			end
+		end
+		if return_result then
+			result = result..sp.."}\n"
+		else
+			print(sp.."}")
+		end
+	elseif return_result then
+		result = result..sp..tostring(t).." (type: "..type(t)..", scarinfo: "..scarvar_getinfo(t)..")\n"
+	else
+		print(sp..tostring(t).." (type: "..type(t)..", scarinfo: "..scarvar_getinfo(t)..")")
+	end
+	return result
+end

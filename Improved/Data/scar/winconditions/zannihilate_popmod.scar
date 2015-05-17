@@ -1,0 +1,21 @@
+-----------------------------------------------------------------------
+-- VPTicker Win Condition
+--
+-- (c) Relic Entertainment 2006
+--
+-- Programmers: Shelby Hubick, Kris Botha, Randy Lukashuk
+-----------------------------------------------------------------------
+import("ScarUtil.scar")
+
+-- used to indicate we want annihilate to be checked
+g_CheckAnnihilate = true
+
+function PopMod_Init()
+	for i=1,World_GetPlayerCount() do
+		local p = World_GetPlayerAt(i)
+		Player_SetMaxPopulation(p, CT_Personnel, 250)
+		Player_SetMaxCapPopulation(p, CT_Personnel, 250)
+	end
+end
+
+Scar_AddInit(PopMod_Init)

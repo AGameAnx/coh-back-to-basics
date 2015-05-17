@@ -1,0 +1,2091 @@
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+--
+-- DESIGNER LIBRARY
+-- Provides some high level functions for us to set things up simply.
+--
+-- 'cos we're lazy like that.
+-- 
+-- (c) 2005 Relic Entertainment
+--
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+function DesignerLib_Init()
+	
+	_AutoReinforceTable = {}		-- Auto Reinforce
+	_lastknownposcheckticker = 1
+	
+	_AutoRetreatTable = {}			-- Auto Retreat
+	
+	_AutoChargeTable = {}			-- Auto Charge
+	_lastautochargeindex = 1
+	
+	_CeasefireTable = {}			-- Ceasefire
+	
+	_MarchTable = {}				-- March Territory Forwards
+	
+	_AutoTerritoryTable = {}		-- Auto Territory
+	_lastautoterritoryindex = 1
+	
+	_ShootTheSkyTable = {}			-- Shoot the Sky
+	sg_shoottheskygroup = SGroup_CreateIfNotFound("sg_shoottheskygroup")
+	
+	_MobRule_Definitions()
+	
+	_ATGunTable = {}
+	_ATGunWeaponCrews = {}
+	_ATGunWeaponCrews[1] = SBP.CW.TOMMIES				-- Race Index 0: Commonwealth
+	_ATGunWeaponCrews[2] = SBP.ALLIES.RIFLEMEN			-- Race Index 1: Allies
+	_ATGunWeaponCrews[3] = SBP.AXIS.VOLKSGRENADIER		-- Race Index 2: Axis
+	_ATGunWeaponCrews[4] = SBP.ELITE.PANZERGRENADIER	-- Race Index 3: Panzer Elite
+	
+	_BridgeTerritoryTable = {}
+	
+end
+Scar_AddInit(DesignerLib_Init)
+
+
+
+--? @group Stats
+
+--? @shortdesc Takes a statistic function and totals up the results for all the players on a given team
+--? @args Integer teamindex, Function statfunction
+--? @result Integer
+function Stats_TeamTally(team, statfunc)
+	
+	local result = 0
+	
+	local _OnePlayer = function(teamid, playerindex, playerid)
+		result = result + statfunc(playerid)
+	end
+
+	Team_ForEach(team, _OnePlayer)
+	
+	return result
+	
+end
+
+
+
+--? @group DesignerLib
+
+-------------------------------------------------------------------------
+-- Auto Cinematic - In/Out
+-- @degnan
+-------------------------------------------------------------------------
+--? @shortdesc Toggles all cinematic related settings. true = go to cinematic, false = go back to normal
+--? @result Void
+--? @args Boolean in/out, Real seconds
+function AutoCinematic(boolean, secs)
+	Game_Letterbox(boolean, secs)
+	Game_FadeToBlack(boolean, secs)
+end
+
+-------------------------------------------------------------------------
+-- AI Setup
+-- @degnan
+-------------------------------------------------------------------------
+--? @args playerID Player, table CapLimits, playerID Target, int AI_difficulty, int ProdTemplate, int Aggression, int Preference, int Counter
+--? @shortdesc Utility wrapper to setup the AI. Visit Scardoc to read the extended description.
+--? @extdesc \n
+--? An example use:\n
+--? Util_AI_Setup(player5, 10, player1, 1, 6, 5, 2, 3)\n
+--? player5 = the AI player \n
+--? 10 = the popcap override value \n
+--? player1 = the main target for the AI \n
+--? 1 = the difficulty setting \n
+--? 6 = the AI production template table entry \n
+--? 5 = the aggression setting, 1-5, 5 is the most aggressive \n
+--? 2 = the unit preference, 1-5, 1 is infantry heavy, 5 is vehicle heavy\n
+--? 3 = the counter preference, 1-5, 1 is anti-infantry, 5 is anti-vehicle\n
+--? \n
+--? @result Void
+function Util_AI_Setup(player, limitpop, target, difficulty, prodtype, tude, pref, focus)
+	
+	-- turn the AI on
+	if player ~= nil then
+		AI_Enable(player, true)
+	elseif player ~= nil or player~= false then
+		error("Util_AI_Setup: invalid AI player ID")
+	end
+	
+	-- what to do about it's pop
+	if limitpop ~= nil then
+		Player_SetPopCapOverride(player, limitpop[1])
+	elseif limitpop ~= nil or limitpop~= false then
+		error("Util_AI_Setup: invalid popcap override number")
+	end
+	
+	-- target player?
+	if target ~= nil then
+		--AI_SetTargetPlayer(player, target)
+	elseif target ~= nil or target~= false then
+		error("Util_AI_Setup: invalid target player ID")
+	end
+	
+	-- difficulty
+	if difficulty ~= nil and difficulty~= false then
+		AI_SetDifficulty(player, difficulty)
+	else
+		AI_SetDifficulty(player, AD_Hard)
+	end
+	
+	-- unit prod restrictions
+    local prodTypes = {
+		{	-- [1] - no builder
+			{SBP.AXIS.PIONEER, 0},
+		},
+		{	-- [2] - no tanks
+			{SBP.AXIS.PANTHER, 0},
+			{SBP.AXIS.OSTWIND, 0},
+			{SBP.AXIS.PANZER, 0},
+			{SBP.AXIS.STUG, 0},
+			{SBP.AXIS.PUMA, 0},
+			{SBP.AXIS.TIGER, 0},
+		},
+		{	-- [3] - no infantry
+			{SBP.AXIS.GRENADIER, 0},
+			{SBP.AXIS.HEAVYMG, 0},
+			{SBP.AXIS.MORTAR, 0},
+			{SBP.AXIS.SNIPER, 0},
+			{SBP.AXIS.OFFICER, 0},
+			{SBP.AXIS.VOLKSGRENADIER, 0},
+			{SBP.AXIS.STORMTROOPER, 0},
+			{SBP.AXIS.KNIGHTSCROSS, 0},
+		},
+		{	-- [4] - basic infantry + all tanks
+			{SBP.AXIS.SNIPER, 0},
+			{SBP.AXIS.OFFICER, 0},
+			{SBP.AXIS.STORMTROOPER, 0},
+			{SBP.AXIS.KNIGHTSCROSS, 0},
+		},
+		{	-- [5] - no heavy tanks + all infantry
+			{SBP.AXIS.PANTHER, 0},
+			{SBP.AXIS.PANZER, 0},
+			{SBP.AXIS.TIGER, 0},
+		},
+		{	-- [6] - basic infantry + no heavy tanks
+			{SBP.AXIS.SNIPER, 0},
+			{SBP.AXIS.OFFICER, 0},
+			{SBP.AXIS.STORMTROOPER, 0},
+			{SBP.AXIS.KNIGHTSCROSS, 0},
+			{SBP.AXIS.OSTWIND, 1},
+			{SBP.AXIS.PUMA, 2},
+			{SBP.AXIS.PANTHER, 0},
+			{SBP.AXIS.PANZER, 0},
+			{SBP.AXIS.TIGER, 0},
+		},
+		{	-- [7] - Custom M06
+			{SBP.AXIS.SNIPER, 0},
+			{SBP.AXIS.OFFICER, 0},
+			{SBP.AXIS.STORMTROOPER, 0},
+			{SBP.AXIS.KNIGHTSCROSS, 0},
+			{SBP.AXIS.STUG, 2},
+			{SBP.AXIS.OSTWIND, 1},
+			{SBP.AXIS.HALFTRACK_FLAME, 2},
+			{SBP.AXIS.HALFTRACK_STUKA, 1},
+			{SBP.AXIS.PUMA, 2},
+			{SBP.AXIS.GOLIATH, 0},
+			{SBP.AXIS.NEBELWERFER, 0},
+			{SBP.AXIS.PANTHER, 0},
+			{SBP.AXIS.PANZER, 0},
+			{SBP.AXIS.TIGER, 0},
+		},
+ 	}
+	-- lock components
+	if prodtype ~= nil and prodtype ~= false and prodtype <= table.getn(prodTypes) then
+		AI_SetProductionLimitsTable(player, prodTypes[prodtype])
+	elseif prodtype ~= nil and prodtype~= false then
+		error("Util_AI_Setup: invalid prodtype number")
+	end
+	
+	-- Defensive(1) vs. Aggressive(5)
+	local attitude = {
+		{.9, .1, .9}, -- [1] - very defensive
+		{.6, .3, .6}, -- [2] - defensive
+		{.5, .5, .5}, -- [3] - average
+		{.3, .6, .3}, -- [4] - offensive
+		{.1, .9, .1}, -- [5] - very offensive
+	}
+	-- agressiveness
+	if tude ~= nil then
+		--AI_DoString( player, "s_personality.advance_percentage = "..attitude[tude][1] )
+		-- higher means more attackers
+		--AI_DoString( player, "s_personality.default_attack_percentage = "..attitude[tude][2] )
+		-- lower means stays in the fight longer
+		--AI_DoString( player, "s_personality.fallback_percentage = "..attitude[tude][3] )
+		-- force attack
+		if tude == 1 then
+			--AI_EnableComponent(player, false, COMPONENT_Attacking)
+		end
+	end
+	
+	-- Infantry(1) vs. Vehicle(5)
+	local preference = {
+		{8, 1, 1}, -- [1] - infantry heavy
+		{6, 3, 1}, -- [2] - infantry first
+		{4, 4, 3}, -- [3] - average
+		{2, 4, 4}, -- [4] - vehicle first
+		{1, 3, 6}, -- [5] - vehicle heavy
+	}
+	if pref ~= nil then
+		-- preferences
+		--AI_SetClassPreference(player, "aiclass_infantry", preference[pref][1])
+		--AI_SetClassPreference(player, "aiclass_light_vehicle", preference[pref][2])
+		--AI_SetClassPreference(player, "aiclass_heavy_vehicle", preference[pref][3])
+	end
+	
+	-- Anti-Inf vs. Anti-Veh
+	local counterfocus = {
+		{8, 1, 1}, -- [1] - anti-infantry heavy
+		{6, 3, 1}, -- [2] - anti-infantry first
+		{4, 4, 3}, -- [3] - average
+		{2, 4, 4}, -- [4] - anti-vehicle first
+		{1, 3, 6}, -- [5] - anti-vehicle heavy
+	}               
+	if focus ~= nil then
+		-- focus
+		--AI_SetAntiClassPreference(player, "aiclass_infantry", counterfocus[focus][1])
+		--AI_SetAntiClassPreference(player, "aiclass_light_vehicle", counterfocus[focus][2])
+		--AI_SetAntiClassPreference(player, "aiclass_heavy_vehicle", counterfocus[focus][3])
+	end
+	
+end
+
+
+-------------------------------------------------------------------------
+--
+-- AUTO-REINFORCE FUNCTIONS
+--
+-- These functions continually monitor a group on your behalf and
+-- reinforce that group should it drop beneath half it's initial member
+-- count. Currently it assumes one squad per group, but this might be
+-- fixed later on if there's enough demand!
+-- 
+-- You can use this on several groups at once and each group is
+-- independant of the others, so make sure you have everyone you want to
+-- be in one autoreinforce set in one group.
+--
+-- This uses an SGroup to reference the group throughout, so you should
+-- use a group that will always reference the same guys (i.e. don't use
+-- a temp group which you subsequently clear out)
+--
+-------------------------------------------------------------------------
+
+
+function AutoReinforce_AddSGroup(sgroup, originpos)
+	
+	if (scartype(originpos) == ST_MARKER) then					-- if a marker was passed in, convert it to a pos
+		originpos = Marker_GetPosition(originpos)
+	end
+	
+	-- do some type checking
+	if (scartype(sgroup) ~= ST_SGROUP) then fatal("AutoReinforce_AddSGroup: SGroupID is invalid") end
+	
+	-- remove any old references to the SGroup from the table
+	for n = table.getn(_AutoReinforceTable), 1, -1 do
+		if (_AutoReinforceTable[n].sgroupid == sgroup) then
+			table.remove(_AutoReinforceTable, n)
+		end
+	end
+	
+	if (SGroup_Count(sgroup) >= 1) then
+		
+		local thisplayer = Squad_GetPlayerOwner(SGroup_GetSpawnedSquadAt(sgroup, 1))
+		local thisblueprint = Squad_GetBlueprint(SGroup_GetSpawnedSquadAt(sgroup, 1))
+		local thispos = Squad_GetPosition(SGroup_GetSpawnedSquadAt(sgroup, 1))
+		local thisthreshold = Squad_GetMax(SGroup_GetSpawnedSquadAt(sgroup, 1))*0.5
+		
+		-- add the new group
+		table.insert(_AutoReinforceTable, {sgroupid = sgroup, playerid = thisplayer, blueprint = thisblueprint, lastknownpos = thispos, origin = originpos, threshold = thisthreshold})
+		
+		-- start up the manager rule if it isn't running already
+		if (Rule_Exists(AutoReinforce_Manager) == false) and (table.getn(_AutoReinforceTable) >= 1) then
+			Rule_Add(AutoReinforce_Manager)
+		end
+		
+	else
+		print("*** WARNING in AutoReinforce_AddSGroup: SGroup is empty ***")
+	end
+	
+end
+
+
+--? @shortdesc Removes an SGroup from the auto-reinforce functions
+--? @result Void
+--? @args SGroupID sgroup
+function AutoReinforce_RemoveSGroup(sgroup)
+	
+	-- do some type checking
+	if (scartype(sgroup) ~= ST_SGROUP) then fatal("AutoReinforce_RemoveSGroup: SGroupID is invalid") end
+	
+	for n = table.getn(_AutoReinforceTable), 1, -1 do
+		if (_AutoReinforceTable[n].sgroupid == sgroup) then
+			table.remove(_AutoReinforceTable, n)
+		end
+	end
+	
+	-- if we removed the last items from the table, remove the manager rule
+	if (table.getn(_AutoReinforceTable) == 0) and (Rule_Exists(AutoReinforce_Manager) == true) then
+		Rule_Remove(AutoReinforce_Manager)
+	end
+	
+end
+
+
+--? @shortdesc Stops monitoring all squads from the auto-reinforce functions
+--? @result Void
+--? @args Void
+function AutoReinforce_RemoveAll()
+
+	-- blank out the table
+	_AutoReinforceTable = {}
+	
+	-- remove the manager rule
+	if (Rule_Exists(AutoReinforce_Manager) == true) then
+		Rule_Remove(AutoReinforce_Manager)
+	end
+	
+end
+
+
+function AutoReinforce_Manager()
+
+	for n = 1, table.getn(_AutoReinforceTable) do
+		
+		if (SGroup_TotalMembersCount(_AutoReinforceTable[n].sgroupid) == 0) then
+			-- squad is dead, recreate the squad and run them in
+			
+			print("Replacing Squad")
+			
+			local pos = World_GetHiddenPositionOnPath(_AutoReinforceTable[n].playerid, _AutoReinforceTable[n].origin, _AutoReinforceTable[n].lastknowpos, CHECK_BOTH)
+			if (pos == nil) then
+				Util_CreateSquadsAtMarkerFacing(_AutoReinforceTable[n].playerid, _AutoReinforceTable[n].sgroupid, _AutoReinforceTable[n].blueprint, _AutoReinforceTable[n].origin, _AutoReinforceTable[n].lastknownpos, 1)
+			else
+				Util_CreateSquadsAtMarkerFacing(_AutoReinforceTable[n].playerid, _AutoReinforceTable[n].sgroupid, _AutoReinforceTable[n].blueprint, pos, _AutoReinforceTable[n].lastknownpos, 1)
+			end
+			
+		elseif (SGroup_TotalMembersCount(_AutoReinforceTable[n].sgroupid) < _AutoReinforceTable[n].threshold) then
+			-- squad has dropped below threshold, reinforce it
+			
+			local reinforcecount = math.ceil(Squad_GetMax(SGroup_GetSpawnedSquadAt(_AutoReinforceTable[n].sgroupid, 1))*0.5)
+			print("Reinforcing Squad: "..reinforcecount)
+			Cmd_InstantReinforceUnitPos(_AutoReinforceTable[n].sgroupid, reinforcecount, _AutoReinforceTable[n].origin, CHECK_OFFCAMERA)
+			
+		else
+			-- squad is fine, just update the squad's position (every so often)
+			
+			print("Saving Squad Position")
+			
+			if 	(_lastknownposcheckticker == 0) then
+				_AutoReinforceTable[n].lastknownpos = SGroup_GetPosition(_AutoReinforceTable[n].squadid)
+			end
+			
+		end
+		
+	end
+
+	_lastknownposcheckticker = _lastknownposcheckticker + 1
+	if 	(_lastknownposcheckticker == 10) then
+		_lastknownposcheckticker = 0
+	end
+
+end
+
+
+
+
+
+-------------------------------------------------------------------------
+--
+-- AUTO-RETREAT FUNCTIONS
+--
+-- These functions continually monitor a group on your behalf and
+-- trigger a retreat action once they take a certain amount of
+-- punsihment. The trigger conditions are:
+-- a) SGroup_TotalMembersCount is reduced to half the starting size *or*
+-- b) SGroup is pinned for 6 to 10 seconds (random per group)
+-- 
+-- You can use this on several groups at once and each group is
+-- independant of the others, so make sure you have everyone you want to
+-- be in one autoretreat set in one group. You can also specify a
+-- threshold to use instead of half (the default)
+--
+-- This uses an SGroup to reference the group throughout, so you should
+-- use a group that will always reference the same guys (i.e. don't use
+-- a temp group which you subsequently clear out)
+-- 
+-------------------------------------------------------------------------
+
+
+--? @shortdesc Sets an sgroup to retreat to the given destination or building once pinned for a certain duration, or reduced to a third of it's original size
+--? @extdesc The optional threshold value should be a percentage (between 0.0 and 1.0) - when the member count drops below this, they retreat
+--? @result Void
+--? @args SGroupID sgroup, MarkerID/Position/EGroupID destination[, Real threshold, LuaFunction onTrigger]
+function AutoRetreat_AddSGroup(sgroup, dest, threshold, func)
+	
+	if (scartype(dest) == ST_MARKER) then
+		dest = Marker_GetPosition(dest)
+	end
+	
+	if threshold == nil then
+		threshold = 0.5
+	end
+	
+	-- do some type checking
+	if (scartype(sgroup) ~= ST_SGROUP) then fatal("AutoRetreat_AddSGroup: SGroupID is invalid") end
+	
+	if (SGroup_Count(sgroup) >= 1) then
+		
+		-- remove any old references to the SGroup from the table
+		for n = table.getn(_AutoRetreatTable), 1, -1 do
+			if (_AutoRetreatTable[n].group == sgroup) then
+				table.remove(_AutoRetreatTable, n)
+			end
+		end
+		
+		-- add the new group
+		table.insert(_AutoRetreatTable, {group = sgroup, destination = dest, pinnedtime = nil, duration = World_GetRand(6, 10), threshold = math.floor(SGroup_TotalMembersCount(sgroup) * threshold), ontrigger = func})
+		
+		-- start up the manager rule if it isn't running already
+		if (Rule_Exists(AutoRetreat_Manager) == false) and (table.getn(_AutoRetreatTable) >= 1) then
+			Rule_AddInterval(AutoRetreat_Manager, 1)
+		end
+		
+	end
+	
+end
+
+
+--? @shortdesc Removes a squad from being monitored by the auto-retreat functions
+--? @result Void
+--? @args SGroupID sgroup
+function AutoRetreat_RemoveSGroup(sgroup)
+
+	-- do some type checking
+	if (scartype(sgroup) ~= ST_SGROUP) then fatal("AutoRetreat_RemoveSGroup: SGroupID is invalid") end
+	
+	-- remove any old references to the SGroup from the table
+	for n = table.getn(_AutoRetreatTable), 1, -1 do
+		if (_AutoRetreatTable[n].group == sgroup) then
+			table.remove(_AutoRetreatTable, n)
+		end
+	end
+
+	-- if we removed the last item, remove the manager rule
+	if (Rule_Exists(AutoRetreat_Manager) == true) and (table.getn(_AutoRetreatTable) == 0) then
+		Rule_Remove(AutoRetreat_Manager)
+	end
+	
+end
+
+
+--? @shortdesc Stops monitoring all squads from the auto-retreat functions
+--? @result Void
+--? @args Void
+function AutoRetreat_RemoveAll()
+
+	-- blank out the table
+	_AutoRetreatTable = {}
+	
+	-- remove the manager rule
+	if (Rule_Exists(AutoRetreat_Manager) == true) then
+		Rule_Remove(AutoRetreat_Manager)
+	end
+	
+end
+
+
+
+function AutoRetreat_Manager()
+	
+	for n = table.getn(_AutoRetreatTable), 1, -1 do
+		
+		if (SGroup_Count(_AutoRetreatTable[n].group) == 0) then
+			table.remove(_AutoRetreatTable, n)
+		else
+			
+			-- see if the squad is pinned...
+			if (SGroup_GetSuppression(_AutoRetreatTable[n].group) > 0.4) then
+				if (_AutoRetreatTable[n].pinnedtime == nil) then
+					-- just become pinned
+					_AutoRetreatTable[n].pinnedtime = World_GetGameTime()
+				elseif ((World_GetGameTime() - _AutoRetreatTable[n].pinnedtime) > _AutoRetreatTable[n].duration) then
+					-- been pinned for more than 10 seconds
+					AutoRetreat_Retreat(_AutoRetreatTable[n])
+					table.remove(_AutoRetreatTable, n)
+				else
+					-- not 10 seconds yet: do nothing (but still check for dropping to the threshold)
+					if (SGroup_TotalMembersCount(_AutoRetreatTable[n].group) <= _AutoRetreatTable[n].threshold) then
+						AutoRetreat_Retreat(_AutoRetreatTable[n])
+						table.remove(_AutoRetreatTable, n)					
+					end
+				end
+			else
+				-- not pinned, so ensure the pinned time is blank
+				_AutoRetreatTable[n].pinnedtime = nil
+				
+				-- see if the squad has dropped to the threshold
+				if (SGroup_TotalMembersCount(_AutoRetreatTable[n].group) <= _AutoRetreatTable[n].threshold) then
+					AutoRetreat_Retreat(_AutoRetreatTable[n])
+					table.remove(_AutoRetreatTable, n)					
+				end
+				
+			end
+			
+		end
+		
+	end
+	
+	-- if we removed the last items from the table, remove the manager rule
+	if (table.getn(_AutoRetreatTable) == 0) then
+		Rule_Remove(AutoRetreat_Manager)
+	end
+	
+end
+
+
+
+
+function AutoRetreat_Retreat(me)
+	
+	print("Retreating: "..SGroup_GetName(me.group))
+	
+	-- retreat to the location and/or garrison the destination building
+	if scartype(me.destination) == ST_SCARPOS then
+		Cmd_Retreat(me.group, me.destination)
+	elseif scartype(me.destination) == ST_EGROUP then
+		Cmd_Retreat(me.group, EGroup_GetPosition(me.destination))
+		Cmd_Garrison(me.group, me.destination, false, true) -- queued
+	end
+	
+	-- call the trigger function if one exists
+	if scartype(me.ontrigger) == ST_FUNCTION then
+		me.ontrigger()
+	end
+	
+	-- remove this squad from the autocharge routines if it's in there
+	AutoCharge_RemoveSGroup(me.group)
+	
+end
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+--
+-- AUTO-CHARGE FUNCTIONS
+--
+-- 
+-------------------------------------------------------------------------
+
+
+--? @shortdesc Sets an sgroup to charge a position when the player steps into the trigger zone
+--? @result Void
+--? @args SGroupID sgroup, MarkerID/Position/EGroupID triggerarea[, Real triggerrange, LuaFunction onTrigger]
+function AutoCharge_AddSGroup(sgroup, pos, range, func)
+	
+	if (scartype(pos) == ST_MARKER) then
+		if range == nil then
+			range = Marker_GetProximityRadius(pos)
+		end
+		pos = Marker_GetPosition(pos)
+	end
+	
+	-- do some type checking
+	if (scartype(sgroup) ~= ST_SGROUP) then fatal("AutoCharge_AddSGroup: SGroupID is invalid") end
+	
+	if (SGroup_Count(sgroup) >= 1) then
+		
+		-- remove any old references to the SGroup from the table
+		for n = table.getn(_AutoChargeTable), 1, -1 do
+			if (_AutoChargeTable[n].group == sgroup) then
+				table.remove(_AutoChargeTable, n)
+			end
+		end
+		
+		-- add the new group
+		table.insert(_AutoChargeTable, {group = sgroup, position = pos, range = range, ontrigger = func})
+		
+		-- start up the manager rule if it isn't running already
+		if (Rule_Exists(AutoCharge_Manager) == false) and (table.getn(_AutoChargeTable) >= 1) then
+			Rule_AddInterval(AutoCharge_Manager, 1)
+		end
+		
+	end
+	
+end
+
+
+--? @shortdesc Removes a squad from being monitored by the auto-charge functions
+--? @result Void
+--? @args SGroupID sgroup
+function AutoCharge_RemoveSGroup(sgroup)
+
+	-- do some type checking
+	if (scartype(sgroup) ~= ST_SGROUP) then fatal("AutoCharge_RemoveSGroup: SGroupID is invalid") end
+	
+	-- remove any old references to the SGroup from the table
+	for n = table.getn(_AutoChargeTable), 1, -1 do
+		if (_AutoChargeTable[n].group == sgroup) then
+			table.remove(_AutoChargeTable, n)
+		end
+	end
+
+	-- if we removed the last item, remove the manager rule
+	if (Rule_Exists(AutoCharge_Manager) == true) and (table.getn(_AutoChargeTable) == 0) then
+		Rule_Remove(AutoCharge_Manager)
+	end
+	
+end
+
+
+--? @shortdesc Stops monitoring all squads from the auto-charge functions
+--? @result Void
+--? @args Void
+function AutoCharge_RemoveAll()
+
+	-- blank out the table
+	_AutoChargeTable = {}
+	
+	-- remove the manager rule
+	if (Rule_Exists(AutoCharge_Manager) == true) then
+		Rule_Remove(AutoCharge_Manager)
+	end
+	
+end
+
+
+
+function AutoCharge_Manager()
+	
+	_lastautochargeindex = _lastautochargeindex + 1
+	if _lastautochargeindex > table.getn(_AutoChargeTable) then
+		_lastautochargeindex = 1
+	end
+	
+	if (table.getn(_AutoChargeTable) >= 1) then
+		
+		local n = _lastautochargeindex
+		
+		if (SGroup_CountSpawned(_AutoChargeTable[n].group) == 0) then
+			table.remove(_AutoChargeTable, n)
+		else
+			
+			if Prox_ArePlayersNearMarker(player1, _AutoChargeTable[n].position, ANY, _AutoChargeTable[n].range) then
+				
+				Cmd_AttackMove(_AutoChargeTable[n].group, _AutoChargeTable[n].position)
+				
+				if scartype(_AutoChargeTable[n].ontrigger) == ST_FUNCTION then
+					_AutoChargeTable[n].ontrigger()
+				end
+				
+				table.remove(_AutoChargeTable, n)
+				
+			end
+			
+		end
+		
+	end
+	
+	-- if we removed the last items from the table, remove the manager rule
+	if (table.getn(_AutoChargeTable) == 0) then
+		Rule_Remove(AutoCharge_Manager)
+	end
+	
+end
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+--
+-- CEASEFIRE FUNCTIONS
+--
+-- The Ceasefire library helps in setting up ambushes. All units in a 
+-- group you add to a ceasefire will NOT auto-target anything, until one
+-- unit amongst them starts firing (either via a player order or a forced
+-- SCAR command). At that point, all units in the group break their 
+-- ceasefire and start auto-targetting again.
+--
+-- You can use this on several groups at once and each group is
+-- independant of the others, so make sure you have everyone you want to
+-- be in one ceasefire in one group.
+--
+-- This uses an SGroup to reference the group throughout, so you should
+-- use a group that will always reference the same guys (i.e. don't use
+-- a temp group which you subsequently clear out)
+--
+-------------------------------------------------------------------------
+
+--? @shortdesc Stops an SGroup from auto-targetting, until one of their members is explicity given an attack order or Ceasefire_RemoveSGroup() is called (at which point they all start firing again)
+--? @extdesc You can optionally specify a function that will be called when the ceasefire is broken by the game (rather than by calling Ceasefire_RemoveSGroup)
+--? @result Void
+--? @args SGroupID sgroup[, LuaFunction function]
+function Ceasefire_AddSGroup(sgroup, onattack)
+	
+	-- create the appropriate modifier
+	local modifier = Modifier_Create(MAT_Weapon, "modifiers\\auto_target_enable_weapon_modifier.lua", MUT_Enable, true, -1, "hardpoint_01")
+	local result = {}
+	
+	-- apply this to each squad in the group
+	local _ApplyModifier = function (gid, idx, sid)
+		for n = 1, Squad_Count(sid) do
+			local eid = Squad_EntityAt(sid, n-1)
+			table.insert(result, Modifier_ApplyToEntity(modifier, eid))
+		end
+	end
+	SGroup_ForEach(sgroup, _ApplyModifier)
+	
+	table.insert(_CeasefireTable, {sgroup = sgroup, egroup = nil, modifier = result, func = onattack})
+	
+	if (Rule_Exists(Ceasefire_Manager) == false) then
+		Rule_AddInterval(Ceasefire_Manager, 2)
+	end
+	
+end
+
+
+--? @shortdesc Removes the ceasefire effect from an sgroup. This may already have been removed by issuing an attack order directly to the group.
+--? @result Void
+--? @args SGroupID sgroup
+function Ceasefire_RemoveSGroup(sgroup)
+
+	-- remove the auto-targetting disabler modifiers applied to the sgroup
+	for n = table.getn(_CeasefireTable), 1, -1 do
+		
+		if (_CeasefireTable[n].sgroup == sgroup) then
+			Modifier_Remove(_CeasefireTable[n].modifier)
+			table.remove(_CeasefireTable, n)
+		end
+		
+	end
+	
+	-- remove the manager rule if we just removed the last group
+	if (table.getn(_CeasefireTable) == 0) then
+		if (Rule_Exists(Ceasefire_Manager) == true) then
+			Rule_Remove(Ceasefire_Manager)
+		end
+	end
+	
+end
+
+
+-- internal function that manages the ceasefires
+function Ceasefire_Manager()
+
+	for n = table.getn(_CeasefireTable), 1, -1 do
+		
+		-- if anyone in this group is attacking...
+		if SGroup_IsAttacking(_CeasefireTable[n].sgroup, ANY) then
+			
+			-- run the associated function if specified
+			if (_CeasefireTable[n].func ~= nil) then
+				_CeasefireTable[n].func()
+			end
+			
+			-- remove the modifiers from everybody
+			Ceasefire_RemoveSGroup(_CeasefireTable[n].sgroup)
+			
+		end
+		
+	end
+	
+end
+
+
+
+--TEMP
+function SGroup_IsAttacking(group, all)
+
+	local _CheckSqaud = function (gid, idx, sid)
+		if Squad_HasActiveCommand(sid) then
+			local command = Squad_GetActiveCommand(sid)
+			if (command == SQUADSTATEID_Combat) then
+				return true
+			else
+				return false
+			end
+		else
+			return false
+		end
+	end
+
+	return SGroup_ForEachAllOrAny(group, all, _CheckSqaud)
+	
+end
+
+
+
+
+-------------------------------------------------------------------------
+--
+-- AUTO TERRITORY FUNCTIONS
+--
+-- The AutoTerritory manager lets you have territories that automatically
+-- change hands as units fight over them, without having to capture any
+-- flags. This is useful for dense areas of small territories - i.e. the
+-- streets in Mission 6. You should use this in conjunction with the
+-- invisible_no_resource_point objects.
+--
+-- The criteria for a change in territory ownership is that the stealing
+-- player must be the only player in the territory for the previous 5
+-- seconds.
+-- 
+-------------------------------------------------------------------------
+
+--? @shortdesc Adds a territory to the automanager. You specify the territory by passing in an EGroup containing the flag.
+--? @result Void
+--? @args EGroupID egroup[, EGroupID egroup2, EGroupID egroup3...]
+function AutoTerritory_AddEGroup(...)
+
+	for n = 1, table.getn(arg) do
+		
+		local egroup = arg[n]
+		
+		-- do some type checking
+		if scartype(egroup) ~= ST_EGROUP then fatal("AutoTerritory_AddEGroup: Invalid EGroup (item "..n..")") end
+		if Entity_IsStrategicPoint(EGroup_GetSpawnedEntityAt(egroup, 1)) == false then fatal("AutoTerritory_AddEGroup: EGroup is not a Flag (item "..n..")") end
+		
+		-- get the sector id
+		local sectorid = World_GetTerritorySectorID(EGroup_GetPosition(egroup))
+		
+		-- clear out any previous entries to this sector
+		for n = table.getn(_AutoTerritoryTable), 1, -1 do
+			if _AutoTerritoryTable[n].sector == sectorid then
+				table.remove(_AutoTerritoryTable, n)
+			end
+		end
+		
+		-- add the new entry
+		table.insert(_AutoTerritoryTable, {group = egroup, sector = sectorid, timer = nil})
+		
+		
+	end
+	
+	-- start up the manager rule if it isn't going already
+	if Rule_Exists(AutoTerritory_Manager) == false then
+		Rule_Add(AutoTerritory_Manager)
+	end
+	
+end
+
+--? @shortdesc Removes a territory from the automanager. You specify the territory by passing in an EGroup containing the flag.
+--? @result Void
+--? @args EGroupID egroup[, EGroupID egroup2, EGroupID egroup3...]
+function AutoTerritory_RemoveEGroup(...)
+
+	for n = 1, table.getn(arg) do
+		
+		local egroup = arg[n]
+		
+		-- do some type checking
+		if scartype(egroup) ~= ST_EGROUP then fatal("AutoTerritory_RemoveEGroup: Invalid EGroup (item "..n..")") end
+		if Entity_IsStrategicPoint(EGroup_GetSpawnedEntityAt(egroup, 1)) == false then fatal("AutoTerritory_RemoveEGroup: EGroup is not a Flag (item "..n..")") end
+		
+		-- get the sector id
+		local sectorid = World_GetTerritorySectorID(EGroup_GetPosition(egroup))
+		
+		-- clear out any previous entries to this sector
+		for n = table.getn(_AutoTerritoryTable), 1, -1 do
+			if _AutoTerritoryTable[n].sector == sectorid then
+				table.remove(_AutoTerritoryTable, n)
+			end
+		end
+		
+		
+	end
+	
+	-- remove the manager rule if we removed the last item it was monitoring
+	if table.getn(_AutoTerritoryTable) == 0 then
+		if Rule_Exists(AutoTerritory_Manager) then
+			Rule_Remove(AutoTerritory_Manager)
+		end
+	end
+	
+end
+
+
+--? @shortdesc Removes all territories from the automanager and shuts the system down.
+--? @result Void
+--? @args Void
+function AutoTerritory_RemoveAll()
+	
+	-- reset the table
+	_AutoTerritoryTable = {}
+	
+	-- remove the manager rule
+	if Rule_Exists(AutoTerritory_Manager) then
+		Rule_Remove(AutoTerritory_Manager)
+	end
+	
+end
+
+
+
+function AutoTerritory_Manager()
+
+	_lastautoterritoryindex = _lastautoterritoryindex + 1
+	if _lastautoterritoryindex > table.getn(_AutoTerritoryTable) then
+		_lastautoterritoryindex = 1
+	end
+	
+	local n = _lastautoterritoryindex
+	
+	
+	if Player_OwnsEGroup(player1, _AutoTerritoryTable[n].group) then
+		
+		-- player 1 owns this currently, so we're looking for the area to become occupied exclusively by player 2
+		if Prox_ArePlayersNearMarker(player1, _AutoTerritoryTable[n].sector, ANY) == false then
+			if Prox_ArePlayersNearMarker(player2, _AutoTerritoryTable[n].sector, ANY) == true then
+				if _AutoTerritoryTable[n].timer == nil then
+					_AutoTerritoryTable[n].timer = World_GetGameTime()
+				else
+					if _AutoTerritoryTable[n].timer <= (World_GetGameTime() - 5) then
+						EGroup_InstantCaptureStrategicPoint(_AutoTerritoryTable[n].group, player2)
+						_AutoTerritoryTable[n].timer = nil
+					end
+				end
+			else
+				_AutoTerritoryTable[n].timer = nil
+			end
+		else
+			_AutoTerritoryTable[n].timer = nil
+		end
+		
+	elseif Player_OwnsEGroup(player2, _AutoTerritoryTable[n].group) then
+		
+		-- player 2 owns this currently, so we're looking for the area to become occupied exclusively by player 1
+		if Prox_ArePlayersNearMarker(player1, _AutoTerritoryTable[n].sector, ANY) == true then
+			if Prox_ArePlayersNearMarker(player2, _AutoTerritoryTable[n].sector, ANY) == false then
+				if _AutoTerritoryTable[n].timer == nil then
+					_AutoTerritoryTable[n].timer = World_GetGameTime()
+				else
+					if _AutoTerritoryTable[n].timer <= (World_GetGameTime() - 5) then
+						EGroup_InstantCaptureStrategicPoint(_AutoTerritoryTable[n].group, player1)
+						_AutoTerritoryTable[n].timer = nil
+					end
+				end
+			else
+				_AutoTerritoryTable[n].timer = nil
+			end
+		else
+			_AutoTerritoryTable[n].timer = nil
+		end
+		
+	else
+		
+		-- this is unowned currently - first player to occupy it collects it
+		if Prox_ArePlayersNearMarker(player1, _AutoTerritoryTable[n].sector, ANY) == false then
+			if Prox_ArePlayersNearMarker(player2, _AutoTerritoryTable[n].sector, ANY) == true then
+				
+				-- player 1 isn't near and player 2 is
+				
+				if _AutoTerritoryTable[n].timer == nil then
+					_AutoTerritoryTable[n].timer = World_GetGameTime()
+				else
+					if _AutoTerritoryTable[n].timer <= (World_GetGameTime() - 5) then
+						EGroup_InstantCaptureStrategicPoint(_AutoTerritoryTable[n].group, player2)
+						_AutoTerritoryTable[n].timer = nil
+					end
+				end
+			end
+		else
+			if Prox_ArePlayersNearMarker(player2, _AutoTerritoryTable[n].sector, ANY) == false then
+				
+				-- player 1 is near and player 2 isn't
+				
+				if _AutoTerritoryTable[n].timer == nil then
+					_AutoTerritoryTable[n].timer = World_GetGameTime()
+				else
+					if _AutoTerritoryTable[n].timer <= (World_GetGameTime() - 5) then
+						EGroup_InstantCaptureStrategicPoint(_AutoTerritoryTable[n].group, player1)
+						_AutoTerritoryTable[n].timer = nil
+					end
+				end
+			end
+		end
+		
+	end
+	
+end
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+--
+-- SHOOT THE SKY FUNCTIONS
+--
+-- Registering a Sync Weapon with this system makes it shoot up in the
+-- air continually, until it is either destroyed or told to stop.
+-- 
+-------------------------------------------------------------------------
+
+
+--? @shortdesc Forces a sync weapon to shoot at the sky, so long as it's manned by a given player.
+--? @result Void
+--? @args SyncWeaponID syncweapon, PlayerID player
+function ShootTheSky_AddSyncWeapon(swid, playerid)
+	
+	if SyncWeapon_Exists(swid) then
+		
+		-- remove any previous entries
+		for n = table.getn(_ShootTheSkyTable), 1, -1 do
+			if _ShootTheSkyTable[n].weapon == swid then
+				table.remove(_ShootTheSkyTable, n)
+			end
+		end
+		
+		-- add the new weapon to the table
+		table.insert(_ShootTheSkyTable, {weapon = swid, pos = Entity_GetPosition(SyncWeapon_GetEntity(swid)), player = playerid} )
+		
+		-- fire off the manager rule if it isn't already going
+		if Rule_Exists(ShootTheSky_Manager) == false then
+			Rule_AddInterval(ShootTheSky_Manager, 3)
+		end
+		
+	end
+	
+end
+
+
+--? @shortdesc Removes a sync weapon from the "shoot at the sky" system. It can then target people again.
+--? @result Void
+--? @args SyncWeaponID syncweapon
+function ShootTheSky_RemoveSyncWeapon(swid)
+	
+	
+	-- remove any existing entries with this swid
+	for n = table.getn(_ShootTheSkyTable), 1, -1 do
+		
+		local this = _ShootTheSkyTable[n]
+		if this.weapon == swid then
+		
+			-- stop the gun firing
+			if SyncWeapon_Exists(this.weapon) and SyncWeapon_IsOwnedByPlayer(this.weapon, this.player) then
+				if Entity_IsPartOfSquad(SyncWeapon_GetEntity(this.weapon)) then
+					local squad = Entity_GetSquad(SyncWeapon_GetEntity(this.weapon))
+					SGroup_Single(sg_shoottheskygroup, squad)
+					Cmd_Stop(sg_shoottheskygroup)
+				end
+			end
+			
+			table.remove(_ShootTheSkyTable, n)
+			
+		end
+	end
+
+	-- remove the manager rule if we just removed the last weapon
+	if table.getn(_ShootTheSkyTable) == 0 then
+		if Rule_Exists(ShootTheSky_Manager) then
+			Rule_Remove(ShootTheSky_Manager)
+		end	
+	end
+	
+end
+
+
+--? @shortdesc Stops all sync weapons from going through their "shooting at the sky" routine.
+--? @result Void
+--? @args Void
+function ShootTheSky_RemoveAll()
+	
+	-- remove any existing entries with this swid
+	for n = table.getn(_ShootTheSkyTable), 1, -1 do
+		
+		local this = _ShootTheSkyTable[n]
+		
+		-- stop the gun firing
+		if SyncWeapon_Exists(this.weapon) and SyncWeapon_IsOwnedByPlayer(this.weapon, this.player) then
+			if Entity_IsPartOfSquad(SyncWeapon_GetEntity(this.weapon)) then
+				local squad = Entity_GetSquad(SyncWeapon_GetEntity(this.weapon))
+				SGroup_Single(sg_shoottheskygroup, squad)
+				Cmd_Stop(sg_shoottheskygroup)
+			end
+		end
+		
+		table.remove(_ShootTheSkyTable, n)
+		
+	end
+	
+	-- remove the manager rule
+	if Rule_Exists(ShootTheSky_Manager) then
+		Rule_Remove(ShootTheSky_Manager)
+	end	
+	
+end
+
+
+
+
+
+function ShootTheSky_Manager()
+	
+	for n = 1, table.getn(_ShootTheSkyTable) do
+		
+		local this = _ShootTheSkyTable[n]
+		
+		-- check to see if it's owned by the correct player first
+		if SyncWeapon_Exists(this.weapon) and SyncWeapon_IsOwnedByPlayer(this.weapon, this.player) then
+			
+			if Entity_IsPartOfSquad(SyncWeapon_GetEntity(this.weapon)) then
+				
+				local squad = Entity_GetSquad(SyncWeapon_GetEntity(this.weapon))
+				
+				SGroup_Single(sg_shoottheskygroup, squad)
+				
+				local dir = World_GetRand(1, 3141) / 1000
+				local pos = World_Pos(this.pos.x + (math.sin(dir) * 30), this.pos.y + (World_GetRand(90, 140)/3), this.pos.z + (math.cos(dir) * 30))
+				
+				Command_SquadPos(player2, sg_shoottheskygroup, SCMD_Attack, pos, false)			
+				
+			end
+			
+		end
+		
+	end
+	
+end
+
+
+
+
+
+-------------------------------------------------------------------------
+--
+-- MOB FUNCTIONS
+--
+-------------------------------------------------------------------------
+function _MobRule_Definitions()
+	--[[ types ]]
+	mobType = {
+		-- volks + officer
+		V = { mob = {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.VOLKSGRENADIER}, lead = SBP.AXIS.OFFICER},
+		-- volks and grens + officer
+		VG = { mob = {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER, SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER}, lead = SBP.AXIS.OFFICER},
+		-- mg crew - mgs and volks + officer
+		HMG = { mob = {SBP.AXIS.HEAVYMG, SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.HEAVYMG, SBP.AXIS.VOLKSGRENADIER}, lead = SBP.AXIS.OFFICER},
+		-- AT crew - mixed AT and volks + officer
+		AT = { mob = {SBP.AXIS.PAK_38, SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER, SBP.AXIS.VOLKSGRENADIER}, lead = SBP.AXIS.OFFICER},
+		-- mortar - mortars and volks + officer
+		M = { mob = {SBP.AXIS.MORTAR, SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.MORTAR, SBP.AXIS.VOLKSGRENADIER}, lead = SBP.AXIS.OFFICER},
+		-- light tank - puma and volks (tank is leader)
+		LT = { mob = {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.VOLKSGRENADIER}, lead = SBP.AXIS.PUMA},
+		-- med tank - stug and volks (tank is leader)
+		MT = { mob = {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER, SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.VOLKSGRENADIER}, lead = SBP.AXIS.STUG},
+		-- heavy tank - panzer and volks (tank is leader)
+		HT = { mob = {SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.GRENADIER, SBP.AXIS.VOLKSGRENADIER, SBP.AXIS.VOLKSGRENADIER}, lead = SBP.AXIS.PANZER},
+	}
+	--[[ source types ]]
+	stype = {
+		OFFMAP = 1,	-- will assume spawning in from the edge of the world
+		BUILD = 2 	-- will check for an Egroup, will not build without it
+	}
+	pace = {
+		FAST = 1,	-- will pause 25 seconds before moving to next spot
+		MED = 2,	-- will pause 45 seconds before moving to next spot
+		SLOW = 3,	-- will pause 65 seconds before moving to next spot
+	}
+end
+--[[ Example:
+
+function Trigger_Mob()
+
+	sg_mobA_all 	= SGroup_CreateIfNotFound("sg_mobA_all")
+	sg_mobA_lead 	= SGroup_CreateIfNotFound("sg_mobA_lead")
+	sg_mobA 		= SGroup_CreateTable("sg_mobA%d", 5)
+	
+	local sgroup = { all = sg_mobA_all, lead = sg_mobA_lead, mob = sg_mobA}
+	
+	local mType = mobType.M 
+	
+	local source = {stype = stype.BUILD, spawn = eg_axisbarracks3, rally = mkr_mob1_rally}
+	
+	local destination = {pace = pace.SLOW, count = 0, move = true, way = {mkr_mob1_way1, mkr_mob1_way2, mkr_mob1_way3, mkr_mob1_way4}, capture = nil}
+
+	MobRule_AddMob(player2, sgroup, mType, source, destination)
+	
+end
+
+]]
+
+function MobRule_AddMob(playerID, sgroupTable, mobName, sourceTable, destinationTable, dedication)
+	
+	if _MobBuild == nil then
+		_MobBuild = {}
+	end
+	local diehard = false
+	if deditcation ~= nil then
+		diehard = dedication
+	end
+	table.insert(_MobBuild, {player = playerID, sgroup = sgroupTable, mtype = mobName, source = sourceTable, dest = destinationTable, retreat = nil, diehard})
+	
+	if Rule_Exists(MobRule_BuildMob_Manager) == false then
+		Rule_AddInterval(MobRule_BuildMob_Manager, 5)
+	end
+
+end
+
+--[[ BUILD PHASE ]]
+-- gathering the strike team
+function MobRule_BuildMob_Manager()
+	
+	if table.getn(_MobBuild) > 0 then 
+		
+		for i = table.getn(_MobBuild), 1, -1 do 
+			
+			local this = _MobBuild[i]
+			
+			-- has the group failed before it started?
+			if this.retreat == true then
+				-- remove the mob
+				table.remove(_MobBuild, i)
+				
+			-- is the mob assembled yet?
+			elseif SGroup_IsEmpty(this.sgroup.all) 
+			-- is it unfinished and not under attack?
+			or ( SGroup_Count(this.sgroup.all) < 4 and SGroup_IsUnderAttack(this.sgroup.all, false, 10) == false ) then
+				print(SGroup_GetName(this.sgroup.all))
+				-- iterate through the mobType mob list
+				for y = 1, 4 --[[table.getn(this.mtype.mob) ]] do
+					-- make the next empty group
+					if SGroup_IsEmpty(this.sgroup.mob[y]) then
+						
+						MobRule_CreateMobMember(this.player, this.sgroup.mob[y], this.mtype.mob[y], this.source)
+						SGroup_AddGroup(this.sgroup.all,this.sgroup.mob[y])
+						break
+					end
+					
+				end
+				
+			-- it's time for the leader
+			elseif SGroup_IsEmpty(this.sgroup.lead) then
+				MobRule_CreateMobMember(this.player, this.sgroup.lead, this.mtype.lead, this.source)
+				
+			-- everyone is here
+			else
+				-- remove the group from this function
+				-- and add it to the next function
+				if _MobAssault == nil then
+					_MobAssault = {}
+				end
+				
+				table.insert(_MobAssault, _MobBuild[i])
+				table.remove(_MobBuild, i)
+				
+				if Rule_Exists(MobRule_AssaultMob_Manager) == false then
+					Rule_AddInterval(MobRule_AssaultMob_Manager, 5)
+				end
+				
+			end
+			
+		end
+		
+	else
+		
+		Rule_RemoveMe()
+		
+	end
+
+end
+
+function MobRule_CreateMobMember(player, group, blue, source)
+	-- 1 = Off Map source
+	if source.stype == 1 then
+		
+		Util_CreateSquads(player, group, blue, source.spawn, source.rally, 1, World_GetRand(3, 5))
+		Cmd_Move(group, Util_GetRandomPosition(source.rally, 7))
+		
+	-- 2 = from a production building
+	elseif source.stype == 2 then
+		
+		if EGroup_IsEmpty(source.spawn) then
+			
+			-- iterate through _MobBuild and 'retreat' any groups from this egroup
+			
+		else
+			
+			Util_CreateSquads(player, group, blue, source.spawn, source.rally, 1, World_GetRand(3, 5))
+			Cmd_Move(group, Util_GetRandomPosition(source.rally, 7))
+			
+		end
+		
+	end
+
+end
+
+function MobRule_AssaultMob_Manager()
+	
+	if table.getn(_MobAssault) > 0 then 
+		
+		for i = table.getn(_MobAssault), 1, -1 do 
+			
+			local this = _MobAssault[i]
+			
+			-- has the group failed before it started?
+			if this.diehard ~= true and ( this.retreat == true or ( this.mtype.lead ~= SBP.AXIS_OFFICER and SGroup_IsEmpty(this.sgroup.lead) ) ) then
+				-- remove the mob
+				if SGroup_IsEmpty(this.sgroup.all) == false then
+					Cmd_Retreat(this.sgroup.all, Marker_GetPosition(this.source.rally))
+				end
+				if SGroup_IsEmpty(this.sgroup.lead) == false then
+					Cmd_Retreat(this.sgroup.lead, Marker_GetPosition(this.source.rally))
+				end
+				table.remove(_MobAssault, i)
+				
+			elseif SGroup_IsUnderAttack(this.sgroup.all, false, 10) or SGroup_IsUnderAttack(this.sgroup.lead, false, 10) then
+				print("under attack")
+				if SGroup_Count(this.sgroup.all) < 3 or ( this.mtype.lead ~= SBP.AXIS_OFFICER and SGroup_IsEmpty(this.sgroup.lead) ) then
+					if SGroup_IsEmpty(this.sgroup.all) == false then
+						Cmd_AbandonTeamWeapon(this.sgroup.all)
+						Cmd_Retreat(this.sgroup.all, Marker_GetPosition(this.source.rally))
+					end
+					this.retreat = true
+				else
+					--Cmd_AttackMove(this.sgroup.all, this.sgroup.lead)
+				end
+				
+			elseif this.dest.move == true then
+				--print("move")
+				-- are there still way points to move to?
+				if table.getn(this.dest.way) > 0 then
+					-- move to the first point
+					-- the remove the first point
+					Cmd_AttackMove(this.sgroup.lead, this.dest.way[1])
+					for n = 1, 4 do 
+						Cmd_Move(this.sgroup.mob[n], Util_GetRandomPosition(this.dest.way[1], 10))
+					end
+					table.remove(this.dest.way, 1)
+					
+				-- do we capture on end?
+				elseif this.dest.capture ~= nil and EGroup_IsCapturedByPlayer(this.dest.capture, this.player, false) == false then
+					
+					Cmd_AttackMoveThenCapture(this.sgroup.all, this.dest.capture)
+					Cmd_AttackMoveThenCapture(this.sgroup.lead, this.dest.capture)
+					
+				-- if not, time to hunt down the player
+				else
+					
+					Player_GetAll(player1)
+					if SGroup_CountSpawned(sg_allsquads) > 0 then
+						Cmd_AttackMove(this.sgroup.all, sg_allsquads)
+						Cmd_AttackMove(this.sgroup.lead, sg_allsquads)
+					end
+					
+				end
+				
+				this.dest.move = false
+				
+			-- not ready to move yet?
+			elseif this.dest.move ~= true then
+				
+				-- this rule is called every 5 seconds
+				-- so a count of 1 = 5 seconds
+				-- pace = 1-3
+				-- so the range is
+				-- pace of 1 - 1*4*5 = 25 secs between moves (+5 cause we have to wait for the next iteration)
+				-- pace of 2 - 2*4*5 = 45 secs between moves (+5 cause we have to wait for the next iteration)
+				-- pace of 3 - 3*4*5 = 65 secs between moves (+5 cause we have to wait for the next iteration)
+				if this.dest.count > this.dest.pace*4 then
+					--print("ready to move")
+					this.dest.move = true
+					this.dest.count = 0
+					
+					local offset = {7, 0, 0, 1}
+					for n = 1, 4 do 
+						if SGroup_IsEmpty(this.sgroup.mob[n]) == false then
+							Cmd_Move(this.sgroup.mob[n], this.sgroup.lead, NO_QUEUE, NIL_DELETE, NIL_FACE, offset[n], 10)
+						end
+					end
+					
+				else
+					--print("counting")
+					this.dest.count = this.dest.count+1
+					
+				end
+				
+				
+			end
+			
+		end
+		
+	else
+		
+		Rule_RemoveMe()
+		
+	end
+
+end
+	
+
+
+
+
+
+-------------------------------------------------------------------------
+--
+-- SMOKE ENTRANCE FUNCTIONS
+--
+-------------------------------------------------------------------------
+
+--? @shortdesc Triggers smoke to come in from the map edge, at the position and direction of the given marker
+--? @args MarkerID marker
+--? @result Void
+function SmokeEntrance_Do(marker)	
+
+	local pos = Marker_GetPosition(marker)
+	local dir = Marker_GetDirection(marker)
+	
+	-- this defines the "shape" of the hits
+	local limits = {}
+	limits[1] = {ymin = 0, ymax = 30, xscale = 1}
+	limits[2] = {ymin = 0, ymax = 30, xscale = -1}
+	limits[3] = {ymin = 31, ymax = 70, xscale = 0.5}
+	limits[4] = {ymin = 31, ymax = 70, xscale = -0.5}
+	limits[5] = {ymin = 71, ymax = 120, xscale = 0}
+	
+	-- the calculated hit positions will go into this table
+	local spots = {}
+	
+	-- calculate positions according to the "shape" and the given marker position / direction
+	for n = 1, table.getn(limits) do	
+		
+		local z_offset = World_GetRand(limits[n].ymin, limits[n].ymax) / 10
+		local x_offset = World_GetRand(25, 50) / 10 * limits[n].xscale
+		
+		local x = pos.x + (x_offset * dir.z) + (z_offset * dir.x)
+		local z = pos.z - (x_offset * dir.x) + (z_offset * dir.z)
+		
+		spots[n] = World_Pos(x, pos.y, z)
+		
+	end
+	
+	-- add to the table the manager uses, and start the manager off
+	if _t_smokepositions == nil then
+		_t_smokepositions = {}
+	end
+	
+	-- if this is in a new area, trigger an event cue
+	--local flag = true
+	--for n = 1, table.getn(_t_smokepositions) do
+	--	if World_DistancePointToPoint(pos, _t_smokepositions[n][1]) < 45 then
+	--		flag = false
+	--		break
+	--	end
+	--end
+	--if flag == true then
+	--	EventCue_Create(CUE.NORMAL, LOC("Smoke Spotted"), LOC(""), pos)
+	--end
+	
+	
+	table.insert(_t_smokepositions, spots)
+	
+	if Rule_Exists(SmokeEntrance_Manager) == false then
+		Rule_AddInterval(SmokeEntrance_Manager, 0.5)
+	end
+	
+end
+
+
+
+
+function SmokeEntrance_Manager()
+	
+	for n = table.getn(_t_smokepositions), 1, -1 do
+		
+		local this = _t_smokepositions[n]
+		
+		Cmd_Ability(player1, ABILITY.SP.SINGLE_MORTAR_SMOKEENTRANCE, this[1])
+		table.remove(this, 1)
+		
+		if table.getn(this) == 0 then
+			table.remove(_t_smokepositions, n)
+		end
+		
+	end
+	
+	if table.getn(_t_smokepositions) == 0 then
+		Rule_RemoveMe()
+	end
+
+end
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+--
+-- AT GUN MANAGEMENT FUNCTIONS
+--
+-- This controls some of the AT guns across the map, making sure they
+-- turn to face the enemy as appropriate and generally look a bit more
+-- intelligent
+-- 
+-- See: http://relicjira.thqinc.com/confluence/display/COHXP/AT+Gun+Manager
+-- 
+-------------------------------------------------------------------------
+
+
+--? @shortdesc Add a gun to the gun manager. The manager will take care of turning it around to attack units, and optionally reinforcing it if the crew is killed.
+--? @extdesc If you pass in an EGroup, it will automatically find or create a corresponding SGroup with sg_ instead of the eg_ prefix.
+--? @args SGroupID/EGroupID group, PlayerID player[, Table facingdirections, Integer currentfacing, Integer reinforcecount, EGroupID/SGroupID/MarkerID/Pos reinforcespawnlocation], Boolean threatarrow
+--? @result Void
+--? @refs http://relicjira.thqinc.com/confluence/display/COHXP/AT+Gun+Manager
+function ATGun_AddGroup(group, player, directions, currentfacing, reinforce, reinforcespawn, threatarrow)
+
+	local swid
+	
+	if threatarrow == nil then
+		threatarrow = false
+	end
+	
+	if scartype(group) == ST_SGROUP then
+		swid = SyncWeapon_GetFromSGroup(group)
+	elseif scartype(group) == ST_EGROUP then
+		swid = SyncWeapon_GetFromEGroup(group)
+		local str = "sg_"..string.sub(EGroup_GetName(group), 4)
+		group = SGroup_CreateIfNotFound(str)
+	else
+		fatal("ATGun_AddGroup: Invalid group - it's not an SGroup nor an EGroup")
+	end
+	
+	table.insert(_ATGunTable, {group = group, player = player, team = Player_GetTeam(player), enemyteam = Team_GetEnemyTeam(Player_GetTeam(player)), swid = swid, directions = directions, currentfacing = currentfacing, reinforce = reinforce, reinforcespawn = reinforcespawn, lastturn = -10, threatarrow_enable = threatarrow, threatarrow_on = false, threatarrow_id = ThreatArrow_CreateGroup()})
+	
+	if Rule_Exists(ATGun_Manager) == false then
+		Rule_AddInterval(ATGun_Manager, 2)
+	end
+	
+end
+
+
+
+
+--? @shortdesc Remove a gun from the gun manager.
+--? @args SGroupID/EGroupID/SyncWeaponID gun 
+--? @result Void
+--? @refs http://relicjira.thqinc.com/confluence/display/COHXP/AT+Gun+Manager
+function ATGun_RemoveGroup(swid)
+
+	if scartype(swid) == ST_SGROUP then
+		swid = SyncWeapon_GetFromSGroup(swid)
+	elseif scartype(swid) == ST_EGROUP then
+		swid = SyncWeapon_GetFromEGroup(swid)
+	end
+	
+	for n = table.getn(_ATGunTable), 1, -1 do 
+		
+		local this = _ATGunTable[n]
+		
+		if this.swid == swid then
+			
+			table.remove(_ATGunTable, n)
+			
+		end
+		
+	end
+
+	if table.getn(_ATGunTable) == 0 then
+		Rule_Remove(ATGun_Manager)
+	end
+	
+end
+
+
+--? @shortdesc Remove's the direction settings for a gun, turning it into a fire-at-anything type. 
+--? @extdesc Use this if you are relocating a gun. Also removes any special first-trigger speech if you have any hooked up, as it may no longer be suitable if you're moving it.
+--? @args SGroupID/EGroupID/SyncWeaponID gun 
+--? @result Void
+--? @refs http://relicjira.thqinc.com/confluence/display/COHXP/AT+Gun+Manager
+function ATGun_RemoveDirections(swid)
+
+	if scartype(swid) == ST_SGROUP then
+		swid = SyncWeapon_GetFromSGroup(swid)
+	elseif scartype(swid) == ST_EGROUP then
+		swid = SyncWeapon_GetFromEGroup(swid)
+	end
+	
+	for n = table.getn(_ATGunTable), 1, -1 do 
+		
+		local this = _ATGunTable[n]
+		
+		if this.swid == swid then
+			
+			this.directions = nil
+			
+			-- clear any special speech triggers (as they may no longer be appropriate)
+			if scartype(this.threatarrow_enable) == ST_FUNCTION then
+				this.threatarrow_enable = true
+			end
+			
+		end
+		
+	end
+
+	if table.getn(_ATGunTable) == 0 then
+		Rule_Remove(ATGun_Manager)
+	end
+	
+end
+
+
+
+-- have the AT guns turn to face incoming units
+function ATGun_Manager()
+
+	for n = table.getn(_ATGunTable), 1, -1 do
+		
+		local this = _ATGunTable[n]
+		local current = this.currentfacing
+		local group = this.group
+		local directions = this.directions
+		local lastturn = this.lastturn
+		
+		if SGroup_Count(group) == 0 then
+			
+			-- if it had a threat arrow activated, remove it now
+			if this.threatarrow_on == true then
+				this.threatarrow_on = false
+				ThreatArrow_Remove(this.threatarrow_id, this.group)
+			end
+			
+			-- if the place we reinforce from is dead, don't reinforce ever again
+			if scartype(this.reinforcespawn) == ST_EGROUP and EGroup_Count(this.reinforcespawn) == 0 then
+				this.reinforce = nil
+			elseif scartype(this.reinforcespawn) == ST_SGROUP and SGroup_Count(this.reinforcespawn) == 0 then
+				this.reinforce = nil
+			end
+			
+			-- checks to see if the SyncWeapon is owned by the 'nil' player, which indicates that the syncweapon is owned by the world
+			if this.reinforce ~= nil and this.reinforce ~= 0 and SyncWeapon_Exists(this.swid) and SyncWeapon_IsOwnedByPlayer(this.swid, nil) then
+				
+				local sbp = _ATGunWeaponCrews[Player_GetRace(this.player) + 1]
+				Util_CreateSquads(this.player, this.group, sbp, this.reinforcespawn, SyncWeapon_GetPosition(this.swid), nil, 3)
+				Cmd_CaptureTeamWeapon(group, EGroup_Single(eg_temp, SyncWeapon_GetEntity(this.swid)), true)
+				
+				this.reinforce = this.reinforce - 1
+				this.reinforcing = true
+				
+			-- regroup the sync weapon if possible
+			elseif SyncWeapon_Exists(this.swid) and SyncWeapon_IsOwnedByPlayer(this.swid, this.player) and Entity_IsPartOfSquad(SyncWeapon_GetEntity(this.swid)) then
+				
+				SGroup_Add(group, Entity_GetSquad(SyncWeapon_GetEntity(this.swid)))
+				this.reinforcing = nil
+				
+			-- else the gun is dead, remove it
+			else
+				
+				table.remove(_ATGunTable, n)
+				
+				if table.getn(_ATGunTable) == 0 then
+					Rule_RemoveMe()
+				end
+				
+			end
+			
+		else
+			
+			-- enforce a 10 second grace time between turns
+			if World_GetGameTime() >= (lastturn + 10) then
+				
+				if directions ~= nil then
+					
+					-- we have a set number of directions, so see if we need to turn
+					-- *** brw 02/27/2007: this needs to be updated to NOT use player1 as the primary player
+					if (current == nil) or Prox_ArePlayersNearMarker(Game_GetLocalPlayer(), directions[current].trigger, ANY) == false then
+						
+						for i = 1, table.getn(directions) do
+							
+							if (current ~= i) and Prox_ArePlayersNearMarker(Game_GetLocalPlayer(), directions[i].trigger, ANY) == true then
+								
+								this.currentfacing = i
+								this.lastturn = World_GetGameTime()
+								Cmd_Move(group, directions[i].dest, nil, nil, directions[i].trigger)
+								break
+								
+							end
+							
+						end
+						
+					end
+					
+				else
+					
+					-- we have no directions, so just turn in place
+					if SGroup_IsMoving(group, ANY) == false and SGroup_IsUnderAttack(group, ANY, 7) and SyncWeapon_IsAttacking(this.swid, 7) == false then
+						
+						SGroup_Clear(sg_temp)
+						SGroup_GetLastAttacker(group, sg_temp)
+						
+						if SGroup_Count(sg_temp) >= 1 and SyncWeapon_CanAttackNow(this.swid, sg_temp) == false then
+							this.lastturn = World_GetGameTime()
+							Cmd_Move(group, SyncWeapon_GetPosition(this.swid), nil, nil, SGroup_GetPosition(sg_temp))
+						end
+						
+					end
+					
+				end
+				
+			end
+			
+			
+			-- deal with the threat arrows
+			if this.threatarrow_enable ~= false then
+				
+				if this.threatarrow_on == false then
+					
+					-- see if it's started attacking, and enable the arrow if it has
+					if SGroup_IsDoingAttack(group, ANY, 5) == true then
+						
+						this.threatarrow_on = true
+						ThreatArrow_Add(this.threatarrow_id, this.group)
+						
+						if scartype(this.threatarrow_enable) == ST_FUNCTION then
+							Util_StartIntel(this.threatarrow_enable)
+							this.threatarrow_enable = true
+						end
+						
+					end
+					
+				else
+					
+					-- see if it's stopped attacking
+					if SGroup_IsDoingAttack(group, ANY, 25) == false then
+						this.threatarrow_on = false
+						ThreatArrow_Remove(this.threatarrow_id, this.group)
+					end
+					
+				end
+				
+			end
+			
+		end
+		
+	end
+	
+end
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------
+--
+-- BRIDGE MANAGEMENT FUNCTIONS
+--
+-- This allows you to hook up a bridge so that it cuts supply lines when
+-- destroyed. It does this by having its own territory which is managed
+-- by the script.
+-- 
+-- See: http://relicjira.thqinc.com/confluence/display/COHXP/Bridge+Territory+Manager
+-- 
+-------------------------------------------------------------------------
+
+
+--? @shortdesc Add a bridge to the Bridge Territory Manager. 
+--? @extdesc bridgepoint, bank1point and bank2point should be egroups each containing one territory flag
+--? @args EGroupID bridge_egroup, EGroupID bridgepoint, EGroupID bank1point, EGroupID bank2point
+--? @result Void
+--? @refs http://relicjira.thqinc.com/confluence/display/COHXP/Bridge+Territory+Manager
+function BridgeTerritory_Add(egroup, bridgepoint, bank1point, bank2point)
+
+	if scartype(bridgepoint) ~= ST_EGROUP then fatal("BridgeTerritory_Add: bridgepoint isn't a valid EGroup") end
+	if EGroup_Count(bridgepoint) ~= 1 then fatal("BridgeTerritory_Add: bridgepoint has too many items in the EGroup, or is empty") end
+	if Entity_IsStrategicPoint( EGroup_GetSpawnedEntityAt(bridgepoint, 1) ) == false then fatal("BridgeTerritory_Add: bridgepoint EGroup doesn't contain a strategic point") end
+	
+	if scartype(bank1point) ~= ST_EGROUP then fatal("BridgeTerritory_Add: bank1point isn't a valid EGroup") end
+	if EGroup_Count(bank1point) ~= 1 then fatal("BridgeTerritory_Add: bank1point has too many items in the EGroup, or is empty") end
+	if Entity_IsStrategicPoint( EGroup_GetSpawnedEntityAt(bank1point, 1) ) == false then fatal("BridgeTerritory_Add: bank1point EGroup doesn't contain a strategic point") end
+	
+	if scartype(bank2point) ~= ST_EGROUP then fatal("BridgeTerritory_Add: bank2point isn't a valid EGroup") end
+	if EGroup_Count(bank2point) ~= 1 then fatal("BridgeTerritory_Add: bank2point has too many items in the EGroup, or is empty") end
+	if Entity_IsStrategicPoint( EGroup_GetSpawnedEntityAt(bank2point, 1) ) == false then fatal("BridgeTerritory_Add: bank2point EGroup doesn't contain a strategic point") end
+	
+	-- find the team of whoever owns the territory under the bridge
+	local currentteam = Util_GetPlayerOwner(bridgepoint)
+	if currentteam ~= nil then
+		currentteam = Player_GetTeam(currentteam)
+	end
+	
+	table.insert(_BridgeTerritoryTable, {bridge = egroup, position = EGroup_GetPosition(egroup), bridgepoint = bridgepoint, currentteam = currentteam, bank1point = bank1point, bank2point = bank2point})
+	
+	if Rule_Exists(BridgeTerritory_Manager) == false then
+		Rule_AddInterval(BridgeTerritory_Manager, 1)
+	end
+
+end
+
+
+
+function BridgeTerritory_Manager()
+
+	for n = 1, table.getn(_BridgeTerritoryTable) do 
+		
+		local this = _BridgeTerritoryTable[n]
+		
+		-- if the bridge has changed (i.e. been destroyed or repaired), rebind it to the egroup
+		if EGroup_Count(this.bridge) == 0 then
+			World_GetNeutralEntitiesNearPoint(this.bridge, this.position, 20)
+			EGroup_Filter(this.bridge, {EBP.BRIDGE_25.NORMAL, EBP.BRIDGE_25.WRECKED, EBP.BRIDGE_25.REBUILT, EBP.BRIDGE_35.NORMAL, EBP.BRIDGE_35.WRECKED, EBP.BRIDGE_35.REBUILT, EBP.BRIDGE_BAILEY_25.NORMAL}, FILTER_KEEP)
+		end
+		
+		if EGroup_ContainsBlueprints(this.bridge, {EBP.BRIDGE_25.WRECKED, EBP.BRIDGE_35.WRECKED}, ANY) then
+			
+			-- bridge is out, set the territory to neutral if it isn't already
+			if this.currentteam ~= nil then
+				Entity_SetStrategicPointNeutral(EGroup_GetSpawnedEntityAt(this.bridgepoint, 1))
+				this.currentteam = nil
+			end
+			
+		else
+			
+			-- find the team of whoever owns the territories on banks 1 and 2
+			local bank1team = Util_GetPlayerOwner(this.bank1point)
+			local bank2team = Util_GetPlayerOwner(this.bank2point)
+			if bank1team ~= nil then
+				bank1team = Player_GetTeam(bank1team)
+			end
+			if bank2team ~= nil then
+				bank2team = Player_GetTeam(bank2team)
+			end
+			
+			-- if a team owns both sides, and it's NOT the same team as that which owns the bridge...
+			if bank1team == bank2team and bank1team ~= this.currentteam and bank1team ~= nil then
+				
+				-- set the bridge to link the two sides
+				EGroup_InstantCaptureStrategicPoint(this.bridgepoint, Team_GetPlayers(bank1team)[1])
+				this.currentteam = bank1team
+				
+			-- or if the bridge is owned by a team that owns NEITHER of the two sides anymore...
+			elseif bank1team ~= this.currentteam and bank2team ~= this.currentteam then
+				
+				-- set the bridge to neutral
+				Entity_SetStrategicPointNeutral(EGroup_GetSpawnedEntityAt(this.bridgepoint, 1))
+				this.currentteam = nil
+				
+			end
+			
+		end
+		
+	end
+
+end
+
+
+
+-------------------------------------------------------------------------
+--
+-- MISCELLANEOUS FUNCTIONS
+--
+-------------------------------------------------------------------------
+
+--? @shortdesc Returns a random item from a table. You can return multiple items (without duplicates) by passing in an optional number parameter.
+--? @args Table table[, Integer numberofitems]
+--? @result Item/Table
+function Table_GetRandomItem(thistable, num)
+	
+	if scartype(thistable) ~= ST_TABLE then
+		fatal("Table_GetRandomItem: Table is invalid")
+	end
+
+	local size = table.getn(thistable)
+	
+	if num == nil or num == 1 then
+		
+		return thistable[World_GetRand(1, size)]
+		
+	else
+		
+		if num > size then
+			num = size
+		end
+		
+		local indexes = {}
+		local result = {}
+		
+		for n = 1, size do
+			indexes[n] = n
+		end
+		
+		for n = 1, num do
+			
+			local rand = World_GetRand(1, table.getn(indexes))
+			local value = indexes[rand]
+			table.remove(indexes, rand)
+			
+			table.insert(result, thistable[value])
+			
+		end
+		
+		return result
+		
+	end
+	
+end
+
+
+--? @shortdesc Disables any resource income - useful to stop resources accruing during the opening movie
+--? @args Void
+--? @result Void
+function Resources_Disable()
+
+	if _resourcekillers == nil then
+		_resourcekillers = {}
+	end
+	
+	if _resourcekillers[1] == nil then
+		_resourcekillers[1] = Modify_PlayerResourceRate(player1, RT_Manpower, 0)
+		_resourcekillers[2] = Modify_PlayerResourceRate(player1, RT_Munition, 0)
+		_resourcekillers[3] = Modify_PlayerResourceRate(player1, RT_Fuel, 0)
+	end
+	
+end
+
+
+--? @shortdesc Re-enables resource income. 
+--? @args Void
+--? @result Void
+function Resources_Enable()
+
+	if _resourcekillers == nil then
+		_resourcekillers = {}
+	end
+	
+	if _resourcekillers[1] ~= nil then
+		
+		Modifier_Remove(_resourcekillers[1])
+		Modifier_Remove(_resourcekillers[2])
+		Modifier_Remove(_resourcekillers[3])
+		
+		_resourcekillers[1] = nil
+		_resourcekillers[2] = nil
+		_resourcekillers[3] = nil
+		
+	end
+	
+end
+
+--? @shortdesc Restores various aspects of the single player game after loading a mission from a save game
+--?	@args Void
+--? @result Void
+function Game_DefaultGameRestore()
+
+	-- restore the sound precache file for the mission
+	local path = ""
+	if type(MISSION_NUMBER) == "number" then
+		path = MISSIONS[MISSION_NUMBER].SOUND.SPEECH_PATH
+	end
+	
+	if path == false or path == nil then
+		path = ""
+	end
+	
+	if g_MissionSpeechPath ~= nil then
+		path = g_MissionSpeechPath
+	end
+	
+	Sound_PreCacheSinglePlayerSpeech(path)
+	
+	-- restore the tech trees for this particular mission
+	TechTreeRestore()
+
+	-- resume playing the appropriate music track
+	Util_RestoreMusic()
+	
+	-- set the nistransition times
+	nis_setintransitiontime(0)
+	nis_setouttransitiontime(0)
+	
+	-- for SP, make unknown the same as visited
+	FOW_SetUnknownIntensity(FOW_GetVisitedIntensity())
+	
+	UI_RestoreBindings()
+	
+end
+
+--? @shortdesc Spawns a raft that will travel from the spawn location to a specified landing location.
+--? @extdesc Note: the raft does not know the difference between land and water and will travel over all of it. 
+--?	@args PlayerID player, EGroupID eg_raft, SGroupID sgroup, SquadBlueprint/Table sbp, Positon spawn, Position land, [Integer numsquads, Integer loadout]
+--? @result Void
+function Util_SpawnRaft(player, egroup, sgroup, sbp, spawn, land, squad_num, loadout)
+
+	Util_CreateEntities(player, egroup, EBP.SP.BOAT, spawn, 1)
+	Util_CreateSquads(player, sgroup, sbp, egroup, nil, squad_num, loadout)
+	Cmd_Ability(egroup, ABILITY.SP.MOVE_BOAT, land, nil, nil, true)
+
+end
+
+
+-- CXP special function for the Commonwealth race that provides supply at points which
+-- any of the trucks that don't normally provide supply, but provide supply if the truck is set up.
+function __ManageCommonwealthTruckSupply()
+
+	local mobile = BP_GetUpgradeBlueprint("upgrade/allies_cw/commonwealth_building_enable_mobile.lua")
+	
+	-- set up the supply truck data
+	if _supply_trucks == nil then
+		_supply_trucks = {
+			{ 
+				sgroup 		= SGroup_CreateIfNotFound("_sg_command_trucks1"),
+				sbp 		= SBP.CW.INFANTRY_HQ,
+				supply_pos	= false,
+			},
+			{ 
+				sgroup 		= SGroup_CreateIfNotFound("_sg_command_trucks2"),
+				sbp 		= SBP.CW.ARMOUR_HQ,
+				supply_pos	= false,
+			},
+		}
+	end
+		
+	-- ensure that all the trucks are treated separately and provide supply themselves.
+	for k, this in pairs(_supply_trucks) do
+	
+		Player_GetAll(Game_GetLocalPlayer(), this.sgroup)
+		SGroup_Filter(this.sgroup, this.sbp, FILTER_KEEP)
+		
+		-- check if the squad is empty and whether or not it has the "mobile" upgrade
+		-- which indicates that the truck is not set up.
+		if SGroup_CountSpawned(this.sgroup) > 0
+		and SGroup_HasEntityUpgrade(this.sgroup, mobile, ALL) == false then	
+			
+			-- give the truck supply at the position the truck is set up
+			-- at
+			if this.supply_pos == false then
+				this.supply_pos = SGroup_GetPosition(this.sgroup)
+				World_SetDesignerSupply(this.supply_pos, true)
+			end
+			
+		elseif this.supply_pos ~= false then
+			
+			-- remove any supply for the truck that we may have
+			-- been providing
+			World_SetDesignerSupply(this.supply_pos, false)
+			this.supply_pos = false
+		end
+		
+	end
+
+end

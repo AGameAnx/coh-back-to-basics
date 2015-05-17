@@ -1,0 +1,578 @@
+
+-- a init table that defines the cost of each commander tree purchase for the particular race for
+-- each of the CXP campaigns for use with capping the command points
+function __Command_TreeSetup()
+	local race = Player_GetRace(Game_GetLocalPlayer())
+	if race == World_GetRaceIndex(TRACE_ALLIES) then
+		t_commander_tree = {
+			{
+				tree = UPG.COMMANDER_TREE.ALLIES.AIRBORNE,
+				upgrades = { 
+					UPG.COMMANDER_TREE.ALLIES.AIRBORNE_00, 
+					UPG.COMMANDER_TREE.ALLIES.AIRBORNE_01, 
+					UPG.COMMANDER_TREE.ALLIES.AIRBORNE_02, 
+					UPG.COMMANDER_TREE.ALLIES.AIRBORNE_10, 
+					UPG.COMMANDER_TREE.ALLIES.AIRBORNE_11, 
+					UPG.COMMANDER_TREE.ALLIES.AIRBORNE_12, 
+				}
+			},
+			{
+				tree = UPG.COMMANDER_TREE.ALLIES.ARMOR,
+				upgrades = { 
+					UPG.COMMANDER_TREE.ALLIES.ARMOR_00, 
+					UPG.COMMANDER_TREE.ALLIES.ARMOR_01, 
+					UPG.COMMANDER_TREE.ALLIES.ARMOR_02, 
+					UPG.COMMANDER_TREE.ALLIES.ARMOR_10, 
+					UPG.COMMANDER_TREE.ALLIES.ARMOR_11, 
+					UPG.COMMANDER_TREE.ALLIES.ARMOR_12, 
+				}
+			},
+			{
+				tree = UPG.COMMANDER_TREE.ALLIES.INFANTRY,
+				upgrades = { 
+					UPG.COMMANDER_TREE.ALLIES.INFANTRY_00, 
+					UPG.COMMANDER_TREE.ALLIES.INFANTRY_01, 
+					UPG.COMMANDER_TREE.ALLIES.INFANTRY_02, 
+					UPG.COMMANDER_TREE.ALLIES.INFANTRY_10, 
+					UPG.COMMANDER_TREE.ALLIES.INFANTRY_11, 
+					UPG.COMMANDER_TREE.ALLIES.INFANTRY_12,
+				}
+			},
+		}
+		
+	elseif race == World_GetRaceIndex(TRACE_ALLIES_COMMONWEALTH) then
+		t_commander_tree = {
+			{
+				tree = UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY,
+				upgrades = { 
+					UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY_00, 
+					UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY_01, 
+					UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY_02, 
+					UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY_10, 
+					UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY_11, 
+					UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY_12, 
+				}
+			},
+			{
+				tree = UPG.COMMANDER_TREE.CW.COMMANDOS,
+				upgrades = { 
+					UPG.COMMANDER_TREE.CW.COMMANDOS_00, 
+					UPG.COMMANDER_TREE.CW.COMMANDOS_01, 
+					UPG.COMMANDER_TREE.CW.COMMANDOS_02, 
+					UPG.COMMANDER_TREE.CW.COMMANDOS_10, 
+					UPG.COMMANDER_TREE.CW.COMMANDOS_11, 
+					UPG.COMMANDER_TREE.CW.COMMANDOS_12, 
+				}
+			},
+			{
+				tree = UPG.COMMANDER_TREE.CW.ENGINEERS,
+				upgrades = { 
+					UPG.COMMANDER_TREE.CW.ENGINEERS_00, 
+					UPG.COMMANDER_TREE.CW.ENGINEERS_01, 
+					UPG.COMMANDER_TREE.CW.ENGINEERS_02, 
+					UPG.COMMANDER_TREE.CW.ENGINEERS_10, 
+					UPG.COMMANDER_TREE.CW.ENGINEERS_11, 
+					UPG.COMMANDER_TREE.CW.ENGINEERS_12, 
+				}
+			},
+		}
+	elseif race == World_GetRaceIndex(TRACE_AXIS) then
+		t_commander_tree = {
+			{
+				tree = UPG.COMMANDER_TREE.AXIS.BLITZKRIEG,
+				upgrades = { 
+					UPG.COMMANDER_TREE.AXIS.BLITZKRIEG_00,
+					UPG.COMMANDER_TREE.AXIS.BLITZKRIEG_01,
+					UPG.COMMANDER_TREE.AXIS.BLITZKRIEG_02,
+					UPG.COMMANDER_TREE.AXIS.BLITZKRIEG_10,
+					UPG.COMMANDER_TREE.AXIS.BLITZKRIEG_11,
+					UPG.COMMANDER_TREE.AXIS.BLITZKRIEG_12,
+				}
+			},
+			{
+				tree = UPG.COMMANDER_TREE.AXIS.DEFENSE,
+				upgrades = { 
+					UPG.COMMANDER_TREE.AXIS.DEFENSE_00,
+					UPG.COMMANDER_TREE.AXIS.DEFENSE_01,
+					UPG.COMMANDER_TREE.AXIS.DEFENSE_02,
+					UPG.COMMANDER_TREE.AXIS.DEFENSE_10,
+					UPG.COMMANDER_TREE.AXIS.DEFENSE_11,
+					UPG.COMMANDER_TREE.AXIS.DEFENSE_12,
+				}
+			},
+			{
+				tree = UPG.COMMANDER_TREE.AXIS.PROPAGANDA,
+				upgrades = { 
+					UPG.COMMANDER_TREE.AXIS.PROPAGANDA_00,
+					UPG.COMMANDER_TREE.AXIS.PROPAGANDA_01,
+					UPG.COMMANDER_TREE.AXIS.PROPAGANDA_02,
+					UPG.COMMANDER_TREE.AXIS.PROPAGANDA_10,
+					UPG.COMMANDER_TREE.AXIS.PROPAGANDA_11,
+					UPG.COMMANDER_TREE.AXIS.PROPAGANDA_12,
+				}
+			},
+		}
+	elseif race == World_GetRaceIndex(TRACE_AXIS_PANZER_ELITE) then
+		t_commander_tree = {
+			{
+				tree = UPG.COMMANDER_TREE.ELITE.LUFTWAFFE,
+				upgrades = { 
+					UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_00,
+					UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_01,
+					UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_02,
+					UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_10,
+					UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_11,
+					UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_12,
+				}
+			},
+			{
+				tree = UPG.COMMANDER_TREE.ELITE.SCORCHED_EARTH,
+				upgrades = { 
+					UPG.COMMANDER_TREE.ELITE.SCORCHED_EARTH_00,
+					UPG.COMMANDER_TREE.ELITE.SCORCHED_EARTH_01,
+					UPG.COMMANDER_TREE.ELITE.SCORCHED_EARTH_02,
+					UPG.COMMANDER_TREE.ELITE.SCORCHED_EARTH_10,
+					UPG.COMMANDER_TREE.ELITE.SCORCHED_EARTH_11,
+					UPG.COMMANDER_TREE.ELITE.SCORCHED_EARTH_12,
+				}
+			},
+			{
+				tree = UPG.COMMANDER_TREE.ELITE.TANK_DESTROYER,
+				upgrades = { 
+					UPG.COMMANDER_TREE.ELITE.TANK_DESTROYER_00,
+					UPG.COMMANDER_TREE.ELITE.TANK_DESTROYER_01,
+					UPG.COMMANDER_TREE.ELITE.TANK_DESTROYER_02,
+					UPG.COMMANDER_TREE.ELITE.TANK_DESTROYER_10,
+					UPG.COMMANDER_TREE.ELITE.TANK_DESTROYER_11,
+					UPG.COMMANDER_TREE.ELITE.TANK_DESTROYER_12,
+				}
+			},
+		}
+	else
+		t_commander_tree = {}
+	end
+end
+Scar_AddInit(__Command_TreeSetup)
+
+-- Sets up tech tree locking / unlocking for each mission in the SP campaign
+function TechTreeSetup()
+	print("Setting up tech tree!")
+
+	-- GLOBAL: unlock abiliies and upgrades that we want in every mission
+	local abilities = {ABILITY.ALLIES.GRENADE, ABILITY.ALLIES.STICKY_BOMB}
+	local upgrade = {UPG.ALLIES.GRENADE, UPG.ALLIES.STICKY_BOMB}
+	local upgrade_to_give = {UPG.ALLIES.WIRE_CUTTER, UPG.ALLIES.DEMOLITION, UPG.SP.AIRBORNE_BASIC_DEFENSES, UPG.ALLIES.STICKY_BOMB, UPG.ALLIES.GRENADE}
+	for i = 1, table.getn(abilities) do 
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), abilities[i], ITEM_UNLOCKED)
+	end
+	for i = 1, table.getn(upgrade) do 
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), upgrade[i], ITEM_REMOVED)
+	end
+	for i = 1, table.getn(upgrade_to_give) do 
+		Cmd_InstantUpgrade(Game_GetLocalPlayer(), upgrade_to_give[i])
+	end
+--	Player_SetAbilityAvailability(player2, ABILITY.AXIS_THROWGRENADE, ITEM_UNLOCKED)
+	
+	-- GLOBAL: Modify CC tree costs
+	Player_SetUpgradeCost(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY_01, 0, 0, 0, 0, 3)					-- RANGERS cost 3
+	Player_SetUpgradeCost(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.AIRBORNE_12, 0, 0, 0, 0, 5)					-- BOMBING RUN costs 5
+	Player_SetUpgradeCost(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.ARMOR_01, 0, 0, 0, 0, 4)						-- CALLIOPE costs 4
+	Player_SetUpgradeCost(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.ARMOR_02, 0, 0, 0, 0, 4)						-- PERSHING costs 4
+	
+	g_defaultActionRateModifier = 0.3
+	-- a variable needed for checking whether or not the command point limit has been reached and reported to the player.
+	g_commandPointMaxReached = false
+	
+	
+	-- M01 D-Day -----------------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission01" then
+		Rule_AddOneShot(Rule_DisableCCMenu, 1)
+		UI_EnableResourceTypeKicker(RT_Action, false) -- turn off action point kickers because CC menu is disabled
+		Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, 0)
+
+		-- lock / unlock  commands
+		Player_SetConstructionMenuAvailability(Game_GetLocalPlayer(), "tp_construction_engineer_basic", ITEM_LOCKED)
+		Player_SetConstructionMenuAvailability(Game_GetLocalPlayer(), "tp_construction_rifleman_basic", ITEM_LOCKED)
+		Player_SetConstructionMenuAvailability(Game_GetLocalPlayer(), "tp_construction_allied_hq", ITEM_LOCKED)
+		Player_SetCommandAvailability(Game_GetLocalPlayer(), SCMD_Retreat, ITEM_REMOVED)
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.ENGINEER_MINESWEEPER, ITEM_LOCKED)
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.ENGINEER_FLAMETHROWER, ITEM_LOCKED)
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.WIRE_CUTTER, ITEM_REMOVED)
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.ALLIES.CUT_WIRES, ITEM_REMOVED)
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.ALLIES.STICKY_BOMB, ITEM_REMOVED)
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.ALLIES.GRENADE, ITEM_REMOVED)
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.ALLIES.BAR_SUPPRESSION, ITEM_REMOVED)
+		
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.REPAIR, ITEM_REMOVED)
+		Player_SetCommandAvailability(Game_GetLocalPlayer(), SCMD_PlaceCharge, ITEM_REMOVED)
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.AID_STATION, ITEM_UNLOCKED)
+			
+		-- turn off satchel charge and grenades for player (until they're told to use it vs. the bunker)
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.ALLIES.SATCHEL_CHARGE_NOREQS, ITEM_REMOVED)
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.ALLIES.GRENADE_NOREQS, ITEM_REMOVED)
+	end
+	
+	-- M02 Paradrop ---------------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission02" then
+		Rule_AddOneShot(Rule_DisableCCMenu, 1)
+		UI_EnableResourceTypeKicker(RT_Action, false) -- turn off action point kickers because CC menu is disabled
+		Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, 0)
+		Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Manpower, 1.6)
+		Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Munition, 1.3)
+		
+		-- allow the airborne squads to build defenses
+ 		Cmd_InstantUpgrade(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY_10)
+	end
+	
+	-- M03 Carentan ---------------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission03" then
+		Rule_AddOneShot(Rule_DisableCCMenu, 1)
+		UI_EnableResourceTypeKicker(RT_Action, false) -- turn off action point kickers because CC menu is disabled
+		m03_ActionRateModID = Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, 0)
+		--UI_BindingSetEnabled("squadcap", false)
+
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.ALLIES.SATCHEL_CHARGE, ITEM_UNLOCKED)
+
+		Player_SetEntityProductionAvailability(Game_GetLocalPlayer(), EBP.ALLIES.TANK_TRAP_RIFLEMEN, ITEM_REMOVED)
+		--Modify_PlayerProductionRate(Game_GetLocalPlayer(), 4.5)
+		
+		Player_SetConstructionMenuAvailability(Game_GetLocalPlayer(), "tp_construction_allied_hq", ITEM_LOCKED)
+		Cmd_InstantUpgrade(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY_10)
+		
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.CONVERT_AMBIENT_BUILDING, ITEM_LOCKED )
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.SP.CONVERT_AMBIENT_BUILDING_CHURCH, ITEM_REMOVED )
+		--HintPoint_AddToProductionButton(PITEM_SquadUpgrade, ABILITY.ALLIED_THROWSATCHELCHARGE, 409272, true)
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.ENGINEER, ITEM_LOCKED)   -- Lock out Engineers
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.AT_57MM, ITEM_LOCKED)    -- Lock out AT Guns
+		Player_SetEntityProductionAvailability(Game_GetLocalPlayer(), EBP.ALLIES.HOWITZER, ITEM_REMOVED) -- Lock out Howitzer
+
+		
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.BAR, ITEM_REMOVED )
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.PARATROOPER_AT, ITEM_REMOVED )
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.AID_STATION, ITEM_REMOVED )
+		
+--		Modify_Upkeep(Game_GetLocalPlayer(), 0.25)																		-- Reduce upkeep penalty for this mission
+	end
+	
+	-- M04 Carentan Counterattack --------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission04" then
+		if m03_ActionRateModID ~= nil then
+			Modifier_Remove(m03_ActionRateModID)
+		end
+		UI_BindingSetEnabled( "company_commander", true )
+		UI_EnableResourceTypeKicker(RT_Action, true)
+		UI_ForceCommanderTreeChoice(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY)
+		g_commandPointLimit = 3
+		Rule_AddInterval(Rule_CapCommandPoints, 1)
+--~ 		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY_01, ITEM_LOCKED)
+--~ 		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY_02, ITEM_LOCKED)
+		
+		Player_SetEntityProductionAvailability(Game_GetLocalPlayer(), EBP.ALLIES.MEDIC_STATION, ITEM_REMOVED)
+		Player_SetEntityProductionAvailability(Game_GetLocalPlayer(), EBP.ALLIES.TRIAGE, ITEM_REMOVED)
+		Player_SetEntityProductionAvailability(Game_GetLocalPlayer(), EBP.ALLIES.TANK_TRAP, ITEM_REMOVED)
+		Player_SetEntityProductionAvailability(Game_GetLocalPlayer(), EBP.ALLIES.TANK_TRAP_RIFLEMEN, ITEM_REMOVED)
+		Player_SetCommandAvailability(Game_GetLocalPlayer(), SCMD_PlaceCharge, ITEM_REMOVED)
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.ALLIES.CUT_WIRES, ITEM_UNLOCKED)
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.ALLIES.STICKY_BOMB, ITEM_UNLOCKED )
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.BAR, ITEM_UNLOCKED )
+		
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.ALLIED_SHERMAN_SMOKE, ITEM_REMOVED)
+		
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.ENGINEER_MINESWEEPER, ITEM_LOCKED)
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.ENGINEER_FLAMETHROWER, ITEM_UNLOCKED)
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.PARATROOPER_AT, ITEM_UNLOCKED)
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.ALLIES.GRENADE, ITEM_UNLOCKED)
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(),	ABILITY.ALLIES.SATCHEL_CHARGE, ITEM_UNLOCKED)
+		--Player_SetAbilityAvailability(Game_GetLocalPlayer(),	ABILITY.ALLIED_DEMOLITION, ITEM_LOCKED)
+		Player_SetUpgradeAvailability(player2, UPG.AXIS.PIONEER_MINESWEEPER, ITEM_UNLOCKED)
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.CONVERT_AMBIENT_BUILDING, ITEM_REMOVED)
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.AT_57MM, ITEM_UNLOCKED)
+
+		Player_SetUpgradeAvailability( Game_GetLocalPlayer(), UPG.SP.CONVERT_AMBIENT_BUILDING_CHURCH, ITEM_LOCKED )
+		Player_SetUpgradeAvailability( Game_GetLocalPlayer(), UPG.ALLIES.SHERMAN_CRAB, ITEM_REMOVED)
+		
+		Cmd_InstantUpgrade(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY_10)
+	end
+	
+	-- M05 Redball Express ----------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission05" then
+		UI_ForceCommanderTreeChoice(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.ARMOR)
+		g_commandPointLimit = 5
+		Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, 0.5)
+		Rule_AddInterval(Rule_CapCommandPoints, 1)
+		
+		-- brw 07/31/07 Removing references to things that never existed in the original COH (!!!)
+--~ 		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIED_SHERMAN_CROCODILE, ITEM_REMOVED)
+--~ 		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIED_SHERMAN_CALLIOPE, ITEM_REMOVED)
+--~ 		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIED_SHERMAN_BULLDOZER, ITEM_REMOVED)
+--~ 		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.ALLIED_FIRE_CALLIOPE, ITEM_REMOVED)
+		
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.CROCODILE, ITEM_LOCKED) -- Lock out Crocodile
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.M10, ITEM_LOCKED)       -- Lock out M10 Tank Destroyer
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.PERSHING, ITEM_LOCKED)  -- Lock out Pershing
+	end
+	
+	-- M06 Cherbourg -----------------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission06" then
+		UI_ForceCommanderTreeChoice(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY)
+		g_commandPointLimit = 5
+		Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, g_defaultActionRateModifier)
+		Rule_AddInterval(Rule_CapCommandPoints, 1)
+
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY_03, ITEM_REMOVED)
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY_13, ITEM_REMOVED) -- Lock out OMA (until player destroys naval guns)
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY_12, ITEM_REMOVED) -- Lock out Howitzer
+		
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.M10, ITEM_LOCKED)                 -- Lock out M10 Tank Destroyer
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.PERSHING, ITEM_LOCKED)            -- Lock out Pershing
+	end
+	
+	-- M07 V2 Rocket ------------------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission07" then
+		UI_ForceCommanderTreeChoice(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.AIRBORNE)
+		g_commandPointLimit = 7
+		Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, g_defaultActionRateModifier)
+		Rule_AddInterval(Rule_CapCommandPoints, 1)
+		
+		Cmd_InstantUpgrade(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.AIRBORNE_00)							-- Pre-purchase paratroopers for player
+
+		--[[ UN/RESTRICT ABILITIES ]]
+		Player_SetConstructionMenuAvailability(Game_GetLocalPlayer(), "tp_construction_allied_hq", ITEM_LOCKED)
+		Player_SetCommandAvailability(Game_GetLocalPlayer(), SCMD_PlaceCharge, ITEM_UNLOCKED)
+	
+		-- custom paradrop ability for M07
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.SP.M07_PARADROP, ITEM_UNLOCKED)
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.ALLIES.GRENADE, ITEM_UNLOCKED)
+		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.ALLIES.SATCHEL_CHARGE, ITEM_UNLOCKED)
+		
+		-- [[ UN/RESTRICT UPGRADES ]]
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.RIFLEMEN_AT, ITEM_UNLOCKED)
+		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIES.PARATROOPER_AT, ITEM_UNLOCKED)
+		-- brw 07/31/07 Removing references to things that never existed in the original COH (!!!)
+--~ 		Player_SetUpgradeAvailability(Game_GetLocalPlayer(), UPG.ALLIED_SATCHEL_CHARGE, ITEM_UNLOCKED)
+		Player_SetUpgradeAvailability( Game_GetLocalPlayer(), UPG.ALLIES.CONVERT_AMBIENT_BUILDING, ITEM_REMOVED )
+	
+		-- allow Airborne squads to build defenses
+		Cmd_InstantUpgrade(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY_10)
+		
+		-- gives easy access to all Axis upgrades
+		Cmd_InstantUpgrade(player2, UPG.AXIS.PHASE2)
+		Cmd_InstantUpgrade(player2, UPG.AXIS.PHASE3)
+		Cmd_InstantUpgrade(player2, UPG.AXIS.PHASE4)
+		
+--		Cmd_InstantUpgrade(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.AIRBORNE_00)
+	end
+	
+	-- M08 Crossing the Vire ----------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission08" then
+		UI_ForceCommanderTreeChoice(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.AIRBORNE)
+		g_commandPointLimit = 9
+		Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, 0.8)
+		Rule_AddInterval(Rule_CapCommandPoints, 1)
+		
+--		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIED_CROCODILE, ITEM_LOCKED) -- Lock out Crocodile
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.M10, ITEM_LOCKED)       -- Lock out M10 Tank Destroyer
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.PERSHING, ITEM_LOCKED)  -- Lock out Pershing
+	end
+	
+	-- M09 Hill 192 --------------------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission09" then
+		UI_ForceCommanderTreeChoice(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY)
+		g_commandPointLimit = 9
+		Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, 0.8)
+		Rule_AddInterval(Rule_CapCommandPoints, 1)
+		
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.M10, ITEM_LOCKED)      -- Lock out M10 Tank Destroyer
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.PERSHING, ITEM_LOCKED) -- Lock out Pershing
+	end
+	
+	-- M10 St. Lo -----------------------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission10" then
+		UI_ForceCommanderTreeChoice(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY)
+		g_commandPointLimit = 9
+		Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, g_defaultActionRateModifier)
+		Rule_AddInterval(Rule_CapCommandPoints, 1)
+		
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.M10, ITEM_LOCKED)       -- Lock out M10 Tank Destroyer
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.PERSHING, ITEM_LOCKED)  -- Lock out Pershing
+	end
+
+	-- M12 Death of a Division -----------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission12" then
+		UI_ForceCommanderTreeChoice(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.ARMOR)
+		g_commandPointLimit = 12
+		Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, g_defaultActionRateModifier)
+		Rule_AddInterval(Rule_CapCommandPoints, 1)
+		
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.PERSHING, ITEM_LOCKED)  -- Lock out Pershing
+--		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.SP_AIRSTRIKE_ROCKETS, ITEM_UNLOCKED)
+		
+	end
+
+	-- M13 Mortain ------------------------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission13" then
+		UI_ForceCommanderTreeChoice(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY)
+		g_commandPointLimit = 13
+		m13_ActionRateModID = Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, g_defaultActionRateModifier)
+		Rule_AddInterval(Rule_CapCommandPoints, 1)
+		
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.PERSHING, ITEM_LOCKED)  -- Lock out Pershing
+		
+		--Player cannot build a Motor Pool or a Tank Depot.
+--		Player_SetAbilityAvailability( Game_GetLocalPlayer(), ABILITY.ALLIED_BAR_SUPPRESSION, ITEM_UNLOCKED )
+		Player_SetAbilityAvailability( Game_GetLocalPlayer(), ABILITY.ALLIES.GRENADE, ITEM_UNLOCKED )
+		Player_SetAbilityAvailability( Game_GetLocalPlayer(), ABILITY.ALLIES.STICKY_BOMB, ITEM_UNLOCKED )
+--		Player_SetEntityProductionAvailability(Game_GetLocalPlayer(), EBP.ALLIED_MOTORPOOL, ITEM_REMOVED)
+		Player_SetEntityProductionAvailability(Game_GetLocalPlayer(), EBP.ALLIES.TANK_DEPOT, ITEM_REMOVED)
+--		Player_SetUpgradeAvailability( Game_GetLocalPlayer(), UPG.ALLIED_BAR, ITEM_REMOVED )
+--		Player_SetUpgradeAvailability( Game_GetLocalPlayer(), UPG.ALLIED_GRENADES , ITEM_REMOVED )
+--		Player_SetUpgradeAvailability( Game_GetLocalPlayer(), UPG.ALLIED_STICKY_BOMB, ITEM_REMOVED )
+		Player_SetUpgradeAvailability( player2, UPG.AXIS.PHASE3, ITEM_UNLOCKED )
+	end
+	
+	-- M14 Mortain Counterattack -----------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission14" then
+--		g_commandPointLimit = 12
+		if m13_ActionRateModID ~= nil then
+			Modifier_Remove(m13_ActionRateModID)
+		end
+--		Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, g_defaultActionRateModifier)
+--		Rule_AddInterval(Rule_CapCommandPoints, 1)
+		
+		Player_SetSquadProductionAvailability(Game_GetLocalPlayer(), SBP.ALLIES.PERSHING, ITEM_LOCKED)  -- Lock out Pershing
+		
+		--free upgrades	
+--~ 		Player_SetAbilityAvailability( Game_GetLocalPlayer(), ABILITY.ALLIED_BAR_SUPPRESSION, ITEM_UNLOCKED )
+		Player_SetAbilityAvailability( Game_GetLocalPlayer(), ABILITY.ALLIES.GRENADE	, ITEM_UNLOCKED )
+		Player_SetAbilityAvailability( Game_GetLocalPlayer(), ABILITY.ALLIES.STICKY_BOMB, ITEM_UNLOCKED )
+--~ 		Player_SetUpgradeAvailability( Game_GetLocalPlayer(), UPG.ALLIED_BAR, ITEM_REMOVED )
+--~ 		Player_SetUpgradeAvailability( Game_GetLocalPlayer(), UPG.ALLIED_GRENADES , ITEM_REMOVED )
+--~ 		Player_SetUpgradeAvailability( Game_GetLocalPlayer(), UPG.ALLIED_STICKY_BOMB, ITEM_REMOVED )
+	end
+	
+	-- M15 Cornered Tiger -------------------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission15" then
+--		g_commandPointLimit = 12
+--		Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, g_defaultActionRateModifier)
+--		Rule_AddInterval(Rule_CapCommandPoints, 1)
+		
+--~ 		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.SP_AIRSTRIKE_ROCKETS, ITEM_UNLOCKED)
+--~ 		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.SP_AIR_RECON, ITEM_UNLOCKED)
+	end
+	
+	-- M16 Chambois --------------------------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission16" then
+--		g_commandPointLimit = 12
+--		Rule_AddInterval(Rule_CapCommandPoints, 1)
+--		Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, g_defaultActionRateModifier)
+		
+--		Player_SetAbilityAvailability (Game_GetLocalPlayer(), ABILITY.ALLIED_STRAFE_RUN2, ITEM_UNLOCKED )
+--		Player_SetAbilityAvailability(Game_GetLocalPlayer(), ABILITY.SP_AIRSTRIKE_ROCKETS, ITEM_UNLOCKED)
+		Cmd_InstantUpgrade(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.AIRBORNE_11)						-- grant strafing run
+		Cmd_InstantUpgrade(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.AIRBORNE_12)						-- grant rocket strike
+	end
+end
+
+function TechTreeRestore()
+	-- GLOBAL: Modify CC tree costs
+	Player_SetUpgradeCost(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.INFANTRY_01, 0, 0, 0, 0, 3)					-- RANGERS cost 3
+	Player_SetUpgradeCost(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.AIRBORNE_12, 0, 0, 0, 0, 5)					-- BOMBING RUN costs 5
+	Player_SetUpgradeCost(Game_GetLocalPlayer(), UPG.COMMANDER_TREE.ALLIES.ARMOR_01, 0, 0, 0, 0, 4)						-- CALLIOPE costs 4
+
+	-- M01 D-Day -----------------------------------------------------------------------------------------------------------------
+	if g_MissionSpeechPath == "Mission01" then
+		Rule_AddOneShot(Rule_DisableCCMenu, 1)
+	-- M02 Paradrop ---------------------------------------------------------------------------------------------------------------
+	elseif g_MissionSpeechPath == "Mission02" then
+		Rule_AddOneShot(Rule_DisableCCMenu, 1)
+	-- M03 Carentan ---------------------------------------------------------------------------------------------------------------
+	elseif g_MissionSpeechPath == "Mission03" then
+		Rule_AddOneShot(Rule_DisableCCMenu, 1)
+	end
+end
+
+-- Disables the Company Commander menu.  Note that this must be done 1 second after the OnInit.
+function Rule_DisableCCMenu()
+	UI_BindingSetEnabled( "company_commander", false )													-- CC menu disabled
+end
+
+
+-- Caps the player's action points at a certain amount so they can't earn more than x command points
+function Rule_CapCommandPoints()
+	-- this is persistent data that is carried between missions to correctly track 
+	-- how many command points the player has gathered, this data must be updated in the
+	-- mission file -- otherwise it will have no impact.
+	-- (see VillersBocage_RPGTracker.scar for an example)
+	if g_CommandPointsGathered == nil then
+		g_CommandPointsGathered = 0
+	end
+
+	local totalResGathered = g_CommandPointsGathered + Stats_ResGathered(Game_GetLocalPlayer()).command
+	local command_points_spent = Stats_ResSpent(Game_GetLocalPlayer()).command
+	local cannot_buy = true
+	local max_reached = true
+	
+	if command_points_spent < g_commandPointLimit then
+		
+		-- variable to track whether or not the player has chosen a commander tree.
+		local has_commander_tree = false
+		local points_to_spend = g_commandPointLimit - command_points_spent
+--~ 		print("@@@### points to spend: "..points_to_spend )
+		local points_to_earn = g_commandPointLimit - totalResGathered
+--~ 		print("@@@### points to earn: "..points_to_earn )
+		
+		for k, this in pairs(t_commander_tree) do
+			
+			-- first check if the player has the overall upgrade for the tree
+			if Player_HasUpgrade(Game_GetLocalPlayer(), this.tree) then
+				
+				has_commander_tree = true
+				-- if the player has an upgrade that can be purchased
+				-- then mark the player as having not reached the max
+				for i=1, table.getn(this.upgrades) do 
+					
+					-- then check the number of command points left in their pool
+					-- against the cost of a particular available purchases.
+					if Player_HasUpgrade(Game_GetLocalPlayer(), this.upgrades[i]) == false then
+						
+						-- this checks whether or not a player has additional points on which to spend command points
+						if Player_GetUpgradeCost(Game_GetLocalPlayer(), this.upgrades[i], RT_Command) <= points_to_spend then
+							cannot_buy = false
+						end
+						
+					end
+					
+					
+				end
+				
+			end
+		
+		end
+		
+		-- if the player hasn't chosen a commander tree then
+		-- don't accidentally cap their points.
+		if has_commander_tree == false then
+			cannot_buy = false
+		end
+		
+	end
+	
+--	print(g_totalResGathered.command)
+--	print("checking command points..")
+	if g_commandPointMaxReached == false
+	and (totalResGathered == g_commandPointLimit or cannot_buy) then
+		Util_MissionTitle(39256)													-- "Maximum Command Points Earned"
+		g_commandPoint_res_id = Modify_PlayerResourceRate(Game_GetLocalPlayer(), RT_Action, 0.0)			-- FINALLY WORKS!
+		UI_EnableResourceTypeKicker(RT_Action, false)								-- turn off action point kickers now that player isn't earning any more Command Points
+		
+		-- in case the player is unable to buy any more upgrades, but has
+		-- left over command points, change the limit.
+		g_commandPointMaxReached = true
+	end
+	
+	if cannot_buy then
+		Player_SetResource(Game_GetLocalPlayer(), RT_Command, 0)
+		Player_SetResource(Game_GetLocalPlayer(), RT_Action, 0)
+		Rule_RemoveMe()
+	end
+end

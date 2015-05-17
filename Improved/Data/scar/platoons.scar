@@ -1,0 +1,234 @@
+--
+--[[ Platoon Scar v2.1 ]]--
+-- coded by AGameAnx at 29-11-2010
+--
+PLATOONS = {
+{BP_GetSquadBlueprint("sbps\\races\\allies\\soldiers\\abilityspawn_ranger_team.lua"),
+	{
+		{"sbps\\races\\allies\\soldiers\\ranger_team.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\allies\\vehicles\\abilityspawn_m18_hellcat.lua"),
+	{
+		{"sbps\\races\\allies\\vehicles\\m18_hellcat.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\allies\\vehicles\\abilityspawn_m36_jackson_squad.lua"),
+	{
+		{"sbps\\races\\allies\\vehicles\\m36_jackson_squad.lua", 1},
+		{"sbps\\races\\allies\\vehicles\\m36_jackson_squad.lua", 4},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\allies\\vehicles\\abilityspawn_m4_sherman_squad_calliope.lua"),
+	{
+		{"sbps\\races\\allies\\vehicles\\m4_sherman_squad_calliope.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\allies\\vehicles\\abilityspawn_m7_priest_squad.lua"),
+	{
+		{"sbps\\races\\allies\\vehicles\\m7_priest_squad.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\allies\\vehicles\\abilityspawn_t17_squad_reinforcement_radio.lua"),
+	{
+		{"sbps\\races\\allies\\vehicles\\t17_squad_reinforcement_radio.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\allies_commonwealth\\vehicles\\abilityspawn_churchill_avre_squad.lua"),
+	{
+		{"sbps\\races\\allies_commonwealth\\vehicles\\churchill_avre_squad.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\allies_commonwealth\\vehicles\\abilityspawn_churchill_squad.lua"),
+	{
+		{"sbps\\races\\allies_commonwealth\\vehicles\\churchill_squad.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\allies_commonwealth\\vehicles\\abilityspawn_kangaroo_carrier_squad.lua"),
+	{
+		{"sbps\\races\\allies_commonwealth\\vehicles\\kangaroo_carrier_squad.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\allies_commonwealth\\vehicles\\abilityspawn_priest_squad.lua"),
+	{
+		{"sbps\\races\\allies_commonwealth\\vehicles\\priest_squad.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\allies_commonwealth\\vehicles\\abilityspawn_staghound_armoured_car_squad.lua"),
+	{
+		{"sbps\\races\\allies_commonwealth\\vehicles\\staghound_armoured_car_squad.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\axis\\soldiers\\abilityspawn_stormtrooper_squad.lua"),
+	{
+		{"sbps\\races\\axis\\soldiers\\stormtrooper_squad.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\axis\\soldiers\\abilityspawn_waffen_ss_command_squad.lua"),
+	{
+		{"sbps\\races\\axis\\soldiers\\waffen_ss_command_squad.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\axis\\soldiers\\abilityspawn_waffen_ss_squad.lua"),
+	{
+		{"sbps\\races\\axis\\soldiers\\waffen_ss_squad.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\axis\\vehicles\\abilityspawn_geschutzwagen_squad.lua"),
+	{
+		{"sbps\\races\\axis\\vehicles\\geschutzwagen_squad.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\axis\\vehicles\\abilityspawn_stug_iv_squad_upgrade.lua"),
+	{
+		{"sbps\\races\\axis\\vehicles\\stug_iv_squad_upgrade.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\axis_panzer_elite\\soldiers\\abilityspawn_luftwaffe_squad.lua"),
+	{
+		{"sbps\\races\\axis_panzer_elite\\soldiers\\luftwaffe_squad.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\axis_panzer_elite\\soldiers\\abilityspawn_panzer_falschirmjager.lua"),
+	{
+		{"sbps\\races\\axis_panzer_elite\\soldiers\\panzer_falschirmjager.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\axis_panzer_elite\\vehicles\\abilityspawn_hummel_squad.lua"),
+	{
+		{"sbps\\races\\axis_panzer_elite\\vehicles\\hummel_squad.lua", 1},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\axis_panzer_elite\\vehicles\\abilityspawn_panther_squad.lua"),
+	{
+		{"sbps\\races\\axis_panzer_elite\\vehicles\\panther_squad.lua", 1},
+		{"sbps\\races\\axis_panzer_elite\\vehicles\\panther_squad.lua", 4},
+	}},
+{BP_GetSquadBlueprint("sbps\\races\\axis_panzer_elite\\vehicles\\abilityspawn_wirblewind_flak_panzer_squad.lua"),
+	{
+		{"sbps\\races\\axis_panzer_elite\\vehicles\\wirblewind_flak_panzer_squad.lua", 1},
+	}}
+}
+
+
+function Platoons_SetEntryPoint(pos, player)
+	if not Platoons_Entry then Platoons_Entry = {} end
+	Platoons_Entry[player] = pos
+end
+
+function Platoons_UpdateEntryPoints()
+	Platoons_Entry = {}
+	local function forPlayerEntity(egroupid, index, entityid)
+		if Entity_GetBlueprint(entityid) == EBP.STRAT_POINT.ENTRY then
+			Platoons_SetEntryPoint(Entity_GetPosition(entityid), World_GetPlayerIndex(Entity_GetPlayerOwner(entityid)))
+		end
+	end
+	local i
+	for i=1,World_GetPlayerCount() do
+		local entities = Player_GetEntities(World_GetPlayerAt(i))
+		EGroup_ForEach(entities, forPlayerEntity)
+	end
+end
+
+function Platoons_Check()
+	local gametime = World_GetGameTime()
+	local added = false
+	local function Platoons_CheckAll(sgroupid, index, squadid)
+		local i
+		for i=1,table.getn(Platoons_Query) do
+			if squadid == Platoons_Query[i][2] then
+				return
+			end
+		end
+		for i=1,table.getn(PLATOONS) do
+			if PLATOONS[i][1] == Squad_GetBlueprint(squadid) then
+				Platoons_AddToQueryByIndex(i, true, squadid, gametime+PLATOONS[i][2][1][2], false)
+				--table.insert(Platoons_Query, {gametime+PLATOONS[i][2][1][2], squadid, PLATOONS[i][2]})
+				break
+			end
+		end
+	end
+	local i
+	for i=1,World_GetPlayerCount() do
+		local playersquads = Player_GetSquads(World_GetPlayerAt(i))
+		SGroup_ForEach(playersquads, Platoons_CheckAll)
+	end
+	Platoon_UpdateSpawnRule()
+end
+
+function Platoon_UpdateSpawnRule()
+	if table.getn(Platoons_Query)>0 then
+		Platoons_SortQuery()
+		if not Rule_Exists(Platoons_Spawn) then
+			Rule_AddInterval(Platoons_Spawn, math.max(Platoons_Query[1][1]-World_GetGameTime(), 1))
+		else
+			Rule_ChangeInterval(Platoons_Spawn, math.max(Platoons_Query[1][1]-World_GetGameTime(), 1))
+		end
+	elseif Rule_Exists(Platoons_Spawn) then
+		Rule_Remove(Platoons_Spawn)
+	end
+end
+
+function Platoons_AddToQueryByIndex(index, squad, attrib, spawnTime, addRule)
+	if spawnTime == nil then spawnTime = World_GetGameTime()+PLATOONS[index][2][1][2] end
+	if addRule == nil then addRule = true end
+	if PLATOONS[index] == nil then
+		error("Unable to add platoon of index "..index.." to query!")
+	else
+		if squad then
+			table.insert(Platoons_Query, {spawnTime, attrib, PLATOONS[index][2]})
+		else
+			local lasttime
+			if spawnTime then
+				lasttime = spawnTime
+			else
+				lasttime = World_GetGameTime()-1
+			end
+			local i
+			for i=1,table.getn(PLATOONS[index][2]) do
+				lasttime = lasttime+PLATOONS[index][2][i][2]
+				table.insert(Platoons_Query, {math.max(lasttime, 0), attrib[0], BP_GetSquadBlueprint(PLATOONS[index][2][i][1]), attrib[1]})
+			end
+		end
+	end
+	if addRule then
+		Platoon_UpdateSpawnRule()
+	end
+end
+
+function Platoons_Spawn()
+	local dosort = false
+	if scartype(Platoons_Query[1][2]) == ST_SQUAD then
+		local owner = Squad_GetPlayerOwner(Platoons_Query[1][2])
+		local moveto
+		if Squad_HasDestination(Platoons_Query[1][2]) then
+			moveto = Squad_GetDestination(Platoons_Query[1][2])
+		else
+			moveto = Squad_GetPosition(Platoons_Query[1][2])
+		end
+		if Platoons_Query[1][2] then
+			Squad_Destroy(Platoons_Query[1][2])
+		end
+		local lasttime = World_GetGameTime()-1
+		local i
+		for i=1,table.getn(Platoons_Query[1][3]) do
+			lasttime = lasttime+Platoons_Query[1][3][i][2]
+			table.insert(Platoons_Query, {math.max(lasttime, 0), owner, BP_GetSquadBlueprint(Platoons_Query[1][3][i][1]), moveto})
+		end
+		dosort = true
+	else
+		local newsquad = Squad_CreateAndSpawnToward(Platoons_Query[1][3], Platoons_Query[1][2], 0, Platoons_Entry[World_GetPlayerIndex(Platoons_Query[1][2])],  Platoons_Query[1][4])
+		local sgroup = SGroup_CreateIfNotFound("Platoons_sgroup")
+		SGroup_Clear(sgroup)
+		SGroup_Add(sgroup, newsquad)
+		Command_SquadPos(Platoons_Query[1][2], sgroup, SCMD_Move, Platoons_Query[1][4], false)
+	end
+	table.remove(Platoons_Query, 1)
+	if table.getn(Platoons_Query)<1 then
+		Rule_RemoveMe()
+	else
+		if dosort then Platoons_SortQuery() end
+		if Rule_Exists(Platoons_Spawn) then
+			Rule_ChangeInterval(Platoons_Spawn, math.max(Platoons_Query[1][1]-World_GetGameTime(), 1))
+		else
+			Rule_AddInterval(Platoons_Spawn, math.max(Platoons_Query[1][1]-World_GetGameTime(), 1))
+		end
+	end
+end
+
+function Platoons_SortQuery()
+	table.sort(Platoons_Query, function(a,b) return a[1]<b[1] end)
+end
+
+function Platoons_Init_Continue()
+	Platoons_UpdateEntryPoints()
+	Platoons_Check()
+	Platoon_UpdateSpawnRule()
+end
+function Platoons_Init()
+	Platoons_Query = {} -- table of currently reinforcing platoon squads. Index => Player World Index
+	Platoons_Entry = {} -- table of entry point positions. Index => Player World Index
+	Rule_AddOneShot(Platoons_Init_Continue, 1)
+end
+Scar_AddInit(Platoons_Init)

@@ -1,0 +1,25 @@
+
+function outputAIMarkers()
+	print("\t-- [[ BtB map fixes ]]")
+	print("\t")
+	print("\t-- AI markers")
+	print("\tlocal nilPos = World_Pos(0, 0, 0)")
+	for i=0,World_GetNumEntities()-1 do
+		local e = World_GetEntity(i)
+		local bp = Entity_GetBlueprint(e)
+		local pos = Entity_GetPosition(e)
+		local name
+		if bp == EBP.STRAT_POINT.AI_HIGH then
+			name = "EBP.STRAT_POINT.AI_HIGH"
+		elseif bp == EBP.STRAT_POINT.AI_MEDIUM then
+			name = "EBP.STRAT_POINT.AI_MEDIUM"
+		elseif bp == EBP.STRAT_POINT.AI_LOW then
+			name = "EBP.STRAT_POINT.AI_LOW"
+		end
+		if name then
+			print(string.format("\tEntity_CreateENV(%s, World_Pos(%.1f, %.1f, %.1f), nilPos)", name, pos.x, pos.y, pos.z))
+		end
+	end
+end
+
+Scar_AddInit(outputAIMarkers)

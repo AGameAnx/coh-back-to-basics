@@ -35,11 +35,11 @@ end
 local capturePointMilitaryPoints = {}
 
 local customCaptureModifiers = {
-	[BP_GetName(EBP.STRAT_POINT.FUEL_HIGH)] = 1.3,
-	[BP_GetName(EBP.STRAT_POINT.FUEL_MED)] = 1.3,
+	[BP_GetName(EBP.STRAT_POINT.FUEL_HIGH)] = 1.25,
+	[BP_GetName(EBP.STRAT_POINT.FUEL_MED)] = 1.25,
 	[BP_GetName(EBP.STRAT_POINT.FUEL_LOW)] = 1.05,
-	[BP_GetName(EBP.STRAT_POINT.MUN_HIGH)] = 1.3,
-	[BP_GetName(EBP.STRAT_POINT.MUN_MED)] = 1.15,
+	[BP_GetName(EBP.STRAT_POINT.MUN_HIGH)] = 1.22,
+	[BP_GetName(EBP.STRAT_POINT.MUN_MED)] = 1.125,
 }
 local customDefendModifiers = {
 	[BP_GetName(EBP.STRAT_POINT.FUEL_HIGH)] = 1.1,
@@ -72,7 +72,7 @@ local customAttackModifiers = {
 local hqDistCache = {}
 local earlyGameTimeRule = 1
 local frontlineMapConstant = 0
-local baseMapConstant = -1.15
+local baseMapConstant = -2.5
 
 --------------------------------------------------------------------------------
 -- target ranking
@@ -102,12 +102,12 @@ local earlyGameScore = 0
 local earlyGameFrontlineMultiplier = 0
 local earlyGameThreatMultiplier = 0
 function RankTargetsPrepass()
-	dr_clear("aicustomdebug2"..s_selfplayerid)
-	dr_setautoclear("aicustomdebug3"..s_selfplayerid, false)
-	dr_setdisplay("aicustomdebug3"..s_selfplayerid, true)
 	local playerCount = World_GetPlayerCount()
 	if not firstPassDone then
 		firstPassDone = true
+		
+		dr_setautoclear("aicustomdebug3"..s_selfplayerid, false)
+		dr_setdisplay("aicustomdebug3"..s_selfplayerid, true)
 		
 		local hqMid = World_Pos(0,0,0)
 		local enemyHQMid = World_Pos(0,0,0)
@@ -246,7 +246,7 @@ function RankTargetsPrepass()
 	
 	earlyGameTimeRule = math.max(0, 1 - math.min(1, World_GetGameTime()/180-0.35)) * math.min(1, 0.5 + k_longMapRatio*2)
 	
-	earlyGameScore = 4*earlyGameTimeRule + k_longMapRatio*earlyGameTimeRule*20
+	earlyGameScore = 10*earlyGameTimeRule + k_longMapRatio*earlyGameTimeRule*5
 	earlyGameFrontlineMultiplier = (1 - earlyGameTimeRule) * math.min(1, (1+k_longMapRatio*2)*0.55+0.45)
 	earlyGameThreatMultiplier = math.max(-1, math.min(1, (0.55 - earlyGameTimeRule)/0.45))
 	
@@ -559,7 +559,8 @@ function RankDefendTargets()
 		end
 	end]]
 	
-	if s_selfplayerid-999 == 2 then
+	--[[if s_selfplayerid-999 == 2 then
+		dr_clear("aicustomdebug2"..s_selfplayerid)
 		
 		local wWidth = World_GetWidth()
 		local wHeight = World_GetLength()
@@ -590,7 +591,7 @@ function RankDefendTargets()
 				end
 			end
 		end
-	end
+	end]]
 end
 
 function Target_CalcAttackPriority(militaryPoint, is_neutral)
@@ -663,7 +664,8 @@ function RankAttackTargets()
 		end
 	end]]
 	
-	if s_selfplayerid-999 == 2 then
+	--[[if s_selfplayerid-999 == 2 then
+		dr_clear("aicustomdebug2"..s_selfplayerid)
 		
 		local wWidth = World_GetWidth()
 		local wHeight = World_GetLength()
@@ -692,7 +694,7 @@ function RankAttackTargets()
 				end
 			end
 		end
-	end
+	end]]
 end
 
 function Target_CalcCapturePriority(capturePoint, vp_mult, fuel_mult, mt_mult)
@@ -763,7 +765,7 @@ function Target_CalcCapturePriority(capturePoint, vp_mult, fuel_mult, mt_mult)
 	local threat = 0
 	local maxThreat = 1
 	if capturePointMilitaryPoints[capturePointID] then
-		threat = Military_GetCombinedThreatAtMilitaryPoint(s_selfplayer, capturePointMilitaryPoints[capturePointID], true) + 0.5
+		threat = Military_GetCombinedThreatAtMilitaryPoint(s_selfplayer, capturePointMilitaryPoints[capturePointID], true) + 0.225
 		if threat < 0 then
 			threat = 0
 		end
@@ -776,7 +778,7 @@ function Target_CalcCapturePriority(capturePoint, vp_mult, fuel_mult, mt_mult)
 			--CustomDebug.Print(string.format("  Positive threat: %.2f maxThreat: %.2f", threat, maxThreat))
 		--end
 	end
-	local priorityWithThreat = priority - threat/maxThreat*10
+	local priorityWithThreat = priority - threat/maxThreat*30
 	
 	--CustomDebug.Print(string.format("  %2.1f threat: %2.2f  priority+threat: %2.2f", priority, threat, priorityWithThreat))
 	
@@ -808,7 +810,7 @@ end
 function RankCapturePoints(vp_mult, vp_max, fuel_mult, mt_mult)
 	AIResource_ClearCapturePointPriorities(s_selfplayer)
 	
-	local neighbour_mult = 0.25
+	local neighbour_mult = 0.2
 	-- for each capture point
 	local capturePointCount = AIResource_GetCapturePointsTotal(s_selfplayer)
 	
@@ -899,6 +901,7 @@ function RankCapturePoints(vp_mult, vp_max, fuel_mult, mt_mult)
 					end
 				end
 			end
+			
 			-- apply a percentage
 			entry.NeighbourScore = entry.NeighbourScore * neighbour_mult / neighbourCount
 		
@@ -920,4 +923,37 @@ function RankCapturePoints(vp_mult, vp_max, fuel_mult, mt_mult)
 			if idx > 15 then break end
 		end
 	end]]
+	
+	if s_selfplayerid-999 == 2 then
+		dr_clear("aicustomdebug2"..s_selfplayerid)
+		
+		local wWidth = World_GetWidth()
+		local wHeight = World_GetLength()
+		local wHalfWidth = wWidth/2
+		local wHalfHeight = wHeight/2
+		
+		for idx,entry in pairs(capture_point_ranking) do
+			if entry and entry.Point then
+				local capturePointID = AIResource_GetCapturePointID(s_selfplayer, entry.Point)
+				local entity = Entity_FromWorldID(capturePointID)
+				if entity then
+					local entityPos = Entity_GetPosition(entity)
+					if entityPos and entityPos.x and entityPos.z then
+						local color
+						if entry.PriorityValue == 0 then
+							color = 0
+						else
+							color = math.min(255, math.max(0, math.ceil(255 * entry.PriorityValue/2 * 1.5)+120))
+						end
+						
+						dr_text2d("aicustomdebug2"..s_selfplayerid,
+							0.005 + 0.8*     (entityPos.x+wHalfWidth ) / (wWidth +1)  * math.max(0.333, 1-math.min(1, wHeight/wWidth)),
+							0.005 + 0.8*(1 - (entityPos.z+wHalfHeight) / (wHeight+1)) * math.max(0.333, 1-math.min(1, wWidth/wHeight)),
+							string.format("%.0f", entry.PriorityValue),
+							15+math.ceil(color/3), color, 15+math.ceil(color/3))
+					end
+				end
+			end
+		end
+	end
 end

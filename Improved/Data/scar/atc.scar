@@ -1,0 +1,1324 @@
+--
+--[[ ATC -- Automatic Territory Capture v1.16 ]]--
+--
+-- Coded by AGameAnx at 27-07-2008 (updated at 13-10-2014)
+-- More info, changelogs can be found in the readme file or here: http://forums.relicnews.com/showthread.php?t=191843
+--
+-- To use this code:
+--
+-- 1. Put all the files to *your mods folder*/Data/scar folder
+-- 2. Modify settings in atc.scar it to your liking (you can use notepad or corsix mod studio to open it)
+-- 3. Extract the scarutil.scar file located in the same folder with corsix mod studio
+-- 4. Open it and add this to a new line after all the imports or to the end of file: import("atc.scar")
+-- 
+
+g_ATC_Enable = false
+
+import("varutil.scar")
+import("upgradesystem.scar")
+
+ATC_Settings = {
+	["Capture Incremental"] = true, -- Default: true
+		-- Determines if the point counting will be incremental or not.
+		-- Incremental capturing works like a timer: each squad, emplacement, captured building in a
+		-- territory adds its own points with each tick. In a non-incremental case, the resulting points
+		-- do not get accumulated.
+		-- Note: Tick interval will change incremental capture speed
+		-- Note: Setting to true disables 'If Enemy Present' setting
+	["Use squad member count"] = true, -- Default: true
+		-- If set to true multiplies squad capture speed by the number of members in it
+	["Min points to capture"] = 150, -- Default: 150
+		-- When capture points reach this amount the territory sector is captured
+	["Capture Incremental: neutral on"] = 1, -- Default: 1
+		-- 0 - Never. Enemy team captures only when it has enough points
+		-- 1 - If a team has less points than min points to capture
+		-- 2 - If a team has less than 'Capture Incremental: neutral on points' points
+	["Capture Incremental: neutral on - points"] = 25, -- Default: 25
+		-- See 'Capture Incremental: neutral on'
+		-- Note: Shouldn't be bigger than 'Min points to capture'
+	["Capture Incremental: max points"] = 1000, -- Default: 1000
+		-- The maximum number of points for the sector, so the process of capture doesn't go too slowly
+		-- Set to 0 to disable this limit
+	["Max Capture Speed"] = 0, -- Default: 0
+		-- If there's a lot of squads in the sector and you want to limit their capture speed
+		-- 0 - Disabled.
+	["If no units present in the sector"] = 3, -- Default: 3
+		-- Determines what to do when there's no units in the current sector
+		-- 0 - Do nothing
+		-- 1 - Make neutral if not in supply
+		-- 2 - Make neutral
+		-- 3 - Increase the points (available only with incremental capture)
+	["If no units present in the sector: Increment"] = 0.2, -- Default: 0.2
+		-- How many points will be added if there are no units in the sector on
+		-- 'If no units present in the sector' set to option 3. You can also use a negative value which
+		-- would instead make accumulated points decrease
+	["If no units present in the sector: Min points to decrement to"] = 50, -- Default: 50
+		-- If 'If no units present in the sector: Increment' has a negative value it will not go lower
+		-- than this amount of points
+	["If Enemy Present"] = 0, -- Default: 0
+		-- 0 - Make neutral if there are more than min units to capture on enemy team in the sector
+		-- 1 - Make neutral if there are enemy units in the sector
+		-- 2 - Make neutral if there are enemy units in the sector or capture by team having more points
+		--     than other team by 'Min points to outnumber to capture' in the sector and having more
+		--     points than 'Min points to capture'
+		-- 3 - Do nothing or capture by team having more squads than other team by
+		--     'Min points to outnumber to capture' in the sector and having more points than
+		--     'Min points to capture'
+		-- 4 - Do nothing. Territory stays owned by its previous owner until all squads and entities of
+		--     that team are removed from that sector
+	["Min points to outnumber to capture"] = 1, -- Default: 1
+		-- minimum points a team needs to outnumber the enemy by to capture the territory when
+		-- 'If Enemy Present' is set to 3 or 4
+	["Capture Secured"] = false, -- Default: false
+		-- If enabled, secured strategic points will also be captured with ATC (Not recommended)
+	["Secure Structures"] = {
+		{EBP.ALLIES.OBSERVATION_POST, {}},
+		{EBP.AXIS.OBSERVATION_POST, {}},
+		{EBP.CW.OBSERVATION_POST, {}},
+		{SBP.CW.HQ, {UPG.CW.MOBILEHQ}},
+		{SBP.CW.HQ_REINFORCEMENT, {UPG.CW.MOBILEHQ}},
+		{SBP.CW.ARMOUR_HQ, {UPG.CW.MOBILEHQ}},
+		{SBP.CW.INFANTRY_HQ, {UPG.CW.MOBILEHQ}},
+	},	-- A list of tables of entities or squads and a table of upgrades needed to determine if these
+	    -- entities or squads make the territory in which they are located secured.
+	["Excluded Strategic Points"] = {},
+		-- a table of strategic points (entity blueprints) not included at ATC_FindTerritorySectors.
+		-- This might be needed with campaign
+		-- Note: Victory Points are excluded by default
+	["Exclude retreating"] = true, -- Default: true
+		-- Determines whether to exclude the retreating squads
+	["Exclude in vehicles"] = false, -- Default: false
+		-- Determines whether to exclude squads which are in hold of other squads (vehicles)
+	["Exclude in buildings"] = false, -- Default: false
+		-- Determines whether to exclude squads in buildings
+	["Include all in buildings"] = false, -- Default: false
+		-- Determines whether to include squads in buildings when counting even if they are not
+		-- originally capturers or not
+		-- Note: Doesn't work if 'Exclude in buildings' is on
+	["Exclude entities"] = false, -- Default: false
+		-- Determines whether to include buildings built in the territory sectors when counting.
+	["Dynamic information"] = {
+		["Show on"] = 4, -- Default: 4
+			-- Determines whether to show a text about territory capturing progress when the mouse is on
+			-- the Strategic Point.
+			-- Note: First 3 settings can't work if the 'Hide strategic points' option is on
+			-- 0 - Never
+			-- 1 - On mouse over
+			-- 2 - On select
+			-- 3 - On both mouse over and select
+			-- 4 - Show always about whichever territory sector the mouse is hovering over
+		["Percent"] = true, -- Default: true
+			-- If set to true it will show percentage of total capture points instead of points as they are.
+			-- You might want to play with min points to capture to get easier and more round percentage numbers.
+			-- Only for incremental capturing
+		["Show max points"] = false, -- Default: false
+			-- If set to true additional text ' / *maxpoints*' will be added to the information text.
+			-- Only for incremental capturing
+		["Show enemy points"] = true, -- Default: true
+			-- If set to true enemy count in the sector will also be shown.
+			-- Only for non-incremental capturing
+		["Position"] = {0.05, 0.15}, -- Default: {0.05, 0.15}
+			-- {x, y} on screen (proportion)
+		["Color"] = {255, 255, 255}, -- Default: {255, 255, 255}
+			-- {Red, Green, Blue} 255 is the maximum value for each of the colors.
+		["Hide delay"] = 0, -- Default: 0
+			-- Will hide the info after this amount of seconds (Without updating it!)
+	},
+	
+	--## READ ONLY variables.
+	-- These variables are read-only at runtime. Use specified functions if you need to change them
+	-- after the game has started.
+	["Check Interval"] = 0.25, -- Default: 0.25 // ATC_ChangeCheckInterval(newInterval)
+		-- The main ATC check function call interval in seconds
+	["Update Per Player"] = false, -- Default: false // ATC_ChangeUpdatePerPlayer(newValue)
+		-- THIS IS CURRENTLY BUGGED!
+		-- Determines if interval for updating will be divided by number of players and updates done
+		-- individually for each player. This can improve performance
+	["Hide strategic points"] = false, -- Default: true // ATC_SP_Hide(hide)
+		-- Makes all the strategic points invisible if enabled
+		-- Note: Use this instead of making them invisible with corsix mod studio, or AI will not capture
+		-- Note: AI players will still be able to build observation points
+		-- Note: AI players will be able to capture as normal. The territory will be flashing and you'll
+		-- get voice notifications whilst you will not get any of the above with normal player controlled
+		-- ATC capture
+	["Move SPs up by"] = 0, -- Default: 0 // ATC_SP_YPos(pos)
+		-- Modifies all the strategic point y positions by this number.
+	["SP Copies"] = 1000, -- Default: 1000 // ATC_SPCopy_YPos(pos)
+		-- If set to false, there will be no copies created.
+		-- This can be used in combination with 'Hide strategic points' to disable people from capturing
+		-- and seeing strategic points, but keeping the strategic point icon on the tactical map.
+		-- Note: Does not work when 'Hide strategic points' is set to false
+		-- Note: Not tested with ATC_FindTerritorySectors call after the game start. Might put these
+		-- copies into ATC and create issues
+	["Capture Time Modifier"] = 1000, -- Default: 1000 // ATC_ModifyCaptureTime(modifier)
+		-- Modifies the default capture time for each and every strategic point
+		-- Set to high amount to make it work better with incremental capture
+		-- Setting to low amount will allow player to capture the sector, but if there are enemies in
+		-- the sector and the counter still haven't reached the proper amount, the territory will be
+		-- captured back by the enemy which would look like a bug
+	["Race Settings"] = {
+		-- These are different settings for every army in the game.
+		-- 
+		-- ## Some explanations:
+		--   Index (TRACE_ALLIES, TRACE_AXIS..)
+		--     This is the army name to identify it with. You can find these constants in luaconsts.scar
+		--   Extra Included Squads
+		--     a table of squads included when counting capture points even if they can't
+		--     originally capture (you can also include all the tanks here)
+		--   Excluded Squads
+		--     a table of squad blueprints that will not be included when counting capture points.
+		--     Note: Squads that originally can't capture will also be skipped, unless they are in
+		--     the included squads table
+		--   Excluded Entities
+		--     a table of entity blueprints that will not be included when counting capture points.
+		--   Capture Rate Multiplier
+		--     Multiplier applied to squad capture rate if it is capturing the strategic point.
+		--     Note: If you have the invisible SPs on AI will still be able to capture. You might want to
+		--     set this option to 1 to keep it fair.
+		--   Squad Capture Rate
+		--     Army specific squad capture rate
+		--   In Hold Squad Capture Rate
+		--     Army specific capture rate for squads in buildings and vehicles 
+		--   Entity Capture Rate
+		--     Army specific entity (building) capture rate
+		--   Squad Member Capture Multiplier
+		--     Allows to modify the significance of additional squad members when considering its capture
+		--     potential. 1st member has 'Squad Capture Rate' significance and each additional member
+		--     has a rate of 'Squad Capture Rate' * 'Squad Member Capture Multiplier'
+		--   Special Squads
+		--     Squad specific capture modifiers
+		--     Example: [SBP.ALLIES.JEEP] = 0.5,
+		--   Special Entities
+		--     Entity specific capture modifiers
+		--     Example: [EBP.ALLIES.MG_NEST] = 2,
+		-- 
+		[TRACE_ALLIES] = {
+			["Excluded Squads"] = {
+				SBP.ALLIES.SNIPER,
+			},
+			["Excluded Entities"] = {
+				EBP.ALLIES.MINES,
+				EBP.ALLIES.MINES_RIFLEMEN,
+				EBP.ALLIES.TANK_TRAP_RIFLEMEN,
+				EBP.ALLIES.TANK_TRAP,
+				EBP.ALLIES.SANDBAG_RIFLEMEN,
+				EBP.ALLIES.SANDBAG,
+				EBP.ALLIES.BARBED_WIRE_RIFLEMEN,
+				EBP.ALLIES.BARBED_WIRE,
+			},
+			["Extra Included Squads"] = {
+				SBP.ALLIES.JEEP,
+			},
+			["Capture Rate Multiplier"] = 5,
+			["Squad Capture Rate"] = 1,
+			["In Hold Squad Capture Rate"] = 1.5,
+			["Entity Capture Rate"] = 5,
+			["Squad Member Capture Multiplier"] = 1,
+			["Special Squads"] = {
+			},
+			["Special Entities"] = {
+			},
+		},
+		[TRACE_AXIS] = {
+			["Extra Included Squads"] = {
+				SBP.AXIS.MOTORCYCLE,
+			},
+			["Excluded Squads"] = {
+				SBP.AXIS.SNIPER,
+				SBP.AXIS.OFFICER,
+			},
+			["Excluded Entities"] = {
+				EBP.AXIS.TANK_TRAP,
+				EBP.AXIS.SANDBAG,
+				EBP.AXIS.MINES,
+				EBP.AXIS.BARBED_WIRE,
+			},
+			["Capture Rate Multiplier"] = 15,
+			["Squad Capture Rate"] = 1,
+			["In Hold Squad Capture Rate"] = 1.5,
+			["Entity Capture Rate"] = 5,
+			["Squad Member Capture Multiplier"] = 1,
+			["Special Squads"] = {
+			},
+			["Special Entities"] = {
+			},
+		},
+		[TRACE_ALLIES_COMMONWEALTH] = {
+			["Extra Included Squads"] = {
+				SBP.CW.COMMAND_CROMWELL,
+			},
+			["Excluded Squads"] = {
+			},
+			["Excluded Entities"] = {
+				EBP.CW.DEMOLITION_CHARGE,
+				EBP.CW.MINES,
+				EBP.CW.SANDBAG,
+				EBP.CW.BARBED_WIRE,
+				EBP.CW.RADIO_BEACON,
+				EBP.CW.SLITTRENCH_NEST,
+			},
+			["Capture Rate Multiplier"] = 15,
+			["Squad Capture Rate"] = 0.8,
+			["In Hold Squad Capture Rate"] = 1.5,
+			["Entity Capture Rate"] = 4,
+			["Squad Member Capture Multiplier"] = 1,
+			["Special Squads"] = {
+				[SBP.CW.COMMAND_CROMWELL] = 1.5,
+			},
+			["Special Entities"] = {
+			},
+		},
+		[TRACE_AXIS_PANZER_ELITE] = {
+			["Extra Included Squads"] = {
+			},
+			["Excluded Squads"] = {
+			},
+			["Excluded Entities"] = {
+				EBP.ELITE.BARBED_WIRE,
+				EBP.ELITE.MINE_TELLER,
+				EBP.ELITE.MINE_AIR_DROPPED,
+				EBP.ELITE.SANDBAG,
+				EBP.ELITE.TANK_TRAP,
+			},
+			["Capture Rate Multiplier"] = 15,
+			["Squad Capture Rate"] = 1.25,
+			["In Hold Squad Capture Rate"] = 1.5,
+			["Entity Capture Rate"] = 5,
+			["Squad Member Capture Multiplier"] = 1,
+			["Special Squads"] = {
+			},
+			["Special Entities"] = {
+			},
+		}
+	},
+	["Upgrades"] = {
+		-- Army specific settings for different upgrades in the game.
+		-- These settings are used for checking for different requirements for every player and changing
+		-- army specific settings ('Race Settings' table copy that is made at the start of the game) for
+		-- each player.
+		--
+		-- Only player upgrades are checked, not entity or squad upgrades
+		-- 
+		-- For more information see upgradesystem.scar
+		-- 
+		[TRACE_ALLIES] = {
+			{ -- Upgrades the Jeep capture rate with the Resource 2 or Armored doctrine upgrades
+				["requirements_operation"] = UpgradeSystem_OPERATION_OR,
+				["requirements"] = {
+					{UpgradeSystem_PlayerUpgrade, BP_GetUpgradeBlueprint("upgrade/allies/allies_resource_upgrade_advanced.lua")},
+					{UpgradeSystem_PlayerUpgrade, UPG.COMMANDER_TREE.ALLIES.ARMOR},
+				},
+				["actions"] = {
+					{UpgradeSystem_ACTION_TABLEACTION, {
+						["index"]="Special Squads",
+						["actions"] = {
+							{UpgradeSystem_ACTION_UPDATEVALUE_SET,
+								{["index"] = SBP.ALLIES.JEEP, ["value"] = 1.5}},
+						},
+					}},
+				},
+			},
+			{ -- Enables sniper capturing with Infantry Doctrine or Airborne + Resource 2 upgrades
+				["requirements_operation"] = UpgradeSystem_OPERATION_OR,
+				["requirements"] = {
+					{UpgradeSystem_PlayerUpgrade, UPG.COMMANDER_TREE.ALLIES.INFANTRY},
+					{UpgradeSystem_PlayerUpgrade,
+						{BP_GetUpgradeBlueprint("upgrade/allies/allies_resource_upgrade_advanced.lua"), UPG.COMMANDER_TREE.ALLIES.AIRBORNE}},
+				},
+				["actions"] = {
+					{UpgradeSystem_ACTION_TABLEACTION, {
+						["index"] = "Excluded Squads",
+						["actions"] = {
+							{UpgradeSystem_ACTION_REMOVEVALUE,
+								{["find"]=true,["find_value"]=SBP.ALLIES.SNIPER}},
+						}
+					}},
+				},
+			},
+		},
+		[TRACE_AXIS] = {
+			{ -- If there's an officer in the field, all units capture faster
+				["validate"] = true,
+				["requirements"] = {
+					{UpgradeSystem_Player_HasSquad, SBP.AXIS.OFFICER},
+				},
+				["actions"] = {
+					{UpgradeSystem_ACTION_UPDATEVALUE, {
+						["index"]="Squad Capture Rate",
+						["operation"] = UpgradeSystem_ACTION_UPDATEVALUE_ADD,
+						["value"] = 0.5,
+					}},
+				},
+			},
+		},
+		[TRACE_ALLIES_COMMONWEALTH] = {
+			{ -- Units capture faster if there are more lieutenants on the field. All 3 upgrades are the same, just unit count differs
+				["validate"] = true,
+				["requirements"] = {
+					{UpgradeSystem_Player_HasSquad, SBP.CW.LIEUTENANT},
+				},
+				["actions"] = {
+					{UpgradeSystem_ACTION_UPDATEVALUE, {
+						["index"]="Squad Capture Rate",
+						["operation"] = UpgradeSystem_ACTION_UPDATEVALUE_ADD,
+						["value"] = 0.1,
+					}},
+				},
+			},
+			{
+				["validate"] = true,
+				["requirements"] = {
+					{UpgradeSystem_Player_HasSquad, {SBP.CW.LIEUTENANT, 2}},
+				},
+				["actions"] = {
+					{UpgradeSystem_ACTION_UPDATEVALUE, {
+						["index"]="Squad Capture Rate",
+						["operation"] = UpgradeSystem_ACTION_UPDATEVALUE_ADD,
+						["value"] = 0.1,
+					}},
+				},
+			},
+			{
+				["validate"] = true,
+				["requirements"] = {
+					{UpgradeSystem_Player_HasSquad, {SBP.CW.LIEUTENANT, 3}},
+				},
+				["actions"] = {
+					{UpgradeSystem_ACTION_UPDATEVALUE, {
+						["index"]="Squad Capture Rate",
+						["operation"] = UpgradeSystem_ACTION_UPDATEVALUE_ADD,
+						["value"] = 0.1,
+					}},
+				},
+			},
+			{ -- Units capture faster if there's a captain on the field
+				["validate"] = true,
+				["requirements"] = {
+					{UpgradeSystem_Player_HasSquad, SBP.CW.CAPTAIN},
+				},
+				["actions"] = {
+					{UpgradeSystem_ACTION_UPDATEVALUE, {
+						["index"]="Squad Capture Rate",
+						["operation"] = UpgradeSystem_ACTION_UPDATEVALUE_ADD,
+						["value"] = 0.3,
+					}},
+				},
+			},
+			{ -- Tanks slowly capture if there's a cromwell command tank on the field
+				["validate"] = true,
+				["requirements"] = {
+					{UpgradeSystem_Player_HasSquad, SBP.CW.COMMAND_CROMWELL},
+				},
+				["actions"] = {
+					{UpgradeSystem_ACTION_TABLEACTION, {
+						["index"]="Special Squads",
+						["actions"] = {
+							{UpgradeSystem_ACTION_UPDATEVALUE_SET,
+								{["index"] = SBP.CW.BREN_CARRIER, ["value"] = 0.1}},
+							{UpgradeSystem_ACTION_UPDATEVALUE_SET,
+								{["index"] = SBP.CW.CHURCHILL_AVRE, ["value"] = 0.7}},
+							{UpgradeSystem_ACTION_UPDATEVALUE_SET,
+								{["index"] = SBP.CW.CHURCHILL_CROC, ["value"] = 0.7}},
+							{UpgradeSystem_ACTION_UPDATEVALUE_SET,
+								{["index"] = SBP.CW.CHURCHILL, ["value"] = 0.7}},
+							{UpgradeSystem_ACTION_UPDATEVALUE_SET,
+								{["index"] = SBP.CW.CHURCHILL_SP_CAEN, ["value"] = 0.7}},
+							{UpgradeSystem_ACTION_UPDATEVALUE_SET,
+								{["index"] = SBP.CW.CROMWELL, ["value"] = 0.5}},
+							{UpgradeSystem_ACTION_UPDATEVALUE_SET,
+								{["index"] = SBP.CW.STUART, ["value"] = 0.25}},
+							{UpgradeSystem_ACTION_UPDATEVALUE_SET,
+								{["index"] = SBP.CW.PRIEST, ["value"] = 0.1}},
+							{UpgradeSystem_ACTION_UPDATEVALUE_SET,
+								{["index"] = SBP.CW.FIREFLY, ["value"] = 0.6}},
+							{UpgradeSystem_ACTION_UPDATEVALUE_SET,
+								{["index"] = SBP.CW.TETRARCH, ["value"] = 0.2}},
+						},
+					}},
+					{UpgradeSystem_ACTION_TABLEACTION, {
+						["index"]="Extra Included Squads",
+						["actions"] = {
+							{UpgradeSystem_ACTION_ADDTONUMERICTABLE, SBP.CW.BREN_CARRIER},
+							{UpgradeSystem_ACTION_ADDTONUMERICTABLE, SBP.CW.CHURCHILL_AVRE},
+							{UpgradeSystem_ACTION_ADDTONUMERICTABLE, SBP.CW.CHURCHILL_CROC},
+							{UpgradeSystem_ACTION_ADDTONUMERICTABLE, SBP.CW.CHURCHILL},
+							{UpgradeSystem_ACTION_ADDTONUMERICTABLE, SBP.CW.CHURCHILL_SP_CAEN},
+							{UpgradeSystem_ACTION_ADDTONUMERICTABLE, SBP.CW.CROMWELL},
+							{UpgradeSystem_ACTION_ADDTONUMERICTABLE, SBP.CW.STUART},
+							{UpgradeSystem_ACTION_ADDTONUMERICTABLE, SBP.CW.PRIEST},
+							{UpgradeSystem_ACTION_ADDTONUMERICTABLE, SBP.CW.FIREFLY},
+							{UpgradeSystem_ACTION_ADDTONUMERICTABLE, SBP.CW.TETRARCH},
+						},
+					}},
+				},
+			},
+		},
+		[TRACE_AXIS_PANZER_ELITE] = {
+			{ -- Makes Panzer Grenadiers capture faster with their capture rate upgrade
+				["requirements"]={
+					{UpgradeSystem_PlayerUpgrade, UPG.ELITE.CAPTURE_RATE},
+				},
+				["actions"]={
+					{UpgradeSystem_ACTION_UPDATEVALUE, {
+						["index"]="Squad Capture Rate",
+						["operation"]=UpgradeSystem_ACTION_UPDATEVALUE_MULTIPLY,
+						["value"]=1.5,
+					}},
+				},
+			},
+		}
+	}
+}
+
+
+function ATC_Init()
+	-- This is used later to make sure we don't include neutral teams
+	ATC_Teams = {}
+	
+	--## Initiate the data first
+	ATC_Data = {}
+		-- All the ATC Data is stored in this single table.
+		-- It's indexed by territory ids and consists of strategic point entity, it's counter, secured 
+		-- flag, and a table indexed by team indexes
+		-- containing the table containing number of squads and entities owned by players
+		-- contained in the current Strategic Point.
+	ATC_Data_EGroup = EGroup_CreateIfNotFound("ATC_Data")
+		-- The EGroup of all strategic points
+	ATC_Data_EGroup_Copy = EGroup_CreateIfNotFound("ATC_Data_EGroup_Copy")
+		-- EGroup for strategic point copies
+	
+	ATC_EGroupCount = 0
+	ATC_SGroupCount = 0
+	
+	ATC_Check_CurPlayer = 1
+	
+	-- Per player actions.
+	ATC_UpgradeList = {}
+	for i=1,World_GetPlayerCount() do
+		local p = World_GetPlayerAt(i)
+		local team = Player_GetTeam(p)
+		local insert = table.getn(ATC_Teams)<2
+		local properteam = ATC_Team_IsProper(team)
+		if team ~= TEAM_NEUTRAL and (insert or properteam) then
+			if insert and not properteam then
+				table.insert(ATC_Teams, team)
+			end
+			local race = Player_GetRaceName(p)
+			ATC_UpgradeList[i] = {
+				settings = {
+					player = p,
+				},
+				data = Clone(ATC_Settings["Race Settings"][race]),
+				upgrades = Clone(ATC_Settings["Upgrades"][race]),
+			}
+		end
+	end
+	
+	--## Some actions and changes
+	if Misc_IsCommandLineOptionSet("dev") then
+		-- adds ATC_Stop and ATC_Start to the console
+		Scar_DebugConsoleExecute("ATC_Stop = function() Scar_DoString('ATC_Stop()') end")
+		Scar_DebugConsoleExecute("ATC_Start = function() Scar_DoString('ATC_Start()') end")
+	end
+	dr_setautoclear("territory_capture_info", 0)
+		-- disables autoclear for dynamic information (would hide right after showing)
+	
+	--Rule_AddOneShot(ATC_Init_Continue, 1)
+	ATC_FindTerritorySectors()
+		-- find all the sectors, buildings in them and any needed information about them
+	
+	if g_ATC_Enable then
+		if not Rule_Exists(ATC_CheckEnable) then Rule_Add(ATC_CheckEnable) end
+		if Rule_Exists(ATC_CheckDisable) then Rule_Remove(ATC_CheckDisable) end
+	else
+		if not Rule_Exists(ATC_CheckEnable) then Rule_Add(ATC_CheckEnable) end
+		if Rule_Exists(ATC_CheckDisable) then Rule_Remove(ATC_CheckDisable) end
+	end
+end
+Scar_AddInit(ATC_Init)
+
+function ATC_Start(printinfo)
+	if printinfo == nil then
+		printinfo = true
+	end
+	
+	ATC_HideInfo()
+	
+	--## Time Rules
+	if not Rule_Exists(ATC_UpdateUpgradeData) then
+		if ATC_Settings["Update Per Player"] then
+			Rule_AddInterval(ATC_UpdateUpgradeData, ATC_Settings["Check Interval"]*World_GetPlayerCount())
+		else
+			Rule_AddInterval(ATC_UpdateUpgradeData, ATC_Settings["Check Interval"])
+		end
+	end
+	if not Rule_Exists(ATC_UpdateData) then
+		Rule_AddInterval(ATC_UpdateData, ATC_Settings["Check Interval"])
+	end
+	if not Rule_Exists(ATC_Check) then
+		if ATC_Settings["Update Per Player"] then
+			Rule_AddInterval(ATC_Check, ATC_Settings["Check Interval"]*World_GetPlayerCount())
+		else
+			Rule_AddInterval(ATC_Check, ATC_Settings["Check Interval"])
+		end
+	end
+	
+	if not Rule_Exists(ATC_ShowInfo_Check) then Rule_Add(ATC_ShowInfo_Check) end
+		-- Check interval for Information show (see 'Show info on' setting)
+	
+	--## Apply all the modifiers
+	ATC_SP_Hide(ATC_Settings["Hide strategic points"])
+	ATC_ModifyCaptureTime(ATC_Settings["Capture Time Modifier"])
+	
+	local temp
+	temp = ATC_Settings["Move SPs up by"]
+	ATC_Settings["Move SPs up by"] = 0
+	ATC_SP_YPos(temp)
+	temp = ATC_Settings["SP Copies"]
+	ATC_Settings["SP Copies"] = 0
+	ATC_SPCopy_YPos(temp)
+	
+	g_ATC_Enable = true
+	if not Rule_Exists(ATC_CheckDisable) then Rule_Add(ATC_CheckDisable) end
+	if Rule_Exists(ATC_CheckEnable) then Rule_Remove(ATC_CheckEnable) end
+	
+	if printinfo then
+		print("-- ATC :: -------- Running Automacic Territory Capture --------")
+		print("-- ATC :: To disable type in console ATC_Stop()")
+		print("-- ATC :: Check Interval: "..ATC_Settings["Check Interval"])
+		print("-- ATC :: Capture Incremental: "..tostring(ATC_Settings["Capture Incremental"]))
+		if ATC_Settings["Capture Incremental"] then
+			print("-- ATC :: Min Points To Capture: "..ATC_Settings["Min points to capture"].." ("..
+				string.format("%.2f", ATC_Settings["Min points to capture"]/ATC_Settings["Capture Incremental: max points"]*100).."%%)")
+			print("-- ATC :: Max Points: "..ATC_Settings["Capture Incremental: max points"])
+		else
+			print("-- ATC :: Max Points: "..ATC_Settings["Capture Incremental: max points"])
+		end
+	end
+end
+
+function ATC_Stop(printinfo)
+	if printinfo == nil then
+		printinfo = true
+	end
+	
+	ATC_HideInfo()
+	
+	--## Time Rules
+	if Rule_Exists(ATC_UpdateUpgradeData) then Rule_Remove(ATC_UpdateUpgradeData) end
+	if Rule_Exists(ATC_UpdateData) then Rule_Remove(ATC_UpdateData) end
+	if Rule_Exists(ATC_Check) then Rule_Remove(ATC_Check) end
+	if Rule_Exists(ATC_ShowInfo_Check) then Rule_Remove(ATC_ShowInfo_Check) end
+	
+	--## Remove all the modifiers
+	local temp
+	
+	temp = ATC_Settings["Hide strategic points"]
+	ATC_SP_Hide(false)
+	ATC_Settings["Hide strategic points"] = temp
+	
+	--ATC_DisableManualCapturing(0)
+	
+	temp = ATC_Settings["Capture Time Modifier"]
+	ATC_ModifyCaptureTime(1)
+	ATC_Settings["Capture Time Modifier"] = temp
+	
+	temp = ATC_Settings["Move SPs up by"]
+	ATC_SP_YPos(0)
+	ATC_Settings["Move SPs up by"] = temp
+	
+	temp = ATC_Settings["SP Copies"]
+	ATC_SPCopy_YPos(false)
+	ATC_Settings["SP Copies"] = temp
+	
+	g_ATC_Enable = false
+	if not Rule_Exists(ATC_CheckEnable) then Rule_Add(ATC_CheckEnable) end
+	if Rule_Exists(ATC_CheckDisable) then Rule_Remove(ATC_CheckDisable) end
+	
+	if printinfo then
+		print("-- ATC :: -------- Stopped Automacic Territory Capture --------")
+		print("-- ATC :: To enable type in console ATC_Start()")
+	end
+end
+
+function ATC_CheckEnable()
+	if g_ATC_Enable and Misc_AreDefaultCommandsEnabled() and not Game_IsLetterboxed() then
+		Rule_RemoveMe()
+		ATC_Start(false)
+	end
+end
+function ATC_CheckDisable()
+	if not g_ATC_Enable then
+		Rule_RemoveMe()
+		ATC_Stop(false)
+	end
+end
+
+function OnGameRestore()
+	if g_ATC_Enable then
+		ATC_Start(false)
+	end
+	Game_DefaultGameRestore()
+end
+
+-- checks if this team can capture with ATC
+function ATC_Team_IsProper(t)
+	local i
+	for i=1,table.getn(ATC_Teams) do
+		if ATC_Teams[i] == t then
+			return true
+		end
+	end
+	return false
+end
+
+-- the main function to check for any actions needed to perform with territory sectors
+function ATC_Check()
+	if Misc_AreDefaultCommandsEnabled() and not Game_IsLetterboxed() then
+		-- returns the best player for capturing the sector from the table or random player from those who
+		-- have the same point count. t - a 'players' table from ATC_Data[x].capturers[y]
+		local function GetPlayerCapturer(players)
+			local i,v
+			local p = {} -- table of players with the biggest number of points in the sector
+			for i,v in pairs(players) do
+				if table.getn(p) == 0 or players[p[1]] < v then
+					p = {i} -- found new biggest
+				elseif v == players[p[1]] then
+					table.insert(p, i) -- found same as the biggest
+				end
+			end
+			return World_GetPlayerAt(Table_GetRandomItem(p))
+		end
+		local i
+		for i=1,table.getn(ATC_Data) do
+			local sp = ATC_Data[i].entity
+			local sp_neutral = World_OwnsEntity(sp)
+			local owner
+			if not sp_neutral then
+				owner = Player_GetTeam(Entity_GetPlayerOwner(sp))
+			end
+			local points = {
+				ATC_Data[i].capturers[ATC_Teams[1]].squad + ATC_Data[i].capturers[ATC_Teams[1]].entity,
+				ATC_Data[i].capturers[ATC_Teams[2]].squad + ATC_Data[i].capturers[ATC_Teams[2]].entity,
+			}
+			if ATC_Data[i].secured and not ATC_Settings["Capture Secured"] then
+				if owner == ATC_Teams[1] then
+					points[2] = 0
+				else
+					points[1] = 0
+				end
+			end
+			if ATC_Settings["Capture Incremental"] then
+				local added_points
+				if ATC_Settings["Max Capture Speed"] > 0 then
+					added_points = math.min(points[1]-points[2], ATC_Settings["Max Capture Speed"])
+				else
+					added_points = points[1]-points[2]
+				end
+				ATC_Data[i].points = ATC_Data[i].points+added_points
+				if not sp_neutral then
+					if points[1] == 0 and points[2] == 0 then
+						if (ATC_Settings["If no units present in the sector"] == 2
+								or (ATC_Settings["If no units present in the sector"] == 1
+								and not World_IsInSupply(Entity_GetPlayerOwner(sp), Entity_GetPosition(sp)))) then
+							ATC_Data[i].points = 0
+						elseif ATC_Settings["If no units present in the sector"] == 3 and ATC_Settings["Capture Incremental"] then
+							if owner == ATC_Teams[1] then
+								ATC_Data[i].points = ATC_Data[i].points + ATC_Settings["If no units present in the sector: Increment"]
+								if ATC_Data[i].points < ATC_Settings["If no units present in the sector: Min points to decrement to"] then
+									ATC_Data[i].points = ATC_Settings["If no units present in the sector: Min points to decrement to"]
+								end
+							elseif owner == ATC_Teams[2] then
+								ATC_Data[i].points = ATC_Data[i].points - ATC_Settings["If no units present in the sector: Increment"]
+								if ATC_Data[i].points > ATC_Settings["If no units present in the sector: Min points to decrement to"] then
+									ATC_Data[i].points = -ATC_Settings["If no units present in the sector: Min points to decrement to"]
+								end
+							end
+						end
+					end
+				end
+				if not sp_neutral and
+						(ATC_Settings["Capture Incremental: neutral on"] == 1
+						and ((owner == ATC_Teams[1]
+						and points[1] < 1
+						and ATC_Data[i].points < ATC_Settings["Min points to capture"])
+						or (owner == ATC_Teams[2]
+						and points[2] < 1
+						and ATC_Data[i].points > -ATC_Settings["Min points to capture"]))
+						or ATC_Settings["Capture Incremental: neutral on"] == 2
+						and ((owner == ATC_Teams[1]
+						and points[1] < 1
+						and ATC_Data[i].points < ATC_Settings["Capture Incremental: neutral on - points"])
+						or (owner == ATC_Teams[2]
+						and points[2] < 1
+						and ATC_Data[i].points > -ATC_Settings["Capture Incremental: neutral on - points"]))) then
+					Entity_SetStrategicPointNeutral(sp)
+				elseif ATC_Data[i].points >= ATC_Settings["Min points to capture"] and owner ~= ATC_Teams[1] and points[1] > 0 then
+					Entity_InstantCaptureStrategicPoint(sp, GetPlayerCapturer(ATC_Data[i].capturers[ATC_Teams[1]].players))
+				elseif ATC_Data[i].points <= -ATC_Settings["Min points to capture"] and owner ~= ATC_Teams[2] and points[2] > 0 then
+					Entity_InstantCaptureStrategicPoint(sp, GetPlayerCapturer(ATC_Data[i].capturers[ATC_Teams[2]].players))
+				end
+				if ATC_Settings["Capture Incremental: max points"] >= ATC_Settings["Min points to capture"] then
+					if ATC_Data[i].points > ATC_Settings["Capture Incremental: max points"] then
+						ATC_Data[i].points = ATC_Settings["Capture Incremental: max points"]
+					elseif ATC_Data[i].points < -ATC_Settings["Capture Incremental: max points"] then
+						ATC_Data[i].points = -ATC_Settings["Capture Incremental: max points"]
+					end
+				end
+				if ATC_Data[i].points < ATC_Settings["Capture Incremental: max points"]
+						and ATC_Data[i].points > -ATC_Settings["Capture Incremental: max points"]
+						and (points[1]>0 or points[2]>2) then
+					TacticalMap_FlashTerritory(World_GetTerritorySectorID(Entity_GetPosition(sp)))
+				else
+					TacticalMap_StopFlashingTerritory(World_GetTerritorySectorID(Entity_GetPosition(sp)))
+				end
+			else
+				if points[1] > 0 and points[2] > 0 then
+					if not sp_neutral and
+							((ATC_Settings["If Enemy Present"] == 0
+							and not sp_neutral
+							and points[1] >= ATC_Settings["Min points to capture"]
+							and points[2] >= ATC_Settings["Min points to capture"])
+							
+							or ATC_Settings["If Enemy Present"] == 1) then
+						Entity_SetStrategicPointNeutral(sp)
+					elseif ATC_Settings["If Enemy Present"] == 2 then
+						local dif = math.abs(points[1] - points[2])
+						if not sp_neutral
+								and ((points[1] < ATC_Settings["Min points to capture"]
+								and points[2] < ATC_Settings["Min points to capture"])
+								or points[1] == points[2]) then
+							Entity_SetStrategicPointNeutral(sp)
+						elseif points[1] >= ATC_Settings["Min points to capture"]
+								and dif >= ATC_Settings["Min points to outnumber to capture"] 
+								and points[1] > points[2] then
+							Entity_InstantCaptureStrategicPoint(sp, GetPlayerCapturer(ATC_Data[i].capturers[ATC_Teams[1]].players))
+						elseif points[2] >= ATC_Settings["Min points to capture"]
+								and dif >= ATC_Settings["Min points to outnumber to capture"] then
+							Entity_InstantCaptureStrategicPoint(sp, GetPlayerCapturer(ATC_Data[i].capturers[ATC_Teams[2]].players))
+						end
+					elseif ATC_Settings["If Enemy Present"] == 3 then
+						local dif = math.abs(points[1] - points[2])
+						if points[1] >= ATC_Settings["Min points to capture"]
+								and points[1] > points[2]
+								and dif >= ATC_Settings["Min points to outnumber to capture"] then
+							Entity_InstantCaptureStrategicPoint(sp, GetPlayerCapturer(ATC_Data[i].capturers[ATC_Teams[1]].players))
+						elseif points[2] >= ATC_Settings["Min points to capture"]
+								and dif >= ATC_Settings["Min points to outnumber to capture"] then
+							Entity_InstantCaptureStrategicPoint(sp, GetPlayerCapturer(ATC_Data[i].capturers[ATC_Teams[2]].players))
+						end
+					end
+				elseif points[1] >= ATC_Settings["Min points to capture"] then
+					Entity_InstantCaptureStrategicPoint(sp, Table_GetRandomItem(Team_GetPlayers(0)))
+				elseif points[2] >= ATC_Settings["Min points to capture"] then
+					Entity_InstantCaptureStrategicPoint(sp, Table_GetRandomItem(Team_GetPlayers(1)))
+				end
+				local sp_neutral = World_OwnsEntity(sp)
+				if not sp_neutral then
+					local owner = Player_GetTeam(Entity_GetPlayerOwner(sp))
+					if ATC_Data[i].capturers[owner].squad < 1 and ATC_Data[i].capturers[owner].entity < 1 then
+						if (ATC_Settings["If no units present in the sector"] == 2
+								or (ATC_Settings["If no units present in the sector"] == 1
+								and not World_IsInSupply( Entity_GetPlayerOwner(sp), Entity_GetPosition(sp))) ) then
+							Entity_SetStrategicPointNeutral(sp)
+						end
+					end
+				end
+			end
+		end
+	else
+		ATC_Stop(false)
+		g_ATC_Enable = true
+	end
+end
+
+function ATC_UpdateUpgradeData()
+	ATC_UpgradeList = UpgradeSystem_UpdateUpgradeData(ATC_UpgradeList)
+end
+
+-- updates the ATC_Data, performed on each ATC_Check
+function ATC_UpdateData()
+	local i
+	for i=1,table.getn(ATC_Data) do
+		-- clear squad counts and set the territory not secured
+		ATC_Data[i].secured = false
+		ATC_Data[i].capturers = {}
+		local j
+		for j=1,table.getn(ATC_Teams) do
+			ATC_Data[i].capturers[ATC_Teams[j]] = {squad=0,entity=0,players={}}
+		end
+	end
+	
+	function UpdatePlayer(i)
+		local p = World_GetPlayerAt(i)
+		local t = Player_GetTeam(p)
+		if ATC_Team_IsProper(t) then
+			local j
+			for j=1,table.getn(ATC_Data) do
+				local sp = ATC_Data[j].entity
+				
+				local sg = ATC_SGroup_Copy()
+				World_GetSquadsWithinTerritorySector( p, sg, World_GetTerritorySectorID( Entity_GetPosition(sp) ), OT_Player)
+				
+				local eg = ATC_EGroup_Copy()
+				EGroup_AddEGroup(eg, EGroup_FromName("ATC_Data["..j.."]"))
+				World_GetEntitiesWithinTerritorySector( p, eg, World_GetTerritorySectorID( Entity_GetPosition(sp) ), OT_Player)
+				
+				if not ATC_Settings["Capture Secured"] then
+					local upgraded = true
+					EGroup_ForEach(eg, function(egroupid, k, e)
+						local l
+						for l=1,table.getn(ATC_Settings["Secure Structures"]) do
+							if Entity_GetBlueprint(e) == ATC_Settings["Secure Structures"][l][1] then
+								local m
+								for m=1,table.getn(ATC_Settings["Secure Structures"][l][2]) do
+									if not Entity_HasUpgrade(e, ATC_Settings["Secure Structures"][l][2][m]) then
+										upgraded = false
+										break
+									end
+								end
+								if upgraded then
+									ATC_Data[j].secured = true
+								end
+								
+								k = EGroup_Count(eg)
+								break
+							end
+						end
+					end)
+					if not upgraded then
+						SGroup_ForEach(sg, function(sgroupid, k, s)
+							for l=1,table.getn(ATC_Settings["Secure Structures"]) do
+								if Squad_GetBlueprint(s) == ATC_Settings["Secure Structures"][l][1] then
+									for m=1,table.getn(ATC_Settings["Secure Structures"][l][2]) do
+										if not Squad_HasUpgrade(s, ATC_Settings["Secure Structures"][l][2][m]) then
+											upgraded = false
+											break
+										end
+									end
+									if upgraded then
+										ATC_Data[j].secured = true
+									end
+									
+									k = SGroup_CountSpawned(sg)
+									break
+								end
+							end
+						end)
+					end
+				end
+				local capturers_squad = 0
+				local capturers_entity = 0
+				if not (ATC_Settings["Exclude in buildings"] and ATC_Settings["Exclude entities"]) then
+					capturers_entity,capturers_squad = ATC_EGroup_GetCapturerPoints(eg, sp)
+					ATC_Data[j].capturers[t].entity = ATC_Data[j].capturers[t].entity + capturers_entity
+				end
+				
+				capturers_squad = capturers_squad + ATC_SGroup_GetCapturerPoints(sg, sp)
+				ATC_Data[j].capturers[t].squad = ATC_Data[j].capturers[t].squad + capturers_squad
+				
+				ATC_Data[j].capturers[t].players[i] = capturers_entity+capturers_squad
+			end
+			ATC_SGroup_Copy_Cleanup()
+			ATC_EGroup_Copy_Cleanup()
+		end
+	end
+	if ATC_Settings["Update Per Player"] then
+		UpdatePlayer(ATC_Check_CurPlayer)
+		ATC_Check_CurPlayer = ATC_Check_CurPlayer + 1
+		if ATC_Check_CurPlayer > World_GetPlayerCount() then
+			ATC_Check_CurPlayer = 1
+		end
+	else
+		for i=1,World_GetPlayerCount() do
+			UpdatePlayer(i)
+		end
+	end
+end
+
+-- Finds all the territory sectors and buildings in them and stores in ATC_Data
+-- Note: Check each entity. Do NOT use this function unless you absolutely have to
+function ATC_FindTerritorySectors()
+	local i,j,e
+	ATC_Data = {}
+	ATC_Data_EGroup = EGroup_CreateIfNotFound("ATC_Data")
+	for i=0,World_GetNumEntities()-1 do
+		e = World_GetEntity(i)
+		local exclude = false
+		for j=1,table.getn(ATC_Settings["Excluded Strategic Points"]) do
+			if Entity_GetBlueprint(e) == ATC_Settings["Excluded Strategic Points"][j] then
+				exlude = true
+				break
+			end
+		end
+		if Entity_IsStrategicPoint(e) and not Entity_IsVictoryPoint(e) and not exlude then
+			local index = table.getn(ATC_Data)+1
+			local p = 0
+			if ATC_Settings["Capture Incremental"] and not World_OwnsEntity(e) then
+				if Player_GetTeam(Entity_GetPlayerOwner(e)) == 0 then
+					p = ATC_Settings["Capture Incremental: max points"]
+				else
+					p = -ATC_Settings["Capture Incremental: max points"]
+				end
+			end
+			ATC_Data[index] = {
+				entity=e,
+				points=p,
+				secured=false,
+				capturers={}
+			}
+			local j
+			for j=1,table.getn(ATC_Teams) do
+				ATC_Data[index].capturers[ATC_Teams[j]] = {squad=0,entity=0,players={}}
+			end
+			EGroup_Add(ATC_Data_EGroup, e)
+			EGroup_Clear(EGroup_CreateIfNotFound("ATC_Data["..index.."]"))
+		end
+	end
+	for i=0,World_GetNumEntities()-1 do
+		e = World_GetEntity(i)
+		if World_OwnsEntity(e) and Entity_IsBuilding(e) and not Entity_IsStrategicPoint(e)
+				and not Entity_IsVictoryPoint(e) and not Entity_IsSyncWeapon(e) and not Entity_IsVehicle(e)
+				and Entity_IsOfType(e, "ambient_building") then
+			local eg = ATC_EGroup_Copy()
+			for j=1,table.getn(ATC_Data) do
+				EGroup_Clear(eg)
+				EGroup_Add(eg, e)
+				if World_GetTerritorySectorID(Entity_GetPosition(e)) ==
+						World_GetTerritorySectorID(Entity_GetPosition(ATC_Data[j].entity)) then
+					EGroup_Add(EGroup_FromName("ATC_Data["..j.."]"), e)
+					break
+				end
+			end
+		end
+	end
+	ATC_SGroup_Copy_Cleanup()
+	ATC_EGroup_Copy_Cleanup()
+end
+
+-- checks if the specified squad can capture the specified strategic point
+function ATC_Squad_IsCapturer(squad, sp)
+	local i
+	local settings = ATC_UpgradeList[World_GetPlayerIndex(Squad_GetPlayerOwner(squad))].data
+	for i=1,table.getn(settings["Excluded Squads"]) do
+		if settings["Excluded Squads"][i] == Squad_GetBlueprint(squad) then
+			return false
+		end
+	end
+	for i=1,table.getn(settings["Extra Included Squads"]) do
+		if settings["Extra Included Squads"][i] == Squad_GetBlueprint(squad) then
+			return true
+		end
+	end
+	if ATC_Settings["Exclude retreating"] and Squad_IsRetreating(squad) then
+		return false
+	end
+	return Squad_CanCaptureStrategicPoint(squad, sp) or (not World_OwnsEntity(sp) and Entity_GetPlayerOwner(sp) == Squad_GetPlayerOwner(squad))
+end
+
+-- counts all the squads in sgroup that can automatically capture specified strategic point
+-- Note: Counts points for every player in sgroups to one variable! You should make sure
+-- sgroup contains only single player entities
+function ATC_SGroup_GetCapturerPoints(sgroup, sp)
+	local points = 0
+	local i
+	SGroup_ForEach(sgroup, function(sgroupid, i, squad)
+		local sg = ATC_SGroup_Copy()
+		local modifier = 1
+		local in_hold = false
+		local settings = ATC_UpgradeList[World_GetPlayerIndex(Squad_GetPlayerOwner(squad))].data
+		if Squad_IsInHoldEntity(squad) and not ATC_Settings["Exclude in buildings"] then
+			in_hold = true
+			modifier = modifier*settings["In Hold Squad Capture Rate"]
+		end
+		if (in_hold and ATC_Settings["Include all in buildings"]) or
+				ATC_Squad_IsCapturer(squad, sp) and not (Squad_IsInHoldSquad(squad) and ATC_Settings["Exclude in vehicles"]) then
+			if Squad_HasActiveCommand(squad) and Squad_GetActiveCommand(squad) == SQUADSTATEID_Capture and not Squad_IsMoving(squad) then
+				modifier = modifier*settings["Capture Rate Multiplier"]
+			end
+			local j,v
+			for j,v in pairs(settings["Special Squads"]) do
+				if j == Squad_GetBlueprint(squad) then
+					modifier = modifier*v
+					break
+				end
+			end
+			if ATC_Settings["Use squad member count"] then
+				SGroup_Clear(sg)
+				SGroup_Add(sg, squad)
+				modifier = modifier + modifier * (SGroup_TotalMembersCount(sg)-1) * settings["Squad Member Capture Multiplier"]
+			end
+			points = points + settings["Squad Capture Rate"]*modifier
+		end
+		if not ATC_Settings["Exclude in vehicles"] and Squad_IsHoldingAny(squad) then
+			SGroup_Clear(sg)
+			Squad_GetSquadsHeld(squad, sg)
+			local sgcopy = ATC_SGroup_Copy(sg)
+			points = points + ATC_SGroup_GetCapturerPoints(sgcopy, sp)
+		end
+	end)
+	return points
+end
+
+function ATC_SGroup_Copy(sg)
+	ATC_SGroupCount = ATC_SGroupCount+1
+	local sgcopy = SGroup_Create("ATC_SGroup_Copy "..ATC_SGroupCount)
+	if scartype(sg) == ST_SGROUP then
+		SGroup_AddGroup(sgcopy, sg)
+	end
+	return sgcopy
+end
+function ATC_EGroup_Copy(eg)
+	ATC_EGroupCount = ATC_EGroupCount+1
+	local egcopy = EGroup_Create("ATC_EGroup_Copy "..ATC_EGroupCount)
+	if scartype(eg) == ST_EGROUP then
+		EGroup_AddGroup(egcopy, eg)
+	end
+	return egcopy
+end
+
+function ATC_SGroup_Copy_Cleanup()
+	local i
+	for i=1,ATC_SGroupCount do
+		SGroup_Destroy(SGroup_FromName("ATC_SGroup_Copy "..i))
+	end
+	ATC_SGroupCount = 0
+end
+function ATC_EGroup_Copy_Cleanup()
+	local i
+	for i=1,ATC_EGroupCount do
+		EGroup_Destroy(EGroup_FromName("ATC_EGroup_Copy "..i))
+	end
+	ATC_EGroupCount = 0
+end
+
+-- counts entity points in egroup along with points of squads contained in buildings
+-- Note: Counts points for every player in egroup to one variable! You should make sure
+-- egroup contains only single player entities
+function ATC_EGroup_GetCapturerPoints(egroup, sp)
+	local points_entities = 0
+	local points_squads = 0
+	for i=1,EGroup_Count(egroup) do
+		local entity = EGroup_GetSpawnedEntityAt(egroup, i)
+		local sp_neutral = World_OwnsEntity(sp)
+		local entity_neutral = World_OwnsEntity(entity)
+		if not sp_neutral and not entity_neutral then
+			local settings = ATC_UpgradeList[World_GetPlayerIndex(Entity_GetPlayerOwner(entity))].data
+			
+			local exclude = false
+			local j
+			for j=1,table.getn(settings["Excluded Entities"]) do
+				if Entity_GetBlueprint(entity) == settings["Excluded Entities"][j] then
+					exclude = true
+					break
+				end
+			end
+			if not exclude and Player_GetTeam(Entity_GetPlayerOwner(sp)) == Player_GetTeam(Entity_GetPlayerOwner(entity)) then
+				local modifier = 1
+				local j,v
+				for j,v in pairs(settings["Special Entities"]) do
+					if j == Entity_GetBlueprint(entity) then
+						modifier = v
+						break
+					end
+				end
+				points_entities = points_entities + settings["Entity Capture Rate"]*modifier
+			end
+			local held = ATC_SGroup_Copy()
+			if not settings["Exclude in buildings"] and Entity_GetSquadsHeld(entity, held) then
+				points_squads = points_squads + ATC_SGroup_GetCapturerPoints(held, sp)
+			end
+		end
+	end
+	return points_entities,points_squads
+end
+
+-- This function checks for current Info settings and issues 'ATC_ShowInfo' if the proper
+-- conditions are met
+function ATC_ShowInfo_Check()
+	if Misc_IsSelectionInputEnabled() and ATC_Settings["Dynamic information"]["Show on"] ~= 0 then
+		local showing = false
+		if ATC_Settings["Dynamic information"]["Show on"] == 1 and Misc_DetectMouseInput() and Misc_IsMouseOverEntity() then
+			local mouseover = Misc_GetMouseOverEntity()
+			local i
+			for i=1,table.getn(ATC_Data) do
+				if ATC_Data[i].entity == mouseover then
+					ATC_ShowInfo(i)
+					showing = true
+					break
+				end
+			end
+		elseif ATC_Settings["Dynamic information"]["Show on"] == 2 then
+			local i
+			for i=1,table.getn(ATC_Data) do
+				if Misc_IsEntitySelected(ATC_Data[i].entity) then
+					ATC_ShowInfo(i)
+					showing = true
+					break
+				end
+			end
+		elseif ATC_Settings["Dynamic information"]["Show on"] == 3 then
+			local mouseover = Misc_GetMouseOverEntity()
+			local i
+			for i=1,table.getn(ATC_Data) do
+				if Misc_IsEntitySelected(ATC_Data[i].entity) or ATC_Data[i].entity == mouseover then
+					ATC_ShowInfo(i)
+					showing = true
+					break
+				end
+			end
+		elseif ATC_Settings["Dynamic information"]["Show on"] == 4 then
+			local mpos = Misc_GetMouseOnTerrain()
+			local sid = World_GetTerritorySectorID(mpos)
+			local i
+			if mpos and (mpos.x ~= 0 or mpos.y ~= 0 or mpos.z ~= 0) then
+				for i=1,table.getn(ATC_Data) do
+					if World_GetTerritorySectorID(Entity_GetPosition(ATC_Data[i].entity)) == sid then
+						ATC_ShowInfo(i)
+						showing = true
+						break
+					end
+				end
+			end
+		end
+		if not (showing or Rule_Exists(ATC_HideInfo)) then
+			Rule_AddInterval(ATC_HideInfo, ATC_Settings["Dynamic information"]["Hide delay"])
+		end
+	end
+end
+
+-- Shows info about strategic point ATC capture points for the sector index
+function ATC_ShowInfo(i)
+	local text = ""
+	local playerteam = Player_GetTeam(Game_GetLocalPlayer())
+	local sp = ATC_Data[i].entity
+	local sp_neutral = World_OwnsEntity(sp)
+	
+	if not sp_neutral then
+		local owner = Player_GetTeam(Entity_GetPlayerOwner(sp))
+		local enemy = Team_GetEnemyTeam(owner)
+	end
+	
+	local points
+	if ATC_Settings["Capture Incremental"] then
+		if ATC_Data[i].points == 0 then
+			points = 0
+		else
+			if playerteam == 0 then
+				points = ATC_Data[i].points
+			else
+				points = -ATC_Data[i].points
+			end
+		end
+		text = "ATC -- "
+		if ATC_Settings["Dynamic information"]["Percent"] then
+			text = text.."Capture percentage: "..string.format("%.2f", points/ATC_Settings["Capture Incremental: max points"]*100).."%"
+		else
+			text = text.."Points: "..string.format("%.2f", points)
+		end
+		if ATC_Settings["Dynamic information"]["Show max points"] then
+			text = text.." / "..ATC_Settings["Capture Incremental: max points"]
+		end
+	else
+		points = {ATC_Data[i].capturers[1][1] + ATC_Data[i].capturers[1][2], ATC_Data[i].capturers[2][1] + ATC_Data[i].capturers[2][2]}
+		text = "ATC -- You: "..string.format("%.2f", points[owner]).."p"
+		if ATC_Settings["Dynamic information"]["Show enemy points"] then
+			text = text.." Enemy: "..string.format("%.2f", points[enemy]).."p"
+		end
+	end
+	ATC_HideInfo(i)
+	dr_text2d("territory_capture_info",
+		ATC_Settings["Dynamic information"]["Position"][1],
+		ATC_Settings["Dynamic information"]["Position"][2],
+		text,
+		ATC_Settings["Dynamic information"]["Color"][1],
+		ATC_Settings["Dynamic information"]["Color"][2],
+		ATC_Settings["Dynamic information"]["Color"][3])
+end
+
+-- Handles strategic point ATC capture points info hiding
+function ATC_HideInfo()
+	if Rule_Exists(ATC_HideInfo) then
+		Rule_Remove(ATC_HideInfo)
+	end
+	dr_clear("territory_capture_info")
+end
+
+
+--------------------------------------------------------------------------------------------
+--## Functions for setting changing
+
+-- handles the strategic point visibility setting change
+function ATC_SP_Hide(hide)
+	ATC_Settings["Hide strategic points"] = hide
+	local i
+	for i=1,table.getn(ATC_Data) do
+		Entity_SimHide(ATC_Data[i].entity, hide)
+	end
+	ATC_SPCopy_YPos(ATC_Settings["SP Copies"])
+end
+
+-- handles the strategic point capture time modifier change
+function ATC_ModifyCaptureTime(modifier)
+	ATC_Settings["Capture Time Modifier"] = modifier
+	if ATC_ModifyCaptureTime_ModifierID then
+		Modifier_Remove(ATC_ModifyCaptureTime_ModifierID)
+	end
+	ATC_ModifyCaptureTime_ModifierID = Modify_CaptureTime(ATC_Data_EGroup, modifier)
+end
+
+-- moves all the strategic points up by this number
+function ATC_SP_YPos(pos)
+	local i
+	for i=1,table.getn(ATC_Data) do
+		local epos = Entity_GetPosition(ATC_Data[i].entity)
+		epos.y = epos.y + pos - ATC_Settings["Move SPs up by"]
+		Entity_SetPosition(ATC_Data[i].entity, epos)
+	end
+	FOW_RevealEGroupOnly(ATC_Data_EGroup, 1)
+	ATC_Settings["Move SPs up by"] = pos
+end
+
+-- moves all the strategic points up by this number
+function ATC_SPCopy_YPos(pos)
+	if pos == false or ATC_Settings["Hide strategic points"] == false then
+		EGroup_DestroyAllEntities(ATC_Data_EGroup_Copy)
+	else
+		local i
+		EGroup_ForEach(ATC_Data_EGroup, function(egroupid, i, e)
+			EGroup_Add(ATC_Data_EGroup_Copy, Entity_CreateENV(Entity_GetBlueprint(e), Entity_GetPosition(e), Entity_GetPosition(e)))
+		end)
+		EGroup_ForEach(ATC_Data_EGroup_Copy, function(egroupid, i, e)
+			local epos = Entity_GetPosition(e)
+			epos.y = epos.y + pos - ATC_Settings["SP Copies"]
+			Entity_SetPosition(e, epos)
+		end)
+		FOW_RevealEGroupOnly(ATC_Data_EGroup_Copy, -1)
+	end
+	ATC_Settings["SP Copies"] = pos
+end
+
+-- changes the check interval for ATC_Check
+function ATC_ChangeCheckInterval(newInterval)
+	ATC_Settings["Check Interval"] = newInterval
+	Rule_ChangeInterval(ATC_UpdateData, newInterval)
+	if ATC_Settings["Update Per Player"] then
+		Rule_ChangeInterval(ATC_UpdateUpgradeData, newInterval*World_GetPlayerCount())
+		Rule_ChangeInterval(ATC_Check, newInterval*World_GetPlayerCount())
+	else
+		Rule_ChangeInterval(ATC_UpdateUpgradeData, newInterval)
+		Rule_ChangeInterval(ATC_Check, newInterval)
+	end
+end
+
+-- changes the value appropriately for Update Per Player
+function ATC_ChangeUpdatePerPlayer(newValue)
+	ATC_Settings["Update Per Player"] = newValue
+	if newValue then
+		Rule_ChangeInterval(ATC_UpdateUpgradeData, ATC_Settings["Check Interval"]*World_GetPlayerCount())
+		Rule_ChangeInterval(ATC_Check, ATC_Settings["Check Interval"]*World_GetPlayerCount())
+	else
+		Rule_ChangeInterval(ATC_UpdateUpgradeData, ATC_Settings["Check Interval"])
+		Rule_ChangeInterval(ATC_Check, ATC_Settings["Check Interval"])
+	end
+end

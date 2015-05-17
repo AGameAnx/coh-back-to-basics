@@ -1,0 +1,1054 @@
+
+MISSIONS = {}
+MISSIONS[9999] = { -- num of temp data
+	PRESETS = { 
+		LETTERBOX = false, 
+		BLACK = false, 
+		AMBIENT_MUTE = false,
+		PERSISTENT_SQUAD_FILE = false, -- example "data:scenarios/sp/m05_redball_express/default_veteran_squads.lua"
+		ATMOSPHERE = false, -- example "Game_LoadAtmosphere"
+		RESOURCE_RATES = {
+--~ 			{resource = 3, scale_factor = 0.55}, resource types must be identified by number because the constant is not recognized yet.
+													-- RT_Action = 3, RT_Fuel, RT_Manpower, RT_Command, RT_Munition
+		},
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {},	-- table of SBPS that you do not want the player to have access to.
+		UPGRADE = { 		-- table of UPGRADES that you do want the player to have access to.
+			GRANT = {},
+			LOCK = {},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	-- table of ABILITIES
+		COMMANDER_TREE = { 		-- NOTE: if the COMMANDER TREE IS FALSE, then the code will automatically disable the commander tree.
+			MAX_POINTS = false,	-- the maximum number of points you want the player to gain during the mission
+			FORCE = false,		-- the commander tree that you want to force the player to use
+			LOCK = {},			-- a table of specific set of commander tree upgrades that are locked for this mission 
+								-- (brw 05/15/2007, there should only ever be one tree locked)
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = false, -- example "Mission05"
+		STARTING_MUSIC = false, -- example {path = "Sound/Music/sp/M06/m06_ob1_takehq", fade = 5, delay = 20)
+		AMBIENCE_PATH = false,
+	},
+	NIS = {
+		OPENING = "sp/CXP1/AUTHIE/NIS/N01_01",
+		CLOSING = "sp/CXP1/AUTHIE/NIS/N02_02",
+	},
+}
+MISSIONS[1234] = { -- num of temp data
+	PRESETS = { 
+		LETTERBOX = true, 
+		BLACK = false, 
+		AMBIENT_MUTE = false,
+		PERSISTENT_SQUAD_FILE = false, -- example "data:scenarios/sp/m05_redball_express/default_veteran_squads.lua"
+		ATMOSPHERE = false,
+		ATMOSPHERE = false,
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {},	-- table of SBPS that you do not want the player to have access to.
+		UPGRADE = { 		-- table of UPGRADES that you do want the player to have access to.
+			GRANT = {},
+			LOCK = {},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	-- table of ABILITIES
+		COMMANDER_TREE = { 		-- NOTE: if the COMMANDER TREE IS FALSE, then the code will automatically disable the commander tree.
+			MAX_POINTS = false,	-- the maximum number of points you want the player to gain during the mission
+			FORCE = false,		-- the commander tree that you want to force the player to use
+			LOCK = {},			-- a table of specific set of commander tree upgrades that are locked for this mission 
+								-- (brw 05/15/2007, there should only ever be one tree locked)
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = false, -- example "Mission05"
+		STARTING_MUSIC = false, -- example {path = "Sound/Music/sp/M06/m06_ob1_takehq", fade = 5, delay = 20)
+		AMBIENCE_PATH = false,
+	}
+}
+
+
+
+-- [[ COH ORIGINAL MISSIONS ]] 
+
+
+MISSIONS[0020] = { -- 20 = Tutorial
+	PRESETS = { 
+		LETTERBOX = false, 
+		BLACK = false, 
+		AMBIENT_MUTE = false,
+		PERSISTENT_SQUAD_FILE = false, 
+		ATMOSPHERE = false,
+		CAMPAIGN = CXP1_CAMPAIGN, -- used for changes that will be applied globally to the campaign
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {},	-- table of SBPS that you do not want the player to have access to.
+		UPGRADE = { 		-- table of UPGRADES that you do want the player to have access to.
+			GRANT = {	UPG.SP.GLIDER_UNLOCK },
+			LOCK = {},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	-- table of ABILITIES
+		COMMANDER_TREE = { 		-- NOTE: if the COMMANDER TREE IS FALSE, then the code will automatically disable the commander tree.
+			MAX_POINTS = false,	-- the maximum number of points you want the player to gain during the mission
+			FORCE = false,		-- the commander tree that you want to force the player to use
+			LOCK = {},			-- a table of specific set of commander tree upgrades that are locked for this mission 
+								-- (brw 05/15/2007, there should only ever be one tree locked)
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "Tutorial",
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+	},
+}
+
+
+
+--[[ 01 = CXP1 or Caen Campaign ]]
+CXP1_CAMPAIGN = {
+	COMMANDER_TREE_COSTS = { 
+--~ 	{ upgrade = commander tree upgrade, cost = command point cost },	-- e.g. to change the cost of a 
+	},
+	RUN_ENTITY_COUNT = false, 		-- a flag to tell the code to turn on or off the entity count logging, use for optimization
+	RESOURCE_MONITOR = {			-- a set of tables that code uses to monitor the MANPOWER rate of resources for the player
+		{popLimit = 80, popMax = 200, scale = 0.80, thisTier = false},
+		{popLimit = 60, popMax = 79, scale = 0.86, thisTier = false},
+		{popLimit = 40, popMax = 59, scale = 0.92, thisTier = false},
+		{popLimit = 20, popMax = 39, scale = 0.96, thisTier = false},
+		{popLimit = 0, popMax = 19, scale = 1, thisTier = false},
+	},
+	ALL_TRUCKS_PROVIDE_SUPPLY = true,
+}
+MISSIONS[0101] = { -- 01 = Authie
+	PRESETS = { 
+		NAME = 1309001,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = false, 
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP1_Authie_LIGHTING.aps",
+		CAMPAIGN = CXP1_CAMPAIGN, -- used for changes that will be applied globally to the campaign
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {SBP.CW.LIEUTENANT, SBP.CW.BREN_CARRIER},	-- table of SBPS that you do not want the player to have access to.
+		UPGRADE = { 		-- table of UPGRADES that you do want the player to have access to.
+			GRANT = { UPG.SP.GLIDER_UNLOCK },
+			LOCK = {UPG.CW.HQ_ECONOMY_BONUS, UPG.CW.HQ_SPEED},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	-- table of ABILITIES
+		COMMANDER_TREE = { 		-- NOTE: if the COMMANDER TREE IS FALSE, then the code will automatically disable the commander tree.
+			MAX_POINTS = false,	-- the maximum number of points you want the player to gain during the mission
+			FORCE = UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY,		-- the commander tree that you want to force the player to use
+			LOCK = {UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY_12, UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY_02},			-- a table of specific set of commander tree upgrades that are locked for this mission 
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "Caen\\sp2\\Mission1",
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+	},
+	NIS = {
+		OPENING = "sp/CXP1/AUTHIE/NIS/N01_01",
+	},
+}
+MISSIONS[0102] = { -- 02 = Hill 112 A
+	PRESETS = { 
+		NAME = 1309004,
+		LETTERBOX = true, 
+		BLACK = false, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp1/hill_112/Hill_112_veteran_squads.lua", 
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP1_HILL112_MIDDAY_00.aps",
+		CAMPAIGN = CXP1_CAMPAIGN,-- used for changes that will be applied globally to the campaign
+		RESOURCE_RATES = {
+			{resource = 3, scale_factor = 0.55},
+		},
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {},	-- table of SBPS that you do not want the player to have access to.
+		UPGRADE = { 		-- table of UPGRADES that you do want the player to have access to.
+			GRANT = {UPG.SP.GLIDER_UNLOCK},
+			LOCK = {},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	-- table of ABILITIES
+		COMMANDER_TREE = { 		-- NOTE: if the COMMANDER TREE IS FALSE, then the code will automatically disable the commander tree.
+			MAX_POINTS = 9,	-- the maximum number of points you want the player to gain during the mission
+			FORCE = UPG.COMMANDER_TREE.CW.ENGINEERS,		-- the commander tree that you want to force the player to use
+			LOCK = {UPG.COMMANDER_TREE.CW.ENGINEERS_02, UPG.COMMANDER_TREE.CW.ENGINEERS_12},			-- a table of specific set of commander tree upgrades that are locked for this mission 
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "Caen/sp2/Mission2", 
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+	},
+	NIS = {
+		OPENING = "sp/CXP1/Hill_112/NIS/N02_01",
+	},
+}
+MISSIONS[0103] = { -- 03 = Carpiquet A
+	PRESETS = { 
+		NAME = 1309007,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp1/carpiquet/Carpiquet_veteran_squads.lua",
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP1_CARPIQUET_NIGHT_00.APS",
+		CAMPAIGN = CXP1_CAMPAIGN,
+		RESOURCE_MONITOR = {			-- resource rates are too high for Carpiquet
+			{popLimit = 80, popMax = 200, scale = 0.76, thisTier = false},
+			{popLimit = 60, popMax = 79, scale = 0.78, thisTier = false},
+			{popLimit = 40, popMax = 59, scale = 0.80, thisTier = false},
+			{popLimit = 20, popMax = 39, scale = 0.82, thisTier = false},
+			{popLimit = 0, popMax = 19, scale = 0.84, thisTier = false},
+		},
+		RESOURCE_RATES = {
+			{resource = 3, scale_factor = 0.55},
+		},
+	},
+	TECH_TREE = { 
+		SQUAD_LOCK = { -- table of SBPS that you do not want the player to have access to.
+			SBP.CW.CAPTAIN,
+			SBP.CW.SAPPER,
+		},	
+		UPGRADE = { 		-- table of UPGRADES that you do want the player to have access to.
+			GRANT = {UPG.SP.GLIDER_UNLOCK},
+			LOCK = {},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	-- table of ABILITIES
+		COMMANDER_TREE = { 		-- NOTE: if the COMMANDER TREE IS FALSE, then the code will automatically disable the commander tree.
+			MAX_POINTS = 7,	-- the maximum number of points you want the player to gain during the mission
+			FORCE = UPG.COMMANDER_TREE.CW.COMMANDOS,		-- the commander tree that you want to force the player to use
+			LOCK = {UPG.COMMANDER_TREE.CW.COMMANDOS_02, UPG.COMMANDER_TREE.CW.COMMANDOS_12, UPG.COMMANDER_TREE.CW.COMMANDOS_03}, -- a table of specific set of commander tree upgrades that are locked for this mission 
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "Caen/sp2/Mission3", 
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+	},
+	NIS = {
+		OPENING = "sp/CXP1/Carpiquet/NIS/N03_01",
+		CLOSING = "sp/CXP1/Carpiquet/NIS/N03_02",
+	},
+}
+MISSIONS[0104] = { -- 04 = Carpiquet B 
+	PRESETS = { 
+		NAME = 1309010,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = false,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp1/carpiquet/Carpiquet_B_veteran_squads.lua", 
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP1_Carpiquet_Dawn_00.aps",
+		CAMPAIGN = CXP1_CAMPAIGN,
+		RESOURCE_RATES = {
+			{resource = 3, scale_factor = 0.55},
+		},
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {},	-- table of SBPS that you do not want the player to have access to.
+		UPGRADE = { 		-- table of UPGRADES that you do want the player to have access to.
+			GRANT = {UPG.SP.GLIDER_UNLOCK},
+			LOCK = {},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	-- table of ABILITIES
+		COMMANDER_TREE = { 		-- NOTE: if the COMMANDER TREE IS FALSE, then the code will automatically disable the commander tree.
+			MAX_POINTS = 11,	-- the maximum number of points you want the player to gain during the mission
+			FORCE = UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY,		-- the commander tree that you want to force the player to use
+			LOCK = {UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY_02},			-- a table of specific set of commander tree upgrades that are locked for this mission 
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "Caen/sp2/Mission4",  
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+	},
+	NIS = {
+		CLOSING = "sp/CXP1/Carpiquet/NIS/N04_01",
+	},
+}
+MISSIONS[0105] = { -- 05 = Hill 112 B 
+	PRESETS = { 
+		NAME = 1309013,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp1/hill_112/Hill_112_Defense_veteran_squads.lua", 
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP1_HILL112_NIGHT_00.aps",
+		CAMPAIGN = CXP1_CAMPAIGN,
+		RESOURCE_RATES = {
+			{resource = 3, scale_factor = 0.55},
+		},
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {},	-- table of SBPS that you do not want the player to have access to.
+		UPGRADE = { 		-- table of UPGRADES that you do want the player to have access to.
+			GRANT = {UPG.SP.GLIDER_UNLOCK},
+			LOCK = {},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	-- table of ABILITIES
+		COMMANDER_TREE = { 		-- NOTE: if the COMMANDER TREE IS FALSE, then the code will automatically disable the commander tree.
+			MAX_POINTS = 11,	-- the maximum number of points you want the player to gain during the mission
+			FORCE = UPG.COMMANDER_TREE.CW.ENGINEERS,		-- the commander tree that you want to force the player to use
+			LOCK = {UPG.COMMANDER_TREE.CW.ENGINEERS_12},			-- a table of specific set of commander tree upgrades that are locked for this mission 
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "Caen/sp2/Mission5", 
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+	},
+	NIS = {
+		OPENING = "sp/CXP1/Hill_112/NIS/N05_01",
+	},
+}
+MISSIONS[0106] = { -- 06 = Caen A 
+	PRESETS = { 
+		NAME = 1309016,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp1/caen/Caen_Assault_veteran_squads.lua", 
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP1_CAEN_DAWN_00.aps",
+		CAMPAIGN = CXP1_CAMPAIGN,
+		RESOURCE_RATES = {
+			{resource = 3, scale_factor = 0.55},
+		},
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {},	-- table of SBPS that you do not want the player to have access to.
+		UPGRADE = { 		-- table of UPGRADES that you do want the player to have access to.
+			GRANT = {UPG.SP.GLIDER_UNLOCK},
+			LOCK = {},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	-- table of ABILITIES
+		COMMANDER_TREE = { 		-- NOTE: if the COMMANDER TREE IS FALSE, then the code will automatically disable the commander tree.
+			MAX_POINTS = false,	-- the maximum number of points you want the player to gain during the mission
+			FORCE = UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY,		-- the commander tree that you want to force the player to use
+			LOCK = {},			-- a table of specific set of commander tree upgrades that are locked for this mission 
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "Caen/sp2/Mission6",
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+	},
+	NIS = {
+		OPENING = "sp/CXP1/Caen/NIS/N06_01",
+	},
+}
+MISSIONS[0107] = { -- 07 = Caen B
+	PRESETS = { 
+		NAME = 1309019,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp1/caen/Caen_Clear_veteran_squads.lua", 
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP1_CAEN_MIDDAY_00.APS",
+		CAMPAIGN = CXP1_CAMPAIGN,
+		RESOURCE_RATES = {
+			{resource = 3, scale_factor = 0.55},
+		},
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {},	-- table of SBPS that you do not want the player to have access to.
+		UPGRADE = { 		-- table of UPGRADES that you do want the player to have access to.
+			GRANT = {
+				UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY_11,
+				UPG.SP.GLIDER_UNLOCK,
+			},
+			LOCK = {},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	-- table of ABILITIES
+		COMMANDER_TREE = { 		-- NOTE: if the COMMANDER TREE IS FALSE, then the code will automatically disable the commander tree.
+			MAX_POINTS = false,	-- the maximum number of points you want the player to gain during the mission
+			FORCE = UPG.COMMANDER_TREE.CW.ENGINEERS,		-- the commander tree that you want to force the player to use
+			LOCK = {},			-- a table of specific set of commander tree upgrades that are locked for this mission 
+								-- (brw 05/15/2007, there should only ever be one tree locked)
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "Caen/sp2/Mission7",  
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+	},
+	NIS = {
+		OPENING = "sp/CXP1/Caen/NIS/N07_01",
+		CLOSING = "sp/CXP1/Caen/NIS/N07_02",
+	},
+}
+MISSIONS[0108] = { -- 08 = Caen C
+	PRESETS = { 
+		NAME = 1309022,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp1/caen/Caen_Counter_veteran_squads.lua", 
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP1_CAEN_NIGHT_00.APS",
+		CAMPAIGN = CXP1_CAMPAIGN,
+		RESOURCE_RATES = {
+			{resource = 3, scale_factor = 0.55},
+		},
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {},	-- table of SBPS that you do not want the player to have access to.
+		UPGRADE = { 		-- table of UPGRADES that you do want the player to have access to.
+			GRANT = {
+				UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY_11,
+				UPG.SP.GLIDER_UNLOCK,
+			},
+			LOCK = {},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	-- table of ABILITIES
+		COMMANDER_TREE = { 		-- NOTE: if the COMMANDER TREE IS FALSE, then the code will automatically disable the commander tree.
+			MAX_POINTS = false,	-- the maximum number of points you want the player to gain during the mission
+			FORCE = false,		-- the commander tree that you want to force the player to use
+			LOCK = {},			-- a table of specific set of commander tree upgrades that are locked for this mission 
+								-- (brw 05/15/2007, there should only ever be one tree locked)
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "Caen/sp2/Mission8", 
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+	},
+	NIS = {
+		OPENING = "sp/CXP1/Caen/NIS/N08_01",
+		CLOSING = "sp/CXP1/Caen/NIS/N08_02",
+	},
+}
+MISSIONS[0109] = { -- 09 = Goodwood
+	PRESETS = { 
+		NAME = 1309025,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp1/goodwood/Goodwood_veteran_squads.lua", 
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP1_GOODWOOD_MIDDAY_00.APS",
+		CAMPAIGN = CXP1_CAMPAIGN,
+		RESOURCE_RATES = {
+			{resource = 3, scale_factor = 0.55},
+		},
+		RESOURCE_MONITOR = {			-- resource rates are too high for Glider
+			{popLimit = 60, popMax = 200, scale = 1, thisTier = false},
+			{popLimit = 40, popMax = 59, scale = 1.03, thisTier = false},
+			{popLimit = 20, popMax = 39, scale = 1.07, thisTier = false},
+			{popLimit = 0, popMax = 19, scale = 1.1, thisTier = false},
+		},
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {},	-- table of SBPS that you do not want the player to have access to.
+		UPGRADE = { 		-- table of UPGRADES that you do want the player to have access to.
+			GRANT = {
+				UPG.SP.GLIDER_UNLOCK,
+			},
+			LOCK = {},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	-- table of ABILITIES
+		COMMANDER_TREE = { 		-- NOTE: if the COMMANDER TREE IS FALSE, then the code will automatically disable the commander tree.
+			MAX_POINTS = false,	-- the maximum number of points you want the player to gain during the mission
+			FORCE = false,		-- the commander tree that you want to force the player to use
+			LOCK = {},			-- a table of specific set of commander tree upgrades that are locked for this mission 
+								-- (brw 05/15/2007, there should only ever be one tree locked)
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "Caen/sp2/Mission9", 
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+	},
+	NIS = {
+		OPENING = "sp/CXP1/Goodwood/NIS/N09_01",
+		CLOSING = "sp/CXP1/Goodwood/NIS/N09_02",
+	},
+}
+
+
+--[[ 02 = CXP2 or OMG Campaign ]]
+
+CXP2_CAMPAIGN = {
+	COMMANDER_TREE_COSTS = {
+		{ upgrade = UPG.COMMANDER_TREE.ELITE.TANK_DESTROYER_12, cost = 5 },	-- Jagdpanther Tank
+		{ upgrade = UPG.COMMANDER_TREE.ELITE.SCORCHED_EARTH_12, cost = 5 },	-- Hummel
+		{ upgrade = UPG.COMMANDER_TREE.ELITE.SCORCHED_EARTH_02, cost = 4 },	-- Hummel
+		{ upgrade = UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_00, cost = 2 },	-- Fallschirmjager
+		{ upgrade = UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_10, cost = 2 },	-- Luftwaffe
+		{ upgrade = UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_11, cost = 2 },	-- Wirblewind
+		{ upgrade = UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_01, cost = 2 },	-- Butterfly Bombs
+	},
+	RUN_ENTITY_COUNT = false,		-- a flag to tell the code to turn on or off the entity count logging, use for optimization
+	RESOURCE_MONITOR = {			-- a set of tables that code uses to monitor the MANPOWER rate of resources for the player
+		{popLimit = 80, popMax = 200, scale = 0.80, thisTier = false},
+		{popLimit = 60, popMax = 79, scale = 0.86, thisTier = false},
+		{popLimit = 40, popMax = 59, scale = 0.92, thisTier = false},
+		{popLimit = 20, popMax = 39, scale = 0.96, thisTier = false},
+		{popLimit = 0, popMax = 19, scale = 1, thisTier = false},
+	},
+}
+
+MISSIONS[0201] = { -- 01 = Wolfheze Glider
+	PRESETS = { 
+		NAME = 1309201,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = false, 
+		ROLE_VARIATION = { 	-- this particular set of data is used to change the role variations on certain squads 
+							-- for this particular mission when the squad is spawned
+			sbps = {SBP.CW.COMMANDOS, SBP.CW.COMMANDOS_MG, SBP.CW.COMMANDOS_MORTAR, SBP.CW.COMMANDOS_PIAT, SBP.CW.COMMANDOS_PARATROOPER_SP, SBP.CW.COMMANDOS_AT_57MM_SP}, 
+			state_machine = "rolevariation", 
+			state = "airborne00",
+		}, 
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP2_WOLFHEZE_MIDDAY_00.aps",
+		CAMPAIGN = CXP2_CAMPAIGN,
+		RESOURCE_MONITOR = {			-- resource rates are too high for Glider
+			{popLimit = 60, popMax = 200, scale = 0.75, thisTier = false},
+			{popLimit = 40, popMax = 59, scale = 0.80, thisTier = false},
+			{popLimit = 20, popMax = 39, scale = 0.82, thisTier = false},
+			{popLimit = 0, popMax = 19, scale = 0.84, thisTier = false},
+		},
+		RESOURCE_RATES = { },
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {
+			SBP.ELITE.KETTENRAD,
+		},
+		UPGRADE = { 		
+			GRANT = {
+				UPG.SP.FALLSCHIRMJAGER_NO_FOW,
+				UPG.ELITE.INCENDIARY_GRENADE,
+				UPG.ELITE.CAPTURE_RATE,
+			},
+			LOCK = {
+				UPG.ELITE.PANZER_ARTILLERIE, 
+				UPG.ELITE.PANZERJAGER, 
+				UPG.ELITE.LOGISTIK, 
+				UPG.ELITE.KAMPFGRUPPE,
+				UPG.ELITE.PANTHER_BATTLEGROUP,
+			},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {
+				ABILITY.ELITE.PANTHER_BATTLEGROUP,
+			},
+		},
+		-- insert construction types to lock out various construction menus
+		LOCK_BUILD_MENU = {
+			TYPE.CONSTRUCT.ELITE.BASIC,
+		},							
+		COMMANDER_TREE = false,
+	},
+	SOUND = {
+		SPEECH_PATH = "omg/sp/Mission1",  
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,		
+	},
+	NIS = {
+        -- other stuff
+        OPENING = "sp/CXP2/WOLFHEZE/NIS/N01_01",
+    },
+
+}
+MISSIONS[0202] = { -- 02 = Wolfheze Attack
+	PRESETS = { 
+		NAME = 1309204,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp2/wolfheze/WolfhezeAttack_veteran_squads.lua",
+		ROLE_VARIATION = { 	-- this particular set of data is used to change the role variations on certain squads 
+							-- for this particular mission when the squad is spawned
+			sbps = {SBP.CW.COMMANDOS, SBP.CW.COMMANDOS_MG, SBP.CW.COMMANDOS_MORTAR, SBP.CW.COMMANDOS_PIAT, SBP.CW.COMMANDOS_PARATROOPER_SP, SBP.CW.COMMANDOS_AT_57MM_SP}, 
+			state_machine = "rolevariation", 
+			state = "airborne00",
+		},
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP2_WOLFHEZE_AFTERNOON_00.aps",
+		CAMPAIGN = CXP2_CAMPAIGN,
+		RESOURCE_RATES = {},
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {
+			SBP.ELITE.HUMMEL, 
+			SBP.ELITE.PANZER_SUPPORT,
+			SBP.ELITE.HALFTRACK_VAMPIRE,
+			SBP.ELITE.HALFTRACK_SNIPER,
+			SBP.ELITE.HALFTRACK_251,
+			SBP.ELITE.MARDER,
+			SBP.ELITE.ARMOURCAR_223,
+			SBP.ELITE.PANZER_IV,
+			SBP.ELITE.PANTHER,
+		},
+		ENTITY_LOCK = {
+		
+			EBP.ELITE.LOGISTIK,
+			EBP.ELITE.PANZERJAGER,
+			EBP.ELITE.PANZER_ARTILLERIE,
+		},
+		UPGRADE = { 		
+			GRANT = {
+				UPG.SP.FALLSCHIRMJAGER_NO_FOW,
+				UPG.ELITE.INCENDIARY_GRENADE,
+				UPG.ELITE.KAMPFGRUPPE,
+				UPG.ELITE.CAPTURE_RATE,
+			},
+			LOCK = {
+				UPG.ELITE.PANZERJAGER,
+				UPG.ELITE.PANZER_ARTILLERIE,
+				UPG.ELITE.GROUP_ZEAL,
+				UPG.ELITE.VETERAN_SGT,
+				UPG.ELITE.SQUAD_SIZE,
+				UPG.ELITE.AT_GRENADE,
+				UPG.ELITE.PANTHER_BATTLEGROUP,
+			},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {
+				ABILITY.ELITE.PANTHER_BATTLEGROUP,
+			},
+		},			
+		-- insert construction types to lock out various construction menus
+		LOCK_BUILD_MENU = {
+		
+		},	
+		COMMANDER_TREE = false,
+	},
+	SOUND = {
+		SPEECH_PATH = "omg/sp/Mission2", 
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+	},
+	NIS = {
+        -- other stuff
+        OPENING = "sp/CXP2/WOLFHEZE/NIS/N02_01",
+        CLOSING = "sp/CXP2/WOLFHEZE/NIS/N02_02",
+    },
+}
+MISSIONS[0203] = { -- 03 = Oosterbeek Defense
+	PRESETS = { 
+		NAME = 1309207,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp2/oosterbeek/Oosterbeek_Defense_veteran_squads.lua",
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP2_OOSTERBEEK_DAYBREAK_00.aps",
+		CAMPAIGN = CXP2_CAMPAIGN,
+		RESOURCE_RATES = {
+			{resource = 3, scale_factor = 0.55},
+		},
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {
+			SBP.ELITE.PANZER_SUPPORT,
+			SBP.ELITE.MARDER,
+			SBP.ELITE.BERGETIGER,
+			SBP.ELITE.HALFTRACK_SNIPER,
+			SBP.ELITE.PANZER_IV,
+			SBP.ELITE.PANTHER,
+		},
+		ENTITY_LOCK = {
+			EBP.ELITE.PANZER_ARTILLERIE,
+		},
+		UPGRADE = { 		
+			GRANT = { 
+				UPG.SP.FALLSCHIRMJAGER_BUILDING,
+				UPG.SP.ALLIES_DUMMY,
+				UPG.ELITE.INCENDIARY_GRENADE,
+				UPG.ELITE.CAPTURE_RATE,
+			},
+			LOCK = {
+				UPG.ELITE.PANZERJAGER,
+				UPG.ELITE.PANZER_ARTILLERIE,
+				UPG.ELITE.GROUP_ZEAL,
+				UPG.ELITE.VETERAN_SGT,
+				UPG.ELITE.PANTHER_BATTLEGROUP,
+			},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {
+				ABILITY.ELITE.PANTHER_BATTLEGROUP,
+			},
+		},	
+		COMMANDER_TREE = { 		
+			MAX_POINTS = 4,	
+			FORCE = false,		
+			LOCK = {
+				UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_01,	-- Henschel
+				UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_02,	-- Henschel
+				UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_11,	-- Wirblewind
+				UPG.COMMANDER_TREE.ELITE.LUFTWAFFE_12,	-- Flak 88s
+			},			
+			GRANT = {},					
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "omg\\sp\\Mission3",  
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+		UNIT_INTROS = { -- used to play specific speech introductions when a certain type of unit is selected
+			{	sbp = SBP.ELITE.HALFTRACK_SNIPER, 
+				speech = {
+					{ACTOR.CXP2.Deinhard, 1418050},
+					{ACTOR.CXP2.Deinhard, 1418060},
+					{ACTOR.CXP2.Deinhard, 1418070},
+				},
+			},
+		},
+	},
+	NIS = {
+        -- other stuff
+        OPENING = "sp/CXP2/OOSTERBEEK/NIS/N03_01",
+    },
+}
+MISSIONS[0204] = { -- 04 = Hell's Highway Ambush
+	PRESETS = { 
+		NAME = 1309210,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp2/hells_highway/Hells_Highway_Ambush_veteran_squads.lua", 
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP2_HELLS_HIGHWAY_DUSK_00.aps",
+		CAMPAIGN = CXP2_CAMPAIGN,
+		RESOURCE_RATES = {
+			{resource = 3, scale_factor = 0.55},
+		},
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {
+			SBP.ELITE.PANZER_SUPPORT,
+			SBP.ELITE.BERGETIGER,
+			SBP.ELITE.PANZER_IV,
+			SBP.ELITE.PANTHER,
+		},
+		ENTITY_LOCK = {
+			-- brw 07/29/07 Done in the mission file because they get changed during the mission
+		},
+		UPGRADE = { 		
+			GRANT = { 
+				UPG.ELITE.KAMPFGRUPPE, 
+				UPG.SP.ALLIES_DUMMY,
+				UPG.SP.FALLSCHIRMJAGER_NO_FOW,
+				UPG.ELITE.INCENDIARY_GRENADE,
+				UPG.ELITE.CAPTURE_RATE,
+			},
+			LOCK = { 
+				UPG.ELITE.PANZER_ARTILLERIE,
+				UPG.ELITE.GROUP_ZEAL,
+				UPG.ELITE.VETERAN_SGT,
+				UPG.ELITE.PANTHER_BATTLEGROUP,
+			},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {
+				ABILITY.ELITE.PANTHER_BATTLEGROUP,
+			},
+		},	
+		COMMANDER_TREE = { 		
+			MAX_POINTS = 10,	
+			FORCE = UPG.COMMANDER_TREE.ELITE.SCORCHED_EARTH,		
+			LOCK = {
+				UPG.COMMANDER_TREE.ELITE.SCORCHED_EARTH_12 -- Hummel
+			},
+			GRANT = {},
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "omg/sp/Mission4", 
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+		UNIT_INTROS = { -- used to play specific speech introductions when a certain type of unit is selected
+			{	sbp = SBP.ELITE.HALFTRACK_251, 
+				speech = {
+					{ACTOR.CXP2.Deinhard, 1418030},
+					{ACTOR.CXP2.Deinhard, 1418040},
+				},
+			},
+		},
+	},
+	NIS = {
+        -- other stuff
+        OPENING = "sp/CXP2/HELLS_HIGHWAY/NIS/N04_01",
+    },
+}
+MISSIONS[0205] = { -- 05 = Best
+	PRESETS = { 
+		NAME = 1309213,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp2/best/Best_veteran_squads.lua",
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP2_BEST_NIGHT_00.aps",
+		CAMPAIGN = CXP2_CAMPAIGN,
+		-- brw resource rates for Best in mission, because they change with difficulty.
+--~ 		RESOURCE_RATES = {
+--~ 			{resource = 3, scale_factor = 0.55},
+--~ 		},
+	},
+
+	TECH_TREE = {
+		SQUAD_LOCK = {
+			SBP.ELITE.BERGETIGER,
+			SBP.ELITE.PANZER_IV,
+			SBP.ELITE.PANTHER,
+		},
+		UPGRADE = { 		
+			GRANT = {
+				UPG.SP.FALLSCHIRMJAGER_NO_FOW,
+				UPG.SP.ALLIES_DUMMY,
+				UPG.ELITE.INCENDIARY_GRENADE,
+				UPG.ELITE.CAPTURE_RATE,
+			},
+			LOCK = {
+				UPG.ELITE.GROUP_ZEAL,
+				UPG.ELITE.VETERAN_SGT,
+				UPG.ELITE.PANTHER_BATTLEGROUP,
+			},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {
+				ABILITY.ELITE.PANTHER_BATTLEGROUP,
+			},
+		},	
+		COMMANDER_TREE = { 		
+			MAX_POINTS = 11,	
+			FORCE = false,		
+			LOCK = {
+				UPG.COMMANDER_TREE.ELITE.TANK_DESTROYER_12, -- Hummel
+				UPG.COMMANDER_TREE.ELITE.SCORCHED_EARTH_12, -- Tank Destroyer
+			},			
+			GRANT = {},					
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "omg/sp/Mission5", 
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+		UNIT_INTROS = { -- used to play specific speech introductions when a certain type of unit is selected
+			{	sbp = SBP.ELITE.PANZER_SUPPORT, 
+				speech = {
+					{ACTOR.CXP2.Deinhard, 1418260},
+					{ACTOR.CXP2.Deinhard, 1418270},
+					{ACTOR.CXP2.Deinhard, 1418280},
+				},
+			},
+		}, 
+	},
+	NIS = {
+        -- other stuff
+        OPENING = "sp/CXP2/BEST/NIS/N05_01",
+        CLOSING = "sp/CXP2/BEST/NIS/N05_02",
+    },
+}
+MISSIONS[0206] = { -- 06 = Arnhem
+	PRESETS = { 
+		NAME = 1309216,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp2/arnhem/Arnhem_veteran_squads.lua",
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP2_ARNHEM_MIDDAY_00.aps",
+		CAMPAIGN = CXP2_CAMPAIGN,
+		RESOURCE_RATES = {
+			{resource = 3, scale_factor = 0.55},
+		},
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {},
+		UPGRADE = { 		
+			GRANT = { 
+				UPG.SP.FALLSCHIRMJAGER_NO_FOW, 
+				UPG.SP.ALLIES_DUMMY,
+				UPG.ELITE.INCENDIARY_GRENADE,
+				UPG.ELITE.PANZER_ARTILLERIE,
+				UPG.ELITE.CAPTURE_RATE,
+			},
+			LOCK = { },
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	
+		COMMANDER_TREE = { 		
+			MAX_POINTS = 13,	
+			FORCE = false,		
+			LOCK = {
+				UPG.COMMANDER_TREE.ELITE.TANK_DESTROYER_12,
+			},			
+			GRANT = {},					
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "omg/sp/Mission6",  
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+		UNIT_INTROS = { -- used to play specific speech introductions when a certain type of unit is selected
+			{	sbp = SBP.ELITE.HUMMEL, 
+				speech = {
+					{ACTOR.CXP2.Deinhard, 1418290},
+					{ACTOR.CXP2.Deinhard, 1418300},
+					{ACTOR.CXP2.Deinhard, 1418310},
+				},
+			},
+			{	sbp = SBP.ELITE.BERGETIGER,
+				speech = {
+					{ACTOR.CXP2.Deinhard, 1418410},
+					{ACTOR.CXP2.Deinhard, 1418420},
+					{ACTOR.CXP2.Deinhard, 1418430},
+				}
+			},
+		}, 
+	},
+	NIS = {
+        -- other stuff
+        OPENING = "sp/CXP2/ARNHEM/NIS/N06_01",
+        CLOSING = "sp/CXP2/ARNHEM/NIS/N06_02",
+    },
+}
+MISSIONS[0207] = { -- 07 = Hell's Highway Hunt
+	PRESETS = { 
+		NAME = 1309219,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp2/hells_highway/Hells_Highway_Hunt_veteran_squads.lua", 
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP2_HELLS_HIGHWAY_STORMY_00.aps",
+		CAMPAIGN = CXP2_CAMPAIGN,
+		RESOURCE_RATES = {
+			{resource = 3, scale_factor = 0.55},
+		},
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {},
+		UPGRADE = { 		
+			GRANT = {
+				UPG.SP.FALLSCHIRMJAGER_NO_FOW,
+				UPG.SP.ALLIES_DUMMY,
+				UPG.ELITE.INCENDIARY_GRENADE,
+				UPG.ELITE.CAPTURE_RATE,
+			},
+			LOCK = {},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	
+		COMMANDER_TREE = { 		
+			MAX_POINTS = false,	
+			FORCE = false,		
+			LOCK = {},			
+			GRANT = {},					
+		},
+	},
+	SOUND = {
+		SPEECH_PATH = "omg/sp/Mission7", 
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+		UNIT_INTROS = { -- used to play specific speech introductions when a certain type of unit is selected
+			{	sbp = SBP.ELITE.HETZER, 
+				speech = {
+					{ACTOR.CXP2.Deinhard, 1418350},
+					{ACTOR.CXP2.Deinhard, 1418360},
+					{ACTOR.CXP2.Deinhard, 1418370},
+				},
+			},
+			{	sbp = SBP.ELITE.JAGDPANTHER, 
+				speech = {
+					{ACTOR.CXP2.Deinhard, 1418380},
+					{ACTOR.CXP2.Deinhard, 1418390},
+					{ACTOR.CXP2.Deinhard, 1418400},
+				},
+			},
+		}, 
+	},
+	NIS = {
+        -- other stuff
+        OPENING = "sp/CXP2/HELLS_HIGHWAY/NIS/N07_01",
+    },
+}
+MISSIONS[0208] = { -- 08 = Oosterbeek Crossing
+	PRESETS = { 
+		NAME = 1309222,
+		LETTERBOX = true, 
+		BLACK = true, 
+		AMBIENT_MUTE = true,
+		PERSISTENT_SQUAD_FILE = "data:scenarios/sp/cxp2/oosterbeek/Oosterbeek_Crossing_veteran_squads.lua",
+		ATMOSPHERE = "data:art/scenarios/presets/atmosphere/CXP2_OOSTERBEEK_NIGHT_00.aps",
+		CAMPAIGN = CXP2_CAMPAIGN,
+		RESOURCE_RATES = {
+			--brw 07/30/2007 removed because player doesn't gain action points fast enough
+--~ 			{resource = 3, scale_factor = 0.55},
+		},
+	},
+	TECH_TREE = {
+		SQUAD_LOCK = {},
+		UPGRADE = { 		
+			GRANT = {
+				UPG.SP.FALLSCHIRMJAGER_NO_FOW,
+				UPG.SP.ALLIES_DUMMY,
+				UPG.ELITE.INCENDIARY_GRENADE,
+				UPG.ELITE.CAPTURE_RATE,
+			},
+			LOCK = {},
+		},	
+		ABILITY = {
+			GRANT = {},
+			LOCK = {},
+		},	
+		COMMANDER_TREE = { 		
+			MAX_POINTS = false,	
+			FORCE = false,		
+			LOCK = {},			
+			GRANT = {},					
+		},
+	},
+	SOUND = {
+		SPEECH_PATH =  "omg/sp/Mission8",
+		STARTING_MUSIC = false,
+		AMBIENCE_PATH = false,
+	},
+	NIS = {
+        -- other stuff
+        OPENING = "sp/CXP2/OOSTERBEEK/NIS/N08_01",
+        CLOSING = "sp/CXP2/OOSTERBEEK/NIS/N08_02",
+    },
+
+}

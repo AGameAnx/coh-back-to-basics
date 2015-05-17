@@ -1,0 +1,516 @@
+-- 
+--[[ UpgradeSystem -- Automatic variable updates through in-game upgrades v1.4 ]]--
+-- 
+-- Coded by AGameAnx at 27-12-2008 (Updated 13-10-2014)
+-- 
+--### Some explanations:
+-- 
+-- UpgradeData = UpgradeSystem_UpdateUpgradeData(UpgradeData)
+--
+-- The UpgradeData table itself looks like this
+--   Upgrade Settings
+--     default values for Player, Entity, Squad, EGroup and SGroup (all may be nil).
+--   Upgrade Data
+--     Data on which all the operations are performed
+--   Upgrade List
+--     tables with separate upgrades.
+-- 
+-- Each upgrade can have these settings (* - required for the upgrade to work):
+-- 
+--#    validate:
+-- Default value: false
+-- If set to true, makes UpgradeSystem check if all the requirements are still met, and 
+-- if they aren't, undo all the performed actions
+-- Note: Will not work on UpgradeSystem_ACTION_SCARFUNC actions, unless a special function for
+-- removing the first function effects is supplied
+-- 
+--#    requirements_operation:
+-- Default value: "and"
+-- Like all the operation settings, can be set to "or" or "and".
+-- 
+--#    requirements*:
+--   {func, attribs}
+-- This can be any function returning a boolean value. The function receives the UpgradeSystem
+-- settings and the 2nd variable that's supplied with its entry in case the call needs to be
+-- customized in some way (settings, attribs)
+-- 
+-- These are the standart functions:
+-- 
+--   UpgradeSystem_Not:
+--     Similar to requirements\required_unary_expr.lua with operation not in RGD modding
+--     attribs:
+--       table of requirements.
+--   
+--   UpgradeSystem_Binary:
+--     Similar to requirements\required_binary_expr.lua in RGD modding
+--     attribs:
+--       operation = "or"/"and"
+--         determines what action to perform. "and" - requirement passes only if all inner
+--         requirements return true. "or" - will pass if at least one inner requirement
+--         returns true
+--       requirements = {}
+--         inner requirements list.
+--   
+--   UpgradeSystem_PlayerUpgrade:
+--     Similar to requirements\required_player_upgrade.lua in RGD modding
+--     Note: Player must be supplied with upgrade table settings
+--     attribs:
+--       player upgrade blueprint or a table of player upgrade blueprints
+--   
+--   UpgradeSystem_SquadUpgrade:
+--     Similar to requirements\required_squad_upgrade.lua in RGD modding
+--     Note: Squad must be supplied with upgrade table settings!
+--     attribs:
+--       an squad upgrade blueprint or a table of squad upgrade blueprints
+--   
+--   UpgradeSystem_SGroupUpgrade:
+--     Similar to multiple requirements\required_squad_upgrade.lua used in RGD modding
+--     Note: SGroup must be supplied with upgrade table settings!
+--     attribs:
+--       an squad upgrade blueprint or a table of squad upgrade blueprints
+--   
+--   UpgradeSystem_EntityUpgrade:
+--     Similar to requirements\required_entity_upgrade.lua in RGD modding
+--     Note: Entity must be supplied with upgrade table settings!
+--     attribs:
+--       an entity upgrade blueprint or a table of entity upgrade blueprints
+--   
+--   UpgradeSystem_EGroupUpgrade:
+--     Similar to multiple requirements\required_entity_upgrade.lua used in RGD modding
+--     Note: EGroup must be supplied with upgrade table settings!
+--     attribs:
+--       an entity upgrade blueprint or a table of entity upgrade blueprints
+--   
+--   UpgradeSystem_Player_HasSquad
+--     Like requirements\required_squad.lua checks if a player has a squad, but this function
+--     can recieve advanced attributes
+--     attribs:
+--       Can be:
+--         1. A squad blueprint
+--         2. A table containing squad blueprint and a desired squad count
+--         3. A table of squad blueprints
+--         4. A table of tables containing squad blueprint and a desired squad count
+--         5. A mixed table of squad blueprints and tables containing squad blueprint and a
+--            desired squad count
+--   
+--   UpgradeSystem_Player_HasEntity
+--     Like requirements\required_entity.lua checks if a player has a entity, but this function
+--     can recieve advanced attributes
+--     attribs:
+--       Can be:
+--         1. An entity blueprint
+--         2. A table containing entity blueprint and a desired entity count
+--         3. A table of entity blueprints
+--         4. A table of tables containing entity blueprint and a desired entity count
+--         5. A mixed table of entity blueprints and tables containing entity blueprint and a
+--            desired entity count
+-- 
+-- 
+--#    actions*:
+-- A table of tables of performed actions if the requirement is met.
+--   {actiontype, attribs}
+-- Unlike the requirements this table has a bit more strict first attribute. It can only have 
+-- a sertain actiontypes supplied chosen from this list:
+--   
+--   UpgradeSystem_ACTION_SCARFUNC
+--     Calls any scar function.
+--     settings:
+--       func:
+--         Any function, recieves 3 arguments: 'Upgrade Settings', 'Upgrade Data' and 'Upgrade List'.
+--         Should always return the updated 'Upgrade Data' only
+--       undofunc:
+--         A function that would undo the first function actions (used in validate)
+--   
+--   UpgradeSystem_ACTION_UPDATEVALUE
+--     Used to update any of the values
+--     settings:
+--       index:
+--         any 'Upgrade Data' table (or any current table the action is performed on) index
+--       find:
+--         must be supported by find_value setting. This is just a boolean to determine to
+--         perform the check or not. The ckeck parses through all the table and finds
+--         its index
+--       find_value:
+--         any value to find if 'find' setting is set to true
+--       operation:
+--         Possible values:
+--           UpgradeSystem_ACTION_UPDATEVALUE_SET
+--             Sets a new value (Use it to create new variables)
+--           UpgradeSystem_ACTION_UPDATEVALUE_MULTIPLY
+--             Multiplies the old value by 'value' setting
+--           UpgradeSystem_ACTION_UPDATEVALUE_ADD
+--             Adds (or substracts if 'value' is negative) the 'value' setting
+--           UpgradeSystem_ACTION_UPDATEVALUE_REMOVE
+--             Removes the value (similar to UpgradeSystem_ACTION_UPDATEVALUE_SET with 'value' nil)
+--       value:
+--         any value, usually a number, because you may only use othe things with
+--         'UpgradeSystem_ACTION_UPDATEVALUE_SET'
+--   
+--   UpgradeSystem_ACTION_REQUIREMENTACTION
+--     this action will only be performed if the requirements are met
+--     settings:
+--       requirements, requirements_operation
+--   
+--   UpgradeSystem_ACTION_TABLEACTION
+--     performs actions on supplied table
+--     settings:
+--       index:
+--         table index
+--       actions:
+--         actions to perform
+--   
+--   UpgradeSystem_ACTION_ADDTONUMERICTABLE
+--     Adds a new value to the number indexed table (to the next index)
+--     Note: Should be performed after UpgradeSystem_ACTION_TABLEACTION, because main data table is
+--           usually a string indexed table
+--     settings:
+--       index:
+--         An index where to insert a value, may be nil
+--         You shouldn't really use it, you will hardly be able to track it later
+--       value:
+--         any value
+--   
+--   UpgradeSystem_ACTION_REMOVEFROMNUMERICTABLE
+--     Removes a value from a number indexed table by finding it by attrib value or by supplied index
+--     settings:
+--       index:
+--         An index which you want to strip from the table
+--         You shouldn't really use it, you will hardly be able to track it
+--       find:
+--         must be supported by find_value setting. This is just a boolean to determine to
+--         perform the check or not. The ckeck parses through all the table and finds
+--         its index
+--       find_value:
+--         any value to find if 'find' setting is set to true
+--         
+
+import("varutil.scar")
+
+UpgradeSystem_OPERATION_AND = "and"
+UpgradeSystem_OPERATION_OR = "or"
+
+UpgradeSystem_ACTION_SCARFUNC = "scarfunc"
+UpgradeSystem_ACTION_REQUIREMENTACTION = "requirement_action"
+UpgradeSystem_ACTION_UPDATEVALUE = "updatevalue"
+UpgradeSystem_ACTION_UPDATEVALUE_SET = "set"
+UpgradeSystem_ACTION_UPDATEVALUE_MULTIPLY = "multiply"
+UpgradeSystem_ACTION_UPDATEVALUE_ADD = "add"
+UpgradeSystem_ACTION_REMOVEVALUE = "remove"
+UpgradeSystem_ACTION_TABLEACTION = "tableaction"
+UpgradeSystem_ACTION_ADDTONUMERICTABLE = "addtonumtable"
+UpgradeSystem_ACTION_REMOVEFROMNUMERICTABLE = "removefromnumtable"
+
+function UpgradeSystem_UpdateUpgradeData(list)
+	local i
+	for i=1,table.getn(list) do
+		local settings = list[i]["settings"]
+		local looplen = table.getn(list[i]["upgrades"])
+		local j=1
+		while j<=looplen do
+			if list[i]["upgrades"][j] then
+				operation = list[i]["upgrades"][j]["requirements_operation"]
+				if UpgradeSystem_RequirementsMet(settings, list[i]["upgrades"][j]["requirements"], operation) then
+					print("Applied upgrade "..j.." from UpgradeData table "..i)
+					local newdata = UpgradeSystem_PerformActions(settings, list[i]["data"], list[i]["upgrades"][j]["actions"])
+					if list[i]["upgrades"][j]["validate"] then
+						list[i]["upgrades"][j]["actions"] = UpgradeSystem_CreateUndoActions(list[i]["upgrades"][j]["actions"], list[i]["data"], newdata)
+						list[i]["upgrades"][j]["requirements"] = UpgradeSystem_CreateUndoRequirements(list[i]["upgrades"][j]["requirements"])
+					else
+						table.remove(list[i]["upgrades"], j)
+						looplen = looplen-1
+						j = j-1
+					end
+					list[i]["data"] = newdata
+				end
+			else
+				print("Upgrade "..j.." is "..scarvar_getinfo(list[i]["upgrades"][j]).." in UpgradeData table "..i.."!")
+			end
+			j = j+1
+		end
+	end
+	return list
+end
+
+function UpgradeSystem_RequirementsMet(settings, list, operation)
+	if operation == nil then
+		operation = UpgradeSystem_OPERATION_AND
+	end
+	local i
+	for i=1,table.getn(list) do
+		local requirementmet
+		if type(list[i]) == "table" then
+			requirementmet = list[i][1](settings, list[i][2])
+		else
+			requirementmet = list[i](settings)
+		end
+		if operation == UpgradeSystem_OPERATION_OR and requirementmet then
+			return true
+		elseif operation == UpgradeSystem_OPERATION_AND and not requirementmet then
+			return false
+		end
+	end
+	if operation == UpgradeSystem_OPERATION_OR then
+		return false
+	elseif operation == UpgradeSystem_OPERATION_AND then
+		return true
+	end
+end
+
+function UpgradeSystem_PerformActions(settings, data, list)
+	local i
+	for i=1,table.getn(list) do
+		if list[i][1] == UpgradeSystem_ACTION_REQUIREMENTACTION and
+				UpgradeSystem_RequirementsMet(settings, list[i][2]["requirements"], list[i][2]["requirements_operation"]) then
+			data = UpgradeSystem_PerformActions(settings, data, list[i][2]["actions"])
+		elseif list[i][1] == UpgradeSystem_ACTION_UPDATEVALUE then
+			local index = list[i][2]["index"]
+			if list[i][2]["find"] then
+				index = FindIndexByValue(data, list[i][2]["find_value"])
+			end
+			if list[i][2]["operation"] == UpgradeSystem_ACTION_UPDATEVALUE_SET then
+				data[index] = list[i][2]["value"]
+			elseif list[i][2]["operation"] == UpgradeSystem_ACTION_UPDATEVALUE_ADD then
+				data[index] = data[index]+list[i][2]["value"]
+			elseif list[i][2]["operation"] == UpgradeSystem_ACTION_UPDATEVALUE_MULTIPLY then
+				data[index] = data[index]*list[i][2]["value"]
+			elseif list[i][2]["operation"] == UpgradeSystem_ACTION_UPDATEVALUE_REMOVE then
+				data[index] = nil
+			end
+		elseif list[i][1] == UpgradeSystem_ACTION_TABLEACTION then
+			data[list[i][2]["index"]] = UpgradeSystem_PerformActions(settings, data[list[i][2]["index"]], list[i][2]["actions"])
+		elseif list[i][1] == UpgradeSystem_ACTION_ADDTONUMERICTABLE then
+			table.insert(data, list[i][2])
+		elseif list[i][1] == UpgradeSystem_ACTION_REMOVEFROMNUMERICTABLE then
+			local index = list[i][2]["index"]
+			if list[i][2]["find"] then
+				index = FindIndexByValue(data, list[i][2]["find_value"])
+			end
+			table.remove(data, index)
+		elseif list[i][1] == UpgradeSystem_ACTION_SCARFUNC then
+			data = list[i][2].func(settings, data, list)
+		end
+	end
+	
+	return data
+end
+
+function UpgradeSystem_CreateUndoRequirements(list)
+	if table.getn(list) == 1 and list[1][1] == UpgradeSystem_Not then
+		return list[1][2]
+	else
+		return {{UpgradeSystem_Not, list}}
+	end
+end
+
+function UpgradeSystem_CreateUndoActions(list, data, newdata)
+	local looplen = table.getn(list)
+	local i
+	for i=1,looplen do
+		if list[i][1] == UpgradeSystem_ACTION_REQUIREMENTACTION then
+			list[i][2]["requirements"] = UpgradeSystem_CreateUndoRequirements(list[i][2]["requirements"])
+			list[i][2]["actions"] = UpgradeSystem_CreateUndoActions(list[i][2]["actions"], data, newdata)
+		elseif list[i][1] == UpgradeSystem_ACTION_UPDATEVALUE then
+			local index = list[i][2]["index"]
+			if list[i][2]["find"] then
+				index = FindIndexByValue(data, list[i][2]["find_value"])
+			end
+			if list[i][2]["operation"] == UpgradeSystem_ACTION_UPDATEVALUE_SET then
+				if scartype(data[index]) == ST_TABLE then
+					list[i][2]["value"] = Clone(data[index])
+				else
+					list[i][2]["value"] = data[index]
+				end
+			elseif list[i][2]["operation"] == UpgradeSystem_ACTION_UPDATEVALUE_ADD then
+				list[i][2]["value"] = -list[i][2]["value"]
+			elseif list[i][2]["operation"] == UpgradeSystem_ACTION_UPDATEVALUE_MULTIPLY then
+				list[i][2]["value"] = 1/list[i][2]["value"]
+			elseif list[i][2]["operation"] == UpgradeSystem_ACTION_UPDATEVALUE_REMOVE then
+				list[i][2]["operation"] = UpgradeSystem_ACTION_UPDATEVALUE_SET
+				if scartype(data[index]) == ST_TABLE then
+					list[i][2]["value"] = Clone(data[index])
+				else
+					list[i][2]["value"] = data[index]
+				end
+			end
+		elseif list[i][1] == UpgradeSystem_ACTION_TABLEACTION then
+			list[i][2]["actions"] = UpgradeSystem_CreateUndoActions(list[i][2]["actions"], data[list[i][2]["index"]], newdata[list[i][2]["index"]])
+		elseif list[i][1] == UpgradeSystem_ACTION_ADDTONUMERICTABLE then
+			local index
+			index = FindIndexByValue(data, list[i][2])
+			list[i][1] = UpgradeSystem_ACTION_REMOVEFROMNUMERICTABLE
+			if scartype(list[i][2]) == ST_TABLE then
+				list[i][2] = {["find"] = true, ["find_value"] = Clone(list[i][2])}
+			else
+				list[i][2] = {["find"] = true, ["find_value"] = list[i][2]}
+			end
+		elseif list[i][1] == UpgradeSystem_ACTION_REMOVEFROMNUMERICTABLE then
+			local index = list[i][2]["index"]
+			if list[i][2]["find"] then
+				index = FindIndexByValue(data, list[i][2]["find_value"])
+			end
+			list[i][1] = UpgradeSystem_ACTION_ADDTONUMERICTABLE
+			if scartype(data[index]) == ST_TABLE then
+				list[i][2] = Clone(data[index])
+			else
+				list[i][2] = data[index]
+			end
+		elseif list[i][1] == UpgradeSystem_ACTION_SCARFUNC then
+			if list[i][2]["undofunc"] then
+				local undofunc = list[i][2]["undofunc"]
+				list[i][2]["undofunc"] = list[i][2]["func"]
+				list[i][2]["func"] = undofunc
+			else
+				table.remove(list, i)
+				looplen = looplen - 1
+			end
+		end
+	end
+	return list
+end
+
+------------------------------------------------------
+------------------------------------------------------
+-- ## Requirement Functions
+
+function UpgradeSystem_Binary(settings, attrib)
+	return UpgradeSystem_RequirementsMet(settings, attrib["requirements"], attrib["operation"])
+end
+
+function UpgradeSystem_Not(settings, attrib)
+	return not UpgradeSystem_RequirementsMet(settings, attrib)
+end
+
+function UpgradeSystem_PlayerUpgrade(settings, attrib)
+	if scartype(attrib) == ST_TABLE then
+		local i
+		for i=1,table.getn(attrib) do
+			if not Player_HasUpgrade(settings["player"], attrib[i]) then
+				return false
+			end
+		end
+		return true
+	else
+		return Player_HasUpgrade(settings["player"], attrib)
+	end
+end
+
+function UpgradeSystem_SquadUpgrade(settings, attrib)
+	if scartype(attrib) == ST_TABLE then
+		local i
+		for i=1,table.getn(attrib) do
+			if not Squad_HasUpgrade(settings["squad"], attrib[i]) then
+				return false
+			end
+		end
+		return true
+	else
+		return Squad_HasUpgrade(settings["squad"], attrib)
+	end
+end
+function UpgradeSystem_SGroupUpgrade(settings, attrib)
+	if scartype(attrib) == ST_TABLE then
+		local i
+		for i=1,table.getn(attrib) do
+			if not SGroup_HasUpgrade(settings["sgroup"], attrib[i]) then
+				return false
+			end
+		end
+		return true
+	else
+		return SGroup_HasUpgrade(settings["sgroup"], attrib)
+	end
+end
+
+function UpgradeSystem_EntityUpgrade(settings, attrib)
+	if scartype(attrib) == ST_TABLE then
+		local i
+		for i=1,table.getn(attrib) do
+			if not Entity_HasUpgrade(settings["entity"], attrib[i]) then
+				return false
+			end
+		end
+		return true
+	else
+		return Entity_HasUpgrade(settings["entity"], attrib)
+	end
+end
+function UpgradeSystem_EGroupUpgrade(settings, attrib)
+	if scartype(attrib) == ST_TABLE then
+		local i
+		for i=1,table.getn(attrib) do
+			if not EGroup_HasUpgrade(settings["egroup"], attrib[i]) then
+				return false
+			end
+		end
+		return true
+	else
+		return EGroup_HasUpgrade(settings["egroup"], attrib)
+	end
+end
+
+function UpgradeSystem_Player_HasSquad(settings, attrib)
+	local allsquads = Player_GetSquads(settings["player"])
+	if scartype(attrib) == ST_TABLE then
+		if scartype(attrib[1]) == ST_PBG and attrib[2] and scartype(attrib[2]) == ST_NUMBER then
+			SGroup_Filter(allsquads, attrib, FILTER_KEEP)
+			return SGroup_CountSpawned(allsquads)>=attrib[2]
+		else
+			local tempsg = SGroup_CreateIfNotFound("temp")
+			local i
+			for i=1,table.getn(attrib) do
+				SGroup_Clear(tempsg)
+				SGroup_AddGroup(tempsg, allsquads)
+				if scartype(attrib[i]) == ST_TABLE then
+					SGroup_Filter(tempsg, attrib[i][1], FILTER_KEEP)
+					if SGroup_CountSpawned(tempsg)<attrib[i][2] then
+						return false
+					end
+				else
+					SGroup_Filter(tempsg, attrib[i], FILTER_KEEP)
+					if SGroup_CountSpawned(tempsg)<1 then
+						return false
+					end
+				end
+			end
+			SGroup_Destroy(tempsg)
+			return true
+		end
+	elseif scartype(attrib) == ST_PBG then
+		SGroup_Filter(allsquads, attrib, FILTER_KEEP)
+		return SGroup_CountSpawned(allsquads)>0
+	end
+	error("Something is wrong with UpgradeSystem_Player_HasSquad requirement (Didn't get any squad blueprints)")
+end
+function UpgradeSystem_Player_HasEntity(settings, attrib)
+	local allentities = Player_GetEntities(settings["player"])
+	if scartype(attrib) == ST_TABLE then
+		if scartype(attrib[1]) == ST_PBG and attrib[2] and scartype(attrib[2]) == ST_NUMBER then
+			EGroup_Filter(allentities, attrib, FILTER_KEEP)
+			return EGroup_Count(allentities)>=attrib[2]
+		else
+			local tempeg = EGroup_CreateIfNotFound("temp")
+			local i
+			for i=1,table.getn(attrib) do
+				EGroup_Clear(tempeg)
+				EGroup_AddGroup(tempeg, allentities)
+				if scartype(attrib[i]) == ST_TABLE then
+					EGroup_Filter(tempeg, attrib[i][1], FILTER_KEEP)
+					if EGroup_Count(tempeg)<attrib[i][2] then
+						return false
+					end
+				else
+					EGroup_Filter(tempeg, attrib[i], FILTER_KEEP)
+					if EGroup_Count(tempeg)<1 then
+						return false
+					end
+				end
+			end
+			EGroup_Destroy(tempeg)
+			return true
+		end
+	elseif scartype(attrib) == ST_PBG then
+		EGroup_Filter(allentities, attrib, FILTER_KEEP)
+		return EGroup_Count(allentities)>0
+	end
+	error("Something is wrong with UpgradeSystem_Player_HasEntity requirement (Didn't get any entity blueprints)")
+end

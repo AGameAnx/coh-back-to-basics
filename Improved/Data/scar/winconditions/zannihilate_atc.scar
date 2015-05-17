@@ -1,0 +1,12 @@
+-----------------------------------------------------------------------
+-- VPTicker Win Condition
+--
+-- (c) Relic Entertainment 2006
+--
+-- Programmers: Shelby Hubick, Kris Botha, Randy Lukashuk
+-----------------------------------------------------------------------
+import("ScarUtil.scar")
+
+-- used to indicate we want annihilate to be checked
+g_CheckAnnihilate = true
+g_ATC_Enable = true
