@@ -1,0 +1,185 @@
+
+-- command macros
+import("squadai-util")
+
+-- squadai plan file
+
+------------------------------------------------------------------------------
+-- sound options
+
+sound = 
+{
+	soundDirectory	= "Battle_Chatter",
+	soundPercentage	= 30.0,
+}
+
+------------------------------------------------------------------------------
+-- plan
+
+plan = 
+{
+	------------------------------------------------------------------------------
+	-- phase0: Before First Bound
+		{
+		type = DATA_PHASE,
+		name = "START PLAN: all move NO COVER NO BACKWARDS",
+		--
+		{
+			apply_to = {ET_Core, ET_RFlank, ET_LFlank},
+			actions = 
+			{
+				--ACTION_MOVE_POSTURE( DT_MAX_SQUAD_RANGE, 1.0, 4.0, 30.0, "squad_formations/squad_ai.lua", PACE_VERYFAST, PACE_VERYFAST, POSTURE_CROUCH, POSTURE_PRONE, 3.0 ),
+				ACTION_MOVE_POSTURE_EXT( DT_MAX_SQUAD_RANGE, 1.0, 4.0, 30.0, "squad_formations/squad_ai.lua", PACE_VERYFAST, PACE_VERYFAST, POSTURE_CROUCH, POSTURE_PRONE, 0.0, false, false, false )
+			}
+		},
+	},
+	{
+		type = DATA_PHASE,
+		name = "1st SQUAD BOUND -- LOOK FOR COVER (hold 5 secs)",
+		--
+		{
+			apply_to = {ET_Core, ET_RFlank, ET_LFlank},
+			actions = 
+			{
+				ACTION_MOVE_POSTURE( DT_MAX_SQUAD_RANGE, 0.85, 10.0, 60.0, "squad_formations/squad_ai.lua", PACE_VERYFAST, PACE_VERYFAST, POSTURE_CROUCH, POSTURE_PRONE, 5.0 ),
+			}
+		},
+	},
+	
+	------------------------------------------------------------------------------
+	-- phase2 -- BOUND 1 CORE (core runs in an drops to prone)
+	{
+		type = DATA_PHASE,
+		name = "Core 1st Bound (hold for 5 secs)",
+		{
+			apply_to = {ET_Core},
+			actions = 
+			{
+				ACTION_DO_CRITICAL( "critical\\attack_plan_modifiers.lua", "attack plan modifiers" ),
+				ACTION_MOVE_POSTURE( DT_MIN_ELEM_RANGE, .70, 10.0, 75.0, "squad_formations/squad_ai.lua", PACE_VERYFAST, PACE_VERYFAST, POSTURE_CROUCH, POSTURE_PRONE, 5.0 ),
+			},
+		},
+	},
+	
+	------------------------------------------------------------------------------
+	-- phase3 - wait (squad returns fire)
+	{
+		type = DATA_PHASE,
+		name = "Return Fire 1 (wait 2 - 4 secs ) ____________________________________NO MODS",
+		{
+			apply_to = ET_All,
+			actions = 
+			{ 
+				ACTION_WAIT_RANDOM( 2.0, 4.0 ),
+				ACTION_UNDO_ALL_CRITICALS(),
+			},
+		},
+	},
+	
+	--[[{
+		type = DATA_PHASE,
+		name = "Return Fire 1 (Move To LOS)",
+		{
+			apply_to = ET_All,
+			actions = 
+			{
+				ACTION_MOVE_LOS( 3.0 )
+			},
+		},
+	},]]
+	
+	------------------------------------------------------------------------------
+	-- phase4 - BOUND 1 FLANKS
+	{
+		type = DATA_PHASE,
+		name = "Flanks 1st Bound to Core (wait 2 - 3.5 secs, hold for 3)",
+		
+		{
+			apply_to = ET_All,
+			actions = 
+			{
+				-- toggle modifiers off
+				ACTION_UNDO_ALL_CRITICALS(),
+			},
+		},
+		
+		{
+			apply_to = {ET_RFlank, ET_LFlank},
+			actions = 
+			{
+				ACTION_WAIT_RANDOM( 2.0, 3.5 ),
+				ACTION_MOVE_POSTURE( DT_MIN_ELEM_RANGE, 0.75, 10.0, 75.0, "squad_formations/squad_ai.lua", PACE_VERYFAST, PACE_VERYFAST, POSTURE_CROUCH, POSTURE_PRONE, 3.0 )
+			},
+		},
+	},
+	
+	------------------------------------------------------------------------------
+	-- phase5 - WAIT
+	{
+		type = DATA_PHASE,
+		name = "Return Fire 2 (wait 4 - 8 secs ) ____________________________________NO MODS",
+		{
+			apply_to = ET_All,
+			actions = 
+			{ 
+				ACTION_WAIT_RANDOM( 6.0, 8.0 ),
+			},
+		},
+	},
+	
+	------------------------------------------------------------------------------
+	-- Phase6 Bound2 - CORE and SCOUTS Look for Cover
+	{
+		type = DATA_PHASE,
+		name = "Core/Scout bound to Cover (wait 0 - 0.5 secs, hold for 1.0 )",
+		{
+			apply_to = {ET_Core, ET_Scout},
+			actions = 
+			{
+				ACTION_WAIT_RANDOM( 0.0, 0.5 ),
+				ACTION_MOVE_POSTURE( DT_MIN_ELEM_RANGE, .60, 8.0, 75.0, "squad_formations/squad_ai.lua", PACE_VERYFAST, PACE_VERYFAST, POSTURE_CROUCH, POSTURE_PRONE, 1.0 ),
+			},
+		},
+	},
+	
+	------------------------------------------------------------------------------
+	-- phase7 - BOUND 1 FLANKS
+	{
+		type = DATA_PHASE,
+		name = "Return Fire 3 (wait 2 - 4 secs ) ____________________________________NO MODS",
+		{
+			apply_to = ET_All,
+			actions = 
+			{ 
+				ACTION_WAIT_RANDOM( 2.0, 4.0 ),
+			},
+		},
+	},
+	
+	------------------------------------------------------------------------------
+	-- Phase8 Bound2 - FLANKS Look for Cover
+	{
+		type = DATA_PHASE,
+		name = "Flanks Bound to Cover (wait 0 - .5, hold for 2)",
+		{
+			apply_to = {ET_RFlank, ET_LFlank},
+			actions = 
+			{
+				ACTION_WAIT_RANDOM( 0.0, 0.5 ),
+				ACTION_MOVE_POSTURE( DT_MIN_ELEM_RANGE, .60, 8.0, 75.0, "squad_formations/squad_ai.lua", PACE_VERYFAST, PACE_VERYFAST, POSTURE_CROUCH, POSTURE_PRONE, 2.0 ),
+			},
+		},
+	},
+	
+	--[[{
+		type = DATA_PHASE,
+		name = "Move To LOS",
+		{
+			apply_to = ET_All,
+			actions = 
+			{
+				ACTION_MOVE_LOS( 3.0 )
+			},
+		},
+	},]]
+}

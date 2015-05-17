@@ -1,0 +1,107 @@
+
+-- command macros
+import("squadai-util")
+
+-- squadai plan file
+
+--------------------------------------------------------------------------------
+-- tuning
+
+-- global to all phases
+cover_search_radius	= 6.0
+cover_search_angle	= 45.0
+formation			= "squad_formations/squad_ai.lua"
+
+--------------------------------------------------------------------------------
+-- sound options
+
+sound = 
+{
+	soundDirectory	= "Battle_Chatter",
+	soundPercentage	= 30.0,
+}
+
+--------------------------------------------------------------------------------
+-- plan 
+
+plan = 
+{
+	-- phase0 - Engagement
+	{
+		type = DATA_PHASE,
+		name = "Ass Building Start: Engagement",	
+		
+		--
+		{
+			apply_to = ET_All,
+			actions =
+			{
+				-- toggle modifiers on
+				ACTION_DO_CRITICAL( "critical\\assault_modifiers.lua", "assault modifiers" ),
+			},
+		},
+		
+		--
+		{
+			apply_to = ET_All,
+			actions =
+			{
+				-- move into pour on fire formation
+				ACTION_MOVE_POSTURE( DT_MAX_SQUAD_RANGE, 0.5, cover_search_radius, cover_search_angle, formation, PACE_VERYFAST, PACE_FAST, POSTURE_CROUCH, POSTURE_PRONE, 1.0 ),
+			},
+		},
+	},
+
+	-- phase1 - Pour On Fire
+	{
+		type = DATA_PHASE,
+		name = "Pour On Fire",
+		
+		{
+			apply_to = ET_All,
+			actions = 
+			{ 
+				ACTION_DO_ABILITY( "abilities\\ally_throw_grenade_assault.lua", 1 ),
+				ACTION_WAIT_PRECISE( 3.0 ),
+				ACTION_DO_ABILITY( "abilities\\ally_throw_grenade_assault.lua", 1 ),
+			},
+		},
+	},
+
+	-- phase3 - Final Attack
+	{
+		type = DATA_PHASE,
+		name = "Final Attack",
+		
+		{
+			apply_to = {ET_Core},
+			actions = 
+			{
+				-- run up closer
+				ACTION_MOVE_POSTURE( DT_MAX_SQUAD_RANGE, 0.60, cover_search_radius, cover_search_angle, formation, PACE_FAST, PACE_FAST, POSTURE_CROUCH, POSTURE_PRONE, 1.0 ),
+				
+				-- throw some grenades	
+				-- old, curious as to why axis are using satchel charges at all -> ACTION_DO_ABILITY( "abilities\\ally_throw_satchel_no_decrement_choose_best.lua", 1 ),
+				ACTION_DO_ABILITY( "abilities\\ally_throw_grenade_assault.lua", 1 ),
+				-- run back
+				ACTION_MOVE_POSTURE_EXT( DT_MAX_SQUAD_RANGE, 0.4, cover_search_radius, cover_search_angle, formation, PACE_VERYFAST, PACE_FAST, POSTURE_CROUCH, POSTURE_PRONE, 0.0, true, false, false ),
+			},
+		},
+	},
+	
+	-- phase4 - Remove Modifiers
+	{
+		type = DATA_PHASE,
+		name = "Remove Modifiers",
+		
+		-- 
+		{
+			apply_to = ET_All,
+			actions = 
+			{
+				-- toggle modifiers off
+				ACTION_UNDO_ALL_CRITICALS(),
+			},
+		},
+	},
+}

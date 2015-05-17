@@ -1,0 +1,73 @@
+
+-- command macros
+import("squadai-util")
+
+-- squadai plan file
+
+--------------------------------------------------------------------------------
+-- tuning
+
+-- global to all phases
+cover_search_radius	= 6.0
+cover_search_angle	= 45.0
+formation			= "squad_formations/squad_ai.lua"
+
+--------------------------------------------------------------------------------
+-- sound options
+
+sound = 
+{
+	soundDirectory	= "Battle_Chatter",
+	soundPercentage	= 30.0,
+}
+
+--------------------------------------------------------------------------------
+-- plan
+plan = 
+{
+	-- phase0 - Engagement
+	{
+		type = DATA_PHASE,
+		name = "Engagement",	
+		
+		--
+		{
+			apply_to = ET_All,
+			actions =
+			{
+				-- toggle modifiers on
+				ACTION_DO_CRITICAL( "critical\\assault_modifiers.lua", "assault modifiers" ),
+			},
+		},
+		
+		--
+		{
+			apply_to = ET_All,
+			actions =
+			{
+				-- set pour on fire formation
+				ACTION_MOVE_POSTURE( DT_MAX_SQUAD_RANGE, 0.8, cover_search_radius, cover_search_angle, formation, PACE_VERYFAST, PACE_FAST, POSTURE_PRONE, POSTURE_PRONE, 0.0 ),
+				ACTION_DO_ABILITY( "abilities\\ally_throw_grenade_assault.lua", 1 ),
+			},
+		},
+	},
+	
+	-- phase3 - Charge
+	PHASE_LEAP_FROG_ABILITY( "Leap Frog", DT_MAX_SQUAD_RANGE, 0.8, 0.45, 4.0, 45.0, "squad_formations/squad_ai.lua", PACE_VERYFAST, POSTURE_PRONE, 1.0, "abilities\\ally_throw_grenade_assault.lua", {ET_CORE}, 1, 1 ),
+	
+	-- phase5 - Remove Modifiers
+	{
+		type = DATA_PHASE,
+		name = "Remove Modifiers",
+		
+		-- 
+		{
+			apply_to = ET_All,
+			actions = 
+			{
+				-- toggle modifiers off
+				ACTION_UNDO_ALL_CRITICALS(),
+			},
+		},
+	},
+}

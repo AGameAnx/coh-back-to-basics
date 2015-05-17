@@ -1,0 +1,35 @@
+
+-- command macros
+import("squadai-util")
+
+-- squadai plan file
+
+------------------------------------------------------------------------------
+-- sound options
+
+sound =
+{
+	soundDirectory	= "Battle_Chatter",
+	soundPercentage	= 30.0,
+}
+
+------------------------------------------------------------------------------
+-- plan 
+
+plan = 
+{
+	------------------------------------------------------------------------------
+	-- phase0: Before First Bound
+	--[[{
+		type = DATA_PHASE,
+		name = "START PLAN: INFANTRY IDLE IDLE IDLE",
+		--
+		{
+			apply_to = {ET_Core, ET_Scout, ET_RFlank, ET_LFlank},
+			actions = 
+			{
+				ACTION_MOVE_POSTURE_EXT( DT_MIN_ELEM_RANGE, 0.98, 4.0, 90.0, "squad_formations/squad_ai.lua", PACE_FAST, PACE_FAST, POSTURE_CROUCH, POSTURE_PRONE, 1.0, false, false, false ),
+			}
+		},
+	},]]
+}
