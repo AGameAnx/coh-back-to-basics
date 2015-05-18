@@ -1,8 +1,10 @@
-
 ----------------------------------------------------------------------------------------------------------------
--- Grid Key Combo Bindings
--- (c) 2007 HoKa
--- (c) 2009 Flakker
+-- Default Key Combo Bindings
+-- (c) 2006 Relic Entertainment
+
+
+-- These combos should NOT be changed by the user.
+-- They are here in case the user screws up the key bindings file in Root/KeyBindings/
 
 -- Bindings use format "Control+Shift+A"
 
@@ -23,88 +25,97 @@ bindings =
 	----------------------------------------------------------------------------------------------------------------
 	-- system commands
 	----------------------------------------------------------------------------------------------------------------
-	escape							="Escape",
-	accept							="Enter",
-	commandqueue						="Shift",
-	pause							="Pause",
-	systemmenu						="F10",
-	company_commander					="Control+Space",
-	select_focus						="Apostrophe",
-	
+
+	escape								="Escape",
+	accept								="Enter",
+	commandqueue							="Shift",
+	pause								="Pause",
+	systemmenu							="F10",
+	select_focus							="Apostrophe",
+	company_commander						="Control+Z",
+
 
 	----------------------------------------------------------------------------------------------------------------
 	-- tactical map commands
 	----------------------------------------------------------------------------------------------------------------
 
-	tactical_map						="Control+S",
-	tm_exit							="Control+S",
-	tm_reset 						="Backspace",
-	tm_objectives 						="O",
+	tactical_map							="Numpad0",
+	tm_exit								="Numpad0",
+	tm_reset 							="Backspace",
+	tm_objectives 							="O",
 	tm_toggle_rotate						="R",
+
 
 	
 	----------------------------------------------------------------------------------------------------------------
 	-- Universal taskbar commands (any hotkeys used here cannot be used elsewhere)
 	----------------------------------------------------------------------------------------------------------------
 	
-	builder_cycle						="Control+Q",
-	infantry_cycle						="Control+W",
-	vehicle_cycle						="Control+E",
+	builder_cycle							="Comma",
+	infantry_cycle							="Period",
+	vehicle_cycle							="Slash",
 
-	manage_hq						="F1",
-	manage_barracks						="F2",
-	manage_armory						="F3",
-	manage_light_motorpool					="F4",
-	manage_heavy_motorpool					="F5",
-	manage_supply_yard					="F6",
+	manage_hq							="F1",
+	manage_barracks							="F2",
+	manage_armory							="F3",
+	manage_light_motorpool						="F4",
+	manage_heavy_motorpool						="F5",
+	manage_supply_yard						="F6",
 	
-	event_cue_cycle						="Space",
-	
+	event_cue_cycle							="Space",
+
+
+
 	-------------------------------------------
 	-- Global Commands
 	-------------------------------------------
 
-	attack							="W",
-	retreat							="R",
-	repair							="D",
-	reinforce							="F",
-	attackground						="E",
-	halt								="Q",
-	rally								="V",
-	unload							="A",
-	common_ability						="O",
+	attack								="A",
+	retreat								="T",
+	repair								="E",
+	reinforce							="R",
+	attackground							="G",
+	halt								="H",
+	rally								="Y",
+	deployheroes							="D",
+	unload								="D",
+	common_ability							="O",
 
 	ping_attack							="Control+A",
 	ping_defend							="Control+D",
-	ping_capture						="Control+C",
+	ping_capture							="Control+C",
 
 	cancel_construction						="Escape",
 	retire								="Delete",
+
 
 
 	-------------------------------------------
 	-- Global Build
 	-------------------------------------------
 
-	build							="A",
-	buildadv							="S",
-	sand_bag							="E",
-	land_mines						="A",
-	barbed_wire	 					="S",
-	tank_traps						="R",
+	build								="B",
+	buildadv							="V",
+	sand_bag							="S",
+	land_mines							="M",
+	land_mines_tricky						="T",
+	land_mines_heavy						="H",
+	barbed_wire		 					="W",
+	tank_traps							="T",
+
 
 
 	-------------------------------------------
 	-- Global Abilties
 	-------------------------------------------
 
-	cut_wires						="Z",
-	camouflage						="D",
-	convert_ambient					="Q",
-	hold_fire_toggle					="S",
+	cut_wires							="W",
+	camouflage							="C",
+	convert_ambient							="B",
+	hold_fire_toggle						="D",
 
-	mortar_barrage					="Z",
-	mortar_smoke_barrage				="X",
+	mortar_barrage							="B",
+	mortar_smoke_barrage						="S",
 	
 
 
@@ -121,7 +132,9 @@ bindings =
 	-- checked with mouse click (selects all units of the same type) -- note: must only be one key
 	crop_selection_modifier 						="Shift",	
 	--same for axis**
-	
+
+
+
 	--------------------------------------------------------------------------------------------------------------
 	-- hotkey group hotkeys
 	--------------------------------------------------------------------------------------------------------------
@@ -152,154 +165,244 @@ bindings =
 	hkgroup_set9							="Control+9",
 
 
-	-------------------------------------------
+
+	---------------------------------------------
 	------------------- Allies ------------------
-	-------------------------------------------
+	---------------------------------------------
 
 	-- Global Allied Abilities
 
-	allies_throw_grenade					="Z",
-	allies_fireup_ability						="X",	
+	allies_throw_grenade							="N",
+	allies_fireup_ability							="F",	
 
 
 	-- Allies HQ
 	
-	allies_engineer						="Q",
+	allies_engineer								="E",
 
-	allies_upgrade_demolitions					="Z",
-	allies_upgrade_wire_cutters					="X",
-
-
-	-- Allies Engineer	
-
-	allies_observation_post					="Q",
-
-	allies_medic_station					="S",
-	allies_mg							="D",
-	allies_105mm_howitzer					="V",
-
-	allies_barracks						="Q",
-	allies_weapons_support_center				="W",
-	allies_motor_pool						="E",
-	allies_tank_depot						="R",
-	allies_supply_yard						="A",
-	allies_triage_center					="S",
-
-	allies_upgrade_flamethrower					="T",
-	allies_upgrade_minesweeper					="G",
-
-	allies_plant_demolitions					="X",
+	allies_upgrade_demolitions						="O",
+	allies_upgrade_wire_cutters						="C",
 
 
-		-- Allies 105mm Howitzer
+		-- Allies Engineer	
 
-		allies_howitzer_barrage					="Z",
+		allies_observation_post						="P",
+
+		allies_medic_station						="N",
+		allies_mg							="E",
+		allies_105mm_howitzer						="H",
+
+		allies_barracks							="B",
+		allies_weapons_support_center					="W",
+		allies_motor_pool						="M",
+		allies_tank_depot						="T",
+		allies_supply_yard						="S",
+		allies_triage_center						="C",
+
+		allies_upgrade_flamethrower					="F",
+		allies_upgrade_minesweeper					="N",
+
+		allies_plant_demolitions					="O",
+
+
+			-- Allies 105mm Howitzer
+
+			allies_howitzer_barrage					="B",
 
 
 	-- Allies Barracks
 
-	allies_riflemen						="Q",
-	allies_jeep						="W",
+	allies_riflemen								="R",
+	allies_jeep								="J",
 
-	allies_upgrade_grenades					="Z",
-	allies_upgrade_stickybombs					="X",
-	allies_upgrade_bar						="C",
+	allies_upgrade_grenades							="N",
+	allies_upgrade_stickybombs						="S",
+	allies_upgrade_bar							="B",
 
 
 		-- Allies Riflemen
 
-		allies_throw_sticky_bomb					="X",
-		allies_suppression_fire					="C",
+		allies_throw_sticky_bomb					="S",
+		allies_suppression_fire						="F",
 
-
-		-- Allies Airborne
-
-		allies_upgrade_recoilless_rifle				="T",
-
-		allies_throw_satchel_charge					="C",
-
-
-		-- Allies Rangers
-
-		allies_upgrade_thompson_rifles				="T",
-	
 
 	-- Allies Weapon Support Center
 
-	allies_mortar_team						="W",	
-	allies_hmg						="Q",
-	allies_sniper						="E",
+	allies_mortar_team							="M",	
+	allies_hmg								="H",
+	allies_sniper								="S",
 
 
 		-- Allies HMG
 
-		allies_armor_piercing_burst					="Z",
+		allies_armor_piercing_burst					="P",
 
 
 	-- Allies Motor Pool
 
-	allies_m3_halftrack						="Q",
-	allies_m8_armored_car					="W",
-	allies_t17_armored_car							="W",
-	allies_57mm_anti_tank_gun					="E",
+	allies_m3_halftrack							="H",
+	allies_m8_armored_car							="A",
+	allies_57mm_anti_tank_gun						="T",
+	allies_t17_armored_car							="C",
 
 
 		-- Allies M3 Halftrack
 
-		allies_upgrade_quad_50_cal_maxson				="T",
+		allies_upgrade_quad_50_cal_maxson				="Q",
 
 
 		-- Allies M8 Armored Car
 
-		allies_upgrade_m2hb_50_cal_machine_gun			="T",
-		allies_upgrade_m8_greyhound_armor_skirts			="G",
+		allies_upgrade_m2hb_50_cal_machine_gun				="U",
+		allies_upgrade_m8_greyhound_armor_skirts			="S",
 
-		allies_greyhound_mines					="Z",
+		allies_greyhound_mines						="M",
 
 
 		-- Allies 57mm AT Gun
 
-		allies_armor_piercing_shells					="Z",
+		allies_armor_piercing_shells					="P",
 
 
 	-- Allies Tank Depot
 
-	allies_m10_tank_destroyer					="Q",
-	allies_m18_hellcat						="Q",
-	allies_m4_crocodile						="W",
-	allies_m4_sherman						="E",
+	allies_m10_tank_destroyer						="M",
+	allies_m4_crocodile							="C",
+	allies_m4_sherman							="S",
+	allies_m18_hellcat							="H",
 
-	allies_upgrade_76mm_gun					="X",
-	allies_upgrade_smoke_screen				="Z",
+	allies_upgrade_76mm_gun							="U",
+	allies_upgrade_smoke_screen						="N",
 
 
 		-- Allies Sherman Flamethrower
 	
-		allies_upgrade_sherman_bulldozer				="T",
+		allies_upgrade_sherman_bulldozer				="B",
 
-		allies_bulldozer_toggle					="Z",
+		allies_bulldozer_toggle						="B",
 
 
 		-- Allies M4 Sherman
 
-		allies_upgrade_sherman_crab				="G",
-		allies_upgrade_sherman_m2hb_50_cal_machine_gun		="T",
+		allies_upgrade_sherman_crab					="C",
+		allies_upgrade_sherman_m2hb_50_cal_machine_gun			="U",
 
-		allies_fire_smoke_canister					="X",
-		allies_crab_mine_clearing					="Z",
+		allies_fire_smoke_canister					="S",
+		allies_crab_mine_clearing					="C",
 
 
 	-- Allies Supply Yard
 
-	allies_supply_yard_upgrade1						="Q",
-	allies_supply_yard_upgrade2						="W",
+	allies_supply_yard_upgrade1						="U",
+	allies_supply_yard_upgrade2						="U",
 
 
 	-- Offmap Reinforcements
 
+		-- Allies Airborne
+
+		allies_upgrade_recoilless_rifle					="O",
+
+		allies_throw_satchel_charge					="L",
+
+
+		-- Allies Rangers
+
+		allies_upgrade_thompson_rifles					="P",
+
+
 		-- Allies Calliope
 
-		allies_calliope_barrage					="Z",
+		allies_calliope_barrage						="B",
+
+
+		-- Allies Pershing
+
+		allies_long_range_shell						="L",
+
+
+
+			------------- HEROES -------------
+
+		-- Allies HQ Heroes
+
+	allies_advanceddefenses_engineers					="A",
+	allies_repair_engineers							="R",
+	allies_demolitions_engineers						="D",
+	allies_charismatic_engineers						="C",
+	allies_pyrotechnic_engineers						="P",
+	allies_elite_engineers							="E",
+
+
+		-- Allies Barracks Heroes
+
+	allies_builder_riflemen							="B",
+	allies_weaponsutility_riflemen						="U",
+	allies_skilled_riflemen							="R",
+	allies_trailblazer_riflemen						="T",
+	allies_weaponsspecialist_riflemen					="W",
+	allies_gladiator_riflemen						="G",
+
+	allies_assault_jeep							="A",
+	allies_skilled_jeep							="J",
+	allies_forwardobservation_jeep						="O",
+
+
+		-- Allies Weapon Support Center Heroes
+
+	allies_armourdefense_hmg						="A",
+	allies_skilled_hmg							="H",
+	allies_camouflage_hmg							="C",
+
+	allies_survival_sniper							="V",
+	allies_specialoperations_sniper						="O",
+
+	allies_skilled_mortar							="M",
+	allies_destructive_mortar						="D",
+
+
+		-- Allies Motorpool Heroes
+
+	allies_support_halftrack						="S",
+	allies_50cal_halftrack							="C",
+
+	allies_armored_greyhound						="A",
+	allies_skilled_greyhound						="G",
+	allies_recon_greyhound							="E",
+	allies_armorpiercing_greyhound						="P",
+
+	allies_hummingbird_atgun						="H",
+	allies_armourbreaking_atgun						="B",
+
+	allies_skilled_rangers							="R",
+	allies_assault_rangers							="A",
+
+
+		-- Allies Tank Depot Heroes
+
+	allies_durable_m10							="R",
+	allies_skilled_m10							="M",
+	allies_field_m10							="F",
+
+	allies_skilled_sherman							="S",
+	allies_durable_sherman							="N",	
+	allies_ace_sherman							="A",
+
+	allies_skilled_crocodile						="C",
+	allies_durable_crocodile						="E",
+
+
+		-- Heroic Unit Abilities
+
+		heroic_incendiary_grenade					="Y",
+		heroic_incendiary_trap						="P",
+		heroic_morale_command						="M",
+		heroic_overdrive						="O",
+		heroic_OMA							="B",
+		heroic_sprint							="I",
+		heroic_vehicle_self_repair					="E",
+		heroic_assisted_bombardment					="M",
+
 
 
 
@@ -309,177 +412,176 @@ bindings =
 	
 	-- Global Commonwealth Hotkeys
 
-	cmnw_set_up_truck						="Z",
-	cmnw_mobilize_truck						="Z",
-	cmnw_secured_resourcing						="T",
-	cmnw_speed_governors						="G",
+	cmnw_set_up_truck							="M",
+	cmnw_mobilize_truck							="M",
+	cmnw_secured_resourcing							="R",
+	cmnw_speed_governors							="G",
 
-	cmnw_assume_cmd_position						="D",
-	cmnw_forward_observation_barrage					="Z",
+	cmnw_assume_cmd_position						="P",
+	cmnw_forward_observation_barrage					="B",
 
-	cmnw_retreat_to_captain						="G",
+	cmnw_retreat_to_captain							="W",
 
-	cmnw_build_slit_trench						="Q",
-	cmnw_build_radio							="G",
+	cmnw_build_slit_trench							="T",
+	cmnw_build_radio							="R",
 
-	cmnw_tank_commander						="T",
-	cmnw_hull_down							="V",
-	cmnw_flank_speed							="X",
-	cmnw_tank_shock							="C",
+	cmnw_tank_commander							="T",
+	cmnw_hull_down								="D",
+	cmnw_flank_speed							="F",
+	cmnw_tank_shock								="S",
 
-	cmnw_creeping_barrage						="X",
-	cmnw_overwatch_barrage						="C",
-	cmnw_counter_battery						="V",
-	buildadv							="S",
+	cmnw_creeping_barrage							="C",
+	cmnw_overwatch_barrage							="O",
+	cmnw_counter_battery							="N",
 
 
 	-- Headquarters
 
-	buildadv							="S",
-	cmnw_armoured_command_truck					="W",
-	cmnw_field_command_truck						="Q",
+	cmnw_armoured_command_truck						="A",
+	cmnw_field_command_truck						="F",
 
-	cmnw_infantry_section						="Q",
-	cmnw_lieutenant							="W",
-	cmnw_bren_carrier							="E",
+	cmnw_infantry_section							="I",
+	cmnw_lieutenant								="L",
+	cmnw_bren_carrier							="B",
 
 
 		-- Tommy Squad
 
-		cmnw_rifle_grenade_upgrade				="B",
-		cmnw_recon_element_upgrade				="T",
-		cmnw_bren_upgrade_upgrade				="G",
+		cmnw_rifle_grenade_upgrade					="N",
+		cmnw_recon_element_upgrade					="E",
+		cmnw_bren_upgrade_upgrade					="M",
 
-		cmnw_smoke_grenade					="Z",
-		cmnw_deploy_marksman					="Z",
-		cmnw_button_enemy_vehicle				="Z",
+		cmnw_smoke_grenade						="S",
+		cmnw_deploy_marksman						="D",
+		cmnw_button_enemy_vehicle					="V",
 
-		cmnw_build_heavy_machine_gun_nest				="W",
-		cmnw_build_mortar_nest					="E",
-		cmnw_build_casualty_clearing_station 			="R",
+		cmnw_build_heavy_machine_gun_nest				="H",
+		cmnw_build_mortar_nest						="M",
+		cmnw_build_casualty_clearing_station 				="C",
 
 		-- Bren Carrier
 
-		cmnw_convert_hmg					="T",
+		cmnw_convert_hmg						="C",
 
-		armor_piercing_burst					="Z",
+		armor_piercing_burst						="P",
+
 
 	-- Lieutenant
 
-	ally_heroic_charge						="X",
+	cmnw_heroic_charge							="C",
 
 
 	-- Mortar Emplacement
 
-	cmnw_mortar_bombardment						="Z",
+	cmnw_mortar_bombardment							="B",
 
 
 	-- Howitzer Emplacement
 
-	cmnw_25pounder_super_charge					="B",
+	cmnw_25pounder_super_charge						="B",
 
 
 	-- Casualty Clearing Station
 
-	cmnw_medical_supplies						="Z",
+	cmnw_medical_supplies							="M",
 
 
 	-- Infantry Headquarters
 
-	cmnw_sapper_squad						="Q",
-	cmnw_captain_squad						="W",
-	cmnw_stuart_tank							="E",
+	cmnw_sapper_squad							="S",
+	cmnw_captain_squad							="C",
+	cmnw_stuart_tank							="T",
 
 
 		-- Sapper Squad
 
-		cmnw_expert_engineer_upgrade				="B",
-		cmnw_demolition_sapper_upgrade				="G",
-		cmnw_piat_upgrade					="T",
+		cmnw_expert_engineer_upgrade					="X",
+		cmnw_demolition_sapper_upgrade					="D",
+		cmnw_piat_upgrade						="P",
 
-		cmnw_demolition_charge					="X",
-		cmnw_piat_ambush					="Z",
+		cmnw_demolition_charge						="O",
+		cmnw_piat_ambush						="P",
 
-		cmnw_build_at_gun					="R",
-		cmnw_build_howitzer					="D",
-		cmnw_build_bofer						="S",
+		cmnw_build_at_gun						="A",
+		cmnw_build_howitzer						="H",
+		cmnw_build_bofer						="B",
 		
 		
 		-- Stuart Light Tank
 
-		cmnw_fire_canister					="Z",
+		cmnw_fire_canister						="F",
 
 
 		-- Captain
-		cmnw_victor_target					="X",
+
+		cmnw_victor_target						="V",
 
 
 	-- Anti-Tank Gun Emplacement
 
-	cmnw_armor_piercing_shells						="Z",
-	cmnw_face_weapon						="X",
+	cmnw_armor_piercing_shells						="P",
+	cmnw_face_weapon							="F",
 
 
 	-- Howitzer Gun Emplacement
 
-	cmnw_25pounder_barrage						="Z",
+	cmnw_25pounder_barrage							="B",
 
 
 	-- Armoured Headquarters
 
-	cmnw_cromwell_tank						="Q",
-	cmnw_kangaroo								="Q",
-	cmnw_command_tank						="W",
-	cmnw_staghound								="W",
-	cmnw_firefly_tank							="E",
+	cmnw_cromwell_tank							="C",
+	cmnw_command_tank							="T",
+	cmnw_firefly_tank							="F",
+	cmnw_staghound								="S",
+	cmnw_kangaroo								="K",
 
 	
 	-- Offmap Units
 
-
 		-- Glider
 
-		cmnw_commandos						="Q",
+		cmnw_commandos							="C",
 
 
 		-- Commandos
 
-		cmnw_concealing_smoke					="C",
-		cmnw_throw_grenade					="Z",
-		cmnw_cmdo_demolition					="X",
+		cmnw_concealing_smoke						="S",
+		cmnw_throw_grenade						="N",
+		cmnw_cmdo_demolition						="O",
 
 
 		-- Tetrarch Glider
 
-		cmnw_tetrarch						="Q",
+		cmnw_tetrarch							="T",
 
 
 		-- Tetrarch
 
-		cmnw_littlejohn_adapter					="T",
-		cmnw_fire_smoke_shell					="X",
+		cmnw_littlejohn_adapter						="L",
+		cmnw_fire_smoke_shell						="S",
 
 
 		-- Glider Headquarters
 
-		cmnw_commando_hmg_squad				="Q",
-		cmnw_commando_mortar_squad				="W",
-		cmnw_commando_piat_squad				="E",
+		cmnw_commando_hmg_squad						="H",
+		cmnw_commando_mortar_squad					="M",
+		cmnw_commando_piat_squad					="P",
 
 
 		-- Priest
 
-		cmnw_howitzer_barrage					="Z",
+		cmnw_howitzer_barrage						="B",
 
 
 		-- Churchill AVRE
 
-		cmnw_fire_petard_mortar_round				="X",
+		cmnw_fire_petard_mortar_round					="P",
 
 
 		-- Churchill Infantry Tank
 
-		cmnw_mine_plow						="T",
+		cmnw_mine_plow							="M",
 
 
 
@@ -489,149 +591,256 @@ bindings =
 
 	-- Global Axis Abilities
 
-	axis_medical_kit						="G",
-	axis_assault						="X",
-	axis_fire_panzerfaust					="X",
+	axis_medical_kit							="K",
+	axis_assault								="L",
+	axis_fire_panzerfaust							="Z",
 
 
 	-- Axis HQ
 
-	axis_pioneer						="Q",
-	
-	axis_escalate_to_skirmish					="Z",
-	axis_escalate_to_battle					="Z",
-	axis_escalate_to_war					="Z",
+	axis_pioneer								="P",
 
-	
-	-- Axis Pioneer
-	
-	axis_observation_post					="Q",
-	axis_bunker						="S",
-	axis_88mm_flak						="D",
+	axis_escalate_to_skirmish						="E",
+	axis_escalate_to_battle							="E",
+	axis_escalate_to_war							="E",
 
-	axis_wehrmacht_quarters					="Q",
-	axis_krieg_barracks					="W",
-	axis_sturm_armory						="E",
-	axis_panzer_command					="R",
-	axis_kampfkraft_battleschool				="A",
+			
+		-- Axis Pioneer
 	
-	axis_upgrade_minesweeper					="T",
-	axis_upgrade_flammenwerfer					="G",
+		axis_observation_post						="P",
+		axis_bunker							="B",
+		axis_88mm_flak							="F",
 
-	axis_salvage							="X",
+		axis_wehrmacht_quarters						="W",
+		axis_krieg_barracks						="B",
+		axis_sturm_armory						="S",
+		axis_panzer_command						="P",
+		axis_kampfkraft_battleschool					="K",
+	
+		axis_upgrade_minesweeper					="N",
+		axis_upgrade_flammenwerfer					="F",
+
+		axis_salvage							="S",
 
 
 	-- Axis Bunker
 
-	axis_goliath							="S",
+	axis_goliath								="G",
 
-	axis_upgrade_bunker_mg42						="Z",
-	axis_upgrade_bunker_aid_station					="X",
-	axis_upgrade_bunker_repair_station					="C",
+	axis_upgrade_bunker_mg42						="M",
+	axis_upgrade_bunker_aid_station						="A",
+	axis_upgrade_bunker_repair_station					="R",
 
 
 		-- Axis Goliath
 
-		axis_goliath_detonate					="Z",
+		axis_goliath_detonate						="D",
 
 
 	-- Wehrmacht Quarters
 
-	axis_motorcycle						="Q",
-	axis_schwimmwagen							="Q",
-	axis_volksgrenadier						="W",
-	axis_hmg							="E",
-	axis_sniper						="R",
-	
+	axis_motorcycle								="M",
+	axis_volksgrenadier							="V",
+	axis_hmg								="H",
+	axis_sniper								="S",
+	axis_schwimmwagen							="W",
+
 
 		-- Axis Volksgrenadiers
 
-		axis_upgrade_volks_mp40					="T",
+		axis_upgrade_volks_mp40						="U",
 	
 
 	-- Krieg Barracks
 
-	axis_halftrack						="Q",
-	axis_grenadier						="W",
-	axis_mortar_team						="E",
-	axis_50mm_pak_38						="R",
+	axis_halftrack								="H",
+	axis_grenadier								="G",
+	axis_mortar_team							="M",
+	axis_50mm_pak_38							="P",
 
 
 		-- Axis Halftrack
 
-		axis_upgrade_halftrack_flammenwerfer			="T",
-		axis_upgrade_halftrack_stuka				="G",
+		axis_upgrade_halftrack_flammenwerfer				="F",
+		axis_upgrade_halftrack_stuka					="S",
 	
-		axis_stuka_rocket_barrage					="Z",
+		axis_stuka_rocket_barrage					="B",
 
 
 		-- Axis Grenadiers
 	
-		axis_upgrade_panzercheck					="T",
-		axis_upgrade_mg42					="G",
+		axis_upgrade_panzercheck					="P",
+		axis_upgrade_mg42						="U",
 
-		axis_throw_grenade					="Z",
+		axis_throw_grenade						="N",
 	
 
 	-- Sturm Armory
 
-	axis_puma						="Q",
-	axis_lieutenant						="W",
-	axis_nebelwerfer						="E",
-	axis_stug							="R",
-	axis_geschutzwagen					="R",
+	axis_puma								="P",
+	axis_lieutenant								="L",
+	axis_nebelwerfer							="N",
+	axis_stug								="S",
+	axis_geschutzwagen							="G",
 
 		
 		-- Axis Puma
 
-		axis_upgrade_puma_50mm_turret				="T",
+		axis_upgrade_puma_50mm_turret					="U",
 
 	
 		-- Axis Lieutenant
 	
-		axis_observed_fire						="Z",
-		axis_supervise_ability					="X",
-		axis_force_retreat						="C",
+		axis_observed_fire						="B",
+		axis_supervise_ability						="V",
+		axis_force_retreat						="F",
 
 
 		-- Axis Nebelwefer
 	
-		axis_nebelwerfer_barrage					="Z",
+		axis_nebelwerfer_barrage					="B",
 
 
 	-- Panzer Command
 	
-	axis_knights_cross						="Q",
-	axis_ostwind_flakpanzer					="W",
-	axis_panzer						="E",
-	axis_panther						="R",
+	axis_knights_cross							="K",
+	axis_ostwind_flakpanzer							="O",
+	axis_panzer								="Z",
+	axis_panther								="P",
+
+
+	-- Offmap Units
 
 
 		-- Axis Stormtroopers
 
-		axis_upgrade_mp44					="G",
-	
-		axis_throw_bundled_grenade					="Z",
+		axis_upgrade_mp44						="U",
+		axis_stormtrooper						="S",
+
+		axis_throw_bundled_grenade					="B",
+
+
+		-- Axis Terror Officer
+
+		axis_officer_execute						="E",
+
+
+		-- Axis Contracted Reinforcements
+
+		axis_contracted_aid_bunker					="A",
+		axis_contracted_repair_bunker					="R",
+		axis_contracted_mg42_bunker					="B",
+		axis_contracted_flak88						="F",						
 
 
 	-- Kampfkraft Battleschool
 
-	axis_train_veteran_infantry_level_1				="Q",
-	axis_train_veteran_infantry_level_2				="Q",
-	axis_train_veteran_infantry_level_3				="Q",
+	axis_train_veteran_infantry_level_1					="I",
+	axis_train_veteran_infantry_level_2					="I",
+	axis_train_veteran_infantry_level_3					="I",
 
-	axis_train_veteran_support_level_1				="W",
-	axis_train_veteran_support_level_2				="W",
-	axis_train_veteran_support_level_3				="W",
+	axis_train_veteran_support_level_1					="W",
+	axis_train_veteran_support_level_2					="W",
+	axis_train_veteran_support_level_3					="W",
 
-	axis_train_veteran_vehicles_level_1				="E",
-	axis_train_veteran_vehicles_level_2				="E",
-	axis_train_veteran_vehicles_level_3				="E",
+	axis_train_veteran_vehicles_level_1					="V",
+	axis_train_veteran_vehicles_level_2					="V",
+	axis_train_veteran_vehicles_level_3					="V",
 
-	axis_train_veteran_tanks_level_1				="R",
-	axis_train_veteran_tanks_level_2				="R",
-	axis_train_veteran_tanks_level_3				="R",
-	
+	axis_train_veteran_tanks_level_1					="T",
+	axis_train_veteran_tanks_level_2					="T",
+	axis_train_veteran_tanks_level_3					="T",
+
+
+			------------- HEROES -------------
+
+		-- Axis HQ Heroes
+
+	axis_combat_pioneers							="C",
+	axis_field_pioneers							="F",
+	axis_tankhunter_pioneers						="H",
+	axis_construction_pioneers						="T",
+	axis_specialops_pioneers						="S",
+
+
+		-- Axis Wehrmacht Quarters Heroes
+
+	axis_accomplished_motorcycle						="M",
+	axis_grenadier_motorcycle						="G",
+	axis_fritz_motorcycle							="Z",
+
+	axis_closecombat_volksgrenadiers					="C",
+	axis_geriatric_volksgrenadiers						="T",
+	axis_accomplished_volksgrenadiers					="V",
+	axis_demolitions_volksgrenadiers					="D",
+	axis_bargain_volksgrenadiers						="B",
+
+	axis_accomplished_hmg							="H",
+	axis_durable_hmg							="U",
+	axis_fatherland_hmg							="L",
+	axis_opencombat_hmg							="O",
+
+	axis_fieldspecialist_sniper						="F",
+	axis_eagleeye_sniper							="E",
+
+
+		-- Axis Krieg Barracks Heroes
+
+	axis_flame_halftrack							="F",
+
+	axis_prepared_grenadiers						="P",
+	axis_distinguished_grenadiers						="D",
+	axis_survivalist_grenadiers						="V",
+
+	axis_accomplished_mortar						="M",
+
+	axis_cheetah_pak38							="C",
+
+	axis_brute_stormtroopers						="B",
+	axis_accomplished_stormtroopers						="S",
+
+
+		-- Axis Sturm Armoy Heroes
+
+	axis_armourhunter_puma							="H",
+	axis_accomplished_puma							="P",
+
+	axis_combatcommand_officer						="C",
+	axis_superintendent_officer						="I",
+
+	axis_mammoth_stug							="M",
+	axis_accomplished_stug							="S",
+
+	axis_armoured_goliath							="A",
+
+
+		-- Axis Panzer Command Heroes
+
+	axis_accomplished_kch							="K",
+
+	axis_accomplished_ostwind						="O",
+	axis_enhanced_ostwind							="E",
+
+	axis_accomplished_panzeriv						="Z",
+	axis_command_panzeriv							="C",
+
+	axis_accomplished_panther						="P",
+	axis_amourdestroyer_panther						="A",
+
+
+		-- Heroic Unit Abilities
+
+		heroic_blitz_charge						="Z",
+		heroic_crippling_trap						="L",
+		heroic_defensive_maneuvers					="M",
+		heroic_explosive_panzerfaust					="Z",
+		heroic_heartening_shout						="U",
+		heroic_inspired_command						="M",
+		heroic_mark_target						="M",
+		heroic_observational_status					="O",
+		heroic_power_walk						="P",
+		heroic_sprint							="I",
+
 
 
 	-------------------------------------------
@@ -640,124 +849,138 @@ bindings =
 
 	-- Global PanzerElite Hotkeys
 
-	pe_Build_Logistik_Kompanie					="Q",
-	pe_Build_Kampfgruppe_Kompanie					="W",
-	pe_Build_Panzer_Jager_Kommand					="E",
-	pe_Build_Panzer_Support_Kommand				="R",
-	pe_Build_Teller_Mine						="A",
-	pe_build_road_blocks						="A",
+	pe_Build_Logistik_Kompanie						="L",
+	pe_Build_Kampfgruppe_Kompanie						="K",
+	pe_Build_Panzer_Jager_Kommand						="J",
+	pe_Build_Panzer_Support_Kommand						="S",
+	pe_Build_Teller_Mine							="M",
+	pe_build_road_blocks							="R",
 
-	pe_GrenadeAT							="X",
-	pe_Grenade								="Z",
-	pe_BoobyTrap							="S",
-	pe_Incendiary_Grenade						="Z",
-	pe_Scorched_Earth							="V",
+	pe_GrenadeAT								="K",
+	pe_Grenade								="N",
+	pe_BoobyTrap								="Y",
+	pe_Incendiary_Grenade							="N",
+	pe_Scorched_Earth							="C",
 
 
 	-- PanzerElite HQ
 
-	pe_Grenadier							="Q",
-	pe_Kettenkrad							="W",
-	pe_Schwimmwagen							="W",
-	pe_Scout_Car							="W",
+	pe_Grenadier								="G",
+	pe_Kettenkrad								="K",
+	pe_Schwimmwagen								="W",
 
-	pe_Research_Incendiary						="Z",
-	pe_Defensive_Operations						="X",
-	pe_panther_battlegroup						="C",
+	pe_panther_battlegroup							="P",
+
+	pe_Research_Incendiary							="N",
+	pe_Defensive_Operations							="D",
 
 
-	--PanzerElite Grenadiers
+		--PanzerElite Grenadiers
 
-		pe_Gewehr43							="T",
-		pe_MP44							="G",		
-		pe_Panzershreck						="B",
+		pe_Gewehr43							="G",
+		pe_MP44								="M",		
+		pe_Panzershreck							="P",
 
-		pe_Volley_Fire						="C",
+		pe_Volley_Fire							="V",
 		
 
 	-- PanzerElite Logistik Companie
 	
-	pe_Scout_Car							="Q",
-	pe_Munitions_Halftrack						="W",
-	pe_Vampire							="E",
+	pe_Scout_Car								="S",
+	pe_Munitions_Halftrack							="M",
+	pe_Vampire								="V",
 
-	pe_Research_Squad_Size						="X",
-	pe_Research_GrenadeAT						="Z",
+	pe_Research_Squad_Size							="I",
+	pe_Research_GrenadeAT							="A",
 
 
 		-- Scout Car
 
-		pe_Logistik_Upgrade					="T",
+		pe_Logistik_Upgrade						="L",
 
 
 		-- Munitions Halftrack
 	
-		pe_Munitions_Halftrack_Maintain_Range			="D",		pe_munitions_halftrack_plant_mines				="Z",
-		pe_Munitions_Halftrack_Goliath				="V",
+		pe_Munitions_Halftrack_Maintain_Range				="M",		
+		pe_munitions_halftrack_plant_mines				="N",
+		pe_Munitions_Halftrack_Goliath					="G",
+
 
 		-- Vampire Halftrack
 
-		pe_Vampire_Resources					="Z",
+		pe_Vampire_Resources						="S",
 
 
 	-- PanzerElite Kampfgruppe Kompanie
 
-	pe_Halftrack							="Q",
-	pe_Mortar_Halftrack						="W",
-	pe_Tankbuster							="E",
+	pe_Halftrack								="H",
+	pe_Mortar_Halftrack							="M",
+	pe_Tankbuster								="G",
 
-	pe_Research_Capture_Rate					="X",
-	pe_Kampfgruppe_Kompanie_Upgrade				="Z",
-	pe_Research_Repair_Upgrade					="C",
+	pe_Research_Capture_Rate						="C",
+	pe_Kampfgruppe_Kompanie_Upgrade						="U",
+	pe_Research_Repair_Upgrade						="E",
 
-	-- PanzerElite Mortar Halftrack
 
-		pe_Mortar_Bombardment					="Z",
-		pe_Incendiary_Mortar_Round				="X",
-		pe_Disable_Free_Fire					="S",
+		-- PanzerElite Mortar Halftrack
+
+		pe_Mortar_Bombardment						="B",
+		pe_Incendiary_Mortar_Round					="N",
+		pe_Disable_Free_Fire						="F",
 
 
 	-- PanzerElite Panzer-Jager Kommmand
 
-		pe_Assault_Grenadiers					="Q",
-		pe_Armoured_Car						="W",
-		pe_Marder							="E",
+	pe_Assault_Grenadiers							="G",
+	pe_Armoured_Car								="C",
+	pe_Marder								="M",
 
-	pe_Research_Zeal							="X",
-	pe_Jager_Kommand_Upgrade					="Z",
+	pe_Research_Zeal							="Z",
+	pe_Jager_Kommand_Upgrade						="U",
 
-	-- PanzerElite Armored Car					
-		pe_Overdrive						="Z",
 
-	-- PanzerElite Marder
-		pe_site_main_gun						="Z",
+		-- PanzerElite Armored Car
+							
+		pe_Overdrive							="V",
 
-	-- PanzerElite Support Command
 
-	pe_Light_AT_Halftrack						="Q",
-	pe_Panzer_Infantry_Tank						="E",
-	pe_Hotchkiss							="E",
-	pe_Bergetiger							="W",
+		-- PanzerElite Marder
 
-	pe_Support_Kommand_Upgrade					="Z",
-	pe_Research_Veteran						="X",
+		pe_site_main_gun						="S",
+
+
+	-- PanzerElite Support Kommand
+
+	pe_Light_AT_Halftrack							="H",
+	pe_Panzer_Infantry_Tank							="P",
+	pe_Bergetiger								="B",
+	pe_Hotchkiss								="K",
+
+	pe_Support_Kommand_Upgrade						="U",
+	pe_Research_Veteran							="V",
 
 
 		-- Light AT Halftrack
 
-		pe_Tread_Breaker						="Z",
-		pe_Focused_Firing						="X",
+		pe_Tread_Breaker						="B",
+		pe_Focused_Firing						="F",
 
 
 		-- PanzerElite Panzer IV
 
-		pe_Armour_Skirts						="G",	
-		pe_MG42_Gunner						="T",
-		pe_Rapid_Fire						="Z",
+		pe_Armour_Skirts						="S",	
+		pe_MG42_Gunner							="M",
+		pe_Rapid_Fire							="R",
+
 
 		-- Bergetiger
 
-		pe_recover_wreck						="Z",
+		pe_recover_wreck						="R",
+
+
+		-- Hotchkiss
+
+		pe_Hotchkiss_cannon						="C",
 
 
 	-- Offmap Units
@@ -765,49 +988,170 @@ bindings =
 
 		-- PanzerElite Hummel
 		
-		pe_Rapid_Fire_Artillery					="X",
-		pe_Hummel_Barrage						="Z",
+		pe_Rapid_Fire_Artillery						="C",
+		pe_Hummel_Barrage						="B",
 
 
 		-- PanzerElite FallschrimJager
 
-		pe_Fire_Panzerfaust					="X",
-		pe_Sprint							="V",
-		pe_FG42							="T",
-		pe_Building_Incendiary_Device				="Z",
+		pe_Fire_Panzerfaust						="Z",
+		pe_Sprint							="I",
+		pe_FG42								="M",
+		pe_Building_Incendiary_Device					="N",
 
 
 		-- PanzerElite Lufftwaffe Crew
 
-		pe_Flak20MM						="Q",
-		pe_Flak88						="R",
+		pe_Flak20MM							="V",
+		pe_Flak88							="F",
 
 
 		-- PanzerElite Logistik Car
 
-		pe_Secure_Sector						="Z",
+		pe_Secure_Sector						="S",
 
 
 		-- PanzerElite Heltzer
 
-		pe_Spotting_Scope					="T",		
+		pe_Spotting_Scope						="S",		
 
 
 	-- Veterancy
 
-	pe_defensive_1							="G",
-	pe_defensive_2							="G",
-	pe_defensive_3							="G",
+	pe_defensive_1								="D",
+	pe_defensive_2								="D",
+	pe_defensive_3								="D",
 
-	pe_offensive_1							="T",
-	pe_offensive_2							="T",
-	pe_offensive_3							="T",
+	pe_offensive_1								="O",
+	pe_offensive_2								="O",
+	pe_offensive_3								="O",
+
+
+
+	-------------------------------------------
+	--------------- UMS Bindings --------------
+	-------------------------------------------
+	
+	-- PUSH
+	
+	-- Hero Respawn
+	
+	
+	-- Allied Abilities
+		-- Demolitions Engineer (Defensive)
+			push_respawn 						="W",
+		-- Saboteur Engineer (Offensive)
+			push_satchel_charge 					="T",
+			
+		-- Guardian Commando (Defensive)
+			push_concealing_smoke 					="S",
+			
+		-- Aggressor Commando (Offensive)
+		
+		-- Base Medic (Defensive)
+			push_burst_heal 					="B",
+			
+		-- Field Medic (Offensive)
+			push_scorch 						="S",
+			
+		-- Cunning Officer (Defensive)
+			push_camouflage 					="C",
+			
+		-- Inspirational Officer (Offensive)
+			push_inspired_command 					="R",
+			
+		-- Defender Heavy Weapon Specialist (Defensive)
+			push_grit 						="G",
+			
+		-- Storm Heavy Weapon Specialist (Offensive)
+			push_heroic_charge 					="C",
+			
+		-- Observation Scout (Defensive)
+		
+		-- Vanguard Scout (Offensive)
+		
+		-- Infiltrator Sniper (Defensive)
+		
+		-- Marksman Sniper (Offensive)
+			push_vital_shot						="V",
+			
+		-- Daredevil Recon (Defensive)
+		
+		-- Illuminator Recon (Offensive)
+			push_flare 						="F",
+	
+	
+	-- Axis
+	
+	-- shares same abilities as Allied
+	
+	
+	-- Hero Spawn Selection
+	-- Applied same way for both Axis and Allies
+	
+		--Engineer/Pioneer
+		push_engineer_pioneer 						="E",
+		--Commando
+		push_commando 							="C",
+		--Medic
+		push_medic 							="M",
+		--Officer
+		push_officer 							="O",
+		--Heavy Weapons
+		push_heavy 							="H",
+		--Scout
+		push_scout 							="S",
+		--Sniper
+		push_sniper							="P",
+		--Recon
+		push_recon 							="R",
+		
+		--Offensive/Defensive
+		push_defensive_unit 						="D",
+		push_offensive_unit 						="F",
+		
+		
+		
+	--	Generic Unlocks
+	
+		push_speed_upgrade 						="J",
+		push_armor_upgrade 						="K",
+		push_damage_upgrade 						="L",
+		push_grenade_upgrade 						="U",
+	
+	-- INVASION
+	
+	-- Allies Spawn Units
+	-- These have been assigned hotkeys specifically for Invasion
+	-- Rangers
+	invasion_ranger 							="A",
+	-- Pershing
+	invasion_pershing 							="P",
+	
+	
+	-- Axis Spawn Units
+	-- Tiger
+	invasion_king_tiger 							="K",
+	invasion_tiger 								="G",
+	-- Puma
+	invasion_puma 								="U",
+	
+		-- Upgrades and Unlocks
+	
+	soldier_unlock 								="L",
+	vehicle_unlock 								="I",
+	popcap_upgrade 								="P",
+	
+	-- Menus
+	invasion_vehicle_menu 							="V",
+	invasion_soldier_menu 							="D",
+	invasion_smoke_screen 							="C",
 
 -- Panzerkrieg
 	
 	-- Universal Abilities
-	tw_direct_fire 								="A",
-	tw_defensive_infantry 							="S",
+	tw_direct_fire 								="D",
+	tw_defensive_infantry 							="I",
 	
 	-- Radio Tower Abilities
 		-- Allies
@@ -815,7 +1159,7 @@ bindings =
 		tw_strafing_run 						="T",
 		tw_bombing_run 							="B",
 		-- Axis
-		tw_flares 							="V",
+		tw_flares 							="F",
 		tw_firestorm 							="T",
 		tw_henschel 							="Q",
 		
@@ -826,160 +1170,111 @@ bindings =
 	-- Allies
 	
 	-- M18 Hellcat
-	tw_armor_piercing_shell							="D",
-	tw_mark_target 								="V",
-	tw_observational_status 						="Z",
-	tw_ambush									="X",
-	tw_flank_speed 								="C",
-	tw_hawkins_mine 								="V",
+	tw_armor_piercing_shell							="P",
+	tw_observational_status 						="O",
+	tw_ambush								="C",
+	tw_flank_speed 								="F",
+	tw_hawkins_mine 							="W",
 	
 	-- M4 Sherman
-	tw_armor_piercing_shell							="D",
-	tw_long_range_shell 							="V",
-	tw_mine_clearing 								="Z",
-	tw_flank_speed 								="C",
-	tw_fire_smoke_shell							="V",
+	tw_long_range_shell 							="L",
+	tw_fire_smoke_shell 							="S",
+	tw_mine_clearing 							="C",
 
 	-- Churchill
-	tw_group_field_repairs 							="D",
-	tw_hull_down 								="V",
-	tw_heroic_charge 								="Z",
-	tw_flank_speed 								="C",
-	tw_tread_breaker 								="V",
+	tw_group_field_repairs 							="G",
+	tw_hull_down 								="W",
+	tw_heroic_charge 							="E",
+	tw_tread_breaker 							="R",
 	
 	-- Axis
 	
 	-- Hotchkiss
-	tw_stun_shot 								="D",
-	tw_mark_target 								="V",
-	tw_camouflage 								="Z",
-	tw_salvage 									="X",
-	tw_stuka_rocket_barrage 						="C",
-	tw_hotchkiss_mine 							="V",
+	tw_stun_shot 								="N",
+	tw_mark_target 								="K",
+	tw_salvage 								="S",
+	tw_stuka_rocket_barrage 						="B",
+	tw_hotchkiss_mine 							="M",
+	tw_camouflage 								="C",
 	
 	-- Panzer IV
-	tw_armor_piercing_shell							="D",
-	tw_triple_shot 								="V",
-	tw_rapid_fire 								="Z",
-	tw_overdrive 								="C",
-	tw_self_repair 								="V",
+	tw_triple_shot 								="L",
+	tw_rapid_fire 								="R",
+	tw_overdrive 								="O",
+	tw_self_repair 								="E",
 	
 	-- Panther
-	tw_sight_main_gun 							="D",
-	tw_blitzkrieg 								="V",
-	tw_observational_status							="Z",
-	tw_precision_artillery 							="X",
-	tw_white_phosphorus_shell 						="C",
-	tw_fire_smoke_shell							="V",
-
--- Assault
-
-	-- Allies
-		-- Heroic Unit Abilities
-
-		heroic_incendiary_grenade					="Y",
-		heroic_incendiary_trap						="P",
-		heroic_morale_command						="M",
-		heroic_overdrive							="O",
-		heroic_OMA								="B",
-		heroic_sprint							="A",
-		heroic_vehicle_self_repair					="C",
-		heroic_assisted_bombardment					="M",
-
-		-- Hero Respawn
+	tw_sight_main_gun 							="M",
+	tw_blitzkrieg 								="Z",
+	tw_precisioni_artillery 						="L",
+	tw_white_phosphorus_shell 						="W",
 	
-		-- Demolitions Engineer (Defensive)
-			push_respawn 						="W",
-
-		-- Saboteur Engineer (Offensive)
-			push_satchel_charge 					="C",
-			
-		-- Guardian Commando (Defensive)
-			push_concealing_smoke 					="V",
-			
-		-- Aggressor Commando (Offensive)
-		
-		-- Base Medic (Defensive)
-			push_burst_heal 						="X",
-			
-		-- Field Medic (Offensive)
-			push_scorch 						="C",
-			
-		-- Cunning Officer (Defensive)
-			push_camouflage 						="C",
-			
-		-- Inspirational Officer (Offensive)
-			push_inspired_command 					="X",
-			
-		-- Defender Heavy Weapon Specialist (Defensive)
-			push_grit 							="X",
-			
-		-- Storm Heavy Weapon Specialist (Offensive)
-			push_heroic_charge 					="V",
-			
-		-- Observation Scout (Defensive)
-		
-		-- Vanguard Scout (Offensive)
-		
-		-- Infiltrator Sniper (Defensive)
-		
-		-- Marksman Sniper (Offensive)
-			push_vital_shot						="C",
-			
-		-- Daredevil Recon (Defensive)
-		
-		-- Illuminator Recon (Offensive)
-			push_flare 							="X",
-
-		-- Hero Spawn Selection
-			-- Applied same way for both Axis and Allies
+--Domination
 	
-		--Engineer/Pioneer
-			push_engineer_pioneer 					="Q",
+	dom_ally_fireup = "F",
+	dom_allies_upgrade_flamethrower						="F",
+	dom_axis_upgrade_flamethrower						="F",
+	dom_heroic_charge							="C",
+	dom_medical_kit								="K",
+	dom_rocket_ambush							="R",
+	dom_throw_sticky_bomb							="S",
+	dom_fire_panzerfaust							="P",
+	dom_builder_spawn							="B",
+	dom_soldier_spawn							="S",
+	dom_rocket_spawn							="R",
+	dom_scout_spawn								="C",
+	dom_sharpshooter_spawn							="H",
+	dom_pathfinder_spawn							="P",
+	dom_demolisher_spawn							="E",
+	dom_dislodger_spawn							="D",
+	dom_machine_gunner_spawn						="G",
+	dom_medic_spawn								="M",
 
-		--Commando
-			push_commando 						="W",
+	pe_offensive_1								="O",
+	pe_offensive_2								="O",
+	pe_offensive_3								="O",
+	
+	----------------------------------------------------
+	---------------- DLC1 Villers-Bocage ---------------
+	----------------------------------------------------
 
-		--Medic
-			push_medic 							="E",
-
-		--Officer
-			push_officer 						="R",
-		
-		--Heavy Weapons
-			push_heavy 							="A",
-		
-		--Recon
-			push_recon 							="S",
-
-		--Scout
-			push_scout 							="D",
-		
-		--Sniper
-			push_sniper							="D",
-		
-		--Offensive/Defensive
-			push_defensive_unit 					="A",
-			push_offensive_unit 					="Q",
-			
-		--	Generic Unlocks
-			push_speed_upgrade 					="J",
-			push_armor_upgrade 					="K",
-			push_damage_upgrade 					="L",
-			push_grenade_upgrade 					="U",
-
-	-- Axis
-		-- Heroic Unit Abilities
-
-		heroic_blitz_charge						="Z",
-		heroic_crippling_trap						="L",
-		heroic_defensive_maneuvers					="M",
-		heroic_explosive_panzerfaust					="Z",
-		heroic_heartening_shout						="U",
-		heroic_inspired_command						="M",
-		heroic_mark_target						="V",
-		heroic_observational_status					="O",
-		heroic_power_walk							="P",
-		heroic_sprint							="A",
-			
+	villers_bocage_he							="E",
+	villers_bocage_tank_shock						="T",
+	villers_bocage_smoke							="S",
+	villers_bocage_defense							="M",
+	
+	villers_bocage_direct_control						="D",
+	villers_bocage_toggle_ammo						="R",
+	villers_bocage_toggle_commander						="C",
+	villers_bocage_arty_barrage						="B",
+	villers_bocage_hide							="E",
+	villers_bocage_drop_weapon						="W",
+	villers_bocage_mark_artillery						="M",
+	villers_bocage_med_kit							="D",
+	
+	-------------------------------------------------
+	---------------DLC2 La Fiere----------------------
+	------------------------------------------------
+	la_fiere_bundled_grenade2                   			   	="R",
+	
+	-------------------------------------------------
+	---------------DLC2 La Fiere----------------------
+	------------------------------------------------
+	axis_stormtrooperTrun							="F",
+	axis_tellermineTrun							="E",
+	
+	-------------------------------------------------
+	---------------DLC3 Falaise Pocket----------------------
+	------------------------------------------------
+	axis_boobytrap_strategicpoint_trun					="P",
+	
+	
+	
+	
 }
+
+
+
+
+
+

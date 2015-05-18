@@ -83,7 +83,6 @@ Global Balance Changes:
 - Significantly improved the effectiveness of Anti-Aircraft Weaponry, they are now much more capable of dealing with incoming aircraft. Multiple of these weapons can now have great air coverage, preventing air strikes from being called in near them.
 - Removed permanent 0.75 accuracy decrease due to how cover works from all vehicles.
 - Improved the way green cover works with vehicles.
-- Added light cover to hedgerows. This cover isn't directional, meaning that squads get an overall cover bonus when standing 'in' a hedgerow.
 - Decreased the time which infantry units need to go out of combat stance from 7 to 5 seconds.
 - Decreased the time which infantry units need to recover from suppression.
 - Added the missing 7th combat slot in slit trenches.
@@ -217,9 +216,10 @@ Americans:
 - M3 Halftracks can no longer transport Heavy Machine Gun or Mortar Teams.
 - M3 Halftrack build time decreased from 40 to 35 seconds.
 - T34 Calliope weapon reworked to be more reliable against all targets. The rockets will never bounce on tank armor any more, but will work like artillery shells in regards to penetration and splash damage.
+- T34 Calliope barrage cost increased from 50 to 60 munitions.
 - M36 Jackson main gun reloading time decreased from 7/7 to 6/6 seconds.
 - Significantly improved the effectiveness of the M18 Hellcat, M10 Wolverine, M36 Jackson, M26 Pershing and M4 'Easy Eight' Sherman versus Panthers, Tigers and King Tigers.
-- T34 Calliope call-in cost changed from 600 manpower to 500 manpower and 50 fuel.
+- T34 Calliope call-in cost changed from 600 manpower to 500 manpower and 80 fuel.
 - M36 Jackson battlegroup call-in cost changed from 900 manpower to 900 manpower and 140 fuel.
 - M36 Jackson battlegroup is no longer limited to once per battle.
 - Combat group call-in cost changed from 650 manpower to 650 manpower and 60 fuel.
@@ -537,12 +537,15 @@ Panzer Elite:
 - Scout Car and Armored Car health decreased from 400 to 380.
 - Supply Halftrack health increased from 370 to 380.
 - Sd.Kfz. 250 Halftrack variants (Vampire, Infantry, Anti-Tank, Recon and Mortar) health decreased from 420 to 380.
-- Fixed and rebalanced the Flakvierling and Wirbelwind weapon tables, making them more effective when dealing with multiple infantry threats. There was a bug where Flakvierlings would not 'penetrate' infantry on medium and longer ranges, making them very inconsistent in battle. Generally, the Flakvierlings should be more reliable and consistent in performance.
 - 88mm Flak 36 AT/AA reloading time increased from 4/6 to 6/6 seconds.
 - 88mm Flak 36 AT/AA emplacement unintended manpower upkeep removed.
 - 88mm Flak 36 AT/AA manpower upkeep decreased from 10.7 to 3.4 manpower/min and fuel upkeep increased from 0 to 3 fuel/min, to be equal to the Wehrmacht version.
 - 20mm Flakvierling 38 manpower upkeep increased from 1.3 to 3.4 manpower/min and fuel upkeep increased from 0 to 2 fuel/min, to be equal to the 40mm Bofors AA Gun.
 - 20mm Flakvierling 38 emplacement unintended manpower upkeep removed.
+- Wirblewind 20mm Flakvierling 38 base damage increased from 19/21 to 32/34, with adjusted accuracy and cooldown to retain the same DPS potential.
+- 20mm Flakvierling 38 base damage increased from 19/21 to 32/34, with adjusted accuracy and cooldown to retain the same DPS potential.
+- 20mm Flakvierling 38 cost decreased from 300 manpower and 30 fuel to 280 manpower and 20 fuel.
+- Fixed and rebalanced the Flakvierling and Wirbelwind weapon tables, making them more effective when dealing with multiple infantry threats. There was a bug where Flakvierlings would not 'penetrate' infantry on medium and longer ranges, making them very inconsistent in battle. Generally, the Flakvierlings should be more reliable and consistent in performance.
 - Marder III main gun reloading time increased from 5/6 to 6/6 seconds.
 - Marder III APCR main gun reloading time increased from 4/4 to 6/6 seconds to match the standard shell; this was an unintended buff the Marder III received once aquiring APCR shells.
 - Anti-Tank Halftrack 37mm PaK 36 reloading time rebalanced from 4/5.5 to 4.5/4.5 seconds.
@@ -579,8 +582,6 @@ Panzer Elite:
 - Panzer IV and Panzer IV Infantry Support Tank health increased from 760 to 860.
 - Sd.Kfz. 222 20mm KwK38 base damage increased from 19/21 to 32/34, significantly improving its DPS potential.
 - Sd.Kfz. 251/9 KwK38 base damage increased from 19/21 to 32/34, significantly improving its DPS potential.
-- Wirblewind 20mm Flakvierling 38 base damage increased from 19/21 to 32/34, with adjusted accuracy and cooldown to retain the same DPS potential.
-- 20mm Flakvierling 38 base damage increased from 19/21 to 32/34, with adjusted accuracy and cooldown to retain the same DPS potential.
 - Kettenkrad Booby Trap setup time decreased from 15 to 5 seconds.
 - Panzerschreck effectiveness (both accuracy and damage) vs light vehicles reduced.
 - Panzerschreck general scatter values decreased significantly.
@@ -1180,7 +1181,7 @@ American:
 - Tank Depot reinforce radius increased from 0 to 20.
 
 Commonwealth:
-- New reward unit: Sherman. Like the Cromwell, the M4A4 Sherman mates a 75mm gun with reasonable armor and good mobility. Can be upgraded with a Tank Commander to increase sight range, and can fire Smoke Dischargers to create a wall of smoke.
+- New reward unit: Sherman. Like the Cromwell, the M4A4 Sherman mates a 75mm gun with reasonable armor and good mobility. Can be upgraded with a Tank Commander to increase sight range and can fire HE shells to suppress and deal with Infantry.
 - New reward unit: Staghound Armoured Car, a Light Armoured Car replacing the Stuart Light Tank when enabled. Less health than the Stuart Light Tank, The Staghound can be upgraded with Sandbags for extra health and a .50cal HMG. It can also lay mines to cover open flanks and cripple enemy assaults.
 - Canadian Infantry are redesigned. They now do suffer from the Movement Reduction Speed in neutral and enemy territory, but now instead they can use a Sprint Ability. In addition, they are armed with a more powerful version of the Lee Enfield Rifle, to indicate that Canadian Infantry are Heavy Shock Infantry. Their health is increased from 110 to 115, thus the squad health from 440 to 460. They still do come with a M2 Flamethrower and have the ability to throw grenades and construct trenches.
 - Highlanders are redesigned. They are now armed with a more powerful version of the Lee Enfield Rifle but no longer come with two Boys AT Rifles by default, they now can get them through an upgrade for 75 munitions. The Over Repair ability still comes by default, they have a basic construction menu and have the ability to throw Grenades.
@@ -1215,6 +1216,7 @@ Commonwealth:
 - Commando Jeep moved to the Glider Headquarters.
 - Canister Ammunition damage increased from 40/40 to 60/60.
 - Canister Ammunition range and accuracy tables fixed.
+- Canister Ammunition munition cost decreased from 75 to 50.
 - Churchill Population cost increased from 10 to 12.
 - Churchill health decreased from 1000 to 900.
 - The global mobility of Churchill Tanks has been decreased.
