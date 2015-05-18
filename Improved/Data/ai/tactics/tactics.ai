@@ -2,7 +2,7 @@
 
 -- how far to look back when checking if we've taken a shot or been shot at
 s_CombatHistoryTicks = 4 * 8
-s_LowHealthPercentage = 0.85
+s_LowHealthPercentage = 0.95
 s_LowHealthPercentageVehicle = 0.99
 s_NearClumpDistanceCap = 150
 s_NearClumpDistanceCap_Small = 35

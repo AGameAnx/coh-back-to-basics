@@ -140,7 +140,7 @@ state_analysis.recalculate_budgets = function()
 	
 	local underAttack = "false"
 	local unit_budget
-	if (cache.threat_at_base > 2) then
+	if cache.threat_at_base > 2 then
 		underAttack = "true"
 		
 		-- only consider top units to build
@@ -178,7 +178,7 @@ state_analysis.recalculate_budgets = function()
 	end
 	
 	ai_budget:setweight("BUDGET_Secure", secureBudget)
-	ai_budget:setweight("BUDGET_PlayerAbility", state_analysis.budget_levels.playerability[increase_tech])
+	ai_budget:setweight("BUDGET_PlayerAbility", state_analysis.budget_levels.playerability[increase_tech] + curResources.munition/30)
 	ai_budget:setweight("BUDGET_SquadAbility", state_analysis.budget_levels.squadability[increase_tech])
 	
 	--[[CustomDebug.Clear()

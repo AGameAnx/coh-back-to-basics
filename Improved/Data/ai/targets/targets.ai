@@ -297,9 +297,10 @@ function RatePointsFromEnemyHQDistance(entityPos, enemyHQDistance) -- enemyHQDis
 	return result
 end
 
-function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend)
+function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, is_friendly)
 	if is_defend == nil then is_defend = false end
 	if is_neutral == nil then is_neutral = false end
+	if is_friendly == nil then is_friendly = false end
 	
 	if not Military_IsMilitaryPointValid(militaryPoint) then return 0.0 end
 	
@@ -419,13 +420,16 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend)
 		militaryPercentValue = militaryPercentValue - 0.1
 		result = result - 0.35
 	end
+	if is_friendly then
+		result = result - 1
+	end
 	
 	local threat = Military_GetCombinedThreatAtMilitaryPoint(s_selfplayer, militaryPoint, is_defend) -- pass in true to get history anti-class added to this threat
 	local threatScore = 0
 	local threatAtBaseScore = 0
 	if threat < 0 then
 		local maxFriendlyThreat = math.max(5, math.min(100, -Military_GetMinCombinedThreatAtMilitaryPoint(s_selfplayer)))
-		threatScore = 4.75*threat/maxFriendlyThreat -- attempt to unblob and spread out units by reducing priority for points that already have friendlies nearby
+		threatScore = 6.75*threat/maxFriendlyThreat -- attempt to unblob and spread out units by reducing priority for points that already have friendlies nearby
 		--logPrint(string.format("  negative threat score: %.2f", threatScore))
 	elseif threat >= 0 then
 		local maxThreat = math.max(5, math.min(130, Military_GetMaxCombinedThreatAtMilitaryPoint(s_selfplayer)))
@@ -616,8 +620,8 @@ function RankDefendTargets()
 	end]]
 end
 
-function Target_CalcAttackPriority(militaryPoint, is_neutral)
-	return Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, false)
+function Target_CalcAttackPriority(militaryPoint, is_neutral, is_friendly)
+	return Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, false, is_friendly)
 end
 function RankAttackTargets()
 	Military_ClearTargets(s_selfplayer, MTARGET_Attack)
@@ -633,7 +637,7 @@ function RankAttackTargets()
 	local neutralMilitaryPointCount = Military_GetNeutralMilitaryPointCount(s_selfplayer)
 	for i=0,neutralMilitaryPointCount-1 do
 		local militaryPoint = Military_GetNeutralMilitaryPointAt(s_selfplayer, i)
-		local priority = Target_CalcAttackPriority(militaryPoint, true)
+		local priority = Target_CalcAttackPriority(militaryPoint, true, false)
 		-- cache the priority
 		local e = {
 			Point = militaryPoint,
@@ -644,34 +648,32 @@ function RankAttackTargets()
 		if priority > 0.0 then
 			Military_AddTarget(s_selfplayer, MTARGET_Attack, militaryPoint, 1+priority*2)
 			targetCount = targetCount + 1
-			if targetCount > 20 then
+			if targetCount >= 7 then
 				break
 			end
 		end
 	end
-	if targetCount < 15 then
-		for i=1,World_GetPlayerCount() do
-			local player = World_GetPlayerAt(i)
-			-- don't attack certain players
-			if Target_ShouldAttackPlayer(player) or Target_ShouldDefendPlayer(player) then
-				-- for each military point
-				local militaryPointCount = Military_GetMilitaryPointCount(s_selfplayer, player)
-				for j=0,militaryPointCount-1 do
-					local militaryPoint = Military_GetMilitaryPointAt(s_selfplayer, player, j)
-					local priority = Target_CalcAttackPriority(militaryPoint, false)
-					-- cache the priority
-					local e = {	
-						Point = militaryPoint,
-						PriorityValue = priority,
-						Neutral = false,
-					}
-					table.insert(attack_point_ranking, e)
-					if priority > 0.0 then
-						Military_AddTarget(s_selfplayer, MTARGET_Attack, militaryPoint, 1+priority*2)
-						targetCount = targetCount + 1
-						if targetCount >= 15 then
-							break
-						end
+	for i=1,World_GetPlayerCount() do
+		local player = World_GetPlayerAt(i)
+		-- don't attack certain players
+		if Target_ShouldAttackPlayer(player) or Target_ShouldDefendPlayer(player) then
+			-- for each military point
+			local militaryPointCount = Military_GetMilitaryPointCount(s_selfplayer, player)
+			for j=0,militaryPointCount-1 do
+				local militaryPoint = Military_GetMilitaryPointAt(s_selfplayer, player, j)
+				local priority = Target_CalcAttackPriority(militaryPoint, false, true)
+				-- cache the priority
+				local e = {	
+					Point = militaryPoint,
+					PriorityValue = priority,
+					Neutral = false,
+				}
+				table.insert(attack_point_ranking, e)
+				if priority > 0.0 then
+					Military_AddTarget(s_selfplayer, MTARGET_Attack, militaryPoint, 1+priority*2)
+					targetCount = targetCount + 1
+					if targetCount >= 15 then
+						break
 					end
 				end
 			end

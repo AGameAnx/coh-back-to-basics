@@ -1052,8 +1052,17 @@ UNIT_CONTROL_PRESET = {
 	MORTAR = {
 		['safety_radius_steps'] = 6,
 		['setup_target_danger'] = 1,
-		['move_back_danger'] = 1,
+		['move_back_danger'] = 1.35,
 		['retreat_danger'] = 10,
+		['init_step'] = 2,
+		['step_count'] = 4,
+		['target_angle_threshold'] = -1
+	},
+	MORTAR_NORETREAT = {
+		['safety_radius_steps'] = 6,
+		['setup_target_danger'] = 1,
+		['move_back_danger'] = 1.35,
+		['retreat_danger'] = -1,
 		['init_step'] = 2,
 		['step_count'] = 4,
 		['target_angle_threshold'] = -1
@@ -1077,7 +1086,7 @@ UNIT_CONTROL_PRESET = {
 AIControl.MainControl = {
 	Settings = {
 		SplitUpdates = 1, -- full update time is grid update time times this number
-		SplitUpdatesIncreaseForSquadCount = 6, -- Increases split update count on secondary update by floor(TotalCount/N)
+		SplitUpdatesIncreaseForSquadCount = 8, -- Increases split update count on secondary update by floor(TotalCount/N)
 		SecondaryUpdateTicks = 5, -- every n updates we'll check for new controlled units
 		
 		RetreatTactic_BattleRadius = 50,
@@ -1122,8 +1131,8 @@ AIControl.MainControl = {
 				},
 				[BP_GetID(SBP.AXIS.SNIPER)] = UNIT_CONTROL_PRESET.SNIPER,
 				[BP_GetID(SBP.AXIS.MORTAR)] = UNIT_CONTROL_PRESET.MORTAR,
-				[BP_GetID(SBP.AXIS.NEBELWERFER)] = UNIT_CONTROL_PRESET.MORTAR,
 				[BP_GetID(SBP.AXIS.CAPTURE_MORTAR_AXIS)] = UNIT_CONTROL_PRESET.MORTAR,
+				[BP_GetID(SBP.AXIS.NEBELWERFER)] = UNIT_CONTROL_PRESET.MORTAR_NORETREAT,
 				[BP_GetID(SBP.AXIS.PAK_38)] = UNIT_CONTROL_PRESET.AT_GUN,
 				[BP_GetID(SBP.AXIS.PAK_40)] = UNIT_CONTROL_PRESET.AT_GUN,
 				[BP_GetID(SBP.AXIS.CAPTURE_AT)] = UNIT_CONTROL_PRESET.AT_GUN,
@@ -1194,7 +1203,7 @@ AIControl.MainControl = {
 		
 		VehicleControl = {
 			DefaultBaseDangerRequiredToRetreat = 65,
-			DefaultDangerRequiredDecreaseWithHealth = 95,
+			DefaultDangerRequiredDecreaseWithHealth = 75,
 			DefaultDangerRequiredDecreaseWithFriendlyArmor = 0.025,
 			DangerRequiredToRetreatDecreaseForLightVehicles = 45,
 			DangerRequiredToRetreatIncreaseNearHQ = 45,

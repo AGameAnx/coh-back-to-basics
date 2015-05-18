@@ -35,7 +35,7 @@ function PositionTargetFilter_Cover(squad)
 	local posCover = Squad_FindCoverCompareCurrent(sim_squad, pos, misc_taskAP, 2.5*misc_taskAP, true)
 	
 	-- if it found cover that is at least 2 m away
-	if World_DistanceSquaredPointToPoint(pos, posCover) > 2.0 then	
+	if World_DistanceSquaredPointToPoint(pos, posCover) > 0.1 then	
 		local oldPosThreatLevel = AISquad_ThreatLevelToSquad(s_selfplayer, squad, pos)
 		local newPosThreatLevel = AISquad_ThreatLevelToSquad(s_selfplayer, squad, posCover)
 		local threatDiff = newPosThreatLevel - oldPosThreatLevel

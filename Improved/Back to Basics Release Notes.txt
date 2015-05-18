@@ -675,6 +675,7 @@ AI:
 - AI will now build its first building near the HQ to reduce the walk time and build it as fast as possible.
 - Improved Panzer Elite building purchase logic.
 - Improved building enter logic.
+- AI will now retreat from buildings properly instead of sitting and waiting to die.
 - Added a script which increases AI starting resources.
 - American AI will now build the motorpool even if there's a tank depot already in play. The demand decrease if there was a tank depot was too large.
 - American AI will rush t3 more often.
@@ -689,7 +690,14 @@ AI:
  * Grenades have had additional demand logic added so that they aren't thrown every time AI gets a target.
  * Repair changes - pioneers and engineers will find repair targets on larger distances (this helps repair bridges and idle tanks that will be around due to new aicontrol script), PE infantry had its repair radius and priority reduced to prevent mass repairs that tended to happen too often.
 - AI will sometimes buy flamethrowers on engineers and pioneers again. The demand function was not working correctly.
+- Improved the way AI takes cover.
 - Improved the way PE AI buys upgrades and techs up.
+- Improved airborne and all glider drop locations.
+- Improved airborne supply drop logic.
+- AI will now use bombing run more often.
+- AI will no longer use henshel overwatch on infantry.
+- Strafing runs will now only be used against infantry.
+- Significantly reduced the amount of tactics position validation failed errors.
 
 Maps:
 - Improved AI getting clumped up on northern Vire River Valley bridge.

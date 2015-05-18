@@ -117,35 +117,37 @@ function strategy_command_tree:do_purchase()
 				CustomDebug.Print('ERROR: Command tree path reached 5 CP - invalid tech route! Path index: '..self.prefIndexChosen..', path upgrades:')
 				self.prefIndexChosen = nil
 				for i=1,count do
+					local command_item = pref_tbl[i]
 					CustomDebug.Print('  '..BP_GetName(command_item))
 				end
-			end
-			local prefcount = 0
-			-- run through the choice table in order, making sure we have each
-			for i=1,count do
-				-- count the total number of these items, including those that have been requested but not active
-				local command_item = pref_tbl[i]
-				local upg_count = UtilPBG_CountTotal(command_item)
-				if upg_count <= 0 then
-					if AIProduction_CanProduceNow(s_selfplayer, PITEM_PlayerUpgrade, command_item, DEFAULT_HERO_ID) then
-						prefcount = prefcount + 1
-						Request_Production(s_selfplayer, TGROUP_CommandTree, TPRIORITY_CommandTree, PITEM_PlayerUpgrade, command_item, DEFAULT_HERO_ID)
-						--strategy_command_tree.trace("CommandTree: Produce:"..BP_GetName(command_item))
-					else
-						--strategy_command_tree.trace("CommandTree: COULD NOT PRODUCE PREF:"..BP_GetName(command_item))
-						return
-					end
-					--aipoptrace();
-				else
-					prefcount = prefcount + 1
-				end
-			end
-			if prefcount >= count then
-				--strategy_command_tree.trace("CommandTree: Done with all pref choices")
-				--aipoptrace();
-				self.prefIndexChosen = nil
 			else
-				return
+				local prefcount = 0
+				-- run through the choice table in order, making sure we have each
+				for i=1,count do
+					-- count the total number of these items, including those that have been requested but not active
+					local command_item = pref_tbl[i]
+					local upg_count = UtilPBG_CountTotal(command_item)
+					if upg_count <= 0 then
+						if AIProduction_CanProduceNow(s_selfplayer, PITEM_PlayerUpgrade, command_item, DEFAULT_HERO_ID) then
+							prefcount = prefcount + 1
+							Request_Production(s_selfplayer, TGROUP_CommandTree, TPRIORITY_CommandTree, PITEM_PlayerUpgrade, command_item, DEFAULT_HERO_ID)
+							--strategy_command_tree.trace("CommandTree: Produce:"..BP_GetName(command_item))
+						else
+							--strategy_command_tree.trace("CommandTree: COULD NOT PRODUCE PREF:"..BP_GetName(command_item))
+							return
+						end
+						--aipoptrace();
+					else
+						prefcount = prefcount + 1
+					end
+				end
+				if prefcount >= count then
+					--strategy_command_tree.trace("CommandTree: Done with all pref choices")
+					--aipoptrace();
+					self.prefIndexChosen = nil
+				else
+					return
+				end
 			end
 		else
 			CustomDebug.Print('Command tree path error')

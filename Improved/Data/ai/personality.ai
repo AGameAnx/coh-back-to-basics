@@ -63,7 +63,7 @@ s_personality =
 	retreat_chance_reevaluate_ticks = 10,       -- (1)
 	
 	min_engineers_below_50_owned = 1,           -- how many engineers minimum do we need to have when we have less than 50 of the map
-	min_engineers_after_50_owned = 3,           -- how many engineers minimum do we need to have when we have more than 50 of the map
+	min_engineers_after_50_owned = 2,           -- how many engineers minimum do we need to have when we have more than 50 of the map
 
 	-- target importance
 	-- dictates default targeting behaviour for attack, defend and capture
@@ -94,8 +94,8 @@ s_personality =
 	min_squadaddon_demand_required = -5,        -- squad addon items with demand below this value will be ignored
 	occupy_near_spawner_limit = 120,            -- minimum distance that the AI will require from an existing spawner building before occupying
 	occupy_max_active = 1,                      -- max number of ambient occupied buildings the AI will attempt to use
-	max_engineers = 4,                          -- max number of engineers you should build
-	max_engineers_with_teammates = 4,           -- max number of engineers when their are teammates
+	max_engineers = 5,                          -- max number of engineers you should build
+	max_engineers_with_teammates = 5,           -- max number of engineers when their are teammates
 	use_military_strength_percentage_cap=false, -- if the military cap should be used
 	military_strength_percentage_cap = 1.0,     -- [-N -> N] what percentage of the enemies military should the AI try to stay near
 	purchase_delay_pace = 1,                    -- the amount of seconds between purchase choices

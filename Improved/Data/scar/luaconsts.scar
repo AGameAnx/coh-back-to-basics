@@ -338,7 +338,8 @@ EBP = {
 		TANK_TRAP_RIFLEMEN 		= BP_GetEntityBlueprint("ebps/races/allies/buildings/tank_traps_rifleman.lua"),
 		MINES					= BP_GetEntityBlueprint("ebps/races/allies/mines/allies_mine.lua"),
 		MINES_RIFLEMEN			= BP_GetEntityBlueprint("ebps/races/allies/mines/allies_mine_rifleman.lua"),
-		HOWITZER				= BP_GetEntityBlueprint("ebps/races/allies/buildings/howitzer_gun_nest.lua")
+		HOWITZER				= BP_GetEntityBlueprint("ebps/races/allies/buildings/howitzer_gun_nest.lua"),
+		GLIDER_HQ				= BP_GetEntityBlueprint("ebps/races/allies/buildings/airborne_glider_hq.lua"),
 
 	},
 	
@@ -1173,6 +1174,7 @@ ABILITY = {
 			SUPPLY_DROP					= BP_GetAbilityBlueprint("abilities/ally_paradrop_ability_supplies.lua"),
 			RECRUIT_PARADROP			= BP_GetAbilityBlueprint("abilities/ally_paradrop_ability.lua"),
 			RECRUIT_PARADROP_AT			= BP_GetAbilityBlueprint("abilities/ally_paradrop_57mm_at.lua"),
+			GLIDER_HQ					= BP_GetAbilityBlueprint("abilities/ally_glider_hq_ability.lua"),
 			RECON						= BP_GetAbilityBlueprint("abilities/ally_air_recon_ability.lua"),
 			STRAFE_MG					= BP_GetAbilityBlueprint("abilities/ally_air_strike_ability_strafe.lua"),
 			STRAFE_ROCKET				= BP_GetAbilityBlueprint("abilities/ally_thunderbolt_airstrike.lua"),
