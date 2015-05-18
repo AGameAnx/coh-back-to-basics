@@ -626,6 +626,7 @@ AI:
  * AI will now respond to threats near its base and in friendly territory much better.
  * Improved defensive building placement.
  * Introduced a balanced randomness element to how AI chooses its attack and defend targets which gets reset periodically to a new value, ensuring that AI will try new approaches rather than trying same strategies over and over. This also helps plug any holes in the overall targets logic.
+ * Improved performance: added caching of values that are reused throughout the game, capped the total amount of points that get processed per update.
 - AI will no longer idle for a number of seconds at the beginning of the game, it is initialized almost instantly.
 - Significantly reduced instances where AI would get stuck and not do anything due to map types or topology.
 - Fixed an issue which caused AI to get stuck on and around bridges or some map areas.
