@@ -191,6 +191,7 @@ Americans:
 - T17 Armored Car health increased from 240/360 to 260/390.
 - T17 Armored Car acceleration increased from 4.5 to 5.5 and Speed increased from 6.5 to 7.
 - M3 Halftrack health decreased from 400 to 380.
+- Infantry can now capture territory from inside M3 Halftracks.
 - Airborne Jeep capture distance increased from 2 to 10, to match the Commando Jeep and Kettenkrad.
 - M5 76mm Anti-Tank Gun reloading time decreased from 6/7 to 6/6 seconds.
 - M5 76mm Anti-Tank Gun manpower upkeep increased from 1.7 to 3.4 manpower/min and fuel upkeep increased from 0 to 3 fuel/min.
@@ -413,6 +414,7 @@ Wehrmacht:
 - Sd.Kfz. 234 Puma health increased from 370 to 400.
 - Sd.Kfz. 251 Halftrack health increased from 370 to 380.
 - Sd.Kfz. 251 Halftrack Flammenwerfer upgrade health bonus decreased from +30 to +20.
+- Infantry can now capture territory from inside Sd.Kfz. 251 Halftracks.
 - 88mm Flak 36 AT/AA reload time increased from 4/6 to 6/6 seconds.
 - 88mm Flak 36 AT/AA manpower upkeep decreased from 10.7 to 3.4 manpower/min.
 - 88mm Flak 36 AT/AA emplacement changed to the smaller Bofors emplacement version, allowing for easier placement.
@@ -614,6 +616,7 @@ Panzer Elite:
 - Sturmgewehr 44 statistics generally improved and tuned to match the new damage model. This weapon is now designed as a medium rate of fire but accurate assault rifle with a 30-round magazine.
 - MG 42 Light Machine Gun base damage increased from 10/12 to 27/29, decreasing the amount of shots it takes to kill infantry.
 - MG 42 Light Machine Gun statistics generally improved and tuned to match the new damage model. This weapon is now designed as a very high rate of fire, decently accurate light machine gun with a 50-round magazine.
+- Panzergrenadier/Jäger Booby Traps reworked as a passive 'default' ability. This means that the ability no longer shows up in the Command Panel. It will still show up when inside a building however.
 
 AI:
 - Significantly improved and switched around much of the unit purchase logic.
