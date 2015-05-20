@@ -290,7 +290,7 @@ Americans:
 - Quad Mounted Browning M2hb .50cal Heavy Machine Gun statistics generally tuned to match the new damage model. This weapon is now designed as a high rate of fire and accurate heavy machine gun with 200-round magazines.
 
 Commonwealth:
-- Added a new ability to the Royal Canadian Artillery: Ammunition Resupply - For the cost of 150 manpower, 200 munitions is granted. Fuel income will be decreased by 50% for two minutes after the ability is triggered.
+- Added a new ability to the Royal Canadian Artillery: Ammunition Resupply - For the cost of 200 manpower, 200 munitions is granted. Fuel income will be decreased by 25% for two minutes after the ability is triggered.
 - Redesigned Highlanders:
   *Can now be upgraded with Boys Anti-Tank Rifles, Sten Sub-Machine Guns or Medical Packages.
   *Entity health increased by 10%, from 100 to 110, increasing the squad health from 400 to 440.
