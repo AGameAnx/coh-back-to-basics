@@ -493,6 +493,7 @@ Wehrmacht:
 - MG 42 Heavy Machine Gun base damage increased from 18/20 to 26/28, decreasing the amount of shots it takes to kill infantry.
 - MG 42 Heavy Machine Gun statistics generally tuned to match the new damage model. This weapon is now designed as a very high rate of fire, decently accurate heavy machine gun with a 250-round magazine.
 - Improved Equipment cost decreased from 100 manpower and 25 fuel to 80 manpower and 20 fuel.
+- Goliath munition cost decreased from 75 to 50.
 
 Panzer Elite:
 - Tank Hunter Tactics renamed and reworked into Breakthrough Tactics, to decrease the specialization of the whole Commander Tree, increasing both its versatility and viability.
@@ -512,6 +513,7 @@ Panzer Elite:
 - Hummel call-in cost changed from 600 manpower to 500 manpower and 50 fuel.
 - Funkwagen 'Vampire' Halftrack camouflage detection radius increased from 9 to 10, and mine detection from 0 to 5.
 - Funkwagen 'Vampire' Halftrack Radio Interception camouflage detection bonus decreased from 30 to 20.
+- Funkwagen 'Vampire' Halftrack Goliath Drop munition cost decreased from 100 to 50.
 - Jägers are now armed with four scopeless Gewehr 43 rifles instead of four MP40 SMG's. Scopeless G43's are great for all ranges; but best for close to medium range engagements.
 - Jägers call-in manpower cost increased from 260 to 340, and require 2 Command Points to unlock.
 - Jägers reinforce cost increased from 30 to 36, and reinforcing time increased from 6 to 7 seconds.
