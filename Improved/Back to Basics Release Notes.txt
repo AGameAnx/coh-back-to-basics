@@ -137,6 +137,7 @@ Graphics:
 - New explosion FX for the newly added Railway Artillery Barrage
 - New explosion FX for the Nebelwerfer and Walking Stuka.
 - Tank Gun explosion FX changed to better represent their caliber and explosive payload.
+- Animated Sherman Smoke Dischargers for all Sherman models. 
 
 User Interface and Language:
 - Added custom minimap symbols for Mortars and Medic type units.
@@ -292,6 +293,7 @@ Americans:
 
 Commonwealth:
 - Added a new ability to the Royal Canadian Artillery: Ammunition Resupply - For the cost of 200 manpower, 200 munitions is granted. Fuel income will be decreased by 25% for two minutes after the ability is triggered.
+- Fixed the problem where the player could have a total of three M7 Priests instead of two.
 - Redesigned Highlanders:
   *Can now be upgraded with Boys Anti-Tank Rifles, Sten Sub-Machine Guns or Medical Packages.
   *Entity health increased by 10%, from 100 to 110, increasing the squad health from 400 to 440.
@@ -307,7 +309,8 @@ Commonwealth:
   *Can no longer plant Demolition Charges.
 - Vickers .303cal Heavy Machine Gun section statistics generally improved.
 - Vickers .303cal Heavy Machine Gun arc of fire decreased from 120 to 100 degrees.
-- Vehicles now properly share their veterancy with a nearby Command Tank, as intended. It turned out that previous veterancy changes disabled this feature, making the use of the Command Tank near vehicles nearly pointless.
+- Vehicles now properly share their veterancy with a nearby Command Tank. It turned out that previous veterancy changes disabled this feature, making the use of the Command Tank near vehicles nearly pointless.
+- Command Tank mobility and hitpoints equalized to the Cromwell.
 - Command Tank Creeping Smoke Barrage ability no longer requires the Royal Canadian Artillery commander tree, but now requires the Command Tank to have veterancy rank 1.
 - Command Tank can now capture territory sectors at a slow rate.
 - Command Tank bonus radius increased from 30 to 40, allowing for easier support without having to cluster vehicles.
@@ -316,10 +319,6 @@ Commonwealth:
   *Veterancy 1: Creeping Smoke Barrage
   *Veterancy 2: Weapon Reload Modifier 0.9, Weapon Accuracy Modifier 1.1
   *Veterancy 3: Weapon Reload Modifier 0.9, Weapon Accuracy Modifier 1.1
-- Command Tank mobility and hitpoints equalized to the Cromwell.
-- Commando Sniper health increased from 77 to 90 to match all other Snipers.
-- Fixed the problem where the player could have a total of three M7 Priests instead of two.
-- Commando Jeeps can now be deployed even when the Glider is in enemy territory.
 - Staghound health increased from 240/360 to 260/390.
 - Cromwell main gun reloading time increased from 5/5 to 6/6 seconds, to match the M4A4 Sherman.
 - Sherman Firefly main gun reloading time increased from 6/6 to 7/7 seconds.
@@ -342,9 +341,8 @@ Commonwealth:
   *Veterancy 1: Increased Sight Range modifier of +5.
   *Veterancy 2: Received damage modifier 0.95.
   *Veterancy 3: Received damage modifier 0.925.
-- Emplacement symbols are highlighted if they are in the same sector as the Captain, making it easier to see if they benefit or not.
 - Recon Element Flares removed completely.
-- Armor Command Truck manpwoer cost decreased from 205 to 200.
+- Armor Command Truck manpower cost decreased from 205 to 200.
 - M7 Priest health increased from 480 to 500.
 - M7 Priest call-in cost changed from 625 manpower to 500 manpower and 50 fuel.
 - M7 Priest can no longer use Counter Battery.
@@ -360,24 +358,35 @@ Commonwealth:
 - Sherman and Sherman Firely acceleration/deceleration increased from 2/4 to 2.4/4.7 and speed increased from 5.2 to 6.1, to simulate the more powerful engine in the M4A4 models compared to the American M4A3 models.
 - Sherman Smoke Dischargers substituted for a High-Explosive Shell. This ability, costing 75 munitions, fires a High-Explosive shell which has a bigger blast radius than the regular shell, also suppressing Infantry on impact. 
 - Machine Gun Emplacement arc of fire decreased from 120 to 80 degrees.
-- Commando .303cal Heavy Machine Gun arc of fire decreased from 120 to 100 degrees.
 - Staghound acceleration increased from 4 to 5.5 and Speed increased from 6.5 to 7.
 - Staghound fuel cost decreased from 35 to 30.
 - Boys Anti-Tank Rifle reliability against infantry targets increased.
 - Boys Anti-Tank Rifle clip size fixed to 5.
 - Boys Anti-Tank Rifle hotkey changed from R to A to not interfere with reinforcing.
 - Boys Anti-Tank Rifle penetration against heavy armor decreased.
-- PIAT projectile reworked to work like regular Infantry Anti-Tank weaponry to vastly improve the reliability of the weapon.
-- Tank Hunters are now equipped with 'Elite' Lee Enfield Rifles as opposed to Sten Sub-Machine Guns.
-- Tank Hunters can now use the PIAT ambush ability.
-- Commando Heavy Machine Gun Teams are now equiped with 'Elite' Lee Enfield Rifles as opposed to Sten Sub-Machine Guns.
-- Commando Mortar Sections are now equipped with 'Elite' Lee Enfield Rifles as opposed to Sten Sub-Machine Guns.
-- Hawker Typhoon .303cal Heavy Machine Gun damage versus infantry decreased from 3x to 2x.
+- PIAT projectile reworked to work like regular Infantry Anti-Tank weaponry to vastly improve the reliability of the weapon. This does however take away the ability to shoot 'over' hedges and walls.
+- Tank Hunters reworked:
+ * The crew now consists of 4 members.
+ * Each crew member costs 75 manpower as opposed to 85, raising the squad cost from 255 to 300.
+ * Are now equipped with 'Elite' Lee Enfield Rifles as opposed to Sten Sub-Machine Guns.
+ * PIAT ambush ability added.
+- Commando Heavy Machine Gun Teams reworked:
+ * The crew now consists of 4 members.
+ * Each crew member costs 65 manpower as opposed to 85, raising the squad cost from 255 to 260.
+ * Are now equiped with 'Elite' Lee Enfield Rifles as opposed to Sten Sub-Machine Guns.
+- Commando Mortar Sections reworked:
+ * The crew now consists of 4 members.
+ * Each crew member costs 75 manpower as opposed to 70, raising the squad cost from 280 to 300.
+ * Are now equipped with 'Elite' Lee Enfield Rifles as opposed to Sten Sub-Machine Guns.
+ * Reinforce time increased from 6 to 10 seconds to match all other Mortar Crews.
+- Commando Sniper health increased from 77 to 90 to match all other Snipers.
+- Commando Jeeps can now be deployed even when the Glider is in enemy territory.
 - Glider, Glider HQ and Tetrach Glider target type fixed and health halved, making them much more vulnerable as intended.
 - Air Force Overwatch radius decreased from 40 to 30, to be less dominating on smaller maps.
 - Air Force Overwatch munition cost decreased from 225 to 200.
 - Added a 30 radius UI circle to indicate where the Air Force Overwatch, making it easier to target it.
 - Typhoon Airstrike munition cost decreased from 175 to 160.
+- Hawker Typhoon .50cal Heavy Machine Gun damage versus infantry decreased from 3x to 2x.
 - Casualty Clearing Station cost increased from 180 manpower and 15 fuel to 200 manpower and 20 fuel.
 - The amount of bodies required to respawn an Infantry Section at the Casualty Clearing Station increased from 6 to 8.
 - Canadian Infantry reinforce cost decreased from 45 to 40.
@@ -421,7 +430,7 @@ Wehrmacht:
 - Tiger main gun reloading time increased from 6/6 to 7/7 seconds.
 - King Tiger main gun reloading time increased from 6/6 to 7/7 seconds.
 - King Tiger call-in cost changed from 600 manpower to 870 manpower and 180 fuel.
-- King Tiger (Henschel) sight range increased from 45 to 55 and camouflage detection radius increased from 0 to 15 to simulate the bonus of the Tank Commander.
+- King Tiger (Henschel) sight range increased from 35 to 40 and camouflage detection radius increased from 0 to 10 to simulate the bonus of the Tank Commander.
 - Panther fuel cost increased from 110 to 140.
 - Geschützwagen health increased from 550 to 600, to match the Marder III.
 - Geschützwagen main gun reloading time decreased from 6/7 to 6/6 seconds, to match the Marder III.
@@ -572,6 +581,7 @@ Panzer Elite:
 - Bundled Anti-Tank Grenade recharge time increased from 45 to 180 seconds to match all Panzer Elite grenade recharging times.
 - MG42 Heavy Machine Gun Emplacement hotkey changed from H to E.
 - Jagdpanther call-in cost changed from 700 manpower to 600 manpower and 110 fuel.
+- Jagdpanther sight range increased from 35 to 40 and camouflage detection radius increased from 0 to 10 to simulate the bonus of the Tank Commander.
 - Hetzer call-in cost changed from 600 manpower to 340 manpower and 65 fuel.
 - Hetzer Spotting Scope upgrade no longer increases its weapon range; this was an unintended feature, munition cost decreased from 25 to 10 to match similar upgrades.
 - Hetzer can now use Ambush Lock-down. Ambush lock-down camouflages the vehicle and applies the following modifiers on the first shot: 2x weapon penetration; 2x accuracy and 1.25.
@@ -1162,7 +1172,7 @@ American:
 - Medic Heal rate decreased from 0.15 to 0.09375.
 - Reworked Bombing Run into Thunderbolt 'Hellfire' Overwatch. Several P47 Thunderbolts will overwatch the designated area for a period of time, attacking visible enemy targets with powerful 5" High Explosive Rockets.
 - M8 Greyhound M2Hb .50cal Upgrade cost increased from 50 to 75 munitions to match all other turrent Machine Gun upgrades.
-- Smoke Discharges redesigned. The player now has to target the ability somewhere around the tank and the tank will then fire four Smoke Rounds to the targeted location.
+- Smoke Dischargers redesigned. The player now has to target the ability somewhere around the tank and the tank will then fire four Smoke Rounds to the targeted location.
 - Sherman Bulldozer munition cost decreased from 75 to 35.
 - Sherman Crab Mine Flail munition cost decreased from 75 to 50.
 - Off-map Combat Group manpower cost decreased from 800 to 650.
@@ -1186,7 +1196,7 @@ American:
 - Tank Depot reinforce radius increased from 0 to 20.
 
 Commonwealth:
-- New reward unit: Sherman. Like the Cromwell, the M4A4 Sherman mates a 75mm gun with reasonable armor and good mobility. Can be upgraded with a Tank Commander to increase sight range and can fire HE shells to suppress and deal with Infantry.
+- New reward unit: Sherman. Like the Cromwell, the M4A4 Sherman mates a 75mm gun with reasonable armor and good mobility. Can be upgraded with a Tank Commander to increase sight range and can use Smoke Dischargers.
 - New reward unit: Staghound Armoured Car, a Light Armoured Car replacing the Stuart Light Tank when enabled. Less health than the Stuart Light Tank, The Staghound can be upgraded with Sandbags for extra health and a .50cal HMG. It can also lay mines to cover open flanks and cripple enemy assaults.
 - Canadian Infantry are redesigned. They now do suffer from the Movement Reduction Speed in neutral and enemy territory, but now instead they can use a Sprint Ability. In addition, they are armed with a more powerful version of the Lee Enfield Rifle, to indicate that Canadian Infantry are Heavy Shock Infantry. Their health is increased from 110 to 115, thus the squad health from 440 to 460. They still do come with a M2 Flamethrower and have the ability to throw grenades and construct trenches.
 - Highlanders are redesigned. They are now armed with a more powerful version of the Lee Enfield Rifle but no longer come with two Boys AT Rifles by default, they now can get them through an upgrade for 75 munitions. The Over Repair ability still comes by default, they have a basic construction menu and have the ability to throw Grenades.
@@ -1289,7 +1299,7 @@ Wehrmacht:
 - Added 'Improved Equipment' to the Kampfkraft Centre. This upgrade will equip Pioneers and Volksgrenadiers with Grenades and Volksgrenadiers with Panzerfausts.
 - Fixed a bug that Blitzkrieg! would give double bonuses towards friendly vehicles.
 - Fixed a bug that the Geschützwagen accuracy tables were worse than the Marder III.
-- Fixed a bug that the Tiger Ace would turn the hull towards the direction it fired the Smoke Discharges.
+- Fixed a bug that the Tiger Ace would turn the hull towards the direction it fired the Smoke Dischargers.
 - P08 Luger Pistol damage, accuracy and range tables improved and fixed.
 - Medic Kit munition cost decreased from 20 to 15 munitions.
 - Medic Kit heal rate set to 0.15.
