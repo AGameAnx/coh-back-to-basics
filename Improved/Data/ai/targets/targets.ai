@@ -421,7 +421,7 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 		result = result - 0.35
 	end
 	if is_friendly then
-		result = result - 1
+		result = result - 1 - math.min(1, 1.1-militaryPercentValue)
 	end
 	
 	local threat = Military_GetCombinedThreatAtMilitaryPoint(s_selfplayer, militaryPoint, is_defend) -- pass in true to get history anti-class added to this threat
@@ -488,7 +488,7 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 		+ threatScore*earlyGameThreatMultiplier
 		+ (minDistFromAllHQs-0.25)*7*(1+midMapMultiplier/5)*math.max(-0.5, 3-k_longMapRatio*2.5)
 		+ 35*math.min(0, minDistFromAllHQs - 0.285 / (1 + midMapMultiplier / 5 + (1 - k_longMapRatio/2.5) * 2))
-		--+ (Military_GetMilitaryPointDiceRoll(s_selfplayer, militaryPoint)*20 - 10)
+		--+ (Military_GetMilitaryPointDiceRoll(s_selfplayer, militaryPoint)*20 - 10) -- this is quite bugged, screws up early game and wrongs wrong in lategame
 	
 	result = result
 		+ baseMapConstant

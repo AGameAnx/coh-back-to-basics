@@ -53,17 +53,17 @@ function Allied_SpecialTechBuildingRules(tech_pbg)
 			return DEMAND_NeverBuild -- for now
 		end]]
 	elseif (tech_pbg == EBP.ALLIES.ARMORY) then -- Weapon Support Center
-		local result = 0
-		if (UtilPBG_CountAliveOrProduced(EBP.ALLIES.QUARTER_MASTER) > 0) then
+		local result = 4
+		if UtilPBG_CountAliveOrProduced(EBP.ALLIES.QUARTER_MASTER) > 0 then
 			result = result + math.min(World_GetGameTime()-250, -4)
 		end
-		if (UtilPBG_CountAliveOrProduced(EBP.ALLIES.MOTORPOOL) > 0) then
+		if UtilPBG_CountAliveOrProduced(EBP.ALLIES.MOTORPOOL) > 0 then
 			result = result + math.min(World_GetGameTime()/2-220, 0)
 		end
-		if (cache.spawner_count>0) then
-			result = result + math.min(5, cache.infantry_count*1.35-10)
+		if cache.spawner_count > 0 then
+			result = result + math.min(5, cache.infantry_count*1.75-10)
 		end
-		return result - s_RANDOM_RULES_PURCHASE1*6 + s_RANDOM_RULES_PURCHASE2*3+1
+		return result - s_RANDOM_RULES_PURCHASE1*6 + s_RANDOM_RULES_PURCHASE2*3
 	elseif (tech_pbg == EBP.ALLIES.MOTORPOOL) then
 		local result = 0
 		if (cache.spawner_tier2_count > 0 or strongerFuel) then

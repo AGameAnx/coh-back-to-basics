@@ -56,9 +56,9 @@ s_defend_structures_allied = {
 	
 	--{pbg = EBP.ALLIES.FOXHOLE, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=0, demand_decrease=2, limit=2 },
 	{pbg = EBP.ALLIES.MG_NEST_AIRBORNE, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=1.5, demand_decrease=1, limit=2 },
-	{pbg = EBP.ALLIES.MG_NEST, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=1.5, demand_decrease=0.75, limit=3 },
-	{pbg = EBP.ALLIES.MEDIC_STATION, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=2, condition_func = HasInfantry, limit=3, demand_decrease=1 },
-	{pbg = EBP.ALLIES.HOWITZER, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=25, limit=3, demand_decrease=15 },
+	{pbg = EBP.ALLIES.MG_NEST, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=1.5, demand_decrease=0.7, limit=3 },
+	{pbg = EBP.ALLIES.MEDIC_STATION, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=2, condition_func = HasInfantry, limit=3, demand_decrease=1.5 },
+	{pbg = EBP.ALLIES.HOWITZER, buildstyle=BS_Defend, demand_type = DEMAND_Building, demand_pref=35, limit=3, demand_decrease=30 },
 	{pbg = EBP.ALLIES.TRIAGE, buildstyle=BS_NearBase, demand_type = DEMAND_Building, demand_pref=40, condition_func = HasInfantry, limit=1},
 }
 

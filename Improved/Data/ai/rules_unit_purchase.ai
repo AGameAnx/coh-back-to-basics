@@ -318,7 +318,7 @@ function Allied_SpecialUnitDemand(unitPBG, currentDemand)
 	if (unitPBG == s_engineer) then
 		demand_increase = demand_increase + EngineerPioneerDemand() - 1
 	elseif (unitPBG == SBP.ALLIES.RIFLEMEN) then
-		demand_increase = demand_increase - math.sqrt(math.max(0, UtilPBG_CountAliveOrProduced(unitPBG)-0.75))*1.8+1.55 + (math.max(-12, math.min(0, maxpopcap-curpopcap-20)))*0.4
+		demand_increase = demand_increase - math.sqrt(math.max(0, UtilPBG_CountAliveOrProduced(unitPBG)-0.75))*1.8+1.4 + (math.max(-12, math.min(0, maxpopcap-curpopcap-20)))*0.4
 	elseif (unitPBG == SBP.ALLIES.MORTAR) then
 		demand_increase = demand_increase + MortarDemand() - UtilPBG_CountAliveOrProduced(unitPBG)*25 + UtilPBG_CountAliveOrProduced(SBP.ALLIES.RIFLEMEN)*0.7-4
 	elseif (unitPBG == SBP.ALLIES.HEAVYMG) then
@@ -490,7 +490,7 @@ allied_cw_callin_settings = {
 	[BP_GetID(ABILITY.COMMANDER_TREE.CW.RECRUIT_KANGAROO)]				= {{SBP.CW.KANGAROO, SBP.CW.TOMMIES_CANADIAN}, 0, 0, 0},
 	[BP_GetID(ABILITY.COMMANDER_TREE.CW.RECRUIT_PRIEST)]				= {{SBP.CW.PRIEST}, 2, 3, 3},
 	
-	[BP_GetID(ABILITY.COMMANDER_TREE.CW.RECRUIT_HIGHLANDERS)]			= {{EBP.CW.HIGHLANDERS}, 3, 1.5, 1},
+	[BP_GetID(ABILITY.COMMANDER_TREE.CW.RECRUIT_HIGHLANDERS)]			= {{SBP.CW.HIGHLANDERS}, 3, 1.5, 1},
 	[BP_GetID(ABILITY.COMMANDER_TREE.CW.GLIDER_COMMANDOS)]				= {{EBP.CW.GLIDER_COMMANDOS, SBP.CW.COMMANDOS}, 3, 1.5, 2},
 	[BP_GetID(ABILITY.COMMANDER_TREE.CW.GLIDER_HQ)]						= {{EBP.CW.GLIDER_HQ}, 1, 1, 0},
 	
