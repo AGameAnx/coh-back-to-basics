@@ -120,7 +120,7 @@ Commander Trees:
 
 - Panzer Elite Luftwaffe Tactics:
 	right: Luftwaffe Ground Forces (1) > Wirbelwind Flakpanzer (3) > 88mm FlaK 36 AT/AA (3)
-	left: Fallschirmjägers (3) > Rocket Run (2) > Henschel 'Panzerknacker' Overwatch (3)
+	left: Fallschirmjägers (3) > Stuka Bombing Strike (2) > Henschel 'Panzerknacker' Overwatch (3)
 	bottom: Tank Awareness (1) > Butteryfly Bombs (2)
 
 - Panzer Elite Breakthrough Tactics:
@@ -168,7 +168,6 @@ User Interface and Language:
 - Obersoldaten received new unit icon, symbol and portrait.
 - Knight's Cross Holders symbol improved.
 - Canadian Infantry received new unit icon, symbol and portrait.
-- Henschel Rocket Run received a new icon.
 
 Americans:
 - New Reward Unit: M18 Hellcat - Armed with the same M1A2 main gun, the M18 Hellcat is a more mobile but less armored tank destroyer than the M10 Wolverine. It can however be upgraded with a M2Hb .50cal Heavy Machine gun for increased effectiveness against infantry.
@@ -508,8 +507,8 @@ Wehrmacht:
 
 Panzer Elite:
 - Tank Hunter Tactics renamed and reworked into Breakthrough Tactics, to decrease the specialization of the whole Commander Tree, increasing both its versatility and viability.
-- Added a new ability to Breakthrough Tactics: Flares - For 45 munition, flares will be dropped on a designated area to reveal any unit present in the area.
 - Added a new ability to Scorched Earth Tactics: Resource Redistribution - A toggled ability which boosts munition income at the cost of fuel income.
+- Replaced Henschel Rocket Run with Stuka Bombing Strike - A JU-87D Stuka will dive in and drop a 250kg bomb on the targeted location for a cost of 125 munitions.
 - Added a new ability for the Reconnaissance Halftrack: "Spotting"; For a short period of time, the camouflage detection radius is doubled. This ability useful to deal with Snipers, as well as that the Armored Car as a clear choice over the Reconnaissance Halftrack due to it being faster and having the overdrive ability. This addition should make it a more interesting choice to go for.
 - Added the missing Squad Leader behavior for Panzer Grenadiers, Jägers, Fallschirmjägers and Luftwaffe Ground Forces.
 - Panzer Grenadiers can now build basic field defences (Barbed Wire/Sandbags) by default; using a separate construction menu.

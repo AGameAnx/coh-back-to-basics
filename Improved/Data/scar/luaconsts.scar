@@ -972,7 +972,7 @@ UPG = {
 		ELITE = {
 			LUFTWAFFE 				= BP_GetUpgradeBlueprint("upgrade/pe_luftwaffe_support"),
 			LUFTWAFFE_00			= BP_GetUpgradeBlueprint("upgrade/pe_luftwaffe_support_00"),	-- Fallshirmjager infiltration
-			LUFTWAFFE_01			= BP_GetUpgradeBlueprint("upgrade/pe_luftwaffe_support_01"),	-- Henschel Rocket Run
+			LUFTWAFFE_01			= BP_GetUpgradeBlueprint("upgrade/pe_luftwaffe_support_01"),	-- JU-87 Stuka Bombing Strike
 			LUFTWAFFE_02			= BP_GetUpgradeBlueprint("upgrade/pe_luftwaffe_support_02"),	-- Henschel AT Overwatch
 			LUFTWAFFE_10			= BP_GetUpgradeBlueprint("upgrade/pe_luftwaffe_support_10"),	-- Luftwaffe
 			LUFTWAFFE_11			= BP_GetUpgradeBlueprint("upgrade/pe_luftwaffe_support_11"),	-- Wirblewind Flakpanzer
@@ -1268,6 +1268,7 @@ ABILITY = {
 			DRACHE_DROP_OFF				= BP_GetAbilityBlueprint("abilities/panzer_elite_drache_drop_off_ability.lua"), -- manpower
 			HENSCHEL					= BP_GetAbilityBlueprint("abilities/panzer_elite_henschel_at_strike.lua"), -- munitions
 			HENSCHEL_ROCKETS			= BP_GetAbilityBlueprint("abilities/panzer_elite_henschel_rockets.lua"), -- munitions
+			JU87			= BP_GetAbilityBlueprint("abilities/panzer_elite_ju87_stuka_airstrike.lua"), -- munitions
 			WIRBLE_WIND					= BP_GetAbilityBlueprint("abilities/panzer_elite_wirblewind_ability.lua"), -- manpower
 			
 			-- scorched earth
