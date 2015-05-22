@@ -41,7 +41,7 @@ s_player_ability_defs_coh[TRACE_ALLIES][BP_GetID(UPG.COMMANDER_TREE.ALLIES.AIRBO
 		ABILITY.ALLIES.PARADROP_ENGINEERS,
 	}
 }
-	
+
 s_player_ability_defs_coh[TRACE_ALLIES][BP_GetID(UPG.COMMANDER_TREE.ALLIES.ARMOR)] = {
 	munition_abilities = {
 		ABILITY.COMMANDER_TREE.ALLIES.ARMOR_HEAL,
@@ -71,7 +71,7 @@ s_player_ability_defs_coh[TRACE_AXIS][BP_GetID(UPG.COMMANDER_TREE.AXIS.DEFENSE)]
 		ABILITY.AXIS.PIONEERS_REINFORCEMENT,
 	}
 }
-	
+
 s_player_ability_defs_coh[TRACE_AXIS][BP_GetID(UPG.COMMANDER_TREE.AXIS.BLITZKRIEG)] = {
 	munition_abilities = {
 		ABILITY.COMMANDER_TREE.AXIS.BLITZKRIEG,
@@ -84,7 +84,7 @@ s_player_ability_defs_coh[TRACE_AXIS][BP_GetID(UPG.COMMANDER_TREE.AXIS.BLITZKRIE
 		ABILITY.AXIS.PIONEERS_REINFORCEMENT,
 	}
 }
-	
+
 s_player_ability_defs_coh[TRACE_AXIS][BP_GetID(UPG.COMMANDER_TREE.AXIS.PROPAGANDA)] = {
 	munition_abilities = {
 		ABILITY.COMMANDER_TREE.AXIS.FIRESTORM,
@@ -100,9 +100,8 @@ s_player_ability_defs_coh[TRACE_AXIS][BP_GetID(UPG.COMMANDER_TREE.AXIS.PROPAGAND
 		ABILITY.AXIS.PIONEERS_REINFORCEMENT,
 	}
 }
-	
----------------------------------- ALLIES CW ------------------------------------------
 
+---------------------------------- ALLIES CW ------------------------------------------
 
 s_player_ability_defs_coh[TRACE_ALLIES_COMMONWEALTH][BP_GetID(UPG.COMMANDER_TREE.CW.CANADIAN_ARTILLERY)] = {
 	munition_abilities = {
@@ -129,7 +128,7 @@ s_player_ability_defs_coh[TRACE_ALLIES_COMMONWEALTH][BP_GetID(UPG.COMMANDER_TREE
 		ABILITY.CW.HQ_REINFORCE,
 	}
 }
-	
+
 s_player_ability_defs_coh[TRACE_ALLIES_COMMONWEALTH][BP_GetID(UPG.COMMANDER_TREE.CW.ENGINEERS)] = {
 	munition_abilities = {
 	},
@@ -141,14 +140,15 @@ s_player_ability_defs_coh[TRACE_ALLIES_COMMONWEALTH][BP_GetID(UPG.COMMANDER_TREE
 		ABILITY.CW.HQ_REINFORCE,
 	}
 }
-	
+
 ---------------------------------- AXIS PE ------------------------------------------	
 
 s_player_ability_defs_coh[TRACE_AXIS_PANZER_ELITE][BP_GetID(UPG.COMMANDER_TREE.ELITE.LUFTWAFFE)] = {
 	munition_abilities = {
 		ABILITY.COMMANDER_TREE.ELITE.AIR_DROPPED_MINES,
 		ABILITY.COMMANDER_TREE.ELITE.HENSCHEL,
-		ABILITY.COMMANDER_TREE.ELITE.HENSCHEL_ROCKETS,
+		ABILITY.COMMANDER_TREE.ELITE.JU87,
+		--ABILITY.COMMANDER_TREE.ELITE.HENSCHEL_ROCKETS,
 	},
 	production_abilities = {
 		ABILITY.COMMANDER_TREE.ELITE.RECRUIT_LUFTWAFFE,
@@ -161,7 +161,7 @@ s_player_ability_defs_coh[TRACE_AXIS_PANZER_ELITE][BP_GetID(UPG.COMMANDER_TREE.E
 		ABILITY.ELITE.GREN_REINFORCEMENT_LARGE,
 	}
 }
-	
+
 s_player_ability_defs_coh[TRACE_AXIS_PANZER_ELITE][BP_GetID(UPG.COMMANDER_TREE.ELITE.SCORCHED_EARTH)] = {
 	munition_abilities = {
 		ABILITY.COMMANDER_TREE.ELITE.SECTOR_ARTILLERY
@@ -177,7 +177,7 @@ s_player_ability_defs_coh[TRACE_AXIS_PANZER_ELITE][BP_GetID(UPG.COMMANDER_TREE.E
 		ABILITY.ELITE.GREN_REINFORCEMENT_LARGE,
 	}
 }
-	
+
 s_player_ability_defs_coh[TRACE_AXIS_PANZER_ELITE][BP_GetID(UPG.COMMANDER_TREE.ELITE.TANK_DESTROYER)] = {
 	munition_abilities = {
 		ABILITY.COMMANDER_TREE.ELITE.RAILWAY_ARTILLERY
