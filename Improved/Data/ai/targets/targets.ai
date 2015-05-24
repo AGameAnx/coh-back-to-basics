@@ -247,9 +247,9 @@ function RankTargetsPrepass()
 		militaryPercentValue = 1.1
 	end
 	
-	earlyGameTimeRule = math.max(0, 1 - math.min(1, World_GetGameTime()/180-0.35)) * math.min(1, 0.5 + k_longMapRatio*2)
+	earlyGameTimeRule = math.max(0, 1 - math.min(1, World_GetGameTime()/260-0.35)) * math.min(1, 0.5 + k_longMapRatio*2)
 	
-	earlyGameScore = 7*earlyGameTimeRule + k_longMapRatio*earlyGameTimeRule*50
+	earlyGameScore = 7*earlyGameTimeRule + k_longMapRatio*earlyGameTimeRule*40
 	earlyGameFrontlineMultiplier = (1 - earlyGameTimeRule) * math.min(1, (1+k_longMapRatio*2)*0.55+0.45)
 	earlyGameThreatMultiplier = math.max(-1, math.min(1, (0.55 - earlyGameTimeRule)/0.45))
 	

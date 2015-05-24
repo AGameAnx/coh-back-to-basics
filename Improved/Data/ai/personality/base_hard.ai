@@ -3,7 +3,7 @@ s_personality.name = "Hard Personality"
 
 s_personality.fallback_chance = 1.0
 
-s_personality.ability_avoidance_percentage = 100
+s_personality.ability_avoidance_percentage = 1
 s_personality.demand_variance = 0.15
 
 s_personality.max_engineers = 3

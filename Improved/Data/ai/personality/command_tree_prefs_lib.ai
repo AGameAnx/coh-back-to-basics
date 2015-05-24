@@ -44,7 +44,7 @@ command_trees = {
 			
 		}},
 		{main = CT_ALLIES.AIRBORNE,
-		weight = 7,
+		weight = 8,
 		choices = {
 			
 			-- Airborne -> Strafing Run -> AT Gun

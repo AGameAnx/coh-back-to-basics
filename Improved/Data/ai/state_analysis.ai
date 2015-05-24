@@ -120,15 +120,15 @@ state_analysis.recalculate_budgets = function()
 	if (cache.military_non_engineer_count >= 2) then
 		-- if he has no spawners, increase tech
 		if (cache.spawner_count == 0) then
-			increase_tech = 5
+			increase_tech = 1
 		elseif (cache.spawner_tier1_count > 0 and cache.spawner_tier2_count == 0) then
-			increase_tech = 4
+			increase_tech = 2
 		elseif (cache.spawner_tier2_count > 0 and cache.spawner_tier1_count == 0) then
 			increase_tech = 3
 		elseif (cache.spawner_tier1_count > 0 and cache.spawner_tier2_count > 0) then
-			increase_tech = 2
+			increase_tech = 4
 		elseif (cache.spawner_count > 3 or (s_current_race == TRACE_ALLIES_COMMONWEALTH and cache.spawner_count >= 3)) then
-			increase_tech = 1 -- we have a few spawners of both tiers
+			increase_tech = 5 -- we have a few spawners of both tiers
 		end
 	end
 	
@@ -178,7 +178,7 @@ state_analysis.recalculate_budgets = function()
 	end
 	
 	ai_budget:setweight("BUDGET_Secure", secureBudget)
-	ai_budget:setweight("BUDGET_PlayerAbility", state_analysis.budget_levels.playerability[increase_tech] + curResources.munition/30)
+	ai_budget:setweight("BUDGET_PlayerAbility", state_analysis.budget_levels.playerability[increase_tech])
 	ai_budget:setweight("BUDGET_SquadAbility", state_analysis.budget_levels.squadability[increase_tech])
 	
 	--[[CustomDebug.Clear()

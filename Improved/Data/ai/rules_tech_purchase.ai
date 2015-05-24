@@ -203,13 +203,13 @@ function Allied_SpecialUpgradeRules(upgrade_pbg)
 		
 		-- Togglable resourcing upgrade
 	elseif (upgrade_pbg == UPG.ALLIES.RESOURCE_UPGRADE3) then
-		if (fuelRate > 21 and cache.infantry_count > 6) or (cache.infantry_count >= 8 and fuelRate > 18) or (cache.infantry_count >= 10 and fuelRate > 14) or (cache.infantry_count >= 12) then
-			return 100
+		if fuelRate+curResources.fuel/70 > cache.infantry_count*3 then
+			return 10
 		end
 		return DEMAND_NeverBuild
 	elseif (upgrade_pbg == UPG.ALLIES.RESOURCE_UPGRADE3_OFF) then
-		if (fuelRate < 14 and cache.infantry_count < 12) or cache.infantry_count <= 6 then
-			return 100
+		if fuelRate+curResources.fuel/70 < cache.infantry_count/4 then
+			return 10
 		end
 		return DEMAND_NeverBuild
 	

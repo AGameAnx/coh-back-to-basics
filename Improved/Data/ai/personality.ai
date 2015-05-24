@@ -112,9 +112,9 @@ s_personality =
 		units         = {55, 55, 35, 45, 30},
 		tech          = {15, 20, 25, 35, 35},
 		addon         = { 5,  5,  5,  5,  5},
-		secure        = { 5,  3,  1,  1,  1},
+		secure        = { 3,  3,  1,  1,  1},
 		playerability = {25, 25, 25, 25, 25},
-		squadability  = { 2,  2,  1,  1,  1}
+		squadability  = { 2,  2, 12, 15, 15}
 	},
 	
 	--------------------------------
@@ -159,9 +159,9 @@ s_personality =
 	{
 		clump_scan_ticks = 1, -- how often the player updates cached clumps for combat tactics
 		threat_weighting = 1.0,
-		importance_weighting = 0,
-		must_be_seen = true,
-		min_threat = 4.0
+		importance_weighting = 0.2,
+		must_be_seen = false,
+		min_threat = 1.0
 	},
 }
 

@@ -16,7 +16,7 @@ end
 
 function check_clump(pos, radius, threshold, infantry)
 	if threshold == nil then threshold = 1 end
-	if radius == nil then radius = 20 end
+	if radius == nil then radius = 25 end
 	if infantry == nil then infantry = true end
 	local count = 0
 	local sg = SGroup_CreateIfNotFound('tactics_checkclump')
@@ -26,7 +26,7 @@ function check_clump(pos, radius, threshold, infantry)
 		local squad = SGroup_GetSpawnedSquadAt(sg, i)
 		local isVehicle = false
 		for j=0,Squad_Count(squad)-1 do
-			local entity = Squad_EntityAt(j)
+			local entity = Squad_EntityAt(squad, j)
 			if Entity_IsVehicle(entity) then
 				isVehicle = true
 				break
@@ -36,6 +36,7 @@ function check_clump(pos, radius, threshold, infantry)
 			if not infantry then
 				count = count + 1
 				if count >= threshold then
+					SGroup_Destroy(sg)
 					return true
 				end
 			end
@@ -43,6 +44,7 @@ function check_clump(pos, radius, threshold, infantry)
 			if infantry then
 				count = count + 1
 				if count >= threshold then
+					SGroup_Destroy(sg)
 					return true
 				end
 			end

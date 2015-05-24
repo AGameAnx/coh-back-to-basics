@@ -45,9 +45,9 @@ function PositionTargetFilter_EnemyClump_Infantry(caster)
 		threat_weighting = 1.0,
 		importance_weighting = 0.05,
 		must_be_seen = true,
-		min_threat = 25}
+		min_threat = 5}
 	local outPos = AIPlayer_GetBestArtilleryPosition(s_selfplayer, artilleryInfo)
-	if outPos and not is_in_base_sector(outPos) and Player_CanSeePosition(s_self_modplayer, outPos) and check_clump(outPos, 20, nil, true) then return outPos end
+	if outPos and not is_in_base_sector(outPos) and Player_CanSeePosition(s_self_modplayer, outPos) and check_clump(outPos, 25, nil, true) then return outPos end
 	return World_Pos(COORD_INVALID, COORD_INVALID, COORD_INVALID)
 end
 function PositionTargetFilter_EnemyClump_Vehicles(caster)
@@ -56,9 +56,9 @@ function PositionTargetFilter_EnemyClump_Vehicles(caster)
 		threat_weighting = 1.0,
 		importance_weighting = 0.05,
 		must_be_seen = true,
-		min_threat = 25}
+		min_threat = 10}
 	local outPos = AIPlayer_GetBestArtilleryPosition(s_selfplayer, artilleryInfo)
-	if outPos and not is_in_base_sector(outPos) and Player_CanSeePosition(s_self_modplayer, outPos) and check_clump(outPos, 25, nil, false) then return outPos end
+	if outPos and not is_in_base_sector(outPos) and Player_CanSeePosition(s_self_modplayer, outPos) and check_clump(outPos, 30, nil, false) then return outPos end
 	return World_Pos(COORD_INVALID, COORD_INVALID, COORD_INVALID)
 end
 
@@ -111,7 +111,7 @@ function AirStrike_Get2ndPosition(caster, pos1, can_see)
 	end
 	
 	-- choose a random angle
-	for i=1,3 do
+	for i=1,5 do
 		local angle = AI_RandRange(0,2*3.14159)
 		local xdir = math.cos(angle)*5
 		local zdir = math.sin(angle)*5
@@ -133,7 +133,7 @@ function AITacticDemand_Recon(abilityPBG)
 	local curResources = AIResource_GetCurrentResources(s_selfplayer)
 	if curResources.munition > 275 then
 		local outPos = AIPlayer_GetBestArtilleryPosition(s_selfplayer, airRecon_artilleryInfo)
-		if outPos then return 0.5-World_GetRand(0,2) end
+		if outPos then return 0.5-AI_RandRange(0,3) end
 	end
 	return -5
 end

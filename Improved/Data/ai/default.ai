@@ -205,21 +205,6 @@ function HandleIncompleteStructures()
 end
 
 ------------------------------------------------------------
--- currently unused helpers
-
--- determine if this tactic can be used given the budget it has for it
-function CanUseAbilityMunitionsBudget(resAmount)
-	-- check to see if we have enough munitions
-	return resAmount.munition < (s_munitionsAvailableForAbilities-s_abilityMunitionsSpent)
-end
-
--- when the ability has been triggered this function needs to be called with munitions that has been spent
-function UseAbilityMunitionsBudget(resAmount)
-	-- accumulate the money spent inbetween budget calculations
-	s_abilityMunitionsSpent = s_abilityMunitionsSpent + resAmount.munition
-end
-
-------------------------------------------------------------
 -- AI_Think and AI_Analyse! This is where it all happens!
 -- The functions are split so that they can be spread over a few different frames.
 
@@ -359,12 +344,12 @@ end
 
 s_munitionsAvailableForAbilities = 0
 s_abilityMunitionsSpent = 0
-s_munitionsToLock = 150
+s_munitionsToLock = 140
 
 -- this function locks a certain amount of resources
 function ability_money_cache(availableResources)
 	-- SHOULD DETERMINE HOW MANY UNITS NEED MONEY AND HOW MUCH. INSTEAD OF ALWAYS LOCKING X AMOUNT
-
+	
 	local minMunitionToLock = s_munitionsToLock + (availableResources.munition-s_munitionsToLock)*0.25
 	
 	-- determine the amount of munitions available at this part of the budget
@@ -372,10 +357,10 @@ function ability_money_cache(availableResources)
 	-- subtract the amount of money used by abilities in the previous frames since last being called
 	s_munitionsAvailableForAbilities = s_munitionsAvailableForAbilities - s_abilityMunitionsSpent
 	
-	--aitrace("Munitions available for squad abilities:"..s_munitionsAvailableForAbilities)
+	--aitrace("Munitions available for squad abilities:"..string.format('%d', s_munitionsAvailableForAbilities))
 	
 	-- if munitions have been spent we need to alert the budget system
-	if (s_abilityMunitionsSpent > 0) then
+	if s_abilityMunitionsSpent > 0 then
 		--aitrace("Ability has been triggered using "..s_abilityMunitionsSpent.." munitions!")
 		local resAmountSpent = ResourceAmount_Zero()
 		resAmountSpent.munition = s_abilityMunitionsSpent
@@ -432,12 +417,12 @@ function InitializeStrategies()
 	
 	-- initialize the budget system
 	ai_budget:init()
-	ai_budget:add("BUDGET_Units", strategy_unit_purchase.do_purchase, s_personality.budget_levels.units[5], false)
-	ai_budget:add("BUDGET_Tech", strategy_tech_purchase.do_purchase, s_personality.budget_levels.tech[5], false, 2)
-	ai_budget:add("BUDGET_AddOn", strategy_addon_purchase.do_purchase, s_personality.budget_levels.addon[5], true)
-	ai_budget:add("BUDGET_Secure", strategy_defence_purchase.do_purchase, s_personality.budget_levels.secure[5], false, 2)
-	ai_budget:add("BUDGET_PlayerAbility", player_abilities.do_purchase, s_personality.budget_levels.playerability[5], true)
-	ai_budget:add("BUDGET_SquadAbility", ability_money_cache, s_personality.budget_levels.squadability[5], true)
+	ai_budget:add("BUDGET_Units", strategy_unit_purchase.do_purchase, s_personality.budget_levels.units[1], false)
+	ai_budget:add("BUDGET_Tech", strategy_tech_purchase.do_purchase, s_personality.budget_levels.tech[1], false, 2)
+	ai_budget:add("BUDGET_AddOn", strategy_addon_purchase.do_purchase, s_personality.budget_levels.addon[1], true)
+	ai_budget:add("BUDGET_Secure", strategy_defence_purchase.do_purchase, s_personality.budget_levels.secure[1], false, 2)
+	ai_budget:add("BUDGET_PlayerAbility", player_abilities.do_purchase, s_personality.budget_levels.playerability[1], true)
+	ai_budget:add("BUDGET_SquadAbility", ability_money_cache, s_personality.budget_levels.squadability[1], true)
 	
 	-- this does the first distribution of funds
 	ai_budget:simulate_pre()

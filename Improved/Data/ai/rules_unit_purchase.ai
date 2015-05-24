@@ -9,6 +9,7 @@ allied_purchase_limits = {
 	[BP_GetID(SBP.ALLIES.SERGEANT)] = 3,
 	[BP_GetID(SBP.ALLIES.HALFTRACK)] = 1,
 	[BP_GetID(SBP.ALLIES.JEEP)] = 1,
+	[BP_GetID(SBP.ALLIES.JEEP_RECOILESS)] = 1,
 	[BP_GetID(SBP.ALLIES.SNIPER)] = 3,
 	[BP_GetID(SBP.ALLIES.MORTAR)] = 2,
 	[BP_GetID(SBP.ALLIES.HEAVYMG)] = 3,
@@ -59,6 +60,7 @@ local sbpLists = {
 	LightVehicle = {
 		SBP.AXIS.MOTORCYCLE,
 		SBP.ALLIES.JEEP,
+		SBP.ALLIES.JEEP_RECOILESS,
 	},
 	Artillery = {
 		SBP.AXIS.NEBELWERFER,
@@ -327,7 +329,7 @@ function Allied_SpecialUnitDemand(unitPBG, currentDemand)
 		demand_increase = demand_increase + SniperDemand() - UtilPBG_CountAliveOrProduced(unitPBG)*6 + UtilPBG_CountAliveOrProduced(SBP.ALLIES.RIFLEMEN)*0.5
 	elseif (unitPBG == SBP.ALLIES.LOGISTICS_ENGINEER) then
 		demand_increase = demand_increase + EngineerPioneerDemand(unitPBG)
-	elseif (unitPBG == SBP.ALLIES.JEEP) then
+	elseif (unitPBG == SBP.ALLIES.JEEP or unitPBG == SBP.ALLIES.JEEP_RECOILESS) then
 		demand_increase = demand_increase + LightVehicleDemand()-4.5
 	elseif (unitPBG == SBP.ALLIES.AT_57MM) then
 		demand_increase = demand_increase - UtilPBG_CountAliveOrProduced(unitPBG)*1.75 - math.min(2.5, World_GetGameTime()/300)
@@ -476,7 +478,7 @@ allied_callin_settings = {
 	
 	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_PARADROP)]			= {{SBP.ALLIES.PARATROOPER}, 3, 7, 2},
 	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_PARADROP_AT)]		= {{SBP.ALLIES.PARATROOPER_AT_57MM, SBP.ALLIES.AT_57MM}, 5, 1, 1},
-	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.GLIDER_HQ)]					= {{EBP.ALLIES.GLIDER_HQ}, 1, 1, 0},
+	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.GLIDER_HQ)]					= {{EBP.ALLIES.GLIDER_HQ}, 0, 0, 0},
 	
 	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_RANGERS)]			= {{SBP.ALLIES.RANGER}, 4, 5, 1.5},
 	[BP_GetID(ABILITY.COMMANDER_TREE.ALLIES.RECRUIT_COMBAT_GROUP_NEW)]	= {{SBP.ALLIES.HELLCAT, SBP.ALLIES.RANGER, SBP.ALLIES.RIFLEMEN}, 12, 22, 3},
@@ -492,7 +494,7 @@ allied_cw_callin_settings = {
 	
 	[BP_GetID(ABILITY.COMMANDER_TREE.CW.RECRUIT_HIGHLANDERS)]			= {{SBP.CW.HIGHLANDERS}, 3, 1.5, 1},
 	[BP_GetID(ABILITY.COMMANDER_TREE.CW.GLIDER_COMMANDOS)]				= {{EBP.CW.GLIDER_COMMANDOS, SBP.CW.COMMANDOS}, 3, 1.5, 2},
-	[BP_GetID(ABILITY.COMMANDER_TREE.CW.GLIDER_HQ)]						= {{EBP.CW.GLIDER_HQ}, 1, 1, 0},
+	[BP_GetID(ABILITY.COMMANDER_TREE.CW.GLIDER_HQ)]						= {{EBP.CW.GLIDER_HQ}, 1, 0, 0},
 	
 	[BP_GetID(ABILITY.COMMANDER_TREE.CW.GLIDER_TETRARCH)]				= {{EBP.CW.GLIDER_TETRARCH, SBP.CW.TETRARCH}, 1, 0, 0},
 	[BP_GetID(ABILITY.COMMANDER_TREE.CW.RECRUIT_CHURCHILL)]				= {{SBP.CW.CHURCHILL}, 3, 3, 2},

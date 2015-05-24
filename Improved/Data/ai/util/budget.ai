@@ -17,10 +17,16 @@ function ai_budget.trace(msg)
 	msg = "[" .. ticks .. "]" .. msg
 
 	aitrace_ext("AI_Budget", msg)
+	if s_selfplayerid-999 == 3 then
+		CustomDebug.Print(msg)
+	end
 end
 
 function ai_budget.trace_clear()
 	aitraceclear_ext("AI_Budget")
+	if s_selfplayerid-999 == 3 then
+		CustomDebug.Clear()
+	end
 end
 
 -- initialize the budget system
@@ -256,7 +262,7 @@ function ai_budget:do_purchases(do_munitions_only)
 	-- run the budget calcs up to X times per frame (in case we have lots of money)
 	local maxRunsPerFrame=kMaxTimesToPurchasePerFrame
 	
-	while(maxRunsPerFrame > 0 and self:internal_do_purchases(resInActiveTasks, do_munitions_only)) do
+	while (maxRunsPerFrame > 0 and self:internal_do_purchases(resInActiveTasks, do_munitions_only)) do
 		resInActiveTasks = Task_CountCost(s_selfplayer, false)
 		--ai_budget.trace("ResInTasks:"..res_to_str(resInActiveTasks))
 		

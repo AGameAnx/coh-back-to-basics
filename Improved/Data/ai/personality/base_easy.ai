@@ -12,7 +12,7 @@ s_personality.min_military_value_start = 40
 s_personality.min_military_value_increment_per_minute = 2
 s_personality.glue_military_percentage = 1.2
 
-s_personality.ability_avoidance_percentage = 10
+s_personality.ability_avoidance_percentage = 0.1
 s_personality.demand_variance = 0.75
 
 s_personality.defensiveness = 0.6

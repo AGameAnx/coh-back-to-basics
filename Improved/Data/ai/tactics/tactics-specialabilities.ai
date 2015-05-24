@@ -205,12 +205,47 @@ end
 -- Grenades
 s_NearClumpDistanceCap_Grenade = 20+5
 function PositionTargetFilter_BestClump_Grenade(squad)
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+	local selfPos = Squad_GetPosition(sim_squad)
+	local sg = SGroup_CreateIfNotFound('tactics_grenadepos')
+	SGroup_Clear(sg)
+	World_GetSquadsNearPoint(s_self_modplayer, sg, selfPos, s_NearClumpDistanceCap_Grenade, OT_Enemy)
+	local closestDist = s_NearClumpDistanceCap_Grenade+5
+	local closestSquad = nil
+	for i=1,SGroup_CountSpawned(sg) do
+		local s = SGroup_GetSpawnedSquadAt(sg, i)
+		local isVehicle = false
+		for j=0,Squad_Count(s)-1 do
+			local entity = Squad_EntityAt(s, j)
+			if Entity_IsVehicle(entity) then
+				isVehicle = true
+				break
+			end
+		end
+		if not isVehicle and not Squad_IsMoving(s) then
+			local pos = Squad_GetPosition(s)
+			local dist = World_DistancePointToPoint(selfPos, pos)
+			if dist < closestDist then
+				closestDist = dist
+				closestSquad = s
+			end
+		end
+	end
+	SGroup_Destroy(sg)
+	if closestSquad then
+		return Squad_GetPosition(closestSquad)
+	else
+		return World_Pos(COORD_INVALID, COORD_INVALID, COORD_INVALID)
+	end
 	--local i = AIPlayer_GetFowBestClumpIdx(s_selfplayer, squad, s_NearClumpDistanceCap_Grenade)
 	--if i < 0 then
-		return World_Pos(COORD_INVALID, COORD_INVALID, COORD_INVALID)
+	--	return World_Pos(COORD_INVALID, COORD_INVALID, COORD_INVALID)
 	--end
-	
 	--return AIPlayer_GetClumpPosition(s_selfplayer, i)
+end
+function TacticDemand_NearEnemyClump_Assault(squad, near_entities, near_squads)
+	local result = TacticDemand_NearEnemyClump_Grenade(squad, near_entities, near_squads)
+	return result - AI_RandRange(1,5)
 end
 function TacticDemand_NearEnemyClump_Grenade(squad, near_entities, near_squads)
 	local sim_squad = AISquad_ConvertToSimSquad(squad)
@@ -222,7 +257,7 @@ function TacticDemand_NearEnemyClump_Grenade(squad, near_entities, near_squads)
 	
 	result = result - (1 - healthLeftPercentage) - (1 - unitsLeft/fullLoadout)
 	
-	--if have_clumps_near_range(squad, s_NearClumpDistanceCap_Grenade) then result = result + 3 end
+	if have_clumps_near_range(squad, s_NearClumpDistanceCap_Grenade) then result = result + 1 end
 	if get_first_enemy_hmg_squad(near_squads) ~= nil then
 		result = result + 1
 	elseif EntityTargetFilter_FirstGarrisoned(squad, near_entities) ~= nil then
@@ -348,7 +383,7 @@ function TacticDemand_Retreat(squad, near_e, near_s)
 	local closestEnemyDistace
 	local enemyCount = 0
 	local friendlyCount = 0
-	for i=1, table.getn(near_s) do
+	for i=1,table.getn(near_s) do
 		if is_enemy_squad(near_s[i]) then
 			if is_not_vehicle(near_s[i]) then
 				enemyCount = enemyCount + Squad_Count(near_s[i])
@@ -503,9 +538,14 @@ function PositionTargetFilter_BestClump_Mortar(squad) return GetArtyPosition(squ
 function TacticDemand_NearEnemyClump_Mortar(squad, near_entities, near_squads) return TacticDemand_Boolean(squad, have_clumps_near_range, {s_NearClumpDistanceCap_Mortar}) end
 
 -- Nebelwerfer
-s_NearClumpDistanceCap_Neb = 175+70
+s_NearClumpDistanceCap_Neb = 245
 function PositionTargetFilter_BestClump_Neb(squad) return GetArtyPosition(squad, s_NearClumpDistanceCap_Neb, true) end
 function TacticDemand_NearEnemyClump_Neb(squad, near_entities, near_squads) return TacticDemand_Boolean(squad, have_clumps_near_range, {s_NearClumpDistanceCap_Neb})*1000 end
+
+-- Stuka zu Fuss
+s_NearClumpDistanceCap_Stuka = 195
+function PositionTargetFilter_BestClump_Stuka(squad) return GetArtyPosition(squad, s_NearClumpDistanceCap_Stuka, true) end
+function TacticDemand_NearEnemyClump_Stuka(squad, near_entities, near_squads) return TacticDemand_Boolean(squad, have_clumps_near_range, {s_NearClumpDistanceCap_Stuka})*1000 end
 
 -- Howitzer
 s_NearClumpDistanceCap_Howie = 250

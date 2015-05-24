@@ -72,6 +72,7 @@ SBP = {
 		--vehicles
 		T17						= BP_GetSquadBlueprint("sbps/races/allies/vehicles/t17_squad_reinforcement_radio.lua"),
 		JEEP					= BP_GetSquadBlueprint("sbps/races/allies/vehicles/jeep_squad.lua"),
+		JEEP_RECOILESS			= BP_GetSquadBlueprint("sbps/races/allies/vehicles/jeep_recoilless_squad.lua"),
 		SCOTT					= BP_GetSquadBlueprint("sbps/races/allies/vehicles/m8_scott_squad.lua"),
 		AT_57MM					= BP_GetSquadBlueprint("sbps/races/allies/vehicles/m1_57mm_at_squad.lua"),
 		HOWITZER				= BP_GetSquadBlueprint("sbps/races/allies/vehicles/m2a1_105mm_howitzer_squad.lua"),
@@ -1177,7 +1178,7 @@ ABILITY = {
 			GLIDER_HQ					= BP_GetAbilityBlueprint("abilities/ally_glider_hq_ability.lua"),
 			RECON						= BP_GetAbilityBlueprint("abilities/ally_air_recon_ability.lua"),
 			STRAFE_MG					= BP_GetAbilityBlueprint("abilities/ally_air_strike_ability_strafe.lua"),
-			STRAFE_ROCKET				= BP_GetAbilityBlueprint("abilities/ally_thunderbolt_airstrike.lua"),
+			STRAFE_ROCKET				= BP_GetAbilityBlueprint("abilities/ally_thunderbolt_hellfire_airstrike.lua"),
 			
 			-- infantry (the rest of the abilities can be acquired through upgrades
 			RECRUIT_RANGERS 			= BP_GetAbilityBlueprint("abilities/ally_reinforcements_ability_rangers.lua"),

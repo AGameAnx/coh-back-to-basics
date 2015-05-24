@@ -396,18 +396,24 @@ AIControl.Grid = {
 				for i=1, AIControl.Grid.Dimensions[1] do
 					for j=1, AIControl.Grid.Dimensions[2] do
 						if AIControl.Grid.Data[i][j][enemyTeam] > 0 then
+							local canSee = Player_CanSeePosition(player, AIControl.Grid.AveragePosData[i][j][enemyTeam])
 							local surroundingSafety = AIControl.MainControl.GetSurroundingSafety({i, j}, 0, 1, team)
 							local danger = 0
 							local dangerFOW = 0
 							for i,v in pairs(surroundingSafety) do
-								danger = danger + v[3] + v[4]*0.05 - v[5]*0.35
-								dangerFOW = dangerFOW + v[3]*0.75 + v[4]*0.25 - v[5]*0.35
+								danger = danger + v[3] + v[4]*0.015 - v[5]*0.35
+								dangerFOW = dangerFOW - v[5]*0.35
+								if canSee then
+									dangerFOW = dangerFOW + v[3] + v[4]*0.015
+								else
+									dangerFOW = dangerFOW + v[3]*0.75 + v[4]*0.2
+								end
 							end
 							if dangerFOW > highestDangerFOW[team] then
 								highestDangerFOW[team] = dangerFOW
 								highestPosFOW[team] = {i, j}
 							end
-							if danger > highestDanger[team] and Player_CanSeePosition(player, AIControl.Grid.AveragePosData[i][j][enemyTeam]) then
+							if canSee and danger > highestDanger[team] then
 								highestDanger[team] = danger
 								highestPos[team] = {i, j}
 							end
@@ -1656,11 +1662,12 @@ AIControl.MainControl = {
 				-- reinforcing
 				local tmpSG = SGroup_CreateIfNotFound("tempsg")
 				SGroup_Single(tmpSG, squad)
-				if Squad_CanInstantReinforceNow(squad) then
+				if Squad_CanInstantReinforceNow(squad) and Squad_HasActiveCommand(squad) and Squad_GetActiveCommand(squad) ~= SQUADSTATEID_Idle then
 					if not Squad_IsReinforcing(squad) or Squad_GetProductionQueueSize(squad) < 2 then
 						Cmd_ReinforceUnit(tmpSG, 1)
 					end
-				elseif Squad_IsReinforcing(squad) then -- Fix for reinforce bug
+				end
+				if Squad_IsReinforcing(squad) and (not Squad_CanInstantReinforceNow(squad) or Squad_Count(squad) == Squad_GetMax(squad)) then -- Fix for reinforce bug
 					Command_Squad(player, tmpSG, SCMD_CancelProduction, false)
 				end
 				SGroup_Destroy(tmpSG)
@@ -2356,7 +2363,7 @@ AIControl.MainControl = {
 							local collectiveDanger = 0
 							local friendlyArmor = 0
 							for j,v in pairs(surroundingSafety) do
-								collectiveDanger = collectiveDanger + v[3] + v[4]*0.01 - v[5]*0.045 - v[6]*0.00125
+								collectiveDanger = collectiveDanger + v[3] + v[4]*0.01 - v[5]*0.0525 - v[6]*0.00125
 								friendlyArmor = friendlyArmor + v[8]
 							end
 							
