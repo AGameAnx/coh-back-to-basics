@@ -152,3 +152,51 @@ function PositionTargetFilter_BestClump_Near(squad)
 
 	return AIPlayer_GetClumpPosition(s_selfplayer,i)
 end
+
+local HMGBlueprintIDs = {
+	[SBP.ALLIES.HEAVYMG] = true,
+	[SBP.ALLIES.PARATROOPER_HEAVYMG_SP] = true,
+	[SBP.AXIS.HEAVYMG] = true,
+	[SBP.AXIS.CAPTURE_MG] = true,
+	[SBP.CW.VICKERSMG] = true,
+	[SBP.CW.VICKERS_MG_SP] = true,
+	[SBP.CW.CAPTURE_MG] = true,
+	[SBP.CW.COMMANDOS_MG42_SP] = true,
+	[SBP.ELITE.HEAVYMG] = true,
+	[SBP.ELITE.FALLSCHIRMJAGER_HMG] = true,
+}
+function PositionTargetFilter_InFrontOfHMG(squad)
+	local sim_squad = AISquad_ConvertToSimSquad(squad)
+	local selfPos = Squad_GetPosition(sim_squad)
+	local sg = SGroup_CreateIfNotFound('tactics_infrontofmgpos')
+	SGroup_Clear(sg)
+	World_GetSquadsNearPoint(s_self_modplayer, sg, selfPos, 100, OT_Enemy)
+	local closestDist = 100+5
+	local closestSquad = nil
+	for i=1,SGroup_CountSpawned(sg) do
+		local s = SGroup_GetSpawnedSquadAt(sg, i)
+		local bpID = BP_GetID(Squad_GetBlueprint(s))
+		if HMGBlueprintIDs[bpID] then
+			local heading = Squad_GetHeading(s)
+			for j=0,Squad_Count(s)-1 do
+				local e = Squad_EntityAt(s, j)
+				if Entity_IsSyncWeapon(e) then
+					heading = Entity_GetHeading(e)
+					break
+				end
+			end
+			local sg2 = SGroup_CreateIfNotFound('tactics_infrontofmgpos2')
+			local squadPos = Squad_GetPosition(s)
+			local dropPos = World_Pos(squadPos.x+heading.x*40, squadPos.y+heading.y*40, squadPos.z+heading.z*40)
+			World_GetSquadsNearPoint(s_self_modplayer, sg2, dropPos, 35, OT_Ally)
+			if SGroup_CountSpawned(sg2) > 0 then
+				SGroup_Destroy(sg2)
+				SGroup_Destroy(sg)
+				return dropPos
+			end
+			SGroup_Destroy(sg2)
+		end
+	end
+	SGroup_Destroy(sg)
+	return World_Pos(COORD_INVALID, COORD_INVALID, COORD_INVALID)
+end

@@ -8,7 +8,7 @@ s_NearClumpDistanceCap = 150
 s_NearClumpDistanceCap_Small = 35
 s_ObstructionSearchRadius = 80
 
-s_demand_increment = 2
+s_demand_increment = 1
 
 import('tactics/tactics-util.ai')
 import('tactics/tactics-player.ai')
