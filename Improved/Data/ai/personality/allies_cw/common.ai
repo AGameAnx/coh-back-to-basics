@@ -1,6 +1,6 @@
 
 s_personality.max_num_capturers = 2
 
-s_personality.budget_levels.units = {100, 100, 30, 40, 30}
+s_personality.budget_levels.units = {100, 80, 30, 40, 30}
 s_personality.budget_levels.tech = {5, 5, 4, 3, 1}
-s_personality.budget_levels.secure = {60, 60, 60, 65, 65}
+s_personality.budget_levels.secure = {60, 60, 65, 65, 65}

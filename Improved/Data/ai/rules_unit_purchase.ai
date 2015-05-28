@@ -365,9 +365,9 @@ function Axis_SpecialUnitDemand(unitPBG, currentDemand)
 	elseif (unitPBG == SBP.AXIS.MORTAR) then
 		demand_increase = demand_increase + MortarDemand() - UtilPBG_CountAliveOrProduced(unitPBG)*7 + math.min(World_GetGameTime()-375, 0)/10 - 11
 	elseif (unitPBG == SBP.AXIS.NEBELWERFER) then
-		demand_increase = demand_increase + MortarDemand() + curResources.munition/12 + resRate.munition/5 - 15 - UtilPBG_CountAliveOrProduced(unitPBG)*10
+		demand_increase = demand_increase + MortarDemand() + curResources.munition/12 + resRate.munition/5 - 25 - UtilPBG_CountAliveOrProduced(unitPBG)*20
 	elseif (unitPBG == SBP.AXIS.HALFTRACK) then
-		demand_increase = demand_increase + MortarDemand()/2 + curResources.munition/6 + resRate.munition/4 - 25 - UtilPBG_CountAliveOrProduced(unitPBG)*5
+		demand_increase = demand_increase + MortarDemand()/2 + curResources.munition/6 + resRate.munition/4 - 35 - UtilPBG_CountAliveOrProduced(unitPBG)*15
 	elseif (unitPBG == SBP.AXIS.MOTORCYCLE) then
 		demand_increase = demand_increase + LightVehicleDemand()-4.5
 	elseif (unitPBG == SBP.AXIS.SCHWIMMWAGEN) then
