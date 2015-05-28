@@ -177,7 +177,9 @@ Americans:
  * Each crew member costs 60 manpower as opposed to 80.
  * Reinforce time reduced from 12 seconds to 7.5.
 - Browning .30cal Heavy Machine Gun arc of fire decreased from 120 to 100 degrees.
+- Medic manpower cost increased from 120 to 150.
 - Significantly reduced combat medic healing effectiveness.
+- Medic now has a Field Dressing ability which allows it to quickly heal up injured squads for 10 ammunition.
 - Machine Gun Emplacement arc of fire decreased from 120 degrees to 80 degrees.
 - Triage Center construction time decreased from 55 to 50 seconds.
 - Ranger upkeep increased from 2.4 to 2.5 manpower per minute per entity.
@@ -185,7 +187,6 @@ Americans:
 - Command Squad Mortar Barrage salvo decreased from 10 to 8 shells.
 - Command Squad manpower cost decreased from 340 to 300.
 - Sergeant manpower cost reduced from 240 to 200.
-- Medic manpower cost increased from 120 to 150.
 - M8 Greyhound health increased from 240/360 to 260/390.
 - M8 Greyhound acceleration increased from 4.5 to 5.5 and Speed increased from 6.5 to 7.
 - T17 Armored Car health increased from 240/360 to 260/390.
@@ -266,7 +267,6 @@ Americans:
 - Sherman accuracy slightly reduced, area of effect tables adjusted.
 - Glider Headquarters target type fixed and health halved, making them much more vulnerable as intended.
 - Glider Headquarters no longer heals by default, instead it now has a timed ability for 35 munitions.
-- Medic now has a Field Dressing ability which allows it to quickly heal up injured squads for 10 ammunition.
 - M1 Garand base damage increased from 24/26 to 27/29, decreasing the amount of shots it takes to kill infantry.
 - M1 Garand statistics generally improved and tuned to match the new damage model.
 - M1 Garand clip size fixed to 8 rounds.
