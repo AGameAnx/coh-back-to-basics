@@ -256,6 +256,7 @@ Americans:
 - Riflemen health increased from 75 to 80.
 - Riflemen can no longer construct mines with Defensive Operations.
 - Riflemen reinforce cost increased from 27 to 28.
+- Riflemen manpower cost increased from 270 to 280.
 - Paratrooper health increased from 78 to 82.
 - Ranger reinforce cost decreased from 45 to 42.
 - Ranger health increased from 75 to 80.
@@ -458,7 +459,7 @@ Wehrmacht:
 - Assault hotkey changed from L to S.
 - 81mm Gr.34 Mortar Emplacement hotkey changed from M to E to no longer interfere with Mines.
 - 150mm Nebelwerfer no longer is affected by Veteran Infantry Training.
-- Kampfkraft Centre construction time decreased from 60 to 40 seconds to slightly increase its appeal early on.
+- Kampfkraft Centre construction time decreased from 60 to 30 seconds to increase its appeal early on.
 - Sturmhaubitze 42 main gun redesigned to be a much more comfortable unit to use while being less dominant per shot.
 - Sturmhaubitze call-in cost changed from 500 manpower to 450 manpower and 70 fuel.
 - Bunkers upgraded to Aid or Repair Stations can no longer hold Infantry.
