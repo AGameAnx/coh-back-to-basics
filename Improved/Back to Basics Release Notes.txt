@@ -208,7 +208,8 @@ Americans:
 - P47 Thunderbolt M2Hb .50cal Heavy Machine Gun damage versus infantry decreased from 3x to 2x.
 - Strafing Run munition cost decreased from 150 to 125.
 - Self Repair recharge time increased from 45 to 120 seconds.
-- Self Repair repair speed decreased from 15 to 6.5 (same as Advanced Repair), duration increased from 20 to 40 seconds to repair a maximum of 260 hitpoints instead of the previous 300.
+- Self Repair repair speed decreased from 15 to 7.5, duration increased from 20 to 40 seconds.
+- Self Repair munition cost decreased from 150 to 100.
 - War Machine recharge time increased from 90 to 120 seconds.
 - M4 'Assault' Sherman main gun redesigned to be a much more comfortable unit to use while being less dominant per shot.
 - M4 'Assault Sherman' call-in cost changed from 500 manpower to 450 manpower and 70 fuel.
