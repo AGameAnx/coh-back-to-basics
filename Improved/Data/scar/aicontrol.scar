@@ -1055,10 +1055,10 @@ AIControl.Pathfinding = {
 --------------------------------------------------------------------------------------------------------------------
 
 UNIT_CONTROL_CONST = {
-	DEFAULT_SETUP_TARGET_DANGER = 2.2,
+	DEFAULT_SETUP_TARGET_DANGER = 2.3,
 	DEFAULT_SAFETY_SEARCH_RADIUS_STEPS = 3,
-	DEFAULT_MOVE_BACK_DANGER = 7.5,
-	DEFAULT_RETREAT_DANGER = 18,
+	DEFAULT_MOVE_BACK_DANGER = 8.5,
+	DEFAULT_RETREAT_DANGER = 19,
 }
 UNIT_CONTROL_PRESET = {
 	SNIPER = {
@@ -1081,9 +1081,9 @@ UNIT_CONTROL_PRESET = {
 		['target_angle_threshold'] = -1
 	},
 	NEBELWERFER = {
-		['safety_radius_steps'] = 6,
+		['safety_radius_steps'] = 7,
 		['setup_target_danger'] = 100, -- shouldn't ever setup (get locked while not barraging)
-		['move_back_danger'] = 0.75,
+		['move_back_danger'] = 0.55,
 		['retreat_danger'] = -1,
 		['init_step'] = 2,
 		['step_count'] = 4,
@@ -1094,7 +1094,7 @@ UNIT_CONTROL_PRESET = {
 		['armor_danger_decrease'] = 0.45,
 		['armor_danger_decrease_reduction_threshold'] = 200,
 		['search_cover'] = false,
-		['safety_radius_steps'] = 5,
+		['safety_radius_steps'] = 6,
 		['setup_target_danger'] = 2,
 		['move_back_danger'] = 0.45,
 		['retreat_danger'] = -1,
@@ -1288,7 +1288,7 @@ AIControl.MainControl = {
 					{weight=1, searchrange=245, cost=35, minThreatToCast=1.5, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_nebelwerfer_barrage.lua')},
 				},
 				[BP_GetID(SBP.AXIS.HALFTRACK)] = {
-					{weight=1, searchrange=225, cost=50, minThreatToCast=2.5, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_stuka_zu_fuss_rocket_halftrack.lua')},
+					{weight=1, searchrange=245, cost=50, minThreatToCast=2.25, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_stuka_zu_fuss_rocket_halftrack.lua')},
 				},
 			},
 		},
