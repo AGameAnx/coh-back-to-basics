@@ -528,6 +528,7 @@ Panzer Elite:
 - Funkwagen 'Vampire' Halftrack Goliath Drop munition cost decreased from 100 to 50.
 - Jägers are now armed with four scopeless Gewehr 43 rifles instead of four MP40 SMG's. Scopeless G43's are great for all ranges; but best for close to medium range engagements.
 - Jägers call-in manpower cost increased from 260 to 340, and require 2 Command Points to unlock.
+- Jägers can now infiltrate the battlefield through neutral buildings, similar to Fallschirmjägers.
 - Jägers reinforce cost increased from 30 to 36, and reinforcing time increased from 6 to 7 seconds.
 - Jägers can now use Vital Shot.
 - Jägers can now use Fire-Up instead of Sprint.
