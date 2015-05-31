@@ -754,6 +754,7 @@ UPG = {
 		BUNKER_MED						= BP_GetUpgradeBlueprint("upgrade/allies/cp_aide_station_upgrade_axis.lua"), 
 		CONVERT_AMBIENT_BUILDING		= BP_GetUpgradeBlueprint("upgrade/convert_ambient_building.lua"),
 		ARMOUR_SKIRTS					= BP_GetUpgradeBlueprint("upgrade/axis/armory_armour_skirts.lua"),
+		INFANTRY_GEAR					= BP_GetUpgradeBlueprint("upgrade/axis/armory_volksgrenadier_gear.lua"),
 		
 		
 		-- veterancy levels that can be researched

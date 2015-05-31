@@ -125,12 +125,9 @@ function Axis_SpecialTechBuildingRules(tech_pbg)
 	
 	local result = 0
 	if tech_pbg == EBP.AXIS.KAMPFKRAFT then
-		if cache.spawner_count < 2 then
-			return DEMAND_NeverBuild
-		end
-		result = result + math.min(0, cache.infantry_count*4.5+math.min(0, World_GetGameTime()/30-120)-35)
+		result = result + math.min(0, math.min(0, World_GetGameTime()/30-15)) + s_RANDOM_RULES_PURCHASE2*5 - 5
 	elseif tech_pbg == EBP.AXIS.QUARTERS then
-		if cache.spawner_count>0 then
+		if cache.spawner_count > 0 then
 			if strongerFuel then
 				result = result - 10
 			end
@@ -184,42 +181,42 @@ function Allied_SpecialUpgradeRules(upgrade_pbg)
 	--end
 	
 	local timeRule = math.min(-math.sqrt(math.max(1700-World_GetGameTime(), 0)), -5)
-	if (upgrade_pbg == UPG.ALLIES.STICKY_BOMB) then
+	if upgrade_pbg == UPG.ALLIES.STICKY_BOMB then
 		return timeRule+3
-	elseif (upgrade_pbg == UPG.ALLIES.DEMOLITION) then
+	elseif upgrade_pbg == UPG.ALLIES.DEMOLITION then
 		return DEMAND_NeverBuild
-	elseif (upgrade_pbg == UPG.ALLIES.ENGINEER_THOMPSON) then
+	elseif upgrade_pbg == UPG.ALLIES.ENGINEER_THOMPSON then
 		return -25+UtilPBG_CountAliveOrProduced(SBP.ALLIES.ENGINEER)*4+timeRule
 	elseif (upgrade_pbg == UPG.ALLIES.RESOURCE_UPGRADE1) then
 		if (fuelRate > 16 or curResources.fuel > 55) then
 			return math.max(cache.infantry_count*1.15-s_RANDOM_RULES_PURCHASE1/5-s_RANDOM_RULES_PURCHASE2/5 + 20 + curResources.fuel/20, timeRule*0.75-4)
 		end
 		return DEMAND_NeverBuild
-	elseif (upgrade_pbg == UPG.ALLIES.RESOURCE_UPGRADE2) then
+	elseif upgrade_pbg == UPG.ALLIES.RESOURCE_UPGRADE2 then
 		if (fuelRate > 19 or curResources.fuel > 90) then
 			return math.max(cache.infantry_count*1.35-s_RANDOM_RULES_PURCHASE2/5+2 + curResources.fuel/30, timeRule*0.65-6)
 		end
 		return DEMAND_NeverBuild
 		
 		-- Togglable resourcing upgrade
-	elseif (upgrade_pbg == UPG.ALLIES.RESOURCE_UPGRADE3) then
+	elseif upgrade_pbg == UPG.ALLIES.RESOURCE_UPGRADE3 then
 		if fuelRate+curResources.fuel/70 > cache.infantry_count*3 then
 			return 10
 		end
 		return DEMAND_NeverBuild
-	elseif (upgrade_pbg == UPG.ALLIES.RESOURCE_UPGRADE3_OFF) then
+	elseif upgrade_pbg == UPG.ALLIES.RESOURCE_UPGRADE3_OFF then
 		if fuelRate+curResources.fuel/70 < cache.infantry_count/4 then
 			return 10
 		end
 		return DEMAND_NeverBuild
 	
-	elseif (upgrade_pbg == UPG.ALLIES.SMOKE_SCREEN) then
+	elseif upgrade_pbg == UPG.ALLIES.SMOKE_SCREEN then
 		local tank_count = UtilPBG_CountAliveOrProduced(SBP.ALLIES.SHERMAN) + UtilPBG_CountAliveOrProduced(SBP.ALLIES.SHERMAN_76MM)
 		if (tank_count > 0) then
 			return math.min(tank_count*5-25, 0)
 		end
 		return DEMAND_NeverBuild
-	elseif (upgrade_pbg == UPG.ALLIES.GUN_76MM) then
+	elseif upgrade_pbg == UPG.ALLIES.GUN_76MM then
 		local tank_count = UtilPBG_CountAliveOrProduced(SBP.ALLIES.SHERMAN) + UtilPBG_CountAliveOrProduced(SBP.ALLIES.SHERMAN_76MM)
 		return math.min(tank_count*10-35+World_GetGameTime()/150, -1)+tank_count
 	end
@@ -258,6 +255,7 @@ function Axis_SpecialUpgradeRules(upgrade_pbg)
 		result = result + math.min(2*UtilPBG_CountAlive(EBP.AXIS.BUNKER)-1, 4)
 	elseif upgrade_pbg == UPG.AXIS.BUNKER_MED then
 		result = result + 4
+	
 	elseif upgrade_pbg == UPG.AXIS.PHASE2 then
 		result = result + 10
 	elseif upgrade_pbg == UPG.AXIS.PHASE3 then
@@ -277,10 +275,16 @@ function Axis_SpecialUpgradeRules(upgrade_pbg)
 		end
 		
 		result = result - s_RANDOM_RULES_PURCHASE1*2 + s_RANDOM_RULES_PURCHASE2*7 - 10 + math.min(10, World_GetGameTime()/35-15)
+	
 	elseif upgrade_pbg == UPG.AXIS.ARMOUR_SKIRTS then
 		if UtilPBG_CountAliveOrProduced(EBP.AXIS.COMMAND) == 0 then
 			return DEMAND_NeverBuild
 		end
+	elseif upgrade_pbg == UPG.AXIS.VETERANCY.INFANTRY1 then
+		result = result + 25 - s_RANDOM_RULES_PURCHASE1*2
+	elseif upgrade_pbg == UPG.AXIS.VETERANCY.INFANTRY_GEAR then
+		result = result + 5 - s_RANDOM_RULES_PURCHASE1*2
+	
 	--[[elseif (upgrade_pbg == UPG.AXIS.VETERANCY.INFANTRY1 or
 			upgrade_pbg == UPG.AXIS.VETERANCY.INFANTRY2 or
 			upgrade_pbg == UPG.AXIS.VETERANCY.INFANTRY3 or
@@ -340,6 +344,7 @@ function Axis_SpecialUpgradeRules(upgrade_pbg)
 
 		-- need at least 5 infantry to increase likeliness to build the upgrade
 		local demand = (3 - cache.vehicle_count) * 2 + s_personality.axis_quarter_master_vehicle_veterancy_demand]]
+	
 	else
 		result = result + math.min(-2*math.sqrt(math.max(800-World_GetGameTime()/1.25, 0)), 0)
 	end
