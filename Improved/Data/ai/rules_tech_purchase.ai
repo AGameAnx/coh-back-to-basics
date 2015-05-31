@@ -125,7 +125,7 @@ function Axis_SpecialTechBuildingRules(tech_pbg)
 	
 	local result = 0
 	if tech_pbg == EBP.AXIS.KAMPFKRAFT then
-		result = result + math.min(0, math.min(0, World_GetGameTime()/30-15)) + s_RANDOM_RULES_PURCHASE2*5 - 5
+		result = result + math.min(0, math.min(0, World_GetGameTime()/30-15)) + s_RANDOM_RULES_PURCHASE2*8 - 10
 	elseif tech_pbg == EBP.AXIS.QUARTERS then
 		if cache.spawner_count > 0 then
 			if strongerFuel then
@@ -283,7 +283,7 @@ function Axis_SpecialUpgradeRules(upgrade_pbg)
 	elseif upgrade_pbg == UPG.AXIS.VETERANCY.INFANTRY1 then
 		result = result + 25 - s_RANDOM_RULES_PURCHASE1*2
 	elseif upgrade_pbg == UPG.AXIS.VETERANCY.INFANTRY_GEAR then
-		result = result + 5 - s_RANDOM_RULES_PURCHASE1*2
+		result = result + 10 - s_RANDOM_RULES_PURCHASE1*2
 	
 	--[[elseif (upgrade_pbg == UPG.AXIS.VETERANCY.INFANTRY1 or
 			upgrade_pbg == UPG.AXIS.VETERANCY.INFANTRY2 or
