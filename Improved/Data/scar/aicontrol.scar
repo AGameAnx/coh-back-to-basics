@@ -1285,10 +1285,10 @@ AIControl.MainControl = {
 			ChangeToCastBelowsavedMunitionsThreshold = 5, -- A percentage chance to cast the abilities even if we're currently saving up our munitions
 			UnitSettings = {
 				[BP_GetID(SBP.AXIS.NEBELWERFER)] = {
-					{weight=1, searchrange=245, cost=35, minThreatToCast=2, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_nebelwerfer_barrage.lua')},
+					{weight=1, searchrange=245, cost=35, minThreatToCast=1.5, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_nebelwerfer_barrage.lua')},
 				},
 				[BP_GetID(SBP.AXIS.HALFTRACK)] = {
-					{weight=1, searchrange=225, cost=50, minThreatToCast=5, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_stuka_zu_fuss_rocket_halftrack.lua')},
+					{weight=1, searchrange=225, cost=50, minThreatToCast=3, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_stuka_zu_fuss_rocket_halftrack.lua')},
 				},
 			},
 		},
