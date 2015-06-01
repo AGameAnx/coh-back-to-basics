@@ -29,12 +29,12 @@ s_personality =
 	name = "Default Personality",               -- name of this personality
 
 	defensiveness = 0.1,                        -- how defensive a player this AI is (from 0-1) with 1 being very defensive
-	defensiveness_budget_increase = 30,         --
+	defensiveness_budget_increase = 10,         --
 	vp_aggressiveness = 0.75,                   -- how hard will the player go for VP (from 0-1) NOTE: they will still go after them to prevent a loss
 	chance_to_occupy = 0.002,                   -- general random factor, how often to occupy (larger the more chance it will happen if it becomes a good choice)
 	max_damage = 600,                           -- amount ge friendly units can take before stopping the build order (if significant damage is taken stop the build order and have the AI react accordingly)
 	max_time = 60*3,                            -- amount of time that will pass before stopping the build order (if the build order stalls or takes longer than expected, it will end and cease being a bottle-neck)
-
+	
 	--------------------------------
 	-- company command tree info
 	command_tree_pref_tbl = {},                 -- list of preferences this personality has, AI will pick randomly from the list
@@ -48,18 +48,18 @@ s_personality =
 	default_attack_percentage = 0.55,           -- when attacking what is the default percentage
 	max_attack_percentage = 0.90,               -- [0,1] what attack percentage do we never want to go over no matter what
 	attack_percentage_increment_per_minute = 0, -- attack percentage increase each minute
-	advance_percentage = 0,                     -- how much more military we need to advance on an enemy
+	advance_percentage = 1.0,                     -- how much more military we need to advance on an enemy
 
-	fallback_percentage = 0.2,                  -- how much less military we need to fallback from an enemy (this is a maybe, depending on a random factor)
-	fallback_health_percentage = 0.45,          -- how little health we need for vehicles to fallback (this is a maybe, depending on a random factor)
-	fallback_capacity_percentage = 0.2,         -- how little squad capacity we need for soldiers to fallback (this is a maybe, depending on a random factor)
-	fallback_chance = 0.9,                      -- the chance of falling back within a certain time frame once the above fallback conditions are met
-	fallback_chance_reevaluate_ticks = 1,       -- how long to wait before reevaluating whether to fallback
-	fallback_health_percentage_always = 0.25,   -- below this health, the vehicle will ALWAYS fallback
+	fallback_percentage = 0,                    -- how much less military we need to fallback from an enemy (this is a maybe, depending on a random factor)
+	fallback_health_percentage = 0,             -- how little health we need for vehicles to fallback (this is a maybe, depending on a random factor)
+	fallback_capacity_percentage = 0,           -- how little squad capacity we need for soldiers to fallback (this is a maybe, depending on a random factor)
+	fallback_chance = 0,                        -- the chance of falling back within a certain time frame once the above fallback conditions are met
+	fallback_chance_reevaluate_ticks = 10,      -- how long to wait before reevaluating whether to fallback
+	fallback_health_percentage_always = 0,      -- below this health, the vehicle will ALWAYS fallback
 
-	retreat_capacity_percentage = 0.3,          -- (0.675) the capacity percentage below which soldier squads will retreat
-	retreat_suppressed_percentage = 0.95,       -- (0.85) if this percent or more of squads in the area are suppressed, the squad will retreat
-	retreat_chance = 0.5,                       -- (1.0)
+	retreat_capacity_percentage = 0,            -- (0.675) the capacity percentage below which soldier squads will retreat
+	retreat_suppressed_percentage = 0,          -- (0.85) if this percent or more of squads in the area are suppressed, the squad will retreat
+	retreat_chance = 0  ,                       -- (1.0)
 	retreat_chance_reevaluate_ticks = 10,       -- (1)
 	
 	min_engineers_below_50_owned = 1,           -- how many engineers minimum do we need to have when we have less than 50 of the map
@@ -112,9 +112,9 @@ s_personality =
 		units         = {55, 55, 35, 45, 30},
 		tech          = {15, 20, 25, 35, 35},
 		addon         = { 5,  5,  5,  5,  5},
-		secure        = { 3,  3,  1,  1,  1},
-		playerability = {25, 25, 25, 25, 25},
-		squadability  = { 2,  2, 12, 15, 15}
+		secure        = { 1,  1,  2,  2,  1},
+		playerability = {20, 20, 25, 25, 25},
+		squadability  = {15, 15, 12, 12, 10}
 	},
 	
 	--------------------------------
@@ -149,7 +149,7 @@ s_personality =
 	
 	--------------------------------
 	-- tactics info
-	ability_avoidance_percentage = 95,       -- what percentage of the time will the AI try to avoid avoidable abilities (artillery)
+	ability_avoidance_percentage = 0.95,       -- what percentage of the time will the AI try to avoid avoidable abilities (artillery)
 	tankmove_tactic_enabled = false,         -- is the tankmove tactic enabled
 	
 	threat_aggressiveness = 0,               -- A direct addition to normal militaryPercentValue (higher value makes AI think it has more units, thus attack into threat more)
@@ -157,11 +157,11 @@ s_personality =
 	-- combat state update
 	clump_scan_params =                      -- currently this clump data is used by tactics for targeting
 	{
-		clump_scan_ticks = 1, -- how often the player updates cached clumps for combat tactics
+		clump_scan_ticks = 8,
 		threat_weighting = 1.0,
-		importance_weighting = 0.2,
+		importance_weighting = 0.5,
 		must_be_seen = false,
-		min_threat = 1.0
+		min_threat = 6
 	},
 }
 

@@ -7,7 +7,6 @@ function TacticFilter_Hold(squad)
 	local healthLeftPercentage = Squad_GetHealthPercentage(sim_squad)
 	return healthLeftPercentage > 0.3 and not ((fullLoadout > 1 and unitsLeft == 1) or (fullLoadout == 1 and healthLeftPercentage < 0.4))
 end
-
 function TacticDemand_Hold(squad, near_e, near_s)
 	local hold_ent = EntityTargetFilter_FirstHold(squad, near_e)
 	if hold_ent == nil then return -99999 end
@@ -58,7 +57,6 @@ function TacticDemand_Hold(squad, near_e, near_s)
 	
 	return result*100-15 - Entity_GetHealthPercentage(hold_ent)*50 + math.min(0, (Entity_GetHealth(hold_ent)-300)*10)
 end
-
 function TacticDemand_HoldHMG(squad, near_e, near_s)
 	local hold_ent = EntityTargetFilter_FirstHold(squad, near_e)
 	if hold_ent == nil then return -99999 end
@@ -107,7 +105,6 @@ function TacticDemand_HoldHMG(squad, near_e, near_s)
 	
 	return result*1500-15 - Entity_GetHealthPercentage(hold_ent)*500 + (Entity_GetHealth(hold_ent)-300)*120
 end
-
 
 -- Marksman shot
 function EntityTargetFilter_MarksmanShot(squad, target_entities)
@@ -183,7 +180,7 @@ function SquadTargetFilter_MarksmanShot1(squad, target_squads)
 end
 function TacticDemand_MarksmanShot(squad, near_entities, near_squads)
 	local result = CountEnemySquads(near_squads)/3-1.1
-	if (EntityTargetFilter_MarksmanShot1(squad, near_entities) ~= nil or SquadTargetFilter_MarksmanShot1(squad, near_squads) ~= nil) then result = result + 525 end
+	if EntityTargetFilter_MarksmanShot1(squad, near_entities) ~= nil or SquadTargetFilter_MarksmanShot1(squad, near_squads) ~= nil then result = result + 525 end
 	return result
 end
 
@@ -257,7 +254,7 @@ function TacticDemand_NearEnemyClump_Grenade(squad, near_entities, near_squads)
 	
 	result = result - (1 - healthLeftPercentage) - (1 - unitsLeft/fullLoadout)
 	
-	if have_clumps_near_range(squad, s_NearClumpDistanceCap_Grenade) then result = result + 1 end
+	if have_clumps_near_range(squad, s_NearClumpDistanceCap_Grenade) then result = result + 2 end
 	if get_first_enemy_hmg_squad(near_squads) ~= nil then
 		result = result + 1
 	elseif EntityTargetFilter_FirstGarrisoned(squad, near_entities) ~= nil then

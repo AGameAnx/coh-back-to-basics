@@ -89,6 +89,7 @@ local firstPassDone = false
 
 local militaryPercentValue = 1
 local percentagePointsCaptured = 0
+local closeToBaseThreshold = 0.55
 
 local k_friendlyHQs = {}
 local k_friendlyHQCount = 0
@@ -162,10 +163,12 @@ function RankTargetsPrepass()
 		local hqMidDistRatio = math.sqrt(hqMidDist.x^2 + hqMidDist.z^2)/k_maxDist
 		
 		frontlineMapConstant = -3 - k_longMapRatio*1.5
+		closeToBaseThreshold = 0.55 / (1 + midMapMultiplier/2)
 		
 		--CustomDebug.Print('k_longMapRatio: '..string.format('%.2f', k_longMapRatio))
 		--CustomDebug.Print('k_frontlineCoefficient: '..string.format('%.2f', k_frontlineCoefficient))
 		--CustomDebug.Print('frontlineMapConstant: '..string.format('%.2f', frontlineMapConstant))
+		--CustomDebug.Print('closeToBaseThreshold: '..string.format('%.3f', closeToBaseThreshold))
 	end
 	
 	frontlinePoints = {}
@@ -364,11 +367,11 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 	distFromAllHQsCoefficient = math.max(-0.1, distFromAllHQsCoefficient) * 12]]
 	
 	local distRatio = math.max(
-		0.15,
+		0.1,
 		math.min(
 			1,
-			((minDistFromFriendlyHQs*1.15)/k_maxDist/furthestPoint - 0.22*(midMapMultiplier/5)) * (1 + midMapMultiplier/4) + (1 - k_longMapRatio*1.75)
-		)*1.15 - 0.15
+			((minDistFromFriendlyHQs*1.1)/k_maxDist/furthestPoint - 0.22*(midMapMultiplier/5)) * (1 + midMapMultiplier/4) + (1 - k_longMapRatio*1.75)
+		)*1.1 - 0.1
 	)
 	
 	local frontlineDistRatio
@@ -434,8 +437,8 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 	elseif threat >= 0 then
 		local maxThreat = math.max(5, math.min(130, Military_GetMaxCombinedThreatAtMilitaryPoint(s_selfplayer)))
 		threatScore = -1.75*threat/maxThreat
-		if minDistFromFriendlyHQs < 0.45 / (1 + midMapMultiplier/2) then -- we have to respond to threats near the HQ
-			threatAtBaseScore = 15 * threat/maxThreat * (1-(minDistFromFriendlyHQs-0.45)/0.45 / (1 + midMapMultiplier/2))
+		if minDistFromFriendlyHQs / k_maxDist / furthestPoint < closeToBaseThreshold then -- we have to respond to threats near the HQ
+			threatAtBaseScore = 15 * threat/maxThreat * (closeToBaseThreshold-minDistFromFriendlyHQs / k_maxDist / furthestPoint)/closeToBaseThreshold
 		end
 		threatScore = threatScore - math.min(1.5, math.max(0.5, 3*(1.025-militaryPercentValue)*threat/maxThreat)) -- if we have a larger army, we want to pursue threats instead of avoiding them. The result adjusted for that here
 	end
@@ -488,14 +491,14 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 		+ threatScore*earlyGameThreatMultiplier
 		+ (minDistFromAllHQs-0.25)*7*(1+midMapMultiplier/5)*math.max(-0.5, 3-k_longMapRatio*2.5)
 		+ 35*math.min(0, minDistFromAllHQs - 0.285 / (1 + midMapMultiplier / 5 + (1 - k_longMapRatio/2.5) * 2))
-		--+ (Military_GetMilitaryPointDiceRoll(s_selfplayer, militaryPoint)*20 - 10) -- this is quite bugged, screws up early game and wrongs wrong in lategame
+		--+ (Military_GetMilitaryPointDiceRoll(s_selfplayer, militaryPoint)*20 - 10) -- this is quite bugged, screws up early game and works wrong in lategame
 	
 	result = result
 		+ baseMapConstant
 		+ threatAtBaseScore
 		+ 0.25*earlyGameTimeRule
 		+ frontlineScore
-			* math.max(0, (distRatio + (1-distRatio)*(0.45 - 1.25*earlyGameTimeRule)))
+			* math.max(0, (distRatio + (1-distRatio)*(0.45 - 1.325*earlyGameTimeRule)))
 			--* (mapMidDistRatio + (1-mapMidDistRatio)*0.5)
 			* (threatMultiplier + (1-threatMultiplier)*0.35)
 			* math.sqrt(minDistFromAllHQs/math.min(1, 0.5+(k_longMapRatio-0.5)/2)+0.2)

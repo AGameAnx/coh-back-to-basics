@@ -655,6 +655,7 @@ AI:
 - Difficulty settings adjusted and the resource bonuses have been reworked.
 - AI can now use reward units.
 - Significant improvements made to aicontrol script:
+ * Significantly improved late game script performance.
  * Added many more types of units to aicontrol such as AT guns, mobile artillery, snipers.
  * Redone much of the script to improve its usability and performance.
  * Mobile artillery and mortars will now be forced to keep their distance from the enemy.
@@ -676,6 +677,11 @@ AI:
  * Vehicles will now retreat from danger properly.
  * Vehicles will now move back to the HQ or to closest safe point when low on health or when they have critical damage.
  * There are special rules for certain vehicles, altering their behavior based on the type of behavior you would expect from them (for example, sherman crocodile will start to keep its distance much later than normal unless there's enemy armor in its vicinity).
+- Added a brand new barrage ability control script:
+ * Fixes issues with AI never using some barrage units.
+ * Picks targets using data from aicontrol grid clump calculations rather than relic's clump search functions.
+ * Can utilize special rules just like normal abilities, but much more reliably - for instance, mortars will fire smoke barrages in front of enemy MGs.
+ * Adheres to normal AI squad ability budget logic - saves up ammo in the lategame, with a small chance of spending the ammo regardless of the fact that AI still thinks it does not have enough. Normal squad abilities work the same way, except much less reliably (engine bugs).
 - To go along with the new vehicle script, important improvements were made to repair unit purchase logic, increasing the number of pioneers and engineers AI builds proportionally to the number of friendly vehicles on the field.
 - Added weights to AI command tree choices - slightly improves randomness but also adds weights which make AI choose the trees more suitable for it slightly more often.
 - AI will no longer use follow on squads with team weapons.
@@ -687,6 +693,7 @@ AI:
  * Changed the way the victory point importance accumulates due to AI having less victory points than the enemy.
 - Significantly improved weapon pick up logic.
 - Significantly improved team weapon capture logic.
+- AI will no longer try to capture forward HQs under fire.
 - Fixed one more possibility where AI could end up turning the 3rd level production on and off endlessly.
 - Decreased AI basic infantry building priority when it's close to popcap.
 - Retreat is now handled through a separate script, considering surrounding danger and strength of friendlies much better as well as retreating from buildings properly.
@@ -709,14 +716,15 @@ AI:
  * Grenades have had additional demand logic added so that they aren't thrown every time AI gets a target.
  * Repair changes - pioneers and engineers will find repair targets on larger distances (this helps repair bridges and idle tanks that will be around due to new aicontrol script), PE infantry had its repair radius and priority reduced to prevent mass repairs that tended to happen too often.
 - AI will sometimes buy flamethrowers on engineers and pioneers again. The demand function was not working correctly.
-- Improved the way AI takes cover.
+- Significantly improved the way AI takes cover - it will prefer positions in front of the target (to prevent it from turning its back in fights) and search cover over shorter distances to make sure it doesn't move around during combat too much. However it will also take cover more frequently and reliably than before.
 - Improved the way PE AI buys upgrades and techs up.
 - Improved airborne and all glider drop locations.
 - Improved airborne supply drop logic.
 - AI will now use bombing run more often.
 - AI will no longer use henshel overwatch on infantry.
-- Strafing runs will now only be used against infantry.
-- Significantly reduced the amount of tactics position validation failed errors.
+- Strafing runs will almost never be used against vehicles anymore.
+- AI will now properly use bombing runs.
+- Significantly reduced the amount of (or hopefully completely fixed) tactics position 'validation failed' errors. This also fixes AI budget problems that were stopping it from purchasing anything.
 
 Maps:
 - Improved AI getting clumped up on northern Vire River Valley bridge.

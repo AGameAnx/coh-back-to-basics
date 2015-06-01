@@ -42,10 +42,6 @@ function TacticDemand_NearEnemySquad_NonVehicle(squad,near_entities,near_squads)
 	return TacticDemand_NearTarget(squad,nil,near_squads,nil,SquadTargetFilter_FirstEnemyNonVehicle)
 end
 
-function TacticDemand_NearEnemySquad_NonVehicle(squad,near_entities,near_squads)
-	return TacticDemand_NearTarget(squad,nil,near_squads,nil,SquadTargetFilter_FirstEnemyNonVehicle)
-end
-
 function TacticDemand_NearEnemySquad_Vehicle(squad, near_entities,near_squads)
 	return TacticDemand_NearTarget(squad,nil,near_squads,nil,SquadTargetFilter_FirstEnemyVehicle)
 end

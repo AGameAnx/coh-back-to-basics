@@ -1,4 +1,6 @@
 
+
+
 --string.lpad = function(str, len, char)
 --	if char == nil then char = ' ' end
 --	return string.rep(char, len - string.len(str))..str
@@ -89,7 +91,7 @@ AIControl.Grid = {
 		end
 		AIControl.Grid.Dimensions[3] = worldWidth/AIControl.Grid.Dimensions[1]
 		AIControl.Grid.Dimensions[4] = worldLength/AIControl.Grid.Dimensions[2]
-		--print("Dimensions: "..AIControl.Grid.Dimensions[1].."*"..AIControl.Grid.Dimensions[3].." x "..AIControl.Grid.Dimensions[2].."*"..AIControl.Grid.Dimensions[4])
+		--print("AIControl Grid Dimensions: "..AIControl.Grid.Dimensions[1].."*"..AIControl.Grid.Dimensions[3].." x "..AIControl.Grid.Dimensions[2].."*"..AIControl.Grid.Dimensions[4])
 		AIControl.Grid.SetupControlPoints(getSpawnableLocations, spawnableLocationEntity)
 		AIControl.Grid.ResetupAIMarkers(nil, SpawnAIMarkers)
 		AIControl.Grid.DataHistory = {}
@@ -408,7 +410,7 @@ AIControl.Grid = {
 								if canSee then
 									dangerFOW = dangerFOW + v[3] + v[4]*0.015
 								else
-									dangerFOW = dangerFOW + v[3]*0.3 + v[4]*0.1
+									dangerFOW = dangerFOW + v[3]*0.275 + v[4]*0.125
 								end
 							end
 							AIControl.Grid.DataClumpFOW[i][j][enemyTeam] = dangerFOW
@@ -440,13 +442,13 @@ AIControl.Grid = {
 					if team == 1 then enemyTeam = 2
 					else enemyTeam = 1 end
 					local pos
-					if highestDangerFOW[team] < 16 then
+					if highestDangerFOW[team] < 2 then
 						AI_DoString(player, "AIControlArtyPosFOW=nil")
 					else
 						pos = AIControl.Grid.AveragePosData[ highestPosFOW[team][1] ][ highestPosFOW[team][2] ][enemyTeam]
 						AI_DoString(player, string.format("AIControlArtyPosFOW=World_Pos(%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z))
 					end
-					if highestDanger[team] < 8 then
+					if highestDanger[team] < 2 then
 						AI_DoString(player, "AIControlArtyPos=nil")
 					else
 						pos = AIControl.Grid.AveragePosData[ highestPos[team][1] ][ highestPos[team][2] ][enemyTeam]
@@ -1066,26 +1068,26 @@ UNIT_CONTROL_PRESET = {
 		['safety_radius_steps'] = 3,
 		['setup_target_danger'] = 0.85,
 		['move_back_danger'] = 2.15,
-		['retreat_danger'] = 12,
+		['retreat_danger'] = 6,
 		['init_step'] = 2,
 		['step_count'] = 2,
 		['target_angle_threshold'] = -1
 	},
 	MORTAR = {
-		['safety_radius_steps'] = 6,
+		['safety_radius_steps'] = 5,
 		['setup_target_danger'] = 1,
 		['move_back_danger'] = 1.35,
 		['retreat_danger'] = 10,
 		['init_step'] = 2,
-		['step_count'] = 4,
+		['step_count'] = 5,
 		['target_angle_threshold'] = -1
 	},
 	NEBELWERFER = {
 		['safety_radius_steps'] = 7,
-		['setup_target_danger'] = 100, -- shouldn't ever setup (get locked while not barraging)
+		['setup_target_danger'] = 0.5, -- shouldn't ever setup (get locked while not barraging)
 		['move_back_danger'] = 0.55,
 		['retreat_danger'] = -1,
-		['init_step'] = 2,
+		['init_step'] = 4,
 		['step_count'] = 4,
 		['target_angle_threshold'] = -1
 	},
@@ -1102,6 +1104,60 @@ UNIT_CONTROL_PRESET = {
 		['step_count'] = 5,
 		['target_angle_threshold'] = 18
 	}
+}
+
+BARRAGE_CONTROL_POSITION = {
+	SMOKE_BARRAGE = function(squad, setting)
+		local HMGBlueprintIDs = {
+			[BP_GetID(SBP.ALLIES.HEAVYMG)] = true,
+			[BP_GetID(SBP.ALLIES.PARATROOPER_HEAVYMG_SP)] = true,
+			[BP_GetID(SBP.AXIS.HEAVYMG)] = true,
+			[BP_GetID(SBP.AXIS.CAPTURE_MG)] = true,
+			[BP_GetID(SBP.CW.VICKERSMG)] = true,
+			[BP_GetID(SBP.CW.VICKERS_MG_SP)] = true,
+			[BP_GetID(SBP.CW.CAPTURE_MG)] = true,
+			[BP_GetID(SBP.CW.COMMANDOS_MG42_SP)] = true,
+			[BP_GetID(SBP.ELITE.HEAVYMG)] = true,
+			[BP_GetID(SBP.ELITE.FALLSCHIRMJAGER_HMG)] = true,
+		}
+		local player = Squad_GetPlayerOwner(squad)
+		local selfPos = Squad_GetPosition(squad)
+		local sg = SGroup_CreateIfNotFound('tactics_infrontofmgpos')
+		SGroup_Clear(sg)
+		World_GetSquadsNearPoint(player, sg, selfPos, setting.searchrange, OT_Enemy)
+		local closestDist = setting.searchrange+5
+		local closestSquad = nil
+		for i=1,SGroup_CountSpawned(sg) do
+			local s = SGroup_GetSpawnedSquadAt(sg, i)
+			local bpID = BP_GetID(Squad_GetBlueprint(s))
+			if HMGBlueprintIDs[bpID] then
+				local heading = false
+				for j=0,Squad_Count(s)-1 do
+					local e = Squad_EntityAt(s, j)
+					if Entity_IsSyncWeapon(e) then
+						heading = Entity_GetHeading(e)
+						break
+					end
+				end
+				if not heading then
+					heading = Squad_GetHeading(s)
+				end
+				local sg2 = SGroup_CreateIfNotFound('tactics_infrontofmgpos2')
+				local squadPos = Squad_GetPosition(s)
+				local dropPos = World_Pos(squadPos.x+heading.x*40, squadPos.y+heading.y*40, squadPos.z+heading.z*40)
+				----dr_drawCircle('aicontrol_maincontrol', dropPos.x, dropPos.y+5, dropPos.z, 2, 255, 127, 0)
+				World_GetSquadsNearPoint(player, sg2, dropPos, 45, OT_Ally)
+				if SGroup_CountSpawned(sg2) > 0 then
+					SGroup_Destroy(sg2)
+					SGroup_Destroy(sg)
+					return dropPos
+				end
+				SGroup_Destroy(sg2)
+			end
+		end
+		SGroup_Destroy(sg)
+		return false
+	end,
 }
 
 AIControl.MainControl = {
@@ -1284,11 +1340,21 @@ AIControl.MainControl = {
 			SaveUpAmount = 150, -- We'll try to save up to this amount of munitions in the lategame
 			ChangeToCastBelowsavedMunitionsThreshold = 5, -- A percentage chance to cast the abilities even if we're currently saving up our munitions
 			UnitSettings = {
+				[BP_GetID(SBP.ALLIES.MORTAR)] = {
+					{weight=4, searchrange=90, cost=20, minThreatToCast=1.75, lockDuration=8, blueprint=BP_GetAbilityBlueprint('abilities/ally_sync_mortar_barrage.lua')},
+					{weight=2, searchrange=100, cost=15, positionFunc=BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/ally_mortar_smoke_barrage.lua')},
+					{weight=2, searchrange=100, cost=15, positionFunc=BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_mortar_smoke_barrage.lua')},
+				},
+				[BP_GetID(SBP.AXIS.MORTAR)] = {
+					{weight=4, searchrange=90, cost=20, minThreatToCast=1.75, lockDuration=8, blueprint=BP_GetAbilityBlueprint('abilities/axis_sync_mortar_barrage.lua')},
+					{weight=2, searchrange=100, cost=15, positionFunc=BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/ally_mortar_smoke_barrage.lua')},
+					{weight=2, searchrange=100, cost=15, positionFunc=BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_mortar_smoke_barrage.lua')},
+				},
 				[BP_GetID(SBP.AXIS.NEBELWERFER)] = {
-					{weight=1, searchrange=245, cost=35, minThreatToCast=1.5, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_nebelwerfer_barrage.lua')},
+					{weight=1, searchrange=245, cost=35, minThreatToCast=2.15, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_nebelwerfer_barrage.lua')},
 				},
 				[BP_GetID(SBP.AXIS.HALFTRACK)] = {
-					{weight=1, searchrange=245, cost=50, minThreatToCast=2.25, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_stuka_zu_fuss_rocket_halftrack.lua')},
+					{weight=1, searchrange=200, cost=50, minThreatToCast=2.75, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_stuka_zu_fuss_rocket_halftrack.lua')},
 				},
 			},
 		},
@@ -1503,6 +1569,8 @@ AIControl.MainControl = {
 			for j = math.max(1, math.floor(y-radius)),math.min(AIControl.Grid.Dimensions[2], math.ceil(y+radius)) do
 				local bSquared = (j-y)^2
 				if aSquared + bSquared <= radiusSquared then
+					--local pos = AIControl.Grid.AveragePosData[i][j][1]
+					----dr_drawCircle('aicontrol_maincontrol', pos.x, World_GetHeightAt(pos.x, pos.z)+3, pos.z, 2, 0, 0, 255)
 					if noFOW then
 						if AIControl.Grid.DataClump[i][j][team] then
 							if AIControl.Grid.DataClump[i][j][team] > maxDanger then
@@ -1702,7 +1770,7 @@ AIControl.MainControl = {
 		SGroup_Destroy(squadsNearSG_enemy)
 		SGroup_Destroy(squadsNearSG_allied)
 		
-		result = result + enemyValue/8 - math.min(friendlyValue, enemyValue)/10
+		result = result + enemyValue/7 - math.min(friendlyValue, enemyValue)/8.5
 		
 		return math.max(0, result)
 	end,
@@ -2436,11 +2504,11 @@ AIControl.MainControl = {
 								local hqMult = 1.6
 								local xBorderDistRatio = math.abs(pos.x) / wHalfWidth - 0.5
 								if xBorderDistRatio > 0 then
-									hqMult = hqMult + xBorderDistRatio*3
+									hqMult = hqMult + xBorderDistRatio*4
 								end
 								local yBorderDistRatio = math.abs(pos.z) / wHalfHeight - 0.5
 								if yBorderDistRatio > 0 then
-									hqMult = hqMult + yBorderDistRatio*3
+									hqMult = hqMult + yBorderDistRatio*4
 								end
 								local retreatDirection = AIControl.MainControl.GetRetreatDirection(surroundingSafety, pos, team, 1.35, 1.45, directionToHq, hqMult, 0.035, 0.5, 0)
 								
@@ -2618,7 +2686,13 @@ AIControl.MainControl = {
 					local squadGameID = Squad_GetGameID(squad)
 					local player = Squad_GetPlayerOwner(squad)
 					local lockSquad = false
-					if not AIControl.MainControl.LockedSquads[team][squadGameID] then
+					if not AIControl.MainControl.LockedSquads[team][squadGameID]
+							or ( -- also want to barrage with any 'setup' unit control squads
+								AIControl.MainControl.LockedSquads[team][squadGameID] == 1 -- Unit control
+								and AIControl.MainControl.UnitControlTargets[team][squadGameID] -- Has target
+								and not AIControl.MainControl.UnitControlTargets[team][squadGameID][1] -- Target is not a move back target
+								)
+							then
 						local bpID = BP_GetID(Squad_GetBlueprint(squad))
 						local setting = AIControl.MainControl.Settings.BarrageControl.UnitSettings[bpID]
 						if setting then
@@ -2643,12 +2717,23 @@ AIControl.MainControl = {
 								for j,v in pairs(setting) do
 									curWeight = curWeight + v.weight
 									if curWeight >= weightRand then
-										local clumpSearchRadius = v.searchrange/(AIControl.Grid.Dimensions[1]+AIControl.Grid.Dimensions[2])*2
 										
-										local bestClump, bestClumpThreat = AIControl.MainControl.GetBestClumpForRadius(enemyTeam, x, y, clumpSearchRadius, false)
-										if bestClump and bestClumpThreat >= v.minThreatToCast then
+										local castPosition = false
+										
+										if not v.positionFunc then
+											local clumpSearchRadius = v.searchrange/((AIControl.Grid.Dimensions[3]+AIControl.Grid.Dimensions[4])/2)
+											----dr_drawCircle('aicontrol_maincontrol', pos.x, pos.y+10, pos.z, clumpSearchRadius*((AIControl.Grid.Dimensions[1]+AIControl.Grid.Dimensions[2])/2), 255, 255, 255)
+											local bestClump, bestClumpThreat = AIControl.MainControl.GetBestClumpForRadius(enemyTeam, x, y, clumpSearchRadius, false)
+											if bestClump and bestClumpThreat >= v.minThreatToCast then
+												castPosition = AIControl.Grid.AveragePosData[bestClump[1]][bestClump[2]][enemyTeam]
+											end
+										else
+											castPosition = v.positionFunc(squad, v)
+										end
+										
+										if castPosition then
 											SGroup_Single(sg, squad)
-											Cmd_Ability(sg, v.blueprint, AIControl.Grid.AveragePosData[bestClump[1]][bestClump[2]][enemyTeam], World_Pos(0,0,0), false, false)
+											Cmd_Ability(sg, v.blueprint, castPosition, World_Pos(0,0,0), false, false)
 											AIControl.MainControl.BarrageControlLockTimers[squadGameID] = v.lockDuration
 											lockSquad = true
 										end

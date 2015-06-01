@@ -26,8 +26,8 @@ function PositionTargetFilter_Cover(squad)
 			posDiff.x = posDiff.x/posDiffLength
 			posDiff.z = posDiff.z/posDiffLength
 			
-			pos.x = pos.x + posDiff.x*7
-			pos.z = pos.z + posDiff.z*7
+			pos.x = pos.x + posDiff.x*5
+			pos.z = pos.z + posDiff.z*5
 		end
 	end
 	
@@ -39,7 +39,7 @@ function PositionTargetFilter_Cover(squad)
 		local oldPosThreatLevel = AISquad_ThreatLevelToSquad(s_selfplayer, squad, pos)
 		local newPosThreatLevel = AISquad_ThreatLevelToSquad(s_selfplayer, squad, posCover)
 		local threatDiff = newPosThreatLevel - oldPosThreatLevel
-		if threatDiff < 1 then -- make sure this position is still safe (otherwise ignore it)
+		if threatDiff < 3 then -- make sure this position is still safe (otherwise ignore it)
 			--if not AIPlayer_IsFireConePosition(s_selfplayer, posCover) then -- never move into someones arc of fire
 				-- never move closer to any of your targets
 				if not AISquad_IsPosWithinDistOfAttackTarget(squad, posCover, 25) then

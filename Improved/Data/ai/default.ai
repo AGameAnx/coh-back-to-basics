@@ -125,7 +125,7 @@ s_budget_info[ REGULAR_BUDGET_TYPE ] = {
 
 s_budget_info[ MUNITION_BUDGET_TYPE ] = {
 	last_purchase_time = -1,
-	purchase_interval = 1,
+	purchase_interval = 5,
 	defs = {
 		{"BUDGET_AddOn", 			TGROUP_AddOns},
 		--{"BUDGET_PlayerAbility", 	TGROUP_PlayerAbility},
@@ -159,7 +159,7 @@ function CalcCapturePriorities()
 end
 
 function Purchase_InitTimeToPurchase()
-	s_purchase_delay_timer_max[MUNITION_BUDGET_TYPE] = 1
+	s_purchase_delay_timer_max[MUNITION_BUDGET_TYPE] = 0
 	s_purchase_delay_timer_max[REGULAR_BUDGET_TYPE] = s_personality.purchase_delay_pace
 end
 
@@ -195,10 +195,10 @@ end
 function HandleIncompleteStructures()
 	local incomplete_structures = Construction_IncompleteStructuresCount(s_selfplayer)
 	--aitrace("Incomplete structures:"..incomplete_structures)
-	if (incomplete_structures > 0) then
+	if incomplete_structures > 0 then
 		local allocatedTasks = Task_CountIncompleteStructure(s_selfplayer)
 		--aitrace("Tasks For Completing Structure:"..allocatedTasks)
-		if (allocatedTasks == 0) then
+		if allocatedTasks == 0 then
 			Request_FinishIncompleteStructure(s_selfplayer, TGROUP_Tech, TPRIORITY_Tech_IncompleteStructure)
 		end
 	end
@@ -322,7 +322,7 @@ AI_Think_Military = function()
 	
 	-- determine if we should cancel incomplete buildings (only once in a while, to reduce potential oscillation issues)
 	if World_GetGameTime() > s_scuttle_incomplete_time then
-		Construction_ScuttleIncompleteThreatenedBuildings(s_selfplayer, 0.5);
+		Construction_ScuttleIncompleteThreatenedBuildings(s_selfplayer, 0)
 		s_scuttle_incomplete_time = World_GetGameTime() + s_scuttle_incomplete_interval
 	end	
 
@@ -344,29 +344,19 @@ end
 
 s_munitionsAvailableForAbilities = 0
 s_abilityMunitionsSpent = 0
-s_munitionsToLock = 140
+s_munitionsToLock = 150
 
--- this function locks a certain amount of resources
+-- this function locks a certain amount of resources for squad abilities
 function ability_money_cache(availableResources)
-	-- SHOULD DETERMINE HOW MANY UNITS NEED MONEY AND HOW MUCH. INSTEAD OF ALWAYS LOCKING X AMOUNT
-	
 	local minMunitionToLock = s_munitionsToLock + (availableResources.munition-s_munitionsToLock)*0.25
 	
-	-- determine the amount of munitions available at this part of the budget
 	s_munitionsAvailableForAbilities = math.min(availableResources.munition, minMunitionToLock)
-	-- subtract the amount of money used by abilities in the previous frames since last being called
 	s_munitionsAvailableForAbilities = s_munitionsAvailableForAbilities - s_abilityMunitionsSpent
 	
-	--aitrace("Munitions available for squad abilities:"..string.format('%d', s_munitionsAvailableForAbilities))
-	
-	-- if munitions have been spent we need to alert the budget system
 	if s_abilityMunitionsSpent > 0 then
-		--aitrace("Ability has been triggered using "..s_abilityMunitionsSpent.." munitions!")
 		local resAmountSpent = ResourceAmount_Zero()
 		resAmountSpent.munition = s_abilityMunitionsSpent
-		-- reset the munitions spent
 		s_abilityMunitionsSpent = 0
-		-- this reduces the demand for these abilities
 		return true, resAmountSpent
 	end
 	
@@ -374,6 +364,17 @@ function ability_money_cache(availableResources)
 	resLockAmount.munition = s_munitionsAvailableForAbilities
 	
 	return false, resLockAmount
+end
+-- Following functions are hardcoded to be used to 'purchase' squad abilities
+-- determine if this tactic can be used given the budget it has for it
+function CanUseAbilityMunitionsBudget(resAmount)
+	if resAmount.munition < s_munitionsAvailableForAbilities-s_abilityMunitionsSpent then
+		return true
+	end
+	return false
+end
+function UseAbilityMunitionsBudget(resAmount)
+	s_abilityMunitionsSpent = s_abilityMunitionsSpent + resAmount.munition
 end
 
 ------------------------------------------------------------
@@ -417,12 +418,12 @@ function InitializeStrategies()
 	
 	-- initialize the budget system
 	ai_budget:init()
-	ai_budget:add("BUDGET_Units", strategy_unit_purchase.do_purchase, s_personality.budget_levels.units[1], false)
+	ai_budget:add("BUDGET_Units", strategy_unit_purchase.do_purchase, s_personality.budget_levels.units[1], false, 2)
 	ai_budget:add("BUDGET_Tech", strategy_tech_purchase.do_purchase, s_personality.budget_levels.tech[1], false, 2)
 	ai_budget:add("BUDGET_AddOn", strategy_addon_purchase.do_purchase, s_personality.budget_levels.addon[1], true)
-	ai_budget:add("BUDGET_Secure", strategy_defence_purchase.do_purchase, s_personality.budget_levels.secure[1], false, 2)
-	ai_budget:add("BUDGET_PlayerAbility", player_abilities.do_purchase, s_personality.budget_levels.playerability[1], true)
-	ai_budget:add("BUDGET_SquadAbility", ability_money_cache, s_personality.budget_levels.squadability[1], true)
+	ai_budget:add("BUDGET_Secure", strategy_defence_purchase.do_purchase, s_personality.budget_levels.secure[1], false, 1)
+	ai_budget:add("BUDGET_PlayerAbility", player_abilities.do_purchase, s_personality.budget_levels.playerability[1], true, 1)
+	ai_budget:add("BUDGET_SquadAbility", ability_money_cache, s_personality.budget_levels.squadability[1], true, 1)
 	
 	-- this does the first distribution of funds
 	ai_budget:simulate_pre()
