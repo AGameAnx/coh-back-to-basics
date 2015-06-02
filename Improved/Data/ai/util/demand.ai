@@ -247,14 +247,13 @@ end
 
 function GetStructureETA(pbg, availableResources)
 	local resCost = AIPlayer_GetStructureCost(s_self_modplayer, pbg)
-	
-	return GetETAFromCost(resCost, availableResources);
+	return GetETAFromCost(resCost, availableResources)
 end
 
 function GetProductionETA(production_type, pbg, availableResources)
 	local resCost = AIPlayer_GetProductionCost(s_self_modplayer, production_type, pbg)
 	local costtext = res_to_str(resCost)
-	return GetETAFromCost(resCost, availableResources);
+	return GetETAFromCost(resCost, availableResources)
 end
 
 function Demand_GetTotalSelfClassRating(classID)

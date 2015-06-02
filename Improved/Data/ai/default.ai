@@ -409,7 +409,7 @@ end
 
 function InitializeStrategies()
 	-- there is no build order phase after the first frame (incase of restarts, savegame, etc)
-	if (World_GetGameTime() > 0 or (AI_IsSP and AI_IsSP())) then
+	if World_GetGameTime() > 0 or (AI_IsSP and AI_IsSP()) then
 		s_buildorder_phase = false
 	end
 	
@@ -437,11 +437,11 @@ function InitializeStrategies()
 	strategy_military.init()
 	strategy_resourcing.init()
 	
-	if (s_commandtree_enabled) then
+	if s_commandtree_enabled then
 		strategy_command_tree:init()
 	end
 	Purchase_InitTimeToPurchase()
-	if (s_buildorder_phase) then
+	if s_buildorder_phase then
 		strategy_buildorder.init()
 	end
 end

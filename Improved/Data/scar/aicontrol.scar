@@ -34,14 +34,14 @@ AIControl.AIDisabling = function()
 			for i=1,AIControl.PlayerCount do
 				local p = World_GetPlayerAt(AIControl.Players[i])
 				if not Player_IsHuman(p) then
-					AI_Enable(p, i == AIControl.CurEnabledAI)
+					--AI_Enable(p, i == AIControl.CurEnabledAI)
 				end
 			end
 			if AIControl.CurEnabledAI > AIControl.PlayerCount then
 				AIControl.CurEnabledAI = -1
 			end
 		else
-			AI_EnableAll(false)
+			--AI_EnableAll(false)
 		end
 		AIControl.CurEnabledAI = AIControl.CurEnabledAI + 1
 	end
@@ -2998,7 +2998,7 @@ AIControl.MainControl = {
 --------------------------------------------------------------------------------------------------------------------
 
 AIControl.__Init3 = function()
-	Rule_AddInterval(AIControl.AIDisabling, 0.25)
+	Rule_AddInterval(AIControl.AIDisabling, 0.125)
 end
 AIControl.__Init2 = function()
 	AIControl.Grid.Update()

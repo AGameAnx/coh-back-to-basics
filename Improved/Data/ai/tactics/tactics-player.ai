@@ -185,7 +185,7 @@ end
 --
 function PositionTargetFilter_Glider(caster)
 	local pos1 = PositionTargetFilter_Paradrop(caster)
-	return pos1, AI_FindOpenNearPos(pos1)
+	return AirStrike_Get2ndPosition(caster, pos1, true)
 end
 function PositionTargetFilter_Paradrop(caster)
 	-- military target list is sorted by priority

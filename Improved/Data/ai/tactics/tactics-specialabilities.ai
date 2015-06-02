@@ -510,7 +510,7 @@ function GetArtyPosition(squad, searchDistance, fow)
 	if fow == nil then fow = true end
 	local sim_squad = AISquad_ConvertToSimSquad(squad)
 	local squadPos = AISquad_GetAnchorPos(squad)
-	if fow and World_GetRand(1, 3) == 1 and AIControlArtyPosFOW and World_DistancePointToPoint(squadPos, AIControlArtyPosFOW) < searchDistance then
+	if fow and World_GetRand(1, 5) <= 2 and AIControlArtyPosFOW and World_DistancePointToPoint(squadPos, AIControlArtyPosFOW) < searchDistance then
 		return AIControlArtyPosFOW
 	elseif AIControlArtyPos and World_DistancePointToPoint(squadPos, AIControlArtyPos) < searchDistance then
 		return AIControlArtyPos

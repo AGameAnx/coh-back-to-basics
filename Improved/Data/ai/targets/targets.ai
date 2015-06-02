@@ -75,7 +75,7 @@ local militaryPointRandomResetStep = 0
 local hqDistCache = {}
 local earlyGameTimeRule = 1
 local frontlineMapConstant = 0
-local baseMapConstant = -4.75
+local baseMapConstant = -4.5
 
 --------------------------------------------------------------------------------
 -- target ranking
@@ -366,6 +366,11 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 	end
 	distFromAllHQsCoefficient = math.max(-0.1, distFromAllHQsCoefficient) * 12]]
 	
+	if is_defend then
+		minDistFromFriendlyHQs = math.min(1, minDistFromFriendlyHQs + 0.2)
+		militaryPercentValue = militaryPercentValue - 0.2
+		result = result - 0.275
+	end
 	local distRatio = math.max(
 		0.1,
 		math.min(
@@ -418,11 +423,6 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 		)
 	end
 	
-	if is_defend then
-		distRatio = math.min(1, distRatio + 0.125)
-		militaryPercentValue = militaryPercentValue - 0.2
-		result = result - 0.35
-	end
 	if is_friendly then
 		result = result - 1 - math.min(1, 1.1-militaryPercentValue)
 	end
@@ -437,7 +437,7 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 	elseif threat >= 0 then
 		local maxThreat = math.max(5, math.min(130, Military_GetMaxCombinedThreatAtMilitaryPoint(s_selfplayer)))
 		threatScore = -1.75*threat/maxThreat
-		if minDistFromFriendlyHQs / k_maxDist / furthestPoint < closeToBaseThreshold then -- we have to respond to threats near the HQ
+		if not is_defend and minDistFromFriendlyHQs / k_maxDist / furthestPoint < closeToBaseThreshold then -- we have to respond to threats near the HQ
 			threatAtBaseScore = 15 * threat/maxThreat * (closeToBaseThreshold-minDistFromFriendlyHQs / k_maxDist / furthestPoint)/closeToBaseThreshold
 		end
 		threatScore = threatScore - math.min(1.5, math.max(0.5, 3*(1.025-militaryPercentValue)*threat/maxThreat)) -- if we have a larger army, we want to pursue threats instead of avoiding them. The result adjusted for that here
@@ -651,7 +651,7 @@ function RankAttackTargets()
 		if priority > 0.0 then
 			Military_AddTarget(s_selfplayer, MTARGET_Attack, militaryPoint, 1+priority*2)
 			targetCount = targetCount + 1
-			if targetCount >= 5 then
+			if targetCount >= 7 then
 				break
 			end
 		end
@@ -675,7 +675,7 @@ function RankAttackTargets()
 				if priority > 0.0 then
 					Military_AddTarget(s_selfplayer, MTARGET_Attack, militaryPoint, 1+priority*2)
 					targetCount = targetCount + 1
-					if targetCount >= 10 then
+					if targetCount >= 15 then
 						break
 					end
 				end
