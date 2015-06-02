@@ -164,7 +164,7 @@ function Purchase_InitTimeToPurchase()
 end
 
 function Purchase_IsTimeToPurchase(budget_type)
-	return (World_GetGameTime() > s_budget_info[ budget_type ].last_purchase_time)
+	return World_GetGameTime() > s_budget_info[ budget_type ].last_purchase_time
 end
 
 function Purchase_ResetPurchaseTimer(budget_type)
@@ -368,10 +368,7 @@ end
 -- Following functions are hardcoded to be used to 'purchase' squad abilities
 -- determine if this tactic can be used given the budget it has for it
 function CanUseAbilityMunitionsBudget(resAmount)
-	if resAmount.munition < s_munitionsAvailableForAbilities-s_abilityMunitionsSpent then
-		return World_Rand(0,3) == 1
-	end
-	return false
+	return resAmount.munition < s_munitionsAvailableForAbilities-s_abilityMunitionsSpent
 end
 function UseAbilityMunitionsBudget(resAmount)
 	s_abilityMunitionsSpent = s_abilityMunitionsSpent + resAmount.munition

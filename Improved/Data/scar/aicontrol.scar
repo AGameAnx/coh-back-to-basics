@@ -2998,7 +2998,7 @@ AIControl.MainControl = {
 --------------------------------------------------------------------------------------------------------------------
 
 AIControl.__Init3 = function()
-	Rule_AddInterval(AIControl.AIDisabling, 0.125)
+	Rule_AddInterval(AIControl.AIDisabling, 0.25)
 end
 AIControl.__Init2 = function()
 	AIControl.Grid.Update()

@@ -157,7 +157,7 @@ s_personality =
 	-- combat state update
 	clump_scan_params =                      -- currently this clump data is used by tactics for targeting
 	{
-		clump_scan_ticks = 16,
+		clump_scan_ticks = 4,
 		threat_weighting = 1.0,
 		importance_weighting = 0.5,
 		must_be_seen = false,
