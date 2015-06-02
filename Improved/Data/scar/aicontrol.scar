@@ -23,14 +23,14 @@ AIControl = {}
 local wHalfWidth = World_GetWidth()/2
 local wHalfHeight = World_GetLength()/2
 
-AIControl.UpdateInterval = 1 -- seconds
+AIControl.UpdateInterval = 2 -- seconds
 AIControl.Players = {}
 AIControl.PlayerCount = 0
 
 AIControl.Grid = {
 	Settings = {
 		SplitUpdates = true, -- If true, the update will be split to be performed over the course of UpdateInterval rather than once per UpdateInterval
-		SplitUpdateCount = 4, -- Number of updates to be done during each UpdateInterval if SplitUpdates are enabled (make sure that dividing update interval by this doesn't produce long fractions)
+		SplitUpdateCount = 8, -- Number of updates to be done during each UpdateInterval if SplitUpdates are enabled (make sure that dividing update interval by this doesn't produce long fractions). Make sure not to go below 0.125s per update, as the game's tick rate is 8 per second.
 		
 		-- These settings will only be used on game start, changing them later on will not affect the actual values
 		Init_Dimensions = {11, 11}, -- Initial dimensions table
@@ -49,6 +49,12 @@ AIControl.Grid = {
 		AIMarker = EBP.STRAT_POINT.AI_LOW, -- should only be set to AI_LOW, AI_MEDIUM or AI_HIGH
 		
 		ReduceMarkerCount = 40, -- Automatically reduce marker count to this number of markers to be updated per player: N/math.max(1, AICount)*math.max(1, math.min(AICount, PlayerCount)).
+		ExcludedUnits = {
+			[BP_GetID(SBP.CW.HQ)] = true,
+			[BP_GetID(SBP.CW.HQ_REINFORCEMENT)] = true,
+			[BP_GetID(SBP.CW.ARMOUR_HQ)] = true,
+			[BP_GetID(SBP.CW.INFANTRY_HQ)] = true,
+		},
 	},
 	
 	Dimensions = {0, 0, 1, 1}, -- {x divisions, y divisions, cell width, cell height}
@@ -317,48 +323,51 @@ AIControl.Grid = {
 		end
 		for i=1,SGroup_CountSpawned(squads) do
 			local s = SGroup_GetSpawnedSquadAt(squads, i)
-			local player = Squad_GetPlayerOwner(s)
-			local team = Player_GetTeam(player)+1
-			local enemyTeam
-			if team == 1 then
-				enemyTeam = 2
-			else
-				enemyTeam = 1
-			end
-			local position = Squad_GetPosition(s)
-			local x,y = AIControl.Grid.GetXY(position)
-			
-			local squadWeight = 1
-			local squadHealthMax = Squad_GetHealthMax(s)
-			local squadHealth = Squad_GetHealth(s)
-			
-			local armorValue = 0
-			if Squad_GetMax(s) == 1 then
-				if squadHealthMax > 200 then
-					squadWeight = squadHealthMax/(50+(squadHealthMax-200)/10)/3 + squadHealth/(50+(squadHealth-200)/10)/3*2
-					armorValue = (squadHealthMax-200)/4
+			local bpID = BP_GetID(Squad_GetBlueprint(s))
+			if not AIControl.Grid.Settings.ExcludedUnits[bpID] then
+				local player = Squad_GetPlayerOwner(s)
+				local team = Player_GetTeam(player)+1
+				local enemyTeam
+				if team == 1 then
+					enemyTeam = 2
 				else
-					squadWeight = squadHealthMax/50/3 + squadHealth/50/3*2
+					enemyTeam = 1
 				end
-				if armorValue > 0 then
-					squadWeight = squadWeight * (1 + armorValue/70)
+				local position = Squad_GetPosition(s)
+				local x,y = AIControl.Grid.GetXY(position)
+				
+				local squadWeight = 1
+				local squadHealthMax = Squad_GetHealthMax(s)
+				local squadHealth = Squad_GetHealth(s)
+				
+				local armorValue = 0
+				if Squad_GetMax(s) == 1 then
+					if squadHealthMax > 200 then
+						squadWeight = squadHealthMax/(50+(squadHealthMax-200)/10)/3 + squadHealth/(50+(squadHealth-200)/10)/3*2
+						armorValue = (squadHealthMax-200)/4
+					else
+						squadWeight = squadHealthMax/50/3 + squadHealth/50/3*2
+					end
+					if armorValue > 0 then
+						squadWeight = squadWeight * (1 + armorValue/70)
+					end
+				elseif Squad_Count(s) > 0 then
+					squadWeight = Squad_Count(s)/2+squadHealthMax/150/3+squadHealth/150/3*2
 				end
-			elseif Squad_Count(s) > 0 then
-				squadWeight = Squad_Count(s)/2+squadHealthMax/150/3+squadHealth/150/3*2
+				if Squad_IsRetreating(s) then
+					squadWeight = squadWeight / 4
+				end
+				
+				AIControl.Grid.Data[x][y][team] = AIControl.Grid.Data[x][y][team] + squadWeight
+				AIControl.Grid.DataCounts[x][y][team] = AIControl.Grid.DataCounts[x][y][team] + 1
+				AIControl.Grid.ArmorData[x][y][team] = AIControl.Grid.ArmorData[x][y][team] + armorValue
+				AIControl.Grid.DataHistory[x][y][team] = AIControl.Grid.DataHistory[x][y][team] + squadWeight/math.max(squadCounts[team])*AIControl.Grid.Settings.HistoryGrowthModifier
+				SGroup_Add(AIControl.Grid.DataSquads[x][y][team], s)
+				
+				AIControl.Grid.AveragePosData[x][y][team].x = AIControl.Grid.AveragePosData[x][y][team].x+position.x
+				AIControl.Grid.AveragePosData[x][y][team].y = AIControl.Grid.AveragePosData[x][y][team].y+position.y
+				AIControl.Grid.AveragePosData[x][y][team].z = AIControl.Grid.AveragePosData[x][y][team].z+position.z
 			end
-			if Squad_IsRetreating(s) then
-				squadWeight = squadWeight / 4
-			end
-			
-			AIControl.Grid.Data[x][y][team] = AIControl.Grid.Data[x][y][team] + squadWeight
-			AIControl.Grid.DataCounts[x][y][team] = AIControl.Grid.DataCounts[x][y][team] + 1
-			AIControl.Grid.ArmorData[x][y][team] = AIControl.Grid.ArmorData[x][y][team] + armorValue
-			AIControl.Grid.DataHistory[x][y][team] = AIControl.Grid.DataHistory[x][y][team] + squadWeight/math.max(squadCounts[team])*AIControl.Grid.Settings.HistoryGrowthModifier
-			SGroup_Add(AIControl.Grid.DataSquads[x][y][team], s)
-			
-			AIControl.Grid.AveragePosData[x][y][team].x = AIControl.Grid.AveragePosData[x][y][team].x+position.x
-			AIControl.Grid.AveragePosData[x][y][team].y = AIControl.Grid.AveragePosData[x][y][team].y+position.y
-			AIControl.Grid.AveragePosData[x][y][team].z = AIControl.Grid.AveragePosData[x][y][team].z+position.z
 		end
 		SGroup_Destroy(squads)
 		
@@ -1145,7 +1154,7 @@ BARRAGE_CONTROL_POSITION = {
 				local sg2 = SGroup_CreateIfNotFound('tactics_infrontofmgpos2')
 				local squadPos = Squad_GetPosition(s)
 				local dropPos = World_Pos(squadPos.x+heading.x*40, squadPos.y+heading.y*40, squadPos.z+heading.z*40)
-				----dr_drawCircle('aicontrol_maincontrol', dropPos.x, dropPos.y+5, dropPos.z, 2, 255, 127, 0)
+				--dr_drawCircle('aicontrol_maincontrol', dropPos.x, dropPos.y+5, dropPos.z, 2, 255, 127, 0)
 				World_GetSquadsNearPoint(player, sg2, dropPos, 45, OT_Ally)
 				if SGroup_CountSpawned(sg2) > 0 then
 					SGroup_Destroy(sg2)
@@ -1163,11 +1172,11 @@ BARRAGE_CONTROL_POSITION = {
 AIControl.MainControl = {
 	Settings = {
 		SplitUpdates = 1, -- full update time is grid update time times this number
-		SplitUpdatesIncreaseForSquadCount = 8, -- Increases split update count on secondary update by floor(TotalCount/N)
-		SecondaryUpdateTicks = 5, -- every n updates we'll check for new controlled units
+		SplitUpdatesIncreaseForSquadCount = 5, -- Increases split update count on secondary update by floor(TotalCount/N)
+		SecondaryUpdateTicks = 6, -- every n updates we'll check for new controlled units
 		
-		RetreatTactic_BattleRadius = 50,
-		RetreatTactic_BaseSafety = 0.7, -- Higher value means higher danger is required for a squad to retreat
+		RetreatTactic_BattleRadius = 55,
+		RetreatTactic_BaseSafety = 0.695, -- Higher value means higher danger is required for a squad to retreat
 		
 		UnitControl = {
 			UnitSettings = {
@@ -1335,7 +1344,7 @@ AIControl.MainControl = {
 			}
 		},
 		
-		BarrageControl = {
+		BarrageControl = { -- Normal ai tactic functionality should be used for most barrages. These barrages are included here mostly to fix the units locked due to other aicontrol functionality
 			SaveUpAmountGrowthWithTime = 150/700, -- Munitions saved starts at 0 and grows throughout the game
 			SaveUpAmount = 150, -- We'll try to save up to this amount of munitions in the lategame
 			ChangeToCastBelowsavedMunitionsThreshold = 5, -- A percentage chance to cast the abilities even if we're currently saving up our munitions
@@ -1418,6 +1427,8 @@ AIControl.MainControl = {
 	
 	SplitUpdateStep = 0,
 	SplitUpdates = 1,
+	
+	HQPositions = {},
 	
 	HQUpdateWait = 0,
 	
@@ -1570,7 +1581,7 @@ AIControl.MainControl = {
 				local bSquared = (j-y)^2
 				if aSquared + bSquared <= radiusSquared then
 					--local pos = AIControl.Grid.AveragePosData[i][j][1]
-					----dr_drawCircle('aicontrol_maincontrol', pos.x, World_GetHeightAt(pos.x, pos.z)+3, pos.z, 2, 0, 0, 255)
+					--dr_drawCircle('aicontrol_maincontrol', pos.x, World_GetHeightAt(pos.x, pos.z)+3, pos.z, 2, 0, 0, 255)
 					if noFOW then
 						if AIControl.Grid.DataClump[i][j][team] then
 							if AIControl.Grid.DataClump[i][j][team] > maxDanger then
@@ -1815,7 +1826,7 @@ AIControl.MainControl = {
 							SGroup_Add(retreatSG, squad)
 							if Squad_IsInHoldEntity(squad) then -- eject squads in entity hold
 								local holdEntity = Squad_GetHoldEntity(squad)
-								SGroup_Eject(retreatSG, Player_GetStartingPosition(player))
+								SGroup_Eject(retreatSG, AIControl.MainControl.HQPositions[AIControl.Players[i]])
 								Cmd_Retreat(retreatSG, nil, nil, true) -- queued retreat
 							elseif Squad_IsInHoldSquad(squad) then -- eject squads in squad hold
 								local holdSquad = Squad_GetHoldSquad(squad)
@@ -2232,6 +2243,7 @@ AIControl.MainControl = {
 					local squadGameID = Squad_GetGameID(squad)
 					if not AIControl.MainControl.LockedSquads[team][squadGameID] or AIControl.MainControl.LockedSquads[team][squadGameID] == 1 then
 						local player = Squad_GetPlayerOwner(squad)
+						local playerIndex = World_GetPlayerIndex(player)
 						local bpID = BP_GetID(Squad_GetBlueprint(squad))
 						local setting = AIControl.MainControl.Settings.UnitControl.UnitSettings[bpID]
 						if setting then
@@ -2260,7 +2272,7 @@ AIControl.MainControl = {
 								
 								local lockSquad = false
 								
-								local playerHQPosition = Player_GetStartingPosition(player)
+								local playerHQPosition = AIControl.MainControl.HQPositions[playerIndex]
 								local directionToHq = normalizeVector(Util_ScarPos(playerHQPosition.x - pos.x, playerHQPosition.z - pos.z))
 								local moveBackDanger = setting['move_back_danger']
 								local retreatDanger = setting['retreat_danger']
@@ -2281,7 +2293,7 @@ AIControl.MainControl = {
 									
 									if retreatDanger >= 0 and collectiveDanger > retreatDanger then
 										local distanceToHq = World_DistancePointToPoint(pos, playerHQPosition)
-										--Cmd_Move(sg, Player_GetStartingPosition(player))
+										--Cmd_Move(sg, AIControl.MainControl.HQPositions[playerIndex])
 										--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+1, pos.z, 'retreating', 255, 0, 0)
 										if distanceToHq > 20 then
 											Cmd_Retreat(sg)
@@ -2409,7 +2421,7 @@ AIControl.MainControl = {
 										AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] = 0
 									elseif AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] then
 										AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] = AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] + 1
-										if AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] > 7 then
+										if AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] > 7/AIControl.MainControl.SplitUpdates then
 											if AIControl.MainControl.LockedSquads[team][squadGameID] then
 												if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
 													AI_UnlockSquad(player, squad)
@@ -2444,6 +2456,7 @@ AIControl.MainControl = {
 					local squadGameID = Squad_GetGameID(squad)
 					if not AIControl.MainControl.LockedSquads[team][squadGameID] or AIControl.MainControl.LockedSquads[team][squadGameID] == 2 then
 						local player = Squad_GetPlayerOwner(squad)
+						local playerIndex = World_GetPlayerIndex(player)
 						local raceStr = Player_GetRaceName(player)
 						local hasDisableCritical = false
 						for j,v in pairs(AIControl.MainControl.Settings.VehicleControl.DisableCriticals) do
@@ -2485,7 +2498,7 @@ AIControl.MainControl = {
 								
 								local x,y = AIControl.Grid.GetXY(pos)
 								
-								local playerHQPosition = Player_GetStartingPosition(player)
+								local playerHQPosition = AIControl.MainControl.HQPositions[playerIndex]
 								
 								local directionToHq = normalizeVector(Util_ScarPos(playerHQPosition.x - pos.x, playerHQPosition.z - pos.z))
 								local initialStep = 0
@@ -2637,14 +2650,14 @@ AIControl.MainControl = {
 									if angle > angleThreshold then
 										lockSquad = true
 										
-										if not AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] or AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] > 10 then
+										if not AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] or AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] > 12/AIControl.MainControl.SplitUpdates then
 											AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = 0
 											Command_SquadPosFacing(player, sg, SCMD_Move, pos, Util_ScarPos(pos.x + facingDirection.x*10, pos.z + facingDirection.z*10), false)
 										else
 											AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] + 1
 										end
 									else
-										if AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] and AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] <= 10 then
+										if AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] and AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] <= 10/AIControl.MainControl.SplitUpdates then
 											AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] + 1
 										else
 											AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = nil
@@ -2675,7 +2688,7 @@ AIControl.MainControl = {
 				end
 				SGroup_Destroy(sg)
 			end
-		
+			
 			-- # Barrage Control #
 			local barrageControlCount = SGroup_CountSpawned(AIControl.MainControl.BarrageUnits[team])
 			if AIControl.MainControl.SplitUpdateStep < barrageControlCount then
@@ -2722,7 +2735,7 @@ AIControl.MainControl = {
 										
 										if not v.positionFunc then
 											local clumpSearchRadius = v.searchrange/((AIControl.Grid.Dimensions[3]+AIControl.Grid.Dimensions[4])/2)
-											----dr_drawCircle('aicontrol_maincontrol', pos.x, pos.y+10, pos.z, clumpSearchRadius*((AIControl.Grid.Dimensions[1]+AIControl.Grid.Dimensions[2])/2), 255, 255, 255)
+											--dr_drawCircle('aicontrol_maincontrol', pos.x, pos.y+10, pos.z, clumpSearchRadius*((AIControl.Grid.Dimensions[1]+AIControl.Grid.Dimensions[2])/2), 255, 255, 255)
 											local bestClump, bestClumpThreat = AIControl.MainControl.GetBestClumpForRadius(enemyTeam, x, y, clumpSearchRadius, false)
 											if bestClump and bestClumpThreat >= v.minThreatToCast then
 												castPosition = AIControl.Grid.AveragePosData[bestClump[1]][bestClump[2]][enemyTeam]
@@ -2734,7 +2747,7 @@ AIControl.MainControl = {
 										if castPosition then
 											SGroup_Single(sg, squad)
 											Cmd_Ability(sg, v.blueprint, castPosition, World_Pos(0,0,0), false, false)
-											AIControl.MainControl.BarrageControlLockTimers[squadGameID] = v.lockDuration
+											AIControl.MainControl.BarrageControlLockTimers[squadGameID] = v.lockDuration/AIControl.MainControl.SplitUpdates
 											lockSquad = true
 										end
 										
@@ -2854,6 +2867,7 @@ AIControl.MainControl = {
 			local player = World_GetPlayerAt(AIControl.Players[i])
 			if not Player_IsHuman(player) then
 				local team = Player_GetTeam(player)+1
+				AIControl.MainControl.HQPositions[AIControl.Players[i]] = Player_GetStartingPosition(player)
 				
 				local squads = Player_GetSquads(player)
 				for j=1,SGroup_CountSpawned(squads) do
@@ -2861,6 +2875,9 @@ AIControl.MainControl = {
 					local sbpID = BP_GetID(Squad_GetBlueprint(s))
 					
 					if AIControl.MainControl.Settings.HQControl.Blueprints[sbpID] then -- hq control
+						if sbpID == BP_GetID(SBP.CW.HQ) or sbpID == BP_GetID(SBP.CW.HQ_REINFORCEMENT) then -- mobile HQ retreat position update
+							AIControl.MainControl.HQPositions[AIControl.Players[i]] = Squad_GetPosition(s)
+						end
 						local sectorID
 						if Squad_HasUpgrade(s, UPG.CW.MOBILEHQ) then
 							sectorID = World_GetTerritorySectorID(Squad_GetPosition(s))

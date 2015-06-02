@@ -419,8 +419,8 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 	end
 	
 	if is_defend then
-		distRatio = math.min(1, distRatio + 0.1)
-		militaryPercentValue = militaryPercentValue - 0.1
+		distRatio = math.min(1, distRatio + 0.125)
+		militaryPercentValue = militaryPercentValue - 0.2
 		result = result - 0.35
 	end
 	if is_friendly then
