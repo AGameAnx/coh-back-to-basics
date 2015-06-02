@@ -23,14 +23,34 @@ AIControl = {}
 local wHalfWidth = World_GetWidth()/2
 local wHalfHeight = World_GetLength()/2
 
-AIControl.UpdateInterval = 2 -- seconds
+AIControl.UpdateInterval = 1.5 -- seconds
 AIControl.Players = {}
 AIControl.PlayerCount = 0
+
+AIControl.CurEnabledAI = 1
+AIControl.AIDisabling = function()
+	if not g_AIControl_Pause then
+		if AIControl.CurEnabledAI > 0 then
+			for i=1,AIControl.PlayerCount do
+				local p = World_GetPlayerAt(AIControl.Players[i])
+				if not Player_IsHuman(p) then
+					AI_Enable(p, i == AIControl.CurEnabledAI)
+				end
+			end
+			if AIControl.CurEnabledAI > AIControl.PlayerCount then
+				AIControl.CurEnabledAI = -1
+			end
+		else
+			AI_EnableAll(false)
+		end
+		AIControl.CurEnabledAI = AIControl.CurEnabledAI + 1
+	end
+end
 
 AIControl.Grid = {
 	Settings = {
 		SplitUpdates = true, -- If true, the update will be split to be performed over the course of UpdateInterval rather than once per UpdateInterval
-		SplitUpdateCount = 8, -- Number of updates to be done during each UpdateInterval if SplitUpdates are enabled (make sure that dividing update interval by this doesn't produce long fractions). Make sure not to go below 0.125s per update, as the game's tick rate is 8 per second.
+		SplitUpdateCount = 6, -- Number of updates to be done during each UpdateInterval if SplitUpdates are enabled (make sure that dividing update interval by this doesn't produce long fractions). Make sure not to go below 0.125s per update, as the game's tick rate is 8 per second.
 		
 		-- These settings will only be used on game start, changing them later on will not affect the actual values
 		Init_Dimensions = {11, 11}, -- Initial dimensions table
@@ -370,6 +390,8 @@ AIControl.Grid = {
 			end
 		end
 		SGroup_Destroy(squads)
+		
+		-- Only enable one AI per update (hack to majorly increase game performance)
 		
 		if not AIControl.Grid.Settings.SplitUpdates or AIControl.Grid.SplitUpdateStep == 0 then
 			for i=1,AIControl.Grid.Dimensions[1] do
@@ -1172,7 +1194,7 @@ BARRAGE_CONTROL_POSITION = {
 AIControl.MainControl = {
 	Settings = {
 		SplitUpdates = 1, -- full update time is grid update time times this number
-		SplitUpdatesIncreaseForSquadCount = 5, -- Increases split update count on secondary update by floor(TotalCount/N)
+		SplitUpdatesIncreaseForSquadCount = 7, -- Increases split update count on secondary update by floor(TotalCount/N)
 		SecondaryUpdateTicks = 6, -- every n updates we'll check for new controlled units
 		
 		RetreatTactic_BattleRadius = 55,
@@ -2650,14 +2672,14 @@ AIControl.MainControl = {
 									if angle > angleThreshold then
 										lockSquad = true
 										
-										if not AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] or AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] > 12/AIControl.MainControl.SplitUpdates then
+										if not AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] or AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] > 6/AIControl.MainControl.SplitUpdates then
 											AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = 0
 											Command_SquadPosFacing(player, sg, SCMD_Move, pos, Util_ScarPos(pos.x + facingDirection.x*10, pos.z + facingDirection.z*10), false)
 										else
 											AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] + 1
 										end
 									else
-										if AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] and AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] <= 10/AIControl.MainControl.SplitUpdates then
+										if AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] and AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] <= 4/AIControl.MainControl.SplitUpdates then
 											AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] + 1
 										else
 											AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = nil
@@ -2975,6 +2997,9 @@ AIControl.MainControl = {
 
 --------------------------------------------------------------------------------------------------------------------
 
+AIControl.__Init3 = function()
+	Rule_AddInterval(AIControl.AIDisabling, 0.125)
+end
 AIControl.__Init2 = function()
 	AIControl.Grid.Update()
 	AIControl.Pathfinding.Init()
@@ -2985,6 +3010,7 @@ AIControl.__Init2 = function()
 	else
 		Rule_AddInterval(AIControl.Grid.Update, AIControl.UpdateInterval)
 	end
+	Rule_AddOneShot(AIControl.__Init3, 5)
 end
 AIControl.__Init = function()
 	if g_AIControl_Enable then

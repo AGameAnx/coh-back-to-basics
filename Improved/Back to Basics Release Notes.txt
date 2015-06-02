@@ -6,7 +6,6 @@ Global Balance Changes:
 - Significant changes made to tank, antitank and infantry antitank scatter. Ballistic weapon misses will look more realistic as opposed to firing far off target when the shot misses.
 - Significant fixes made to area of effect damage related to area of effect "accuracy". Previously there was a potential to not apply area of effect damage even on minimum radius. Area of effect will now always be applied correctly.
 - Area of effect damage and penetration profiles tuned down to make area of effect weapon effectiveness work as intended after the area of effect "accuracy" fix.
-- Fog of War scatter penalties decreased for all Artillery and Rocket Artillery.
 - Tank area of effect profiles redone to make them less reliant on direct impacts and more on area of effect damage. This is also a change that works because and is highly related to scatter changes.
 - Anti-blob radius decreased from 10 to 6. The radius worked differently than originally expected, creating a bigger aura than intended.
 - Anti-blob should no longer affect squads who are inside of buildings, bunkers and halftracks. This does not include trenches.

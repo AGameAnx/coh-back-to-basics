@@ -60,7 +60,7 @@ s_commandtree_enabled = (false == AI_IsMODCoHO()) -- disabled for CoHO which doe
 s_commandtree_purchase_time = -1
 s_commandtree_purchase_interval = 5
 s_scuttle_incomplete_time = -1
-s_scuttle_incomplete_interval = 3
+s_scuttle_incomplete_interval = 1
 
 -- Rules for ending the build order, commented out, now handled directly by strategy_buildorder.is_done()
 -- k_maxBuildOrderTime = 8*60
@@ -104,7 +104,7 @@ TPRIORITY_BuildOrder 				= 100
 --
 ai_assert = false
 ai_frameTime = 2 -- AI full update cycle time
-ai_targetsUpdateSpacing = 3 -- How many update cycles AI should wait before updating its targets (costly operation)
+ai_targetsUpdateSpacing = 4 -- How many update cycles AI should wait before updating its targets (costly operation)
 
 -------------------------------------------------------------
 -- Budget Information
@@ -115,7 +115,7 @@ MUNITION_BUDGET_TYPE = 2
 s_budget_info = {}
 s_budget_info[ REGULAR_BUDGET_TYPE ] = {
 	last_purchase_time = -1,
-	purchase_interval = 1,
+	purchase_interval = 3,
 	defs = {
 		{"BUDGET_Units", 	TGROUP_BuildUnits},
 		{"BUDGET_Tech", 	TGROUP_Tech},
@@ -125,7 +125,7 @@ s_budget_info[ REGULAR_BUDGET_TYPE ] = {
 
 s_budget_info[ MUNITION_BUDGET_TYPE ] = {
 	last_purchase_time = -1,
-	purchase_interval = 5,
+	purchase_interval = 1,
 	defs = {
 		{"BUDGET_AddOn", 			TGROUP_AddOns},
 		--{"BUDGET_PlayerAbility", 	TGROUP_PlayerAbility},
@@ -344,7 +344,7 @@ end
 
 s_munitionsAvailableForAbilities = 0
 s_abilityMunitionsSpent = 0
-s_munitionsToLock = 150
+s_munitionsToLock = 70
 
 -- this function locks a certain amount of resources for squad abilities
 function ability_money_cache(availableResources)
@@ -369,7 +369,7 @@ end
 -- determine if this tactic can be used given the budget it has for it
 function CanUseAbilityMunitionsBudget(resAmount)
 	if resAmount.munition < s_munitionsAvailableForAbilities-s_abilityMunitionsSpent then
-		return true
+		return World_Rand(0,3) == 1
 	end
 	return false
 end

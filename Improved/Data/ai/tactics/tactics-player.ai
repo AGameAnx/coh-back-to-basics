@@ -183,6 +183,10 @@ end
 --------------------------------------------------------------------------------
 -- Paradrop
 --
+function PositionTargetFilter_Glider(caster)
+	local pos1 = PositionTargetFilter_Paradrop(caster)
+	return pos1, AI_FindOpenNearPos(pos1)
+end
 function PositionTargetFilter_Paradrop(caster)
 	-- military target list is sorted by priority
 	local targetCount = Military_GetTargetCount(s_selfplayer, MTARGET_Defend)

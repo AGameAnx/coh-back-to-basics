@@ -75,7 +75,7 @@ local militaryPointRandomResetStep = 0
 local hqDistCache = {}
 local earlyGameTimeRule = 1
 local frontlineMapConstant = 0
-local baseMapConstant = -4.5
+local baseMapConstant = -4.75
 
 --------------------------------------------------------------------------------
 -- target ranking
@@ -651,7 +651,7 @@ function RankAttackTargets()
 		if priority > 0.0 then
 			Military_AddTarget(s_selfplayer, MTARGET_Attack, militaryPoint, 1+priority*2)
 			targetCount = targetCount + 1
-			if targetCount >= 7 then
+			if targetCount >= 5 then
 				break
 			end
 		end
@@ -675,7 +675,7 @@ function RankAttackTargets()
 				if priority > 0.0 then
 					Military_AddTarget(s_selfplayer, MTARGET_Attack, militaryPoint, 1+priority*2)
 					targetCount = targetCount + 1
-					if targetCount >= 15 then
+					if targetCount >= 10 then
 						break
 					end
 				end
