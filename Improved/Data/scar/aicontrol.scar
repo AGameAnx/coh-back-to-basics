@@ -356,6 +356,48 @@ AIControl.Grid = {
 				local position = Squad_GetPosition(s)
 				local x,y = AIControl.Grid.GetXY(position)
 				
+				-- reinforcing
+				local tmpSG = SGroup_CreateIfNotFound("tempsg")
+				SGroup_Single(tmpSG, s)
+				if Squad_CanInstantReinforceNow(s) and Squad_HasActiveCommand(s) and Squad_GetActiveCommand(s) ~= SQUADSTATEID_Idle then
+					if not Squad_IsReinforcing(s) or Squad_GetProductionQueueSize(s) < 2 then
+						Cmd_ReinforceUnit(tmpSG, 1)
+					end
+				end
+				if Squad_IsReinforcing(s) and (not Squad_CanInstantReinforceNow(s) or Squad_Count(s) == Squad_GetMax(s)) then -- Fix for reinforce bug
+					Command_Squad(player, tmpSG, SCMD_CancelProduction, false)
+				end
+				SGroup_Destroy(tmpSG)
+				
+				-- retreating
+				if Squad_IsUnderAttack(s, 2) and not Squad_IsRetreating(s) and not AIControl_IsSquadVehicle(s) then
+					local retreatDemand = AIControl.MainControl.RetreatTactic(s)
+					if retreatDemand > 0 then
+						--local r = World_GetRand(0, 20)/10
+						--if r <= retreatDemand then
+							local retreatSG = SGroup_CreateIfNotFound('BtB_retreat')
+							SGroup_Clear(retreatSG)
+							SGroup_Add(retreatSG, s)
+							if Squad_IsInHoldEntity(s) then -- eject squads in entity hold
+								local holdEntity = Squad_GetHoldEntity(s)
+								SGroup_Eject(retreatSG, AIControl.MainControl.HQPositions[AIControl.Players[i]])
+								Cmd_Retreat(retreatSG, nil, nil, true) -- queued retreat
+							elseif Squad_IsInHoldSquad(s) then -- eject squads in squad hold
+								local holdSquad = Squad_GetHoldSquad(s)
+								local tmpSG = SGroup_CreateIfNotFound('BtB_tmp')
+								SGroup_Clear(tmpSG)
+								SGroup_Add(tmpSG, holdSquad)
+								Cmd_EjectOccupants(tmpSG)
+								SGroup_Destroy(tmpSG)
+								Cmd_Retreat(retreatSG, nil, nil, true) -- queued retreat
+							else
+								Cmd_Retreat(retreatSG)
+							end
+							SGroup_Destroy(retreatSG)
+						--end
+					end
+				end
+				
 				local squadWeight = 1
 				local squadHealthMax = Squad_GetHealthMax(s)
 				local squadHealth = Squad_GetHealth(s)
@@ -1814,59 +1856,6 @@ AIControl.MainControl = {
 		end
 		
 		--dr_clear('aicontrol_maincontrol')
-		
-		-- Manual reinforcing and retreating, overrides
-		for i=1,AIControl.PlayerCount do
-			local player = World_GetPlayerAt(AIControl.Players[i])
-			local team = Player_GetTeam(player)+1
-			
-			local squads = Player_GetSquads(player)
-			for j=1,SGroup_CountSpawned(squads) do
-				local squad = SGroup_GetSpawnedSquadAt(squads, j)
-				
-				-- reinforcing
-				local tmpSG = SGroup_CreateIfNotFound("tempsg")
-				SGroup_Single(tmpSG, squad)
-				if Squad_CanInstantReinforceNow(squad) and Squad_HasActiveCommand(squad) and Squad_GetActiveCommand(squad) ~= SQUADSTATEID_Idle then
-					if not Squad_IsReinforcing(squad) or Squad_GetProductionQueueSize(squad) < 2 then
-						Cmd_ReinforceUnit(tmpSG, 1)
-					end
-				end
-				if Squad_IsReinforcing(squad) and (not Squad_CanInstantReinforceNow(squad) or Squad_Count(squad) == Squad_GetMax(squad)) then -- Fix for reinforce bug
-					Command_Squad(player, tmpSG, SCMD_CancelProduction, false)
-				end
-				SGroup_Destroy(tmpSG)
-				
-				-- retreating
-				if Squad_IsUnderAttack(squad, 2) and not Squad_IsRetreating(squad) and not AIControl_IsSquadVehicle(squad) then
-					local retreatDemand = AIControl.MainControl.RetreatTactic(squad)
-					if retreatDemand > 0 then
-						--local r = World_GetRand(0, 20)/10
-						--if r <= retreatDemand then
-							local retreatSG = SGroup_CreateIfNotFound('BtB_retreat')
-							SGroup_Clear(retreatSG)
-							SGroup_Add(retreatSG, squad)
-							if Squad_IsInHoldEntity(squad) then -- eject squads in entity hold
-								local holdEntity = Squad_GetHoldEntity(squad)
-								SGroup_Eject(retreatSG, AIControl.MainControl.HQPositions[AIControl.Players[i]])
-								Cmd_Retreat(retreatSG, nil, nil, true) -- queued retreat
-							elseif Squad_IsInHoldSquad(squad) then -- eject squads in squad hold
-								local holdSquad = Squad_GetHoldSquad(squad)
-								local tmpSG = SGroup_CreateIfNotFound('BtB_tmp')
-								SGroup_Clear(tmpSG)
-								SGroup_Add(tmpSG, holdSquad)
-								Cmd_EjectOccupants(tmpSG)
-								SGroup_Destroy(tmpSG)
-								Cmd_Retreat(retreatSG, nil, nil, true) -- queued retreat
-							else
-								Cmd_Retreat(retreatSG)
-							end
-							SGroup_Destroy(retreatSG)
-						--end
-					end
-				end
-			end
-		end
 		
 		if AIControl.MainControl.SplitUpdateStep == 0 then
 			AIControl.MainControl.SecondaryUpdateTicks = AIControl.MainControl.SecondaryUpdateTicks + 1

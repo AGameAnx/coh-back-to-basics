@@ -366,11 +366,6 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 	end
 	distFromAllHQsCoefficient = math.max(-0.1, distFromAllHQsCoefficient) * 12]]
 	
-	if is_defend then
-		minDistFromFriendlyHQs = math.min(1, minDistFromFriendlyHQs + 0.2)
-		militaryPercentValue = militaryPercentValue - 0.2
-		result = result - 0.275
-	end
 	local distRatio = math.max(
 		0.1,
 		math.min(
@@ -378,6 +373,12 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 			((minDistFromFriendlyHQs*1.1)/k_maxDist/furthestPoint - 0.22*(midMapMultiplier/5)) * (1 + midMapMultiplier/4) + (1 - k_longMapRatio*1.75)
 		)*1.1 - 0.1
 	)
+	if is_defend then
+		militaryPercentValue = math.min(1, militaryPercentValue) - 0.35
+		enemyHQDistances[1] = enemyHQDistances[1]/1.15
+		enemyHQDistances[2] = enemyHQDistances[2]/1.15
+		result = result - 0.225
+	end
 	
 	local frontlineDistRatio
 	
