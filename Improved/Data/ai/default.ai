@@ -103,8 +103,8 @@ TPRIORITY_BuildOrder 				= 100
 
 --
 ai_assert = false
-ai_frameTime = 2 -- AI full update cycle time
-ai_targetsUpdateSpacing = 4 -- How many update cycles AI should wait before updating its targets (costly operation)
+ai_frameTime = 8 -- AI full update cycle time
+ai_targetsUpdateSpacing = 2 -- How many update cycles AI should wait before updating its targets (costly operation)
 
 -------------------------------------------------------------
 -- Budget Information
@@ -213,6 +213,7 @@ AI_Think_Start = function()
 	s_selfplayer = AIPlayer_GetLocal(AI_GetPlayerID())
 	
 	ClearPlayerRatingCache()
+	UtilPBF_ClearCache()
 	
 	-- If there has been an assert, just show the debug and don't do anything else.
 	-- The AI is essentially paused.
@@ -226,7 +227,7 @@ AI_Think_Start = function()
 	if s_buildorder_phase==false then
 		--aitrace("Trying to killing InActive budgets")
 		for k,v in pairs(s_budget_info) do
-			if (Purchase_IsTimeToPurchase(k)) then
+			if Purchase_IsTimeToPurchase(k) then
 				Purchase_KillInActiveBudgetTasks(k)
 			end
 		end

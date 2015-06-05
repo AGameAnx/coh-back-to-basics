@@ -22,27 +22,19 @@ axis_pe_tier1_spawner = {EBP.ELITE.PANZERJAGER,EBP.ELITE.LOGISTIK}
 axis_pe_tier2_spawner = {EBP.ELITE.KAMPFGRUPPE,EBP.ELITE.PANZER_ARTILLERIE}
 
 function _spawncountaliveproduced(tbl)
-
 	local count = 0
-
 	for k,v in pairs(tbl) do
 		count = count + UtilPBG_CountAliveOrProduced(v)
 	end
-	
 	return count
-	
 end
 
 function _spawnalivecount(tbl)
-
 	local count = 0
-	
 	for k,v in pairs(tbl) do
 		count = count + UtilPBG_CountAlive(v)
 	end
-	
 	return count
-	
 end
 
 function _spawnrequestcount(tbl)
@@ -75,7 +67,6 @@ end
 function Util_SpawnerCount()
 	
 	local t = _chooseBasedOnRace(allies_spawner, axis_spawner, allies_cw_spawner, axis_pe_spawner)
-	
 	return _spawncountaliveproduced(t)
 end
 

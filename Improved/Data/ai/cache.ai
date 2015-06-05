@@ -35,7 +35,7 @@ cache.simulate_pre = function()
 	cache.all_resource_pts_total = cache.all_capture_pts_total - cache.vp_total
 	
 	cache.max_vp_tickets = 0
-	if (cache.vp_total > 0) then
+	if cache.vp_total > 0 then
 		cache.max_vp_tickets = WinCondition_GetMaxVPTickets()
 	end
 	

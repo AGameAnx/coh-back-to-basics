@@ -228,8 +228,8 @@ function LightVehicleDemand()
 	local pcount = World_GetPlayerCount()
 	for p=1,pcount do
 		local player = World_GetPlayerAt(p)
-		if (Player_IsAlive(player)) then
-			if (Player_GetTeam(player) ~= s_self_team) then
+		if Player_IsAlive(player) then
+			if Player_GetTeam(player) ~= s_self_team then
 				num_snipers = num_snipers + GetPlayerSquadCount("Sniper", p)
 			else
 				num_light_vehicle = num_light_vehicle + GetPlayerSquadCount("LightVehicle", p)

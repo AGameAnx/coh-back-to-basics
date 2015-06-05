@@ -75,7 +75,7 @@ local militaryPointRandomResetStep = 0
 local hqDistCache = {}
 local earlyGameTimeRule = 1
 local frontlineMapConstant = 0
-local baseMapConstant = -4.5
+local baseMapConstant = -5.5
 
 --------------------------------------------------------------------------------
 -- target ranking
@@ -252,7 +252,7 @@ function RankTargetsPrepass()
 	
 	earlyGameTimeRule = math.max(0, 1 - math.min(1, World_GetGameTime()/260-0.35)) * math.min(1, 0.5 + k_longMapRatio*2)
 	
-	earlyGameScore = 7*earlyGameTimeRule + k_longMapRatio*earlyGameTimeRule*40
+	earlyGameScore = 7*earlyGameTimeRule + k_longMapRatio*earlyGameTimeRule*20
 	earlyGameFrontlineMultiplier = (1 - earlyGameTimeRule) * math.min(1, (1+k_longMapRatio*2)*0.55+0.45)
 	earlyGameThreatMultiplier = math.max(-1, math.min(1, (0.55 - earlyGameTimeRule)/0.45))
 	
@@ -375,8 +375,8 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 	)
 	if is_defend then
 		militaryPercentValue = math.min(1, militaryPercentValue) - 0.35
-		enemyHQDistances[1] = enemyHQDistances[1]/1.15
-		enemyHQDistances[2] = enemyHQDistances[2]/1.15
+		enemyHQDistances[1] = enemyHQDistances[1]/1.2
+		enemyHQDistances[2] = enemyHQDistances[2]/1.2
 		result = result - 0.225
 	end
 	
@@ -437,11 +437,11 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 		--logPrint(string.format("  negative threat score: %.2f", threatScore))
 	elseif threat >= 0 then
 		local maxThreat = math.max(5, math.min(130, Military_GetMaxCombinedThreatAtMilitaryPoint(s_selfplayer)))
-		threatScore = -1.75*threat/maxThreat
+		threatScore = -1.55*threat/maxThreat
 		if not is_defend and minDistFromFriendlyHQs / k_maxDist / furthestPoint < closeToBaseThreshold then -- we have to respond to threats near the HQ
-			threatAtBaseScore = 15 * threat/maxThreat * (closeToBaseThreshold-minDistFromFriendlyHQs / k_maxDist / furthestPoint)/closeToBaseThreshold
+			threatAtBaseScore = 20 * threat/maxThreat * (closeToBaseThreshold-minDistFromFriendlyHQs / k_maxDist / furthestPoint)/closeToBaseThreshold
 		end
-		threatScore = threatScore - math.min(1.5, math.max(0.5, 3*(1.025-militaryPercentValue)*threat/maxThreat)) -- if we have a larger army, we want to pursue threats instead of avoiding them. The result adjusted for that here
+		threatScore = threatScore - math.min(0.5, math.max(-1, 2*(1-militaryPercentValue)*threat/maxThreat)) -- if we have a larger army, we want to pursue threats instead of avoiding them. The result adjusted for that here
 	end
 	
 	local threatMultiplier = (enemyHQDistances[2]/k_maxDist/furthestPoint - 0.5)*(1.05 - math.max(0.75, math.min(1.75, (militaryPercentValue-1)/2+1))) + 0.5
