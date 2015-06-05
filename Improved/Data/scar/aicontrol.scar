@@ -1,17 +1,14 @@
 
-
-
 --string.lpad = function(str, len, char)
 --	if char == nil then char = ' ' end
 --	return string.rep(char, len - string.len(str))..str
 --end
 
-local function normalizeVector(pos)
+function normalizeVector(pos)
 	local length = math.sqrt(pos.x*pos.x + pos.y*pos.y + pos.z*pos.z)
 	return World_Pos(pos.x / length, pos.y / length, pos.z / length)
 end
-
-local function AIControl_IsSquadVehicle(squad)
+function AIControl_IsSquadVehicle(squad)
 	return Squad_GetMax(squad) == 1 and Entity_IsVehicle(Squad_EntityAt(squad, 0))
 end
 
@@ -20,10 +17,6 @@ g_AIControl_Pause = false
 
 AIControl = {}
 
-local wHalfWidth = World_GetWidth()/2
-local wHalfHeight = World_GetLength()/2
-
-AIControl.UpdateInterval = 1.5 -- seconds
 AIControl.Players = {}
 AIControl.PlayerCount = 0
 
@@ -38,7 +31,7 @@ AIControl.AIDisabling = function()
 				end
 			end
 			if AIControl.CurEnabledAI > AIControl.PlayerCount then
-				AIControl.CurEnabledAI = -1
+				AIControl.CurEnabledAI = 0
 			end
 		else
 			AI_EnableAll(false)
@@ -50,7 +43,7 @@ end
 AIControl.Grid = {
 	Settings = {
 		SplitUpdates = true, -- If true, the update will be split to be performed over the course of UpdateInterval rather than once per UpdateInterval
-		SplitUpdateCount = 6, -- Number of updates to be done during each UpdateInterval if SplitUpdates are enabled (make sure that dividing update interval by this doesn't produce long fractions). Make sure not to go below 0.125s per update, as the game's tick rate is 8 per second.
+		SplitUpdateIncreasePerSquadCount = 5,
 		
 		-- These settings will only be used on game start, changing them later on will not affect the actual values
 		Init_Dimensions = {11, 11}, -- Initial dimensions table
@@ -78,19 +71,30 @@ AIControl.Grid = {
 	},
 	
 	Dimensions = {0, 0, 1, 1}, -- {x divisions, y divisions, cell width, cell height}
+	
 	DataHistory = {}, -- double array of Dimensions[1] * Dimensions[2] size containing threat history over time
-	DataSquads = {}, -- double array of Dimensions[1] * Dimensions[2] size containing squads for each cell
+	t_DataHistory = {}, -- double array of Dimensions[1] * Dimensions[2] size containing threat history over time
+	
 	DataClump = {}, -- double array of Dimensions[1] * Dimensions[2] size containing threat combined with nearby cell threat without cells hidden in FOW
 	DataClumpFOW = {}, -- double array of Dimensions[1] * Dimensions[2] size containing threat combined with nearby cell threat with cells hidden in FOW and additional weight for history
+	
+	DataSquads = {}, -- double array of Dimensions[1] * Dimensions[2] size containing squads for each cell
+	t_DataSquads = {}, -- double array of Dimensions[1] * Dimensions[2] size containing squads for each cell used for split updates
 	DataCounts = {}, -- double array of Dimensions[1] * Dimensions[2] size containing unit counts for each cell
+	t_DataCounts = {}, -- double array of Dimensions[1] * Dimensions[2] size containing unit counts for each cell used for split updates
 	Data = {}, -- double array of Dimensions[1] * Dimensions[2] size containing unit weights for each cell
+	t_Data = {}, -- double array of Dimensions[1] * Dimensions[2] size containing unit weights for each cell used for split updates
 	ArmorData = {}, -- double array of Dimensions[1] * Dimensions[2] size containing total unit min armor for each cell
+	t_ArmorData = {}, -- double array of Dimensions[1] * Dimensions[2] size containing total unit min armor for each cell used for split updates
 	AveragePosData = {}, -- double array of Dimensions[1] * Dimensions[2] size containing average unit positions for each cell
+	t_AveragePosData = {}, -- double array of Dimensions[1] * Dimensions[2] size containing average unit positions for each cell used for split updates
+	
 	ControlPoints = {}, -- double array of Dimensions[1] * Dimensions[2] size containing spawnable locations or middle positions for each cell
 	DisabledLocations = {}, -- in case HQ setup was unsuccessful in a certain point, we disable further attempts of setting up there
 	AIMarkerCount = 0,
 	AIMarkers = {}, -- array containing invisible entities used by AI for building defensive structures
 	
+	SplitUpdateCount = 1,
 	SplitUpdateStep = 0,
 	SplitUpdateSquads = {},
 	
@@ -98,16 +102,6 @@ AIControl.Grid = {
 		local worldWidth, worldLength = World_GetWidth(), World_GetLength()
 		if auto == nil then auto = AIControl.Grid.Settings.AutoDimensionsEnable end
 		if SpawnAIMarkers == nil then SpawnAIMarkers = AIControl.Grid.Settings.SpawnAIMarkers end
-		for i=1,AIControl.Grid.Dimensions[1] do
-			if AIControl.Grid.DataSquads[i] then
-				for j=1,AIControl.Grid.Dimensions[2] do
-					if AIControl.Grid.DataSquads[i][j] then
-						SGroup_Destroy(AIControl.Grid.DataSquads[i][j][1])
-						SGroup_Destroy(AIControl.Grid.DataSquads[i][j][2])
-					end
-				end
-			end
-		end
 		if auto then
 			AIControl.Grid.Dimensions[1] = math.floor(worldWidth/x)
 			AIControl.Grid.Dimensions[2] = math.floor(worldLength/y)
@@ -121,13 +115,19 @@ AIControl.Grid = {
 		AIControl.Grid.SetupControlPoints(getSpawnableLocations, spawnableLocationEntity)
 		AIControl.Grid.ResetupAIMarkers(nil, SpawnAIMarkers)
 		AIControl.Grid.DataHistory = {}
+		AIControl.Grid.t_DataHistory = {}
 		AIControl.Grid.DataSquads = {}
+		AIControl.Grid.t_DataSquads = {}
 		for i=1,AIControl.Grid.Dimensions[1] do
 			AIControl.Grid.DataHistory[i] = {}
+			AIControl.Grid.t_DataHistory[i] = {}
 			AIControl.Grid.DataSquads[i] = {}
+			AIControl.Grid.t_DataSquads[i] = {}
 			for j=1,AIControl.Grid.Dimensions[2] do
 				AIControl.Grid.DataHistory[i][j] = {0, 0}
-				AIControl.Grid.DataSquads[i][j] = {SGroup_CreateIfNotFound("AIControl.Grid.DataSquads["..i.."]["..j.."][1]"), SGroup_CreateIfNotFound("AIControl.Grid.DataSquads["..i.."]["..j.."][2]")}
+				AIControl.Grid.t_DataHistory[i][j] = {0, 0}
+				AIControl.Grid.DataSquads[i][j] = {{}, {}}
+				AIControl.Grid.t_DataSquads[i][j] = {{}, {}}
 			end
 		end
 	end,
@@ -216,30 +216,50 @@ AIControl.Grid = {
 			--print(" - result count: "..AIControl.Grid.AIMarkerCount)
 		end
 	end,
-	ResetData = function()
-		for i=1, AIControl.Grid.Dimensions[1] do
-			AIControl.Grid.Data[i] = {}
-			AIControl.Grid.ArmorData[i] = {}
-			AIControl.Grid.DataCounts[i] = {}
-			AIControl.Grid.AveragePosData[i] = {}
+	ResetData = function(resetReal)
+		if resetReal == nil then resetReal = false end
+		for i=1,AIControl.Grid.Dimensions[1] do
+			AIControl.Grid.t_Data[i] = {}
+			AIControl.Grid.t_ArmorData[i] = {}
+			AIControl.Grid.t_DataCounts[i] = {}
+			AIControl.Grid.t_DataSquads[i] = {}
+			AIControl.Grid.t_AveragePosData[i] = {}
+			
 			AIControl.Grid.DataClump[i] = {}
 			AIControl.Grid.DataClumpFOW[i] = {}
-			for j=1, AIControl.Grid.Dimensions[2] do
-				AIControl.Grid.Data[i][j] = {0, 0}
-				AIControl.Grid.ArmorData[i][j] = {0, 0}
-				AIControl.Grid.DataCounts[i][j] = {0, 0}
+			
+			for j=1,AIControl.Grid.Dimensions[2] do
+				AIControl.Grid.t_Data[i][j] = {0, 0}
+				AIControl.Grid.t_ArmorData[i][j] = {0, 0}
+				AIControl.Grid.t_DataCounts[i][j] = {0, 0}
+				AIControl.Grid.t_DataSquads[i][j] = {{}, {}}
+				AIControl.Grid.t_AveragePosData[i][j] = {AIControl.Grid.ControlPoints[i][j], AIControl.Grid.ControlPoints[i][j]}
+				
 				AIControl.Grid.DataClump[i][j] = {0, 0}
 				AIControl.Grid.DataClumpFOW[i][j] = {0, 0}
-				SGroup_Clear(AIControl.Grid.DataSquads[i][j][1])
-				SGroup_Clear(AIControl.Grid.DataSquads[i][j][2])
-				AIControl.Grid.AveragePosData[i][j] = {AIControl.Grid.ControlPoints[i][j], AIControl.Grid.ControlPoints[i][j]}
+			end
+		end
+		if resetReal then
+			for i=1,AIControl.Grid.Dimensions[1] do
+				AIControl.Grid.Data[i] = {}
+				AIControl.Grid.ArmorData[i] = {}
+				AIControl.Grid.DataCounts[i] = {}
+				AIControl.Grid.DataSquads[i] = {}
+				AIControl.Grid.AveragePosData[i] = {}
+				for j=1,AIControl.Grid.Dimensions[2] do
+					AIControl.Grid.Data[i][j] = {0, 0}
+					AIControl.Grid.ArmorData[i][j] = {0, 0}
+					AIControl.Grid.DataCounts[i][j] = {0, 0}
+					AIControl.Grid.DataSquads[i][j] = {{}, {}}
+					AIControl.Grid.AveragePosData[i][j] = {AIControl.Grid.ControlPoints[i][j], AIControl.Grid.ControlPoints[i][j]}
+				end
 			end
 		end
 	end,
 	
 	GetXY = function(pos)
-		local x = math.floor((pos.x+wHalfWidth)/AIControl.Grid.Dimensions[3])+1
-		local y = math.floor((pos.z+wHalfHeight)/AIControl.Grid.Dimensions[4])+1
+		local x = math.floor((pos.x+World_GetWidth()/2)/AIControl.Grid.Dimensions[3])+1
+		local y = math.floor((pos.z+World_GetLength()/2)/AIControl.Grid.Dimensions[4])+1
 		if x < 1 then
 			x = 1
 		elseif x > AIControl.Grid.Dimensions[1] then
@@ -270,9 +290,13 @@ AIControl.Grid = {
 		return squadCounts
 	end,
 	Update = function()
+		if g_AIControl_Pause then return end
+		
 		local squadCounts = AIControl.Grid.UpdateAIPlayers()
 		if not AIControl.Grid.Settings.SplitUpdates or AIControl.Grid.SplitUpdateStep == 0 then
-			AIControl.Grid.ResetData()
+			dr_clear('aicontrol_maincontrol')
+			dr_clear("aicontrol_grid")
+			AIControl.Grid.ResetData(false)
 			for i=1,AIControl.Grid.Dimensions[1] do
 				for j=1,AIControl.Grid.Dimensions[2] do
 					AIControl.Grid.AveragePosData[i][j] = {World_Pos(0, 0, 0), World_Pos(0, 0, 0)}
@@ -283,6 +307,7 @@ AIControl.Grid = {
 								- math.max(0, AIControl.Grid.Settings.HistoryDecrementPerTick)
 								- (math.max(1, AIControl.Grid.DataHistory[i][j][team]/20)^2)/math.max(1, squadCounts[team])
 								)
+							AIControl.Grid.t_DataHistory[i][j][team] = AIControl.Grid.DataHistory[i][j][team]
 						end
 					end
 				end
@@ -305,11 +330,13 @@ AIControl.Grid = {
 					end
 				end
 				
-				local sqPerStep = math.ceil(sqCount/AIControl.Grid.Settings.SplitUpdateCount)
-				for i=1,AIControl.Grid.Settings.SplitUpdateCount do
+				AIControl.Grid.SplitUpdateCount = math.max(1, math.ceil(sqCount / AIControl.Grid.Settings.SplitUpdateIncreasePerSquadCount))
+				
+				local sqPerStep = AIControl.Grid.Settings.SplitUpdateIncreasePerSquadCount
+				for i=1,AIControl.Grid.SplitUpdateCount do
 					AIControl.Grid.SplitUpdateSquads[i] = SGroup_CreateIfNotFound("sg_aicontrol_splitupdatesquads_"..i)
 					SGroup_Clear(AIControl.Grid.SplitUpdateSquads[i])
-					if sqCount >= AIControl.Grid.Settings.SplitUpdateCount or i <= sqCount then
+					if sqCount >= AIControl.Grid.SplitUpdateCount or i <= sqCount then
 						for j=(i-1)*sqPerStep+1,math.min(sqCount, i*sqPerStep) do
 							if allSquads[j] then
 								SGroup_Add(AIControl.Grid.SplitUpdateSquads[i], allSquads[j])
@@ -324,7 +351,7 @@ AIControl.Grid = {
 		if AIControl.Grid.Settings.SplitUpdates then
 			AIControl.Grid.SplitUpdateStep = AIControl.Grid.SplitUpdateStep + 1
 			squads = AIControl.Grid.SplitUpdateSquads[AIControl.Grid.SplitUpdateStep]
-			if AIControl.Grid.SplitUpdateStep >= AIControl.Grid.Settings.SplitUpdateCount then
+			if AIControl.Grid.SplitUpdateStep >= AIControl.Grid.SplitUpdateCount then
 				AIControl.Grid.SplitUpdateStep = 0
 			end
 		else
@@ -344,62 +371,84 @@ AIControl.Grid = {
 		for i=1,SGroup_CountSpawned(squads) do
 			local s = SGroup_GetSpawnedSquadAt(squads, i)
 			local bpID = BP_GetID(Squad_GetBlueprint(s))
+			local player = Squad_GetPlayerOwner(s)
+			local team = Player_GetTeam(player)+1
+			local enemyTeam
+			if team == 1 then
+				enemyTeam = 2
+			else
+				enemyTeam = 1
+			end
+			local position = Squad_GetPosition(s)
+			local x,y = AIControl.Grid.GetXY(position)
+			
+			local retreated = false
+			if not Player_IsHuman(player) then
+				
+				-- reinforcing
+				local tmpSG = SGroup_CreateIfNotFound("tempsg")
+				SGroup_Single(tmpSG, s)
+				if Squad_CanInstantReinforceNow(s) and Squad_HasActiveCommand(s) and Squad_GetActiveCommand(s) ~= SQUADSTATEID_Idle then
+					if not Squad_IsReinforcing(s) or Squad_GetProductionQueueSize(s) < 2 then
+						Cmd_ReinforceUnit(tmpSG, 1)
+					end
+				end
+				if Squad_IsReinforcing(s) and (not Squad_CanInstantReinforceNow(s) or Squad_Count(s) == Squad_GetMax(s)) then -- Fix for reinforce bug
+					Command_Squad(player, tmpSG, SCMD_CancelProduction, false)
+				end
+				SGroup_Destroy(tmpSG)
+				
+				-- retreating
+				if Squad_IsUnderAttack(s, 2) and not Squad_IsRetreating(s) and not AIControl_IsSquadVehicle(s) then
+					local retreatDemand = AIControl.MainControl.RetreatTactic(s)
+					if retreatDemand > 0 then
+						--local r = World_GetRand(0, 20)/10
+						--if r <= retreatDemand then
+							retreated = true
+							
+							local retreatSG = SGroup_CreateIfNotFound('BtB_retreat')
+							SGroup_Clear(retreatSG)
+							SGroup_Add(retreatSG, s)
+							if Squad_IsInHoldEntity(s) then -- eject squads in entity hold
+								local holdEntity = Squad_GetHoldEntity(s)
+								SGroup_Eject(retreatSG, AIControl.MainControl.HQPositions[AIControl.Players[i]])
+								Cmd_Retreat(retreatSG, nil, nil, true) -- queued retreat
+							elseif Squad_IsInHoldSquad(s) then -- eject squads in s hold
+								local holdSquad = Squad_GetHoldSquad(s)
+								local tmpSG = SGroup_CreateIfNotFound('BtB_tmp')
+								SGroup_Clear(tmpSG)
+								SGroup_Add(tmpSG, holdSquad)
+								Cmd_EjectOccupants(tmpSG)
+								SGroup_Destroy(tmpSG)
+								Cmd_Retreat(retreatSG, nil, nil, true) -- queued retreat
+							else
+								Cmd_Retreat(retreatSG)
+							end
+							SGroup_Destroy(retreatSG)
+						--end
+					end
+				end
+				
+				if not retreated then
+					local raceStr = Player_GetRaceName(player)
+					local ucSetting = AIControl.MainControl.Settings.UnitControl.UnitSettings[sbpID]
+					if ucSetting then -- unit control
+						SGroup_Add(AIControl.MainControl.UnitControls[team], s)
+						AIControl.MainControl.FUnitControl(s, ucSetting)
+					else
+						local exclude = AIControl.MainControl.Settings.VehicleControl.ExcludeFromControl[raceStr] and AIControl.MainControl.Settings.VehicleControl.ExcludeFromControl[raceStr][BP_GetID]
+						if not exclude and AIControl_IsSquadVehicle(s) then -- vehicle control
+							AIControl.MainControl.FVehicleControl(s)
+						end
+					end
+					local bcSetting = AIControl.MainControl.Settings.BarrageControl.UnitSettings[sbpID]
+					if bcSetting then
+						AIControl.MainControl.FBarrageControl(s, bcSetting)
+					end
+				end
+			end
+			
 			if not AIControl.Grid.Settings.ExcludedUnits[bpID] then
-				local player = Squad_GetPlayerOwner(s)
-				local team = Player_GetTeam(player)+1
-				local enemyTeam
-				if team == 1 then
-					enemyTeam = 2
-				else
-					enemyTeam = 1
-				end
-				local position = Squad_GetPosition(s)
-				local x,y = AIControl.Grid.GetXY(position)
-				
-				if not Player_IsHuman(player) then
-					-- reinforcing
-					local tmpSG = SGroup_CreateIfNotFound("tempsg")
-					SGroup_Single(tmpSG, s)
-					if Squad_CanInstantReinforceNow(s) and Squad_HasActiveCommand(s) and Squad_GetActiveCommand(s) ~= SQUADSTATEID_Idle then
-						if not Squad_IsReinforcing(s) or Squad_GetProductionQueueSize(s) < 2 then
-							Cmd_ReinforceUnit(tmpSG, 1)
-						end
-					end
-					if Squad_IsReinforcing(s) and (not Squad_CanInstantReinforceNow(s) or Squad_Count(s) == Squad_GetMax(s)) then -- Fix for reinforce bug
-						Command_Squad(player, tmpSG, SCMD_CancelProduction, false)
-					end
-					SGroup_Destroy(tmpSG)
-					
-					-- retreating
-					if Squad_IsUnderAttack(s, 2) and not Squad_IsRetreating(s) and not AIControl_IsSquadVehicle(s) then
-						local retreatDemand = AIControl.MainControl.RetreatTactic(s)
-						if retreatDemand > 0 then
-							--local r = World_GetRand(0, 20)/10
-							--if r <= retreatDemand then
-								local retreatSG = SGroup_CreateIfNotFound('BtB_retreat')
-								SGroup_Clear(retreatSG)
-								SGroup_Add(retreatSG, s)
-								if Squad_IsInHoldEntity(s) then -- eject squads in entity hold
-									local holdEntity = Squad_GetHoldEntity(s)
-									SGroup_Eject(retreatSG, AIControl.MainControl.HQPositions[AIControl.Players[i]])
-									Cmd_Retreat(retreatSG, nil, nil, true) -- queued retreat
-								elseif Squad_IsInHoldSquad(s) then -- eject squads in squad hold
-									local holdSquad = Squad_GetHoldSquad(s)
-									local tmpSG = SGroup_CreateIfNotFound('BtB_tmp')
-									SGroup_Clear(tmpSG)
-									SGroup_Add(tmpSG, holdSquad)
-									Cmd_EjectOccupants(tmpSG)
-									SGroup_Destroy(tmpSG)
-									Cmd_Retreat(retreatSG, nil, nil, true) -- queued retreat
-								else
-									Cmd_Retreat(retreatSG)
-								end
-								SGroup_Destroy(retreatSG)
-							--end
-						end
-					end
-				end
-				
 				local squadWeight = 1
 				local squadHealthMax = Squad_GetHealthMax(s)
 				local squadHealth = Squad_GetHealth(s)
@@ -418,35 +467,40 @@ AIControl.Grid = {
 				elseif Squad_Count(s) > 0 then
 					squadWeight = Squad_Count(s)/2+squadHealthMax/150/3+squadHealth/150/3*2
 				end
-				if Squad_IsRetreating(s) then
+				if Squad_IsRetreating(s) or retreated then
 					squadWeight = squadWeight / 4
 				end
 				
-				AIControl.Grid.Data[x][y][team] = AIControl.Grid.Data[x][y][team] + squadWeight
-				AIControl.Grid.DataCounts[x][y][team] = AIControl.Grid.DataCounts[x][y][team] + 1
-				AIControl.Grid.ArmorData[x][y][team] = AIControl.Grid.ArmorData[x][y][team] + armorValue
-				AIControl.Grid.DataHistory[x][y][team] = AIControl.Grid.DataHistory[x][y][team] + squadWeight/math.max(squadCounts[team])*AIControl.Grid.Settings.HistoryGrowthModifier
-				SGroup_Add(AIControl.Grid.DataSquads[x][y][team], s)
+				AIControl.Grid.t_Data[x][y][team] = AIControl.Grid.t_Data[x][y][team] + squadWeight
+				AIControl.Grid.t_DataCounts[x][y][team] = AIControl.Grid.t_DataCounts[x][y][team] + 1
+				AIControl.Grid.t_ArmorData[x][y][team] = AIControl.Grid.t_ArmorData[x][y][team] + armorValue
+				AIControl.Grid.t_DataHistory[x][y][team] = AIControl.Grid.t_DataHistory[x][y][team] + squadWeight/math.max(squadCounts[team])*AIControl.Grid.Settings.HistoryGrowthModifier
+				AIControl.Grid.t_DataSquads[x][y][team][table.getn(AIControl.Grid.t_DataSquads[x][y][team])+1] = s
 				
-				AIControl.Grid.AveragePosData[x][y][team].x = AIControl.Grid.AveragePosData[x][y][team].x+position.x
-				AIControl.Grid.AveragePosData[x][y][team].y = AIControl.Grid.AveragePosData[x][y][team].y+position.y
-				AIControl.Grid.AveragePosData[x][y][team].z = AIControl.Grid.AveragePosData[x][y][team].z+position.z
+				AIControl.Grid.t_AveragePosData[x][y][team].x = AIControl.Grid.t_AveragePosData[x][y][team].x+position.x
+				AIControl.Grid.t_AveragePosData[x][y][team].y = AIControl.Grid.t_AveragePosData[x][y][team].y+position.y
+				AIControl.Grid.t_AveragePosData[x][y][team].z = AIControl.Grid.t_AveragePosData[x][y][team].z+position.z
 			end
 		end
 		SGroup_Destroy(squads)
 		
-		-- Only enable one AI per update (hack to majorly increase game performance)
-		
 		if not AIControl.Grid.Settings.SplitUpdates or AIControl.Grid.SplitUpdateStep == 0 then
+			local wHalfWidth = World_GetWidth()/2
+			local wHalfHeight = World_GetLength()/2
 			for i=1,AIControl.Grid.Dimensions[1] do
 				for j=1,AIControl.Grid.Dimensions[2] do
 					for team=1,2 do
+						AIControl.Grid.DataCounts[i][j][team] = AIControl.Grid.t_DataCounts[i][j][team]
+						AIControl.Grid.DataSquads[i][j][team] = AIControl.Grid.t_DataSquads[i][j][team]
+						AIControl.Grid.Data[i][j][team] = AIControl.Grid.t_Data[i][j][team]
+						AIControl.Grid.ArmorData[i][j][team] = AIControl.Grid.t_ArmorData[i][j][team]
+						AIControl.Grid.DataHistory[i][j][team] = AIControl.Grid.t_DataHistory[i][j][team]
 						if AIControl.Grid.DataCounts[i][j][team] > 0 then
-							AIControl.Grid.AveragePosData[i][j][team].x = AIControl.Grid.AveragePosData[i][j][team].x/AIControl.Grid.DataCounts[i][j][team]
-							AIControl.Grid.AveragePosData[i][j][team].y = AIControl.Grid.AveragePosData[i][j][team].y/AIControl.Grid.DataCounts[i][j][team]
-							AIControl.Grid.AveragePosData[i][j][team].z = AIControl.Grid.AveragePosData[i][j][team].z/AIControl.Grid.DataCounts[i][j][team]
+							AIControl.Grid.AveragePosData[i][j][team].x = AIControl.Grid.t_AveragePosData[i][j][team].x/AIControl.Grid.DataCounts[i][j][team]
+							AIControl.Grid.AveragePosData[i][j][team].y = AIControl.Grid.t_AveragePosData[i][j][team].y/AIControl.Grid.DataCounts[i][j][team]
+							AIControl.Grid.AveragePosData[i][j][team].z = AIControl.Grid.t_AveragePosData[i][j][team].z/AIControl.Grid.DataCounts[i][j][team]
 						else
-							AIControl.Grid.AveragePosData[i][j][team] = World_Pos(i*AIControl.Grid.Dimensions[3] - wHalfWidth, 0, j*AIControl.Grid.Dimensions[4] - wHalfHeight)
+							AIControl.Grid.AveragePosData[i][j][team] = {AIControl.Grid.ControlPoints[i][j], AIControl.Grid.ControlPoints[i][j]}
 						end
 					end
 				end
@@ -458,12 +512,7 @@ AIControl.Grid = {
 			local highestPosFOW = {{0, 0}, {0, 0}}
 			local highestDangerFOW = {0, 0}
 			for team=1,2 do
-				local enemyTeam
-				if team == 1 then
-					enemyTeam = 2
-				else
-					enemyTeam = 1
-				end
+				local enemyTeam = Team_GetEnemyTeam(team-1)+1
 				local player
 				for i=1,World_GetPlayerCount() do
 					local p = World_GetPlayerAt(i)
@@ -532,17 +581,18 @@ AIControl.Grid = {
 				end
 			end
 			
-			--dr_clear("aicontrol_grid")
 			--AIControl.Grid.DebugOutput()
 			
 			AIControl.MainControl.Update()
 		end
 	end,
 	DebugOutput = function()
+		local wHalfWidth = World_GetWidth()/2
+		local wHalfHeight = World_GetLength()/2
 		local function pr(i, j, val1, val2)
 			local x = i*AIControl.Grid.Dimensions[3]-wHalfWidth-AIControl.Grid.Dimensions[3]/2
 			local y = j*AIControl.Grid.Dimensions[4]-wHalfHeight-AIControl.Grid.Dimensions[4]/2
-			--dr_text3d('aicontrol_grid', x, World_GetHeightAt(x, y)+0.35, y, string.format('%.1f / %.1f', val1, val2), 0, 255, 0)
+			dr_text3d('aicontrol_grid', x, World_GetHeightAt(x, y)+0.35, y, string.format('%.1f / %.1f', val1, val2), 0, 255, 0)
 		end
 		for i=1,AIControl.Grid.Dimensions[1] do
 			for j=1,AIControl.Grid.Dimensions[2] do
@@ -564,24 +614,24 @@ AIControl.Pathfinding = {
 	CurrentYStep = 1,
 	Entity = nil,
 	DebugPrint = function(path)
-		--dr_clear("aicontrol_pathfinding_mapdebug")
+		dr_clear("aicontrol_pathfinding_mapdebug")
 		for y = 1,AIControl.Pathfinding.StepsTotal[2] do
 			local line = ''
 			for x = 1,AIControl.Pathfinding.StepsTotal[1] do
 				if AIControl.Pathfinding.Data[x][y] then
 					--if y == AIControl.Pathfinding.CurrentYStep then
-					--	--dr_text2d("aicontrol_pathfinding_mapdebug", 0.007+x*0.004, 0.007+y*0.0045, '-', 255, 255, 255)
+					--	dr_text2d("aicontrol_pathfinding_mapdebug", 0.007+x*0.004, 0.007+y*0.0045, '-', 255, 255, 255)
 					--end
 				else
-					--dr_text2d("aicontrol_pathfinding_mapdebug", 0.007+x*0.004, 0.007+y*0.0045, '+', 0, 0, 0)
+					dr_text2d("aicontrol_pathfinding_mapdebug", 0.007+x*0.004, 0.007+y*0.0045, '+', 0, 0, 0)
 				end
 			end
 		end
 		
 		if path then
-			--dr_clear("aicontrol_pathfinding_pathdebug")
+			dr_clear("aicontrol_pathfinding_pathdebug")
 			for i,v in pairs(path) do
-				--dr_text2d("aicontrol_pathfinding_pathdebug", 0.007+v[1]*0.004, 0.007+v[2]*0.0045, 'o', 255, 0, 0)
+				dr_text2d("aicontrol_pathfinding_pathdebug", 0.007+v[1]*0.004, 0.007+v[2]*0.0045, 'o', 255, 0, 0)
 			end
 		end
 	end,
@@ -1053,9 +1103,9 @@ AIControl.Pathfinding = {
 		AIControl.Pathfinding.ReconstructFullMap()
 	end,
 	ReconstructPart = function()
-		
+		local wHalfWidth = World_GetWidth()/2
+		local wHalfHeight = World_GetLength()/2
 		local halfWidth = AIControl.Pathfinding.Settings.Precision/2
-		
 		for step=1,2 do
 			for x=1,AIControl.Pathfinding.StepsTotal[1] do
 				AIControl.Pathfinding.Data[x][AIControl.Pathfinding.CurrentYStep] = false
@@ -1082,8 +1132,9 @@ AIControl.Pathfinding = {
 		--AIControl.Pathfinding.DebugPrint()
 	end,
 	ReconstructFullMap = function()
+		local wHalfWidth = World_GetWidth()/2
+		local wHalfHeight = World_GetLength()/2
 		local halfWidth = AIControl.Pathfinding.Settings.Precision/2
-		
 		for x=2,AIControl.Pathfinding.StepsTotal[1]-1 do
 			for y=2,AIControl.Pathfinding.StepsTotal[2]-1 do
 				local pos = World_GetSpawnablePosition(World_Pos(
@@ -1113,16 +1164,18 @@ AIControl.Pathfinding = {
 		--AIControl.Pathfinding.DebugPrint()
 	end,
 	Init = function()
+		local wHalfWidth = World_GetWidth()/2
+		local wHalfHeight = World_GetLength()/2
 		AIControl.Pathfinding.Entity = Entity_CreateENV(AIControl.Pathfinding.Settings.EntityBlueprint, World_Pos(-wHalfWidth, 0, -wHalfHeight), World_Pos(1, 0, 0))
 		Entity_DeSpawn(AIControl.Pathfinding.Entity)
 		
-		--dr_setdisplay("aicontrol_pathfinding_mapdebug", true)
-		--dr_setautoclear("aicontrol_pathfinding_mapdebug", false)
-		--dr_clear("aicontrol_pathfinding_mapdebug")
+		dr_setdisplay("aicontrol_pathfinding_mapdebug", true)
+		dr_setautoclear("aicontrol_pathfinding_mapdebug", false)
+		dr_clear("aicontrol_pathfinding_mapdebug")
 		
-		--dr_setdisplay("aicontrol_pathfinding_pathdebug", true)
-		--dr_setautoclear("aicontrol_pathfinding_pathdebug", false)
-		--dr_clear("aicontrol_pathfinding_pathdebug")
+		dr_setdisplay("aicontrol_pathfinding_pathdebug", true)
+		dr_setautoclear("aicontrol_pathfinding_pathdebug", false)
+		dr_clear("aicontrol_pathfinding_pathdebug")
 		
 		AIControl.Pathfinding.Reset()
 		--Rule_AddInterval(AIControl.Pathfinding.ReconstructPart, 0.1)
@@ -1220,7 +1273,6 @@ BARRAGE_CONTROL_POSITION = {
 				local sg2 = SGroup_CreateIfNotFound('tactics_infrontofmgpos2')
 				local squadPos = Squad_GetPosition(s)
 				local dropPos = World_Pos(squadPos.x+heading.x*40, squadPos.y+heading.y*40, squadPos.z+heading.z*40)
-				--dr_drawCircle('aicontrol_maincontrol', dropPos.x, dropPos.y+5, dropPos.z, 2, 255, 127, 0)
 				World_GetSquadsNearPoint(player, sg2, dropPos, 45, OT_Ally)
 				if SGroup_CountSpawned(sg2) > 0 then
 					SGroup_Destroy(sg2)
@@ -1237,9 +1289,7 @@ BARRAGE_CONTROL_POSITION = {
 
 AIControl.MainControl = {
 	Settings = {
-		SplitUpdates = 1, -- full update time is grid update time times this number
-		SplitUpdatesIncreaseForSquadCount = 7, -- Increases split update count on secondary update by floor(TotalCount/N)
-		SecondaryUpdateTicks = 6, -- every n updates we'll check for new controlled units
+		SecondaryUpdateTicks = 12, -- every n updates we'll check for new controlled units
 		
 		RetreatTactic_BattleRadius = 55,
 		RetreatTactic_BaseSafety = 0.695, -- Higher value means higher danger is required for a squad to retreat
@@ -1435,7 +1485,7 @@ AIControl.MainControl = {
 		},
 		
 		HQControl = {
-			UpdateInterval = 2, -- HQ updates will be performed only every Nth time
+			UpdateInterval = 4, -- HQ updates will be performed only every Nth time
 			Blueprints = {
 				[BP_GetID(SBP.CW.HQ)] = true,
 				[BP_GetID(SBP.CW.HQ_REINFORCEMENT)] = true,
@@ -1503,17 +1553,12 @@ AIControl.MainControl = {
 	SecondaryUpdateTicks = 0,
 	
 	-- SGroups
-	UnitControls = {},
-	Vehicles = {},
 	HQs = {},
-	BarrageUnits = {},
 	
 	AICheatModifiers = {},
 	LockedSquads = {{}, {}},
 	HQTargets = {{}, {}},
 	SettingUpHQs = {{}, {}}, -- array containing all HQ setup attempts and time when they start (used to determine failed setup attempts)
-	
-	SplitUpdateStep = 0,
 	
 	UnitControlTargets = {{}, {}},
 	UnitControlUnlockTimers = {{}, {}},
@@ -1528,9 +1573,6 @@ AIControl.MainControl = {
 	BarrageControlLockTimers = {},
 	
 	Init = function()
-		AIControl.MainControl.UnitControls = {SGroup_CreateIfNotFound("AIControl.MainControl.TWT1"), SGroup_CreateIfNotFound("AIControl.MainControl.TWT2")}
-		AIControl.MainControl.Vehicles = {SGroup_CreateIfNotFound("AIControl.MainControl.VT1"), SGroup_CreateIfNotFound("AIControl.MainControl.VT2")}
-		AIControl.MainControl.BarrageUnits = {SGroup_CreateIfNotFound("AIControl.BarrageUnits.BUT1"), SGroup_CreateIfNotFound("AIControl.MainControl.BUT2")}
 		AIControl.MainControl.HQs = {SGroup_CreateIfNotFound("AIControl.MainControl.HQT1"), SGroup_CreateIfNotFound("AIControl.MainControl.HQT2")}
 		
 		AIControl.MainControl.FindTerritorySectors()
@@ -1619,6 +1661,8 @@ AIControl.MainControl = {
 		return retreatDirection
 	end,
 	GetRetreatLocation = function(pos, retreatDirection, retreatDistance)
+		local wHalfWidth = World_GetWidth()/2
+		local wHalfHeight = World_GetLength()/2
 		local result = Util_ScarPos(
 			pos.x + retreatDirection.x*retreatDistance,
 			pos.z + retreatDirection.z*retreatDistance
@@ -1646,8 +1690,6 @@ AIControl.MainControl = {
 			for j = math.max(1, math.floor(y-radius)),math.min(AIControl.Grid.Dimensions[2], math.ceil(y+radius)) do
 				local bSquared = (j-y)^2
 				if aSquared + bSquared <= radiusSquared then
-					--local pos = AIControl.Grid.AveragePosData[i][j][1]
-					--dr_drawCircle('aicontrol_maincontrol', pos.x, World_GetHeightAt(pos.x, pos.z)+3, pos.z, 2, 0, 0, 255)
 					if noFOW then
 						if AIControl.Grid.DataClump[i][j][team] then
 							if AIControl.Grid.DataClump[i][j][team] > maxDanger then
@@ -1706,6 +1748,9 @@ AIControl.MainControl = {
 	end,
 	GetSurroundingSafety = function(pos, dist, steps, team)
 		local result, resultCount = {}, 0
+		
+		local wHalfWidth = World_GetWidth()/2
+		local wHalfHeight = World_GetLength()/2
 		
 		--[[local gridPos = {
 			math.floor((pos.x+wHalfWidth)/AIControl.Grid.Dimensions[3])+1,
@@ -1779,7 +1824,7 @@ AIControl.MainControl = {
 		SGroup_Clear(squadsNearSG_allied)
 		World_GetSquadsNearPoint(p, squadsNearSG_enemy , pos, AIControl.MainControl.Settings.RetreatTactic_BattleRadius, OT_Enemy)
 		World_GetSquadsNearPoint(p, squadsNearSG_allied, pos, AIControl.MainControl.Settings.RetreatTactic_BattleRadius-10, OT_Ally)
-		--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+3, pos.z, SGroup_Count(squadsNearSG_allied), 255, 0, 0)
+		dr_text3d('aicontrol_maincontrol', pos.x, pos.y+3, pos.z, SGroup_Count(squadsNearSG_allied), 255, 0, 0)
 		
 		--local maxHealth = Squad_GetHealthMax(squad)
 		local healthLeft = Squad_GetHealth(squad)
@@ -1852,12 +1897,548 @@ AIControl.MainControl = {
 		return math.max(0, result)
 	end,
 	
-	Update = function()
-		if g_AIControl_Pause then
-			return
-		end
+	FUnitControl = function(squad, setting)
+		local wHalfWidth = World_GetWidth()/2
+		local wHalfHeight = World_GetLength()/2
 		
-		--dr_clear('aicontrol_maincontrol')
+		local sg = SGroup_Create("aicontrol_vc_tempsg")
+		local squadGameID = Squad_GetGameID(squad)
+		local player = Squad_GetPlayerOwner(squad)
+		local team = Player_GetTeam(player)+1
+		local enemyTeam = Team_GetEnemyTeam(team-1)+1
+		local playerIndex = World_GetPlayerIndex(player)
+		if not AIControl.MainControl.LockedSquads[team][squadGameID] or AIControl.MainControl.LockedSquads[team][squadGameID] == 1 then
+			local pos = Squad_GetPosition(squad)
+			local x,y = AIControl.Grid.GetXY(pos)
+			
+			--print("["..BP_GetName(Squad_GetBlueprint(squad)).."] --- "..team.." "..World_GetPlayerIndex(player))
+			SGroup_Single(sg, squad)
+			
+			local syncWeapon = SyncWeapon_GetFromSGroup(sg)
+			--local syncWeaponEntity = SyncWeapon_GetEntity(syncWeapon)
+			if not Squad_IsInHoldEntity(squad) and not Squad_IsRetreating(squad) then
+				--local isUnderAttack = Squad_IsUnderAttack(squad, 2)
+				local healthPercentage = Squad_GetHealthPercentage(squad)
+				local stepsTotal = setting['safety_radius_steps']
+				local surroundingSafety = AIControl.MainControl.GetSurroundingSafety({x, y}, 0, stepsTotal, team)
+				table.sort(surroundingSafety, function(a, b) return a[3] > b[3] end)
+				
+				local collectiveDanger = 0
+				local totalArmor = 0
+				for i,v in pairs(surroundingSafety) do
+					collectiveDanger = collectiveDanger + v[3] + v[4]*0.01 - v[5]*0.1 - v[6]*0.0025
+					totalArmor = totalArmor + v[7]
+				end
+				dr_text3d('aicontrol_maincontrol', pos.x, pos.y+9, pos.z, string.format('%.2f', collectiveDanger), 255, 255, 255)
+				
+				local lockSquad = false
+				
+				local playerHQPosition = AIControl.MainControl.HQPositions[playerIndex]
+				local directionToHq = normalizeVector(Util_ScarPos(playerHQPosition.x - pos.x, playerHQPosition.z - pos.z))
+				local moveBackDanger = setting['move_back_danger']
+				local retreatDanger = setting['retreat_danger']
+				if setting['targets_armor'] then
+					local dangerDecrease = math.min(setting['armor_danger_decrease_reduction_threshold'], totalArmor)*setting['armor_danger_decrease']
+					
+					moveBackDanger = moveBackDanger + dangerDecrease
+					if retreatDanger >= 0 then
+						retreatDanger = retreatDanger + dangerDecrease
+					end
+				end
+				if collectiveDanger > moveBackDanger then
+					
+					-- We are in danger
+					dr_text3d('aicontrol_maincontrol', pos.x, pos.y+2, pos.z, 'in danger', 255, 255, 0)
+					
+					lockSquad = true
+					
+					if retreatDanger >= 0 and collectiveDanger > retreatDanger then
+						local distanceToHq = World_DistancePointToPoint(pos, playerHQPosition)
+						--Cmd_Move(sg, AIControl.MainControl.HQPositions[playerIndex])
+						dr_text3d('aicontrol_maincontrol', pos.x, pos.y+1, pos.z, 'retreating', 255, 0, 0)
+						if distanceToHq > 20 then
+							Cmd_Retreat(sg)
+						end
+					else
+						dr_text3d('aicontrol_maincontrol', pos.x, pos.y+1, pos.z, 'moving away', 255, 255, 0)
+						
+						local hqMult = 0.7
+						local xBorderDistRatio = math.abs(pos.x) / wHalfWidth - 0.6
+						if xBorderDistRatio > 0 then
+							hqMult = hqMult + xBorderDistRatio*2
+						end
+						local yBorderDistRatio = math.abs(pos.z) / wHalfHeight - 0.6
+						if yBorderDistRatio > 0 then
+							hqMult = hqMult + yBorderDistRatio*2
+						end
+						local retreatDirection = AIControl.MainControl.GetRetreatDirection(surroundingSafety, pos, team, 1.5, 1.1, directionToHq, hqMult, 0.025, 0.5, 0)
+						local retreatDistance = 5+math.min(30, math.max(0, 3*(collectiveDanger-2)))
+						local retreatLocation = AIControl.MainControl.GetRetreatLocation(pos, retreatDirection, retreatDistance)
+						
+						local x2,y2 = AIControl.Grid.GetXY(retreatLocation)
+						local retreatLocation2 = AIControl.MainControl.GetRetreatLocation(
+							retreatLocation,
+							AIControl.MainControl.GetRetreatDirection(
+								AIControl.MainControl.GetSurroundingSafety({x2, y2}, 0, stepsTotal, team),
+								retreatLocation,
+								team, 1.5, 1.1, directionToHq, hqMult, 0.025, 0.5, 0),
+							retreatDistance)
+						
+						Cmd_Move(sg, retreatLocation, false)
+						Cmd_Move(sg, retreatLocation2, true)
+						Cmd_Move(sg, playerHQPosition, true)
+					end
+				else
+					local targetSafetyData = AIControl.MainControl.GetSurroundingSafety({x, y}, setting['init_step'], setting['step_count'], team)
+					table.sort(targetSafetyData, function(a, b) return a[3] > b[3] end)
+					
+					if targetSafetyData[1][3] > setting['setup_target_danger'] then
+						
+						lockSquad = true
+						dr_text3d('aicontrol_maincontrol', pos.x, pos.y+3, pos.z, 'setting up', 255, 255, 255)
+						
+						local dangerMultiplier
+						local safetyMultiplier
+						local hqDirectionMultiplier
+						local historyMultiplier
+						local armorMultiplier
+						if setting['targets_armor'] then
+							dangerMultiplier = -3
+							safetyMultiplier = -1
+							hqDirectionMultiplier = -0.5
+							historyMultiplier = -0.005
+							armorMultiplier = 0
+						else
+							dangerMultiplier = -0.05
+							safetyMultiplier = -0.0005
+							hqDirectionMultiplier = 0
+							historyMultiplier = 0
+							armorMultiplier = -2
+						end
+						local headingDirection = AIControl.MainControl.GetRetreatDirection(targetSafetyData, pos, team, dangerMultiplier, safetyMultiplier, directionToHq, hqDirectionMultiplier, historyMultiplier, armorMultiplier, 0)
+						local headingPos = AIControl.MainControl.GetRetreatLocation(pos, headingDirection, 25)
+						dr_drawline(World_Pos(pos.x, pos.y+0.35, pos.z), World_Pos(headingPos.x, headingPos.y+0.35, headingPos.z), 0, 125, 125, 'aicontrol_maincontrol')
+						
+						local setupWell = false
+						--print(tostring(AIControl.MainControl.UnitControlTargets[team][squadGameID]))
+						if AIControl.MainControl.UnitControlTargets[team][squadGameID] and not AIControl.MainControl.UnitControlTargets[team][squadGameID][1] then
+							local heading = normalizeVector(World_Pos(
+								AIControl.MainControl.UnitControlTargets[team][squadGameID][3].x - AIControl.MainControl.UnitControlTargets[team][squadGameID][2].x,
+								0,
+								AIControl.MainControl.UnitControlTargets[team][squadGameID][3].z - AIControl.MainControl.UnitControlTargets[team][squadGameID][2].z
+							))
+							local angle = math.acos(
+								(heading.x*headingDirection.x+heading.z*headingDirection.z) /
+								(math.sqrt(heading.x*heading.x + heading.z*heading.z) * math.sqrt(headingDirection.x*headingDirection.x + headingDirection.z*headingDirection.z))
+							)*180/3.14
+							
+							dr_text3d('aicontrol_maincontrol', pos.x, pos.y+4, pos.z, 'angle: '..string.format('%d', angle), 255, 255, 255)
+							if setting['target_angle_threshold'] == -1 or angle < setting['target_angle_threshold'] then
+								dr_text3d('aicontrol_maincontrol', pos.x, pos.y+2, pos.z, 'setup well', 255, 0, 0)
+								setupWell = true
+							end
+						end
+						if setupWell and World_DistancePointToPoint(pos, AIControl.MainControl.UnitControlTargets[team][squadGameID][2]) > AIControl.MainControl.Settings.UnitControl.CoverSearchRadius*3 then
+							dr_text3d('aicontrol_maincontrol', pos.x, pos.y+5, pos.z, 'NOT IN COVER', 255, 0, 0)
+							setupWell = false
+						end
+						if not setupWell then
+							local coverSearchPos = pos
+							for i=0,Squad_Count(squad)-1 do
+								local e = Squad_EntityAt(squad, i)
+								if Entity_IsSyncWeapon(e) then
+									coverSearchPos = Entity_GetPosition(e)
+								end
+							end
+							
+							if setting['attack_move_forward'] then
+								Cmd_AttackMove(sg, headingPos, false)
+							else
+								local setupPos = pos
+								if setting['search_cover'] then
+									setupPos = Squad_FindCover(squad, pos, AIControl.MainControl.Settings.UnitControl.CoverSearchRadius)
+									
+									dr_text3d('aicontrol_maincontrol', coverPos.x, coverPos.y+0.35, coverPos.z, 'o', 255, 255, 255)
+									dr_text3d('aicontrol_maincontrol', pos.x, pos.y+1, pos.z, 'new setup pos', 255, 0, 0)
+								end
+								
+								AIControl.MainControl.UnitControlTargets[team][squadGameID] = {false, setupPos, headingPos}
+								Command_SquadPosFacing(player, sg, SCMD_Move, setupPos, headingPos, false)
+							end
+						end
+					end
+				end
+				
+				if lockSquad then
+					if not AIControl.MainControl.LockedSquads[team][squadGameID] then
+						AIControl.MainControl.LockedSquads[team][squadGameID] = 1
+						if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
+							AI_LockSquad(player, squad)
+						end
+					end
+				else
+					if AIControl.MainControl.UnitControlTargets[team][squadGameID] then
+						AIControl.MainControl.UnitControlTargets[team][squadGameID] = nil
+						AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] = 0
+					elseif AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] then
+						AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] = AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] + 1
+						if AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] > 7/AIControl.MainControl.SplitUpdates then
+							if AIControl.MainControl.LockedSquads[team][squadGameID] then
+								if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
+									AI_UnlockSquad(player, squad)
+								end
+							end
+							AIControl.MainControl.LockedSquads[team][squadGameID] = nil
+							AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] = nil
+						end
+					else
+						if AIControl.MainControl.LockedSquads[team][squadGameID] then
+							if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
+								AI_UnlockSquad(player, squad)
+							end
+							AIControl.MainControl.LockedSquads[team][squadGameID] = nil
+						end
+					end
+				end
+			end
+		end
+		SGroup_Destroy(sg)
+	end,
+	
+	FVehicleControl = function(squad)
+		local wHalfWidth = World_GetWidth()/2
+		local wHalfHeight = World_GetLength()/2
+		
+		local sg = SGroup_Create("aicontrol_v_tempsg")
+		local squadGameID = Squad_GetGameID(squad)
+		local player = Squad_GetPlayerOwner(squad)
+		local team = Player_GetTeam(player)+1
+		local enemyTeam = Team_GetEnemyTeam(team-1)+1
+		local playerIndex = World_GetPlayerIndex(player)
+		if not AIControl.MainControl.LockedSquads[team][squadGameID] or AIControl.MainControl.LockedSquads[team][squadGameID] == 2 then
+			local raceStr = Player_GetRaceName(player)
+			local hasDisableCritical = false
+			for j,v in pairs(AIControl.MainControl.Settings.VehicleControl.DisableCriticals) do
+				if Squad_HasCritical(squad, v) then
+					hasDisableCritical = true
+					break
+				end
+			end
+			local lockSquad = false
+			if not hasDisableCritical then
+				local lowHealth = false
+				local healthPercentage = Squad_GetHealthPercentage(squad)
+				local pos = Squad_GetPosition(squad)
+				
+				-- Retreat on low health
+				local hasDamageCritical = false
+				for j,v in pairs(AIControl.MainControl.Settings.VehicleControl.DamageCriticals) do
+					if Squad_HasCritical(squad, v) then
+						hasDamageCritical = true
+						break
+					end
+				end
+				if (AIControl.MainControl.VehicleControl.RepairsRetreat[team][squadGameID] and healthPercentage < 0.9)
+						or (not Squad_IsAttacking(squad, 10) and (healthPercentage < 0.5 or hasDamageCritical)) then
+					lockSquad = true
+					lowHealth = true
+					dr_text3d('aicontrol_maincontrol', pos.x, pos.y+3, pos.z, 'low health', 255, 0, 0)
+				else
+					AIControl.MainControl.VehicleControl.RepairsRetreat[team][squadGameID] = nil
+				end
+				
+				if not AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID]
+						or (lowHealth and AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID] > 35)
+						or (not lowHealth and AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID] > 5) then
+					AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID] = nil
+					--print("["..BP_GetName(Squad_GetBlueprint(squad)).."] --- "..team.." "..World_GetPlayerIndex(player))
+					
+					SGroup_Single(sg, squad)
+					
+					local x,y = AIControl.Grid.GetXY(pos)
+					
+					local playerHQPosition = AIControl.MainControl.HQPositions[playerIndex]
+					
+					local directionToHq = normalizeVector(Util_ScarPos(playerHQPosition.x - pos.x, playerHQPosition.z - pos.z))
+					local initialStep = 0
+					local stepsTotal = 9
+					local maxDist = initialStep + stepsTotal
+					local surroundingSafety = AIControl.MainControl.GetSurroundingSafety({x, y}, initialStep, stepsTotal, team)
+					table.sort(surroundingSafety, function(a, b) return a[3] > b[3] end)
+					
+					local collectiveDanger = 0
+					local friendlyArmor = 0
+					for j,v in pairs(surroundingSafety) do
+						collectiveDanger = collectiveDanger + v[3] + v[4]*0.01 - v[5]*0.04 - v[6]*0.00125
+						friendlyArmor = friendlyArmor + v[8]
+					end
+					
+					local hqMult = 1.6
+					local xBorderDistRatio = math.abs(pos.x) / wHalfWidth - 0.5
+					if xBorderDistRatio > 0 then
+						hqMult = hqMult + xBorderDistRatio*4
+					end
+					local yBorderDistRatio = math.abs(pos.z) / wHalfHeight - 0.5
+					if yBorderDistRatio > 0 then
+						hqMult = hqMult + yBorderDistRatio*4
+					end
+					local retreatDirection = AIControl.MainControl.GetRetreatDirection(surroundingSafety, pos, team, 1.35, 1.45, directionToHq, hqMult, 0.035, 0.5, 0)
+					
+					local baseDangerRequirement = AIControl.MainControl.Settings.VehicleControl.DefaultBaseDangerRequiredToRetreat
+					local dangerRequirementDecreaseWithHealth = AIControl.MainControl.Settings.VehicleControl.DefaultDangerRequiredDecreaseWithHealth
+					local dangerRequirementDecreaseWithFriendlyArmor = AIControl.MainControl.Settings.VehicleControl.DefaultDangerRequiredDecreaseWithFriendlyArmor
+					local customSettings = AIControl.MainControl.Settings.VehicleControl.CustomVehicles[raceStr][BP_GetID(Squad_GetBlueprint(squad))]
+					if customSettings then
+						if customSettings[1] ~= nil then
+							baseDangerRequirement = customSettings[1]
+						end
+						if customSettings[2] ~= nil then
+							dangerRequirementDecreaseWithHealth = customSettings[2]
+						end
+						if customSettings[3] ~= nil then
+							dangerRequirementDecreaseWithFriendlyArmor = customSettings[3]
+						end
+					end
+					local dangerRequiredToRetreat = baseDangerRequirement - dangerRequirementDecreaseWithHealth*math.min(1, math.max(0, 1-(healthPercentage-0.25)/0.75)) + dangerRequirementDecreaseWithFriendlyArmor*friendlyArmor
+					if not customSettings then
+						local maxHealth = Squad_GetHealthMax(squad)
+						if maxHealth < 850 then
+							dangerRequiredToRetreat = dangerRequiredToRetreat - math.min(1, math.max(0, 1-(maxHealth-150)/(850-150))) * AIControl.MainControl.Settings.VehicleControl.DangerRequiredToRetreatDecreaseForLightVehicles
+						end
+					end
+					local distToHq = World_DistancePointToPoint(pos, playerHQPosition)
+					if distToHq < 75 then
+						dangerRequiredToRetreat = dangerRequiredToRetreat + AIControl.MainControl.Settings.VehicleControl.DangerRequiredToRetreatIncreaseNearHQ*math.max(0, 1-(distToHq-25)/50)
+					end
+					
+					local retreatDistance = 20
+					local retreatThreshold
+					if lowHealth then
+						retreatThreshold = 15
+					else
+						retreatThreshold = math.max(0, math.min(25, 100*(collectiveDanger-math.max(0, dangerRequiredToRetreat))/math.max(1, dangerRequiredToRetreat)))
+					end
+					
+					local retreatLocation = AIControl.MainControl.GetRetreatLocation(pos, retreatDirection, retreatDistance)
+					dr_drawline(World_Pos(pos.x, pos.y+1, pos.z), World_Pos(retreatLocation.x, retreatLocation.y+1, retreatLocation.z), 255, 125, 0, 'aicontrol_maincontrol')
+					
+					dr_text3d('aicontrol_maincontrol', pos.x, pos.y+5, pos.z, 'danger: '..string.format('%d / %d', collectiveDanger, dangerRequiredToRetreat), 255, 255, 255)
+					
+					-- Retreat if in danger
+					if not lockSquad then
+						-- Retreat if in danger
+						if collectiveDanger > dangerRequiredToRetreat then
+							lockSquad = true
+						end
+					end
+					
+					if lockSquad then
+						local inSafety = false
+						if lowHealth then
+							if collectiveDanger < -0.2+0.175*healthPercentage or distToHq < 25 then
+								dr_text3d('aicontrol_maincontrol', pos.x, pos.y+4, pos.z, 'in safety', 255, 255, 0)
+								if Squad_IsMoving(squad) then
+									dr_text3d('aicontrol_maincontrol', pos.x, pos.y+2, pos.z, 'stopped', 255, 255, 255)
+									Cmd_Stop(sg)
+								end
+								inSafety = true
+							end
+						end
+						if not inSafety then
+							if lowHealth or (retreatThreshold > 5 and World_DistancePointToPoint(pos, retreatLocation) > 5) then
+								dr_text3d('aicontrol_maincontrol', pos.x, pos.y+4, pos.z, 'retreating', 255, 255, 255)
+								
+								Cmd_Move(sg, retreatLocation, false)
+								
+								for j=1,5 do
+									hqMult = hqMult + 0.35
+									local x2,y2 = AIControl.Grid.GetXY(retreatLocation)
+									local retreatLocation2 = AIControl.MainControl.GetRetreatLocation(
+										retreatLocation,
+										AIControl.MainControl.GetRetreatDirection(
+											AIControl.MainControl.GetSurroundingSafety({x2, y2}, math.max(0, stepsTotal-j), stepsTotal, team),
+											retreatLocation,
+											team, 1.25, 1.45, directionToHq, hqMult, 0.035, 0.5),
+										retreatDistance)
+									dr_drawline(World_Pos(retreatLocation.x, retreatLocation.y+1, retreatLocation.z), World_Pos(retreatLocation2.x, retreatLocation2.y+1, retreatLocation2.z), 255, 0, 0, 'aicontrol_maincontrol')
+									Cmd_Move(sg, retreatLocation2, true)
+									retreatLocation = retreatLocation2
+								end
+								
+								dr_drawline(World_Pos(retreatLocation.x, retreatLocation.y+1, retreatLocation.z), World_Pos(playerHQPosition.x, playerHQPosition.y+1, playerHQPosition.z), 255, 0, 0, 'aicontrol_maincontrol')
+								Cmd_Move(sg, playerHQPosition, true)
+								
+								AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID] = 1
+							else
+								if Squad_IsMoving(squad) then
+									dr_text3d('aicontrol_maincontrol', pos.x, pos.y+2, pos.z, 'stopped', 255, 255, 255)
+									Cmd_Stop(sg)
+								end
+							end
+						end
+					end
+					
+					if not lockSquad and pos.x > -wHalfWidth and pos.x < wHalfWidth and pos.z > -wHalfHeight and pos.z < wHalfHeight then
+						local angleThreshold
+						
+						-- Rotate if facing badly
+						local facingDirection
+						if table.getn(surroundingSafety) >= 2 and surroundingSafety[1][3] > 1.5 and surroundingSafety[2][3] > 1.5 then
+							angleThreshold = 105
+							if customSettings and customSettings[4] == true then
+								facingDirection = Util_ScarPos(retreatDirection.x, retreatDirection.z)
+							else
+								facingDirection = Util_ScarPos(-retreatDirection.x, -retreatDirection.z)
+							end
+						else
+							angleThreshold = 160
+							if customSettings and customSettings[4] == true then
+								facingDirection = Util_ScarPos(directionToHq.x, directionToHq.z)
+							else
+								facingDirection = Util_ScarPos(-directionToHq.x, -directionToHq.z)
+							end
+						end
+						
+						local heading = Squad_GetHeading(squad)
+						
+						local angle = math.acos(
+							(facingDirection.x*heading.x+facingDirection.z*heading.z) /
+							(math.sqrt(facingDirection.x*facingDirection.x + facingDirection.z*facingDirection.z) * math.sqrt(heading.x*heading.x + heading.z*heading.z))
+						)*180/3.14
+						
+						if angle > angleThreshold then
+							lockSquad = true
+							
+							if not AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] or AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] > 6/AIControl.MainControl.SplitUpdates then
+								AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = 0
+								Command_SquadPosFacing(player, sg, SCMD_Move, pos, Util_ScarPos(pos.x + facingDirection.x*10, pos.z + facingDirection.z*10), false)
+							else
+								AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] + 1
+							end
+						else
+							if AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] and AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] <= 4/AIControl.MainControl.SplitUpdates then
+								AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] + 1
+							else
+								AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = nil
+							end
+						end
+						
+					end
+				elseif AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID] then
+					lockSquad = true
+					AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID] = AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID] + 1
+				end
+			end
+			
+			if lockSquad then
+				if not AIControl.MainControl.LockedSquads[team][squadGameID] then
+					AIControl.MainControl.LockedSquads[team][squadGameID] = 2
+					if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
+						AI_LockSquad(player, squad)
+					end
+				end
+			elseif AIControl.MainControl.LockedSquads[team][squadGameID] then
+				AIControl.MainControl.LockedSquads[team][squadGameID] = nil
+				if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
+					AI_UnlockSquad(player, squad)
+				end
+			end
+		end
+		SGroup_Destroy(sg)
+	end,
+	
+	FBarrageControl = function(squad, setting)
+		local sg = SGroup_Create("aicontrol_bc_tempsg")
+		local squadGameID = Squad_GetGameID(squad)
+		local player = Squad_GetPlayerOwner(squad)
+		local team = Player_GetTeam(player)+1
+		local enemyTeam = Team_GetEnemyTeam(team-1)+1
+		local playerIndex = World_GetPlayerIndex(player)
+		local lockSquad = false
+		if not AIControl.MainControl.LockedSquads[team][squadGameID]
+				or ( -- also want to barrage with any 'setup' unit control squads
+					AIControl.MainControl.LockedSquads[team][squadGameID] == 1 -- Unit control
+					and AIControl.MainControl.UnitControlTargets[team][squadGameID] -- Has target
+					and not AIControl.MainControl.UnitControlTargets[team][squadGameID][1] -- Target is not a move back target
+					)
+				then
+			local bpID = BP_GetID(Squad_GetBlueprint(squad))
+			local curMunitions = Player_GetResource(player, RT_Munition)
+			local desiredSaveUpAmount = math.min(AIControl.MainControl.Settings.BarrageControl.SaveUpAmount, AIControl.MainControl.Settings.BarrageControl.SaveUpAmountGrowthWithTime*World_GetGameTime())
+			
+			local shouldCast = true
+			if curMunitions < desiredSaveUpAmount then -- are we saving up?
+				shouldCast = World_GetRand(0,100) < AIControl.MainControl.Settings.BarrageControl.ChangeToCastBelowsavedMunitionsThreshold
+			end
+			
+			if shouldCast then
+				local pos = Squad_GetPosition(squad)
+				local x,y = AIControl.Grid.GetXY(pos)
+				local totalAbilityWeight = 0
+				for j,v in pairs(setting) do
+					totalAbilityWeight = totalAbilityWeight + v.weight
+				end
+				
+				local weightRand = World_GetRand(0,totalAbilityWeight)
+				local curWeight = 0
+				for j,v in pairs(setting) do
+					curWeight = curWeight + v.weight
+					if curWeight >= weightRand then
+						
+						local castPosition = false
+						
+						if not v.positionFunc then
+							local clumpSearchRadius = v.searchrange/((AIControl.Grid.Dimensions[3]+AIControl.Grid.Dimensions[4])/2)
+							dr_drawCircle('aicontrol_maincontrol', pos.x, pos.y+10, pos.z, clumpSearchRadius*((AIControl.Grid.Dimensions[1]+AIControl.Grid.Dimensions[2])/2), 255, 255, 255)
+							local bestClump, bestClumpThreat = AIControl.MainControl.GetBestClumpForRadius(enemyTeam, x, y, clumpSearchRadius, false)
+							if bestClump and bestClumpThreat >= v.minThreatToCast then
+								castPosition = AIControl.Grid.AveragePosData[bestClump[1]][bestClump[2]][enemyTeam]
+							end
+						else
+							castPosition = v.positionFunc(squad, v)
+						end
+						
+						if castPosition then
+							SGroup_Single(sg, squad)
+							Cmd_Ability(sg, v.blueprint, castPosition, World_Pos(0,0,0), false, false)
+							AIControl.MainControl.BarrageControlLockTimers[squadGameID] = v.lockDuration/AIControl.MainControl.SplitUpdates
+							lockSquad = true
+						end
+						
+						break
+					end
+				end
+			end
+		end
+		if lockSquad then
+			if not AIControl.MainControl.LockedSquads[team][squadGameID] then
+				AIControl.MainControl.LockedSquads[team][squadGameID] = 3
+				if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
+					AI_LockSquad(player, squad)
+				end
+			end
+		else
+			if AIControl.MainControl.BarrageControlLockTimers[squadGameID] then
+				AIControl.MainControl.BarrageControlLockTimers[squadGameID] = AIControl.MainControl.BarrageControlLockTimers[squadGameID] - 1
+				if AIControl.MainControl.BarrageControlLockTimers[squadGameID] <= 0 then
+					if AIControl.MainControl.LockedSquads[team][squadGameID] then
+						if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
+							AI_UnlockSquad(player, squad)
+						end
+					end
+					AIControl.MainControl.BarrageControlLockTimers[squadGameID] = nil
+					AIControl.MainControl.LockedSquads[team][squadGameID] = nil
+				end
+			end
+		end
+		SGroup_Destroy(sg)
+	end,
+	
+	Update = function()
+		if g_AIControl_Pause then return end
+		
+		local wHalfWidth = World_GetWidth()/2
+		local wHalfHeight = World_GetLength()/2
 		
 		if AIControl.MainControl.SplitUpdateStep == 0 then
 			AIControl.MainControl.SecondaryUpdateTicks = AIControl.MainControl.SecondaryUpdateTicks + 1
@@ -1938,55 +2519,53 @@ AIControl.MainControl = {
 		end
 		
 		local updateHQs = false
-		if AIControl.MainControl.SplitUpdateStep == 0 then
-			AIControl.MainControl.HQUpdateWait = AIControl.MainControl.HQUpdateWait + 1
-			if AIControl.MainControl.HQUpdateWait > AIControl.MainControl.Settings.HQControl.UpdateInterval then
-				updateHQs = true
-				
-				-- Territory sector update
-				for SID in pairs(AIControl.MainControl.TerritorySectors) do -- Determine which sectors are being captured
-					AIControl.MainControl.TerritorySectors[SID].BeingCaptured = false
-					local sectorPos = Entity_GetPosition(AIControl.MainControl.TerritorySectors[SID].Entity)
-					local x, y = math.floor((sectorPos.x+wHalfWidth)/AIControl.Grid.Dimensions[3])+1, math.floor((sectorPos.z+wHalfHeight)/AIControl.Grid.Dimensions[4])+1
-					if World_OwnsEntity(AIControl.MainControl.TerritorySectors[SID].Entity) then
-						for team=1,2 do
-							for i=-1,1 do
-								for j=-1,1 do
-									local curx, cury = x+i, y+j
-									if curx>0 and curx <= AIControl.Grid.Dimensions[1] and cury>0 and cury<=AIControl.Grid.Dimensions[2] then
-										local count = SGroup_CountSpawned(AIControl.Grid.DataSquads[x+i][y+j][team])
-										for k=1,count do
-											local squad = SGroup_GetSpawnedSquadAt(AIControl.Grid.DataSquads[x+i][y+j][team], k)
-											if Squad_HasActiveCommand(squad) and Squad_GetActiveCommand(squad) == SQUADSTATEID_Capture then
-												AIControl.MainControl.TerritorySectors[SID].BeingCaptured = true
-												break
-											end
+		AIControl.MainControl.HQUpdateWait = AIControl.MainControl.HQUpdateWait + 1
+		if AIControl.MainControl.HQUpdateWait > AIControl.MainControl.Settings.HQControl.UpdateInterval then
+			updateHQs = true
+			
+			-- Territory sector update
+			for SID in pairs(AIControl.MainControl.TerritorySectors) do -- Determine which sectors are being captured
+				AIControl.MainControl.TerritorySectors[SID].BeingCaptured = false
+				local sectorPos = Entity_GetPosition(AIControl.MainControl.TerritorySectors[SID].Entity)
+				local x, y = math.floor((sectorPos.x+wHalfWidth)/AIControl.Grid.Dimensions[3])+1, math.floor((sectorPos.z+wHalfHeight)/AIControl.Grid.Dimensions[4])+1
+				if World_OwnsEntity(AIControl.MainControl.TerritorySectors[SID].Entity) then
+					for team=1,2 do
+						for i=-1,1 do
+							for j=-1,1 do
+								local curx, cury = x+i, y+j
+								if curx>0 and curx <= AIControl.Grid.Dimensions[1] and cury>0 and cury<=AIControl.Grid.Dimensions[2] then
+									local count = table.getn(AIControl.Grid.DataSquads[x+i][y+j][team])
+									for k=1,count do
+										local squad = AIControl.Grid.DataSquads[x+i][y+j][team][k]
+										if Squad_HasActiveCommand(squad) and Squad_GetActiveCommand(squad) == SQUADSTATEID_Capture then
+											AIControl.MainControl.TerritorySectors[SID].BeingCaptured = true
+											break
 										end
 									end
-									if AIControl.MainControl.TerritorySectors[SID].BeingCaptured then break end
 								end
 								if AIControl.MainControl.TerritorySectors[SID].BeingCaptured then break end
 							end
 							if AIControl.MainControl.TerritorySectors[SID].BeingCaptured then break end
 						end
-					else
-						local entityTeam = Player_GetTeam(Entity_GetPlayerOwner(AIControl.MainControl.TerritorySectors[SID].Entity))+1
-						local entityEnemyTeam
-						if entityTeam == 1 then entityEnemyTeam = 2
-						else entityEnemyTeam = 1 end
-						local count = SGroup_CountSpawned(AIControl.Grid.DataSquads[x][y][entityEnemyTeam])
-						for i=1,count do
-							local squad = SGroup_GetSpawnedSquadAt(AIControl.Grid.DataSquads[x][y][entityEnemyTeam], i)
-							if Squad_HasActiveCommand(squad) and Squad_GetActiveCommand(squad) == SQUADSTATEID_Capture then
-								AIControl.MainControl.TerritorySectors[SID].BeingCaptured = true
-								break
-							end
+						if AIControl.MainControl.TerritorySectors[SID].BeingCaptured then break end
+					end
+				else
+					local entityTeam = Player_GetTeam(Entity_GetPlayerOwner(AIControl.MainControl.TerritorySectors[SID].Entity))+1
+					local entityEnemyTeam
+					if entityTeam == 1 then entityEnemyTeam = 2
+					else entityEnemyTeam = 1 end
+					local count = table.getn(AIControl.Grid.DataSquads[x][y][entityEnemyTeam])
+					for i=1,count do
+						local squad = AIControl.Grid.DataSquads[x][y][entityEnemyTeam][i]
+						if Squad_HasActiveCommand(squad) and Squad_GetActiveCommand(squad) == SQUADSTATEID_Capture then
+							AIControl.MainControl.TerritorySectors[SID].BeingCaptured = true
+							break
 						end
 					end
 				end
-				
-				AIControl.MainControl.HQUpdateWait = 0
 			end
+			
+			AIControl.MainControl.HQUpdateWait = 0
 		end
 		for team=1,2 do
 			local enemyTeam = Team_GetEnemyTeam(team-1)+1
@@ -2245,560 +2824,6 @@ AIControl.MainControl = {
 					i = i + 1
 				end
 			end
-			
-			-- # Unit Control #
-			local unitControlCount = SGroup_CountSpawned(AIControl.MainControl.UnitControls[team])
-			if AIControl.MainControl.SplitUpdateStep < unitControlCount then
-				local perStep = math.ceil(unitControlCount/AIControl.MainControl.SplitUpdates)
-				local sg = SGroup_Create("aicontrol_vc_tempsg")
-				for i=1+AIControl.MainControl.SplitUpdateStep*perStep,math.min(unitControlCount, (AIControl.MainControl.SplitUpdateStep+1)*perStep) do
-					local squad = SGroup_GetSpawnedSquadAt(AIControl.MainControl.UnitControls[team], i)
-					local squadGameID = Squad_GetGameID(squad)
-					if not AIControl.MainControl.LockedSquads[team][squadGameID] or AIControl.MainControl.LockedSquads[team][squadGameID] == 1 then
-						local player = Squad_GetPlayerOwner(squad)
-						local playerIndex = World_GetPlayerIndex(player)
-						local bpID = BP_GetID(Squad_GetBlueprint(squad))
-						local setting = AIControl.MainControl.Settings.UnitControl.UnitSettings[bpID]
-						if setting then
-							local pos = Squad_GetPosition(squad)
-							local x,y = AIControl.Grid.GetXY(pos)
-							
-							--print("["..BP_GetName(Squad_GetBlueprint(squad)).."] --- "..team.." "..World_GetPlayerIndex(player))
-							SGroup_Single(sg, squad)
-							
-							local syncWeapon = SyncWeapon_GetFromSGroup(sg)
-							--local syncWeaponEntity = SyncWeapon_GetEntity(syncWeapon)
-							if not Squad_IsInHoldEntity(squad) and not Squad_IsRetreating(squad) then
-								--local isUnderAttack = Squad_IsUnderAttack(squad, 2)
-								local healthPercentage = Squad_GetHealthPercentage(squad)
-								local stepsTotal = setting['safety_radius_steps']
-								local surroundingSafety = AIControl.MainControl.GetSurroundingSafety({x, y}, 0, stepsTotal, team)
-								table.sort(surroundingSafety, function(a, b) return a[3] > b[3] end)
-								
-								local collectiveDanger = 0
-								local totalArmor = 0
-								for i,v in pairs(surroundingSafety) do
-									collectiveDanger = collectiveDanger + v[3] + v[4]*0.01 - v[5]*0.1 - v[6]*0.0025
-									totalArmor = totalArmor + v[7]
-								end
-								--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+9, pos.z, string.format('%.2f', collectiveDanger), 255, 255, 255)
-								
-								local lockSquad = false
-								
-								local playerHQPosition = AIControl.MainControl.HQPositions[playerIndex]
-								local directionToHq = normalizeVector(Util_ScarPos(playerHQPosition.x - pos.x, playerHQPosition.z - pos.z))
-								local moveBackDanger = setting['move_back_danger']
-								local retreatDanger = setting['retreat_danger']
-								if setting['targets_armor'] then
-									local dangerDecrease = math.min(setting['armor_danger_decrease_reduction_threshold'], totalArmor)*setting['armor_danger_decrease']
-									
-									moveBackDanger = moveBackDanger + dangerDecrease
-									if retreatDanger >= 0 then
-										retreatDanger = retreatDanger + dangerDecrease
-									end
-								end
-								if collectiveDanger > moveBackDanger then
-									
-									-- We are in danger
-									--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+2, pos.z, 'in danger', 255, 255, 0)
-									
-									lockSquad = true
-									
-									if retreatDanger >= 0 and collectiveDanger > retreatDanger then
-										local distanceToHq = World_DistancePointToPoint(pos, playerHQPosition)
-										--Cmd_Move(sg, AIControl.MainControl.HQPositions[playerIndex])
-										--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+1, pos.z, 'retreating', 255, 0, 0)
-										if distanceToHq > 20 then
-											Cmd_Retreat(sg)
-										end
-									else
-										--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+1, pos.z, 'moving away', 255, 255, 0)
-										
-										local hqMult = 0.7
-										local xBorderDistRatio = math.abs(pos.x) / wHalfWidth - 0.6
-										if xBorderDistRatio > 0 then
-											hqMult = hqMult + xBorderDistRatio*2
-										end
-										local yBorderDistRatio = math.abs(pos.z) / wHalfHeight - 0.6
-										if yBorderDistRatio > 0 then
-											hqMult = hqMult + yBorderDistRatio*2
-										end
-										local retreatDirection = AIControl.MainControl.GetRetreatDirection(surroundingSafety, pos, team, 1.5, 1.1, directionToHq, hqMult, 0.025, 0.5, 0)
-										local retreatDistance = 5+math.min(30, math.max(0, 3*(collectiveDanger-2)))
-										local retreatLocation = AIControl.MainControl.GetRetreatLocation(pos, retreatDirection, retreatDistance)
-										
-										local x2,y2 = AIControl.Grid.GetXY(retreatLocation)
-										local retreatLocation2 = AIControl.MainControl.GetRetreatLocation(
-											retreatLocation,
-											AIControl.MainControl.GetRetreatDirection(
-												AIControl.MainControl.GetSurroundingSafety({x2, y2}, 0, stepsTotal, team),
-												retreatLocation,
-												team, 1.5, 1.1, directionToHq, hqMult, 0.025, 0.5, 0),
-											retreatDistance)
-										
-										Cmd_Move(sg, retreatLocation, false)
-										Cmd_Move(sg, retreatLocation2, true)
-										Cmd_Move(sg, playerHQPosition, true)
-									end
-								else
-									local targetSafetyData = AIControl.MainControl.GetSurroundingSafety({x, y}, setting['init_step'], setting['step_count'], team)
-									table.sort(targetSafetyData, function(a, b) return a[3] > b[3] end)
-									
-									if targetSafetyData[1][3] > setting['setup_target_danger'] then
-										
-										lockSquad = true
-										--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+3, pos.z, 'setting up', 255, 255, 255)
-										
-										local dangerMultiplier
-										local safetyMultiplier
-										local hqDirectionMultiplier
-										local historyMultiplier
-										local armorMultiplier
-										if setting['targets_armor'] then
-											dangerMultiplier = -3
-											safetyMultiplier = -1
-											hqDirectionMultiplier = -0.5
-											historyMultiplier = -0.005
-											armorMultiplier = 0
-										else
-											dangerMultiplier = -0.05
-											safetyMultiplier = -0.0005
-											hqDirectionMultiplier = 0
-											historyMultiplier = 0
-											armorMultiplier = -2
-										end
-										local headingDirection = AIControl.MainControl.GetRetreatDirection(targetSafetyData, pos, team, dangerMultiplier, safetyMultiplier, directionToHq, hqDirectionMultiplier, historyMultiplier, armorMultiplier, 0)
-										local headingPos = AIControl.MainControl.GetRetreatLocation(pos, headingDirection, 25)
-										--dr_drawline(World_Pos(pos.x, pos.y+0.35, pos.z), World_Pos(headingPos.x, headingPos.y+0.35, headingPos.z), 0, 125, 125, 'aicontrol_maincontrol')
-										
-										local setupWell = false
-										--print(tostring(AIControl.MainControl.UnitControlTargets[team][squadGameID]))
-										if AIControl.MainControl.UnitControlTargets[team][squadGameID] and not AIControl.MainControl.UnitControlTargets[team][squadGameID][1] then
-											local heading = normalizeVector(World_Pos(
-												AIControl.MainControl.UnitControlTargets[team][squadGameID][3].x - AIControl.MainControl.UnitControlTargets[team][squadGameID][2].x,
-												0,
-												AIControl.MainControl.UnitControlTargets[team][squadGameID][3].z - AIControl.MainControl.UnitControlTargets[team][squadGameID][2].z
-											))
-											local angle = math.acos(
-												(heading.x*headingDirection.x+heading.z*headingDirection.z) /
-												(math.sqrt(heading.x*heading.x + heading.z*heading.z) * math.sqrt(headingDirection.x*headingDirection.x + headingDirection.z*headingDirection.z))
-											)*180/3.14
-											
-											--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+4, pos.z, 'angle: '..string.format('%d', angle), 255, 255, 255)
-											if setting['target_angle_threshold'] == -1 or angle < setting['target_angle_threshold'] then
-												--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+2, pos.z, 'setup well', 255, 0, 0)
-												setupWell = true
-											end
-										end
-										if setupWell and World_DistancePointToPoint(pos, AIControl.MainControl.UnitControlTargets[team][squadGameID][2]) > AIControl.MainControl.Settings.UnitControl.CoverSearchRadius*3 then
-											--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+5, pos.z, 'NOT IN COVER', 255, 0, 0)
-											setupWell = false
-										end
-										if not setupWell then
-											local coverSearchPos = pos
-											for i=0,Squad_Count(squad)-1 do
-												local e = Squad_EntityAt(squad, i)
-												if Entity_IsSyncWeapon(e) then
-													coverSearchPos = Entity_GetPosition(e)
-												end
-											end
-											
-											if setting['attack_move_forward'] then
-												Cmd_AttackMove(sg, headingPos, false)
-											else
-												local setupPos = pos
-												if setting['search_cover'] then
-													setupPos = Squad_FindCover(squad, pos, AIControl.MainControl.Settings.UnitControl.CoverSearchRadius)
-													
-													--dr_text3d('aicontrol_maincontrol', coverPos.x, coverPos.y+0.35, coverPos.z, 'o', 255, 255, 255)
-													--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+1, pos.z, 'new setup pos', 255, 0, 0)
-												end
-												
-												AIControl.MainControl.UnitControlTargets[team][squadGameID] = {false, setupPos, headingPos}
-												Command_SquadPosFacing(player, sg, SCMD_Move, setupPos, headingPos, false)
-											end
-										end
-									end
-								end
-								
-								if lockSquad then
-									if not AIControl.MainControl.LockedSquads[team][squadGameID] then
-										AIControl.MainControl.LockedSquads[team][squadGameID] = 1
-										if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
-											AI_LockSquad(player, squad)
-										end
-									end
-								else
-									if AIControl.MainControl.UnitControlTargets[team][squadGameID] then
-										AIControl.MainControl.UnitControlTargets[team][squadGameID] = nil
-										AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] = 0
-									elseif AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] then
-										AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] = AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] + 1
-										if AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] > 7/AIControl.MainControl.SplitUpdates then
-											if AIControl.MainControl.LockedSquads[team][squadGameID] then
-												if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
-													AI_UnlockSquad(player, squad)
-												end
-											end
-											AIControl.MainControl.LockedSquads[team][squadGameID] = nil
-											AIControl.MainControl.UnitControlUnlockTimers[team][squadGameID] = nil
-										end
-									else
-										if AIControl.MainControl.LockedSquads[team][squadGameID] then
-											if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
-												AI_UnlockSquad(player, squad)
-											end
-											AIControl.MainControl.LockedSquads[team][squadGameID] = nil
-										end
-									end
-								end
-							end
-						end
-					end
-				end
-				SGroup_Destroy(sg)
-			end
-			
-			-- # Vehicle Control #
-			local vehicleControlCount = SGroup_CountSpawned(AIControl.MainControl.Vehicles[team])
-			if AIControl.MainControl.SplitUpdateStep < vehicleControlCount then
-				local perStep = math.ceil(vehicleControlCount/AIControl.MainControl.SplitUpdates)
-				local sg = SGroup_Create("aicontrol_v_tempsg")
-				for i=1+AIControl.MainControl.SplitUpdateStep*perStep,math.min(vehicleControlCount, (AIControl.MainControl.SplitUpdateStep+1)*perStep) do
-					local squad = SGroup_GetSpawnedSquadAt(AIControl.MainControl.Vehicles[team], i)
-					local squadGameID = Squad_GetGameID(squad)
-					if not AIControl.MainControl.LockedSquads[team][squadGameID] or AIControl.MainControl.LockedSquads[team][squadGameID] == 2 then
-						local player = Squad_GetPlayerOwner(squad)
-						local playerIndex = World_GetPlayerIndex(player)
-						local raceStr = Player_GetRaceName(player)
-						local hasDisableCritical = false
-						for j,v in pairs(AIControl.MainControl.Settings.VehicleControl.DisableCriticals) do
-							if Squad_HasCritical(squad, v) then
-								hasDisableCritical = true
-								break
-							end
-						end
-						local lockSquad = false
-						if not hasDisableCritical then
-							local lowHealth = false
-							local healthPercentage = Squad_GetHealthPercentage(squad)
-							local pos = Squad_GetPosition(squad)
-							
-							-- Retreat on low health
-							local hasDamageCritical = false
-							for j,v in pairs(AIControl.MainControl.Settings.VehicleControl.DamageCriticals) do
-								if Squad_HasCritical(squad, v) then
-									hasDamageCritical = true
-									break
-								end
-							end
-							if (AIControl.MainControl.VehicleControl.RepairsRetreat[team][squadGameID] and healthPercentage < 0.9)
-									or (not Squad_IsAttacking(squad, 10) and (healthPercentage < 0.5 or hasDamageCritical)) then
-								lockSquad = true
-								lowHealth = true
-								--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+3, pos.z, 'low health', 255, 0, 0)
-							else
-								AIControl.MainControl.VehicleControl.RepairsRetreat[team][squadGameID] = nil
-							end
-							
-							if not AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID]
-									or (lowHealth and AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID] > 35)
-									or (not lowHealth and AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID] > 5) then
-								AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID] = nil
-								--print("["..BP_GetName(Squad_GetBlueprint(squad)).."] --- "..team.." "..World_GetPlayerIndex(player))
-								
-								SGroup_Single(sg, squad)
-								
-								local x,y = AIControl.Grid.GetXY(pos)
-								
-								local playerHQPosition = AIControl.MainControl.HQPositions[playerIndex]
-								
-								local directionToHq = normalizeVector(Util_ScarPos(playerHQPosition.x - pos.x, playerHQPosition.z - pos.z))
-								local initialStep = 0
-								local stepsTotal = 9
-								local maxDist = initialStep + stepsTotal
-								local surroundingSafety = AIControl.MainControl.GetSurroundingSafety({x, y}, initialStep, stepsTotal, team)
-								table.sort(surroundingSafety, function(a, b) return a[3] > b[3] end)
-								
-								local collectiveDanger = 0
-								local friendlyArmor = 0
-								for j,v in pairs(surroundingSafety) do
-									collectiveDanger = collectiveDanger + v[3] + v[4]*0.01 - v[5]*0.0525 - v[6]*0.00125
-									friendlyArmor = friendlyArmor + v[8]
-								end
-								
-								local hqMult = 1.6
-								local xBorderDistRatio = math.abs(pos.x) / wHalfWidth - 0.5
-								if xBorderDistRatio > 0 then
-									hqMult = hqMult + xBorderDistRatio*4
-								end
-								local yBorderDistRatio = math.abs(pos.z) / wHalfHeight - 0.5
-								if yBorderDistRatio > 0 then
-									hqMult = hqMult + yBorderDistRatio*4
-								end
-								local retreatDirection = AIControl.MainControl.GetRetreatDirection(surroundingSafety, pos, team, 1.35, 1.45, directionToHq, hqMult, 0.035, 0.5, 0)
-								
-								local baseDangerRequirement = AIControl.MainControl.Settings.VehicleControl.DefaultBaseDangerRequiredToRetreat
-								local dangerRequirementDecreaseWithHealth = AIControl.MainControl.Settings.VehicleControl.DefaultDangerRequiredDecreaseWithHealth
-								local dangerRequirementDecreaseWithFriendlyArmor = AIControl.MainControl.Settings.VehicleControl.DefaultDangerRequiredDecreaseWithFriendlyArmor
-								local customSettings = AIControl.MainControl.Settings.VehicleControl.CustomVehicles[raceStr][BP_GetID(Squad_GetBlueprint(squad))]
-								if customSettings then
-									if customSettings[1] ~= nil then
-										baseDangerRequirement = customSettings[1]
-									end
-									if customSettings[2] ~= nil then
-										dangerRequirementDecreaseWithHealth = customSettings[2]
-									end
-									if customSettings[3] ~= nil then
-										dangerRequirementDecreaseWithFriendlyArmor = customSettings[3]
-									end
-								end
-								local dangerRequiredToRetreat = baseDangerRequirement - dangerRequirementDecreaseWithHealth*math.min(1, math.max(0, 1-(healthPercentage-0.25)/0.75)) + dangerRequirementDecreaseWithFriendlyArmor*friendlyArmor
-								if not customSettings then
-									local maxHealth = Squad_GetHealthMax(squad)
-									if maxHealth < 850 then
-										dangerRequiredToRetreat = dangerRequiredToRetreat - math.min(1, math.max(0, 1-(maxHealth-150)/(850-150))) * AIControl.MainControl.Settings.VehicleControl.DangerRequiredToRetreatDecreaseForLightVehicles
-									end
-								end
-								local distToHq = World_DistancePointToPoint(pos, playerHQPosition)
-								if distToHq < 75 then
-									dangerRequiredToRetreat = dangerRequiredToRetreat + AIControl.MainControl.Settings.VehicleControl.DangerRequiredToRetreatIncreaseNearHQ*math.max(0, 1-(distToHq-25)/50)
-								end
-								
-								local retreatDistance = 20
-								local retreatThreshold
-								if lowHealth then
-									retreatThreshold = 15
-								else
-									retreatThreshold = math.max(0, math.min(25, 100*(collectiveDanger-math.max(0, dangerRequiredToRetreat))/math.max(1, dangerRequiredToRetreat)))
-								end
-								
-								local retreatLocation = AIControl.MainControl.GetRetreatLocation(pos, retreatDirection, retreatDistance)
-								--dr_drawline(World_Pos(pos.x, pos.y+1, pos.z), World_Pos(retreatLocation.x, retreatLocation.y+1, retreatLocation.z), 255, 125, 0, 'aicontrol_maincontrol')
-								
-								--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+5, pos.z, 'danger: '..string.format('%d / %d', collectiveDanger, dangerRequiredToRetreat), 255, 255, 255)
-								
-								-- Retreat if in danger
-								if not lockSquad then
-									-- Retreat if in danger
-									if collectiveDanger > dangerRequiredToRetreat then
-										lockSquad = true
-									end
-								end
-								
-								if lockSquad then
-									local inSafety = false
-									if lowHealth then
-										if collectiveDanger < -0.2+0.175*healthPercentage or distToHq < 25 then
-											--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+4, pos.z, 'in safety', 255, 255, 0)
-											if Squad_IsMoving(squad) then
-												--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+2, pos.z, 'stopped', 255, 255, 255)
-												Cmd_Stop(sg)
-											end
-											inSafety = true
-										end
-									end
-									if not inSafety then
-										if lowHealth or (retreatThreshold > 5 and World_DistancePointToPoint(pos, retreatLocation) > 5) then
-											--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+4, pos.z, 'retreating', 255, 255, 255)
-											
-											Cmd_Move(sg, retreatLocation, false)
-											
-											for j=1,5 do
-												hqMult = hqMult + 0.35
-												local x2,y2 = AIControl.Grid.GetXY(retreatLocation)
-												local retreatLocation2 = AIControl.MainControl.GetRetreatLocation(
-													retreatLocation,
-													AIControl.MainControl.GetRetreatDirection(
-														AIControl.MainControl.GetSurroundingSafety({x2, y2}, math.max(0, stepsTotal-j), stepsTotal, team),
-														retreatLocation,
-														team, 1.25, 1.45, directionToHq, hqMult, 0.035, 0.5),
-													retreatDistance)
-												--dr_drawline(World_Pos(retreatLocation.x, retreatLocation.y+1, retreatLocation.z), World_Pos(retreatLocation2.x, retreatLocation2.y+1, retreatLocation2.z), 255, 0, 0, 'aicontrol_maincontrol')
-												Cmd_Move(sg, retreatLocation2, true)
-												retreatLocation = retreatLocation2
-											end
-											
-											--dr_drawline(World_Pos(retreatLocation.x, retreatLocation.y+1, retreatLocation.z), World_Pos(playerHQPosition.x, playerHQPosition.y+1, playerHQPosition.z), 255, 0, 0, 'aicontrol_maincontrol')
-											Cmd_Move(sg, playerHQPosition, true)
-											
-											AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID] = 1
-										else
-											if Squad_IsMoving(squad) then
-												--dr_text3d('aicontrol_maincontrol', pos.x, pos.y+2, pos.z, 'stopped', 255, 255, 255)
-												Cmd_Stop(sg)
-											end
-										end
-									end
-								end
-								
-								if not lockSquad and pos.x > -wHalfWidth and pos.x < wHalfWidth and pos.z > -wHalfHeight and pos.z < wHalfHeight then
-									local angleThreshold
-									
-									-- Rotate if facing badly
-									local facingDirection
-									if table.getn(surroundingSafety) >= 2 and surroundingSafety[1][3] > 1.5 and surroundingSafety[2][3] > 1.5 then
-										angleThreshold = 105
-										if customSettings and customSettings[4] == true then
-											facingDirection = Util_ScarPos(retreatDirection.x, retreatDirection.z)
-										else
-											facingDirection = Util_ScarPos(-retreatDirection.x, -retreatDirection.z)
-										end
-									else
-										angleThreshold = 160
-										if customSettings and customSettings[4] == true then
-											facingDirection = Util_ScarPos(directionToHq.x, directionToHq.z)
-										else
-											facingDirection = Util_ScarPos(-directionToHq.x, -directionToHq.z)
-										end
-									end
-									
-									local heading = Squad_GetHeading(squad)
-									
-									local angle = math.acos(
-										(facingDirection.x*heading.x+facingDirection.z*heading.z) /
-										(math.sqrt(facingDirection.x*facingDirection.x + facingDirection.z*facingDirection.z) * math.sqrt(heading.x*heading.x + heading.z*heading.z))
-									)*180/3.14
-									
-									if angle > angleThreshold then
-										lockSquad = true
-										
-										if not AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] or AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] > 6/AIControl.MainControl.SplitUpdates then
-											AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = 0
-											Command_SquadPosFacing(player, sg, SCMD_Move, pos, Util_ScarPos(pos.x + facingDirection.x*10, pos.z + facingDirection.z*10), false)
-										else
-											AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] + 1
-										end
-									else
-										if AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] and AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] <= 4/AIControl.MainControl.SplitUpdates then
-											AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] + 1
-										else
-											AIControl.MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = nil
-										end
-									end
-									
-								end
-							elseif AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID] then
-								lockSquad = true
-								AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID] = AIControl.MainControl.VehicleControl.RetreatCmdTimers[team][squadGameID] + 1
-							end
-						end
-						
-						if lockSquad then
-							if not AIControl.MainControl.LockedSquads[team][squadGameID] then
-								AIControl.MainControl.LockedSquads[team][squadGameID] = 2
-								if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
-									AI_LockSquad(player, squad)
-								end
-							end
-						elseif AIControl.MainControl.LockedSquads[team][squadGameID] then
-							AIControl.MainControl.LockedSquads[team][squadGameID] = nil
-							if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
-								AI_UnlockSquad(player, squad)
-							end
-						end
-					end
-				end
-				SGroup_Destroy(sg)
-			end
-			
-			-- # Barrage Control #
-			local barrageControlCount = SGroup_CountSpawned(AIControl.MainControl.BarrageUnits[team])
-			if AIControl.MainControl.SplitUpdateStep < barrageControlCount then
-				local perStep = math.ceil(barrageControlCount/AIControl.MainControl.SplitUpdates)
-				local sg = SGroup_Create("aicontrol_bc_tempsg")
-				for i=1+AIControl.MainControl.SplitUpdateStep*perStep,math.min(barrageControlCount, (AIControl.MainControl.SplitUpdateStep+1)*perStep) do
-					local squad = SGroup_GetSpawnedSquadAt(AIControl.MainControl.BarrageUnits[team], i)
-					local squadGameID = Squad_GetGameID(squad)
-					local player = Squad_GetPlayerOwner(squad)
-					local lockSquad = false
-					if not AIControl.MainControl.LockedSquads[team][squadGameID]
-							or ( -- also want to barrage with any 'setup' unit control squads
-								AIControl.MainControl.LockedSquads[team][squadGameID] == 1 -- Unit control
-								and AIControl.MainControl.UnitControlTargets[team][squadGameID] -- Has target
-								and not AIControl.MainControl.UnitControlTargets[team][squadGameID][1] -- Target is not a move back target
-								)
-							then
-						local bpID = BP_GetID(Squad_GetBlueprint(squad))
-						local setting = AIControl.MainControl.Settings.BarrageControl.UnitSettings[bpID]
-						if setting then
-							local curMunitions = Player_GetResource(player, RT_Munition)
-							local desiredSaveUpAmount = math.min(AIControl.MainControl.Settings.BarrageControl.SaveUpAmount, AIControl.MainControl.Settings.BarrageControl.SaveUpAmountGrowthWithTime*World_GetGameTime())
-							
-							local shouldCast = true
-							if curMunitions < desiredSaveUpAmount then -- are we saving up?
-								shouldCast = World_GetRand(0,100) < AIControl.MainControl.Settings.BarrageControl.ChangeToCastBelowsavedMunitionsThreshold
-							end
-							
-							if shouldCast then
-								local pos = Squad_GetPosition(squad)
-								local x,y = AIControl.Grid.GetXY(pos)
-								local totalAbilityWeight = 0
-								for j,v in pairs(setting) do
-									totalAbilityWeight = totalAbilityWeight + v.weight
-								end
-								
-								local weightRand = World_GetRand(0,totalAbilityWeight)
-								local curWeight = 0
-								for j,v in pairs(setting) do
-									curWeight = curWeight + v.weight
-									if curWeight >= weightRand then
-										
-										local castPosition = false
-										
-										if not v.positionFunc then
-											local clumpSearchRadius = v.searchrange/((AIControl.Grid.Dimensions[3]+AIControl.Grid.Dimensions[4])/2)
-											--dr_drawCircle('aicontrol_maincontrol', pos.x, pos.y+10, pos.z, clumpSearchRadius*((AIControl.Grid.Dimensions[1]+AIControl.Grid.Dimensions[2])/2), 255, 255, 255)
-											local bestClump, bestClumpThreat = AIControl.MainControl.GetBestClumpForRadius(enemyTeam, x, y, clumpSearchRadius, false)
-											if bestClump and bestClumpThreat >= v.minThreatToCast then
-												castPosition = AIControl.Grid.AveragePosData[bestClump[1]][bestClump[2]][enemyTeam]
-											end
-										else
-											castPosition = v.positionFunc(squad, v)
-										end
-										
-										if castPosition then
-											SGroup_Single(sg, squad)
-											Cmd_Ability(sg, v.blueprint, castPosition, World_Pos(0,0,0), false, false)
-											AIControl.MainControl.BarrageControlLockTimers[squadGameID] = v.lockDuration/AIControl.MainControl.SplitUpdates
-											lockSquad = true
-										end
-										
-										break
-									end
-								end
-							end
-						end
-					end
-					if lockSquad then
-						if not AIControl.MainControl.LockedSquads[team][squadGameID] then
-							AIControl.MainControl.LockedSquads[team][squadGameID] = 3
-							if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
-								AI_LockSquad(player, squad)
-							end
-						end
-					else
-						if AIControl.MainControl.BarrageControlLockTimers[squadGameID] then
-							AIControl.MainControl.BarrageControlLockTimers[squadGameID] = AIControl.MainControl.BarrageControlLockTimers[squadGameID] - 1
-							if AIControl.MainControl.BarrageControlLockTimers[squadGameID] <= 0 then
-								if AIControl.MainControl.LockedSquads[team][squadGameID] then
-									if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
-										AI_UnlockSquad(player, squad)
-									end
-								end
-								AIControl.MainControl.BarrageControlLockTimers[squadGameID] = nil
-								AIControl.MainControl.LockedSquads[team][squadGameID] = nil
-							end
-						end
-					end
-				end
-				SGroup_Destroy(sg)
-			end
-		end
-		
-		AIControl.MainControl.SplitUpdateStep = AIControl.MainControl.SplitUpdateStep + 1
-		if AIControl.MainControl.SplitUpdateStep >= AIControl.MainControl.SplitUpdates then
-			AIControl.MainControl.SplitUpdateStep = 0
 		end
 	end,
 	
@@ -2868,76 +2893,46 @@ AIControl.MainControl = {
 		
 		-- Find all controlled squads and HQ targets
 		local targets = {{}, {}}
-		SGroup_Clear(AIControl.MainControl.UnitControls[1])
-		SGroup_Clear(AIControl.MainControl.UnitControls[2])
-		SGroup_Clear(AIControl.MainControl.Vehicles[1])
-		SGroup_Clear(AIControl.MainControl.Vehicles[2])
-		SGroup_Clear(AIControl.MainControl.BarrageUnits[1])
-		SGroup_Clear(AIControl.MainControl.BarrageUnits[2])
 		SGroup_Clear(AIControl.MainControl.HQs[1])
 		SGroup_Clear(AIControl.MainControl.HQs[2])
 		for i=1,AIControl.PlayerCount do
 			local player = World_GetPlayerAt(AIControl.Players[i])
-			if not Player_IsHuman(player) then
-				local team = Player_GetTeam(player)+1
-				AIControl.MainControl.HQPositions[AIControl.Players[i]] = Player_GetStartingPosition(player)
+			local team = Player_GetTeam(player)+1
+			AIControl.MainControl.HQPositions[AIControl.Players[i]] = Player_GetStartingPosition(player)
+			
+			local squads = Player_GetSquads(player)
+			for j=1,SGroup_CountSpawned(squads) do
+				local s = SGroup_GetSpawnedSquadAt(squads, j)
+				local sbpID = BP_GetID(Squad_GetBlueprint(s))
 				
-				local squads = Player_GetSquads(player)
-				for j=1,SGroup_CountSpawned(squads) do
-					local s = SGroup_GetSpawnedSquadAt(squads, j)
-					local sbpID = BP_GetID(Squad_GetBlueprint(s))
-					
-					if AIControl.MainControl.Settings.HQControl.Blueprints[sbpID] then -- hq control
-						if sbpID == BP_GetID(SBP.CW.HQ) or sbpID == BP_GetID(SBP.CW.HQ_REINFORCEMENT) then -- mobile HQ retreat position update
-							AIControl.MainControl.HQPositions[AIControl.Players[i]] = Squad_GetPosition(s)
+				if AIControl.MainControl.Settings.HQControl.Blueprints[sbpID] then -- hq control
+					if sbpID == BP_GetID(SBP.CW.HQ) or sbpID == BP_GetID(SBP.CW.HQ_REINFORCEMENT) then -- mobile HQ retreat position update
+						AIControl.MainControl.HQPositions[AIControl.Players[i]] = Squad_GetPosition(s)
+					end
+					local sectorID
+					if Squad_HasUpgrade(s, UPG.CW.MOBILEHQ) then
+						sectorID = World_GetTerritorySectorID(Squad_GetPosition(s))
+						if AIControl.MainControl.TerritorySectors[sectorID] then
+							AIControl.MainControl.TerritorySectors[sectorID].SetupHQCount[team] = AIControl.MainControl.TerritorySectors[sectorID].SetupHQCount[team] + 1
 						end
-						local sectorID
-						if Squad_HasUpgrade(s, UPG.CW.MOBILEHQ) then
-							sectorID = World_GetTerritorySectorID(Squad_GetPosition(s))
+					else
+						local gameID = Squad_GetGameID(s)
+						if AIControl.MainControl.HQTargets[team][gameID] then
+							targets[team][gameID] = AIControl.MainControl.HQTargets[team][gameID]
+							sectorID = AIControl.MainControl.HQTargets[team][gameID][1]
 							if AIControl.MainControl.TerritorySectors[sectorID] then
 								AIControl.MainControl.TerritorySectors[sectorID].SetupHQCount[team] = AIControl.MainControl.TerritorySectors[sectorID].SetupHQCount[team] + 1
 							end
-						else
-							local gameID = Squad_GetGameID(s)
-							if AIControl.MainControl.HQTargets[team][gameID] then
-								targets[team][gameID] = AIControl.MainControl.HQTargets[team][gameID]
-								sectorID = AIControl.MainControl.HQTargets[team][gameID][1]
-								if AIControl.MainControl.TerritorySectors[sectorID] then
-									AIControl.MainControl.TerritorySectors[sectorID].SetupHQCount[team] = AIControl.MainControl.TerritorySectors[sectorID].SetupHQCount[team] + 1
-								end
-							end
-						end
-						if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
-							AI_LockSquad(player, s)
-						end
-						SGroup_Add(AIControl.MainControl.HQs[team], s)
-					else
-						local raceStr = Player_GetRaceName(player)
-						if AIControl.MainControl.Settings.UnitControl.UnitSettings[sbpID] then -- unit control
-							SGroup_Add(AIControl.MainControl.UnitControls[team], s)
-						else
-							local exclude = AIControl.MainControl.Settings.VehicleControl.ExcludeFromControl[raceStr] and AIControl.MainControl.Settings.VehicleControl.ExcludeFromControl[raceStr][BP_GetID]
-							if not exclude and AIControl_IsSquadVehicle(s) then -- vehicle control
-								SGroup_Add(AIControl.MainControl.Vehicles[team], s)
-							end
-						end
-						if AIControl.MainControl.Settings.BarrageControl.UnitSettings[sbpID] then
-							SGroup_Add(AIControl.MainControl.BarrageUnits[team], s)
 						end
 					end
+					if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
+						AI_LockSquad(player, s)
+					end
+					SGroup_Add(AIControl.MainControl.HQs[team], s)
 				end
 			end
 		end
 		AIControl.MainControl.HQTargets = targets
-		
-		local countTotal =
-			SGroup_CountSpawned(AIControl.MainControl.UnitControls[1])
-			+ SGroup_CountSpawned(AIControl.MainControl.UnitControls[2])
-			+ SGroup_CountSpawned(AIControl.MainControl.Vehicles[1])
-			+ SGroup_CountSpawned(AIControl.MainControl.Vehicles[2])
-			+ SGroup_CountSpawned(AIControl.MainControl.BarrageUnits[1])
-			+ SGroup_CountSpawned(AIControl.MainControl.BarrageUnits[2])
-		AIControl.MainControl.SplitUpdates = AIControl.MainControl.Settings.SplitUpdates + math.floor(countTotal / AIControl.MainControl.Settings.SplitUpdatesIncreaseForSquadCount)
 	end,
 	FindTerritorySectors = function()
 		AIControl.MainControl.TerritorySectors = {}
@@ -2989,39 +2984,41 @@ AIControl.MainControl = {
 --------------------------------------------------------------------------------------------------------------------
 
 AIControl.__Init3 = function()
-	--Rule_AddInterval(AIControl.AIDisabling, 0.125)
+	Rule_AddInterval(AIControl.AIDisabling, 0.25)
 end
 AIControl.__Init2 = function()
+	AIControl.Grid.ResetData(true)
 	AIControl.Grid.Update()
 	AIControl.Pathfinding.Init()
 	AIControl.MainControl.Init()
 	
-	if AIControl.Grid.Settings.SplitUpdates then
-		Rule_AddInterval(AIControl.Grid.Update, AIControl.UpdateInterval/AIControl.Grid.Settings.SplitUpdateCount)
-	else
-		Rule_AddInterval(AIControl.Grid.Update, AIControl.UpdateInterval)
-	end
-	Rule_AddOneShot(AIControl.__Init3, 5)
+	Rule_AddInterval(AIControl.Grid.Update, 0.25)
+	--Rule_AddOneShot(AIControl.__Init3, 5)
 end
 AIControl.__Init = function()
 	if g_AIControl_Enable then
-		--dr_setdisplay("aicontrol_maincontrol", true)
-		--dr_setautoclear("aicontrol_maincontrol", false)
-		--dr_clear("aicontrol_maincontrol")
-		--dr_setdisplay("aicontrol_grid", true)
-		--dr_setautoclear("aicontrol_grid", false)
-		--dr_clear("aicontrol_grid")
+		dr_setdisplay("aicontrol_maincontrol", true)
+		dr_setautoclear("aicontrol_maincontrol", false)
+		dr_clear("aicontrol_maincontrol")
+		dr_setdisplay("aicontrol_grid", true)
+		dr_setautoclear("aicontrol_grid", false)
+		dr_clear("aicontrol_grid")
 		
 		AIControl.Grid.SetDimensions(AIControl.Grid.Settings.Init_Dimensions[1], AIControl.Grid.Settings.Init_Dimensions[2])
 		AIControl.Grid.UpdateAIPlayers()
 		AIControl.Grid.ReduceMarkerCount()
 		
-		Rule_AddOneShot(AIControl.__Init2, 1)
+		Rule_AddOneShot(AIControl.__Init2, 0.125)
 	end
 end
 
-AIControl.Init = function()
-	Rule_AddOneShot(AIControl.__Init, 1)
+AIControl_Init = function()
+	Rule_Remove(AIControl.AIDisabling)
+	Rule_Remove(AIControl.__Init)
+	Rule_Remove(AIControl.__Init2)
+	Rule_Remove(AIControl.__Init3)
+	Rule_Remove(AIControl.Grid.Update)
+	Rule_AddOneShot(AIControl.__Init, 0.125)
 end
 
-Scar_AddInit(AIControl.Init)
+Scar_AddInit(AIControl_Init)
