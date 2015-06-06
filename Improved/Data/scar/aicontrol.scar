@@ -23,7 +23,7 @@ AIControl.PlayerCount = 0
 AIControl.Grid = {
 	Settings = {
 		SplitUpdates = true, -- If true, the update will be split to be performed over the course of UpdateInterval rather than once per UpdateInterval
-		SplitUpdateIncreasePerSquadCount = 8,
+		SplitUpdateIncreasePerSquadCount = 20,
 		
 		-- These settings will only be used on game start, changing them later on will not affect the actual values
 		Init_Dimensions = {11, 11}, -- Initial dimensions table
