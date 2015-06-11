@@ -1,8 +1,15 @@
 -- Targets
 
-local k_maxDist = math.sqrt(World_GetWidth()*World_GetWidth() + World_GetLength()*World_GetLength())
-local k_capPercentageCoefficient = 0.6-math.min(0.6, k_maxDist/700-0.3)
-local k_longMapRatio = math.max(0, math.min(1, math.abs(World_GetWidth() - World_GetLength())/k_maxDist))
+-- locals and table indexing optimization
+local min = math.min
+local max = math.max
+local ceil = math.ceil
+local sqrt = math.sqrt
+local sort = table.sort
+
+local k_maxDist = sqrt(World_GetWidth()*World_GetWidth() + World_GetLength()*World_GetLength())
+local k_capPercentageCoefficient = 0.6-min(0.6, k_maxDist/700-0.3)
+local k_longMapRatio = max(0, min(1, math.abs(World_GetWidth() - World_GetLength())/k_maxDist))
 local k_frontlineCoefficient = 0.275 * (1 + k_longMapRatio*0.35)
 
 -- should we consider targets owned by a certain mod player
@@ -80,9 +87,11 @@ local baseMapConstant = -5.5
 --------------------------------------------------------------------------------
 -- target ranking
 
-defend_point_ranking = {}
-attack_point_ranking = {}
-capture_point_ranking = {}
+local defend_point_ranking = {}
+local attack_point_ranking = {}
+local attack_point_ranking_c = 0
+local capture_point_ranking = {}
+
 capture_points_available = 0
 
 local firstPassDone = false
@@ -102,6 +111,7 @@ local furthestPoint = 1
 local closestEnemyPoint
 local furthestFriendlyPoint
 local frontlinePoints = {}
+local frontlinePointCount = 0
 local earlyGameScore = 0
 local earlyGameFrontlineMultiplier = 0
 local earlyGameThreatMultiplier = 0
@@ -142,16 +152,16 @@ function RankTargetsPrepass()
 		
 		local distx = mapMid.x - hqMid.x
 		local distz = mapMid.z - hqMid.z
-		local midDist = math.sqrt(distx^2 + distz^2)/k_maxDist
+		local midDist = sqrt(distx^2 + distz^2)/k_maxDist
 		
 		--CustomDebug.Print("midDist: "..midDist.."")
 		if midDist < 0.15 then
 			midMapMultiplier = 0
 		else
-			midMapMultiplier = math.min(6, 6*(midDist/0.4))
+			midMapMultiplier = min(6, 6*(midDist*2.5))
 		end
-		mapMid.x = math.max(-World_GetWidth()/2, math.min(World_GetWidth()/2, mapMid.x + distx*1.5))
-		mapMid.z = math.max(-World_GetLength()/2, math.min(World_GetLength()/2, mapMid.z + distz*1.5))
+		mapMid.x = max(-World_GetWidth()*0.5, min(World_GetWidth()*0.5, mapMid.x + distx*1.5))
+		mapMid.z = max(-World_GetLength()*0.5, min(World_GetLength()*0.5, mapMid.z + distz*1.5))
 		--logPrint("hqMid: ("..hqMid.x..", "..hqMid.z..")")
 		--logPrint("mapMid: ("..mapMid.x..", "..mapMid.z..")")
 		
@@ -160,10 +170,10 @@ function RankTargetsPrepass()
 			0,
 			enemyHQMid.z-friendlyHQMid.z
 		)
-		local hqMidDistRatio = math.sqrt(hqMidDist.x^2 + hqMidDist.z^2)/k_maxDist
+		local hqMidDistRatio = sqrt(hqMidDist.x^2 + hqMidDist.z^2)/k_maxDist
 		
 		frontlineMapConstant = -3 - k_longMapRatio*1.5
-		closeToBaseThreshold = 0.55 / (1 + midMapMultiplier/2)
+		closeToBaseThreshold = 0.55 / (1 + midMapMultiplier*0.5)
 		
 		--CustomDebug.Print('k_longMapRatio: '..string.format('%.2f', k_longMapRatio))
 		--CustomDebug.Print('k_frontlineCoefficient: '..string.format('%.2f', k_frontlineCoefficient))
@@ -172,6 +182,7 @@ function RankTargetsPrepass()
 	end
 	
 	frontlinePoints = {}
+	frontlinePointCount = 0
 	furthestPoint = -1
 	closestEnemyPoint = nil
 	furthestFriendlyPoint = Player_GetStartingPosition(Player_FromId(s_selfplayerid)) -- own hq position
@@ -190,7 +201,8 @@ function RankTargetsPrepass()
 				if Target_ShouldAttackPlayer(player) then
 					if midMapMultiplier == 0 then
 						if Military_IsNextToSupply(s_selfplayer, militaryPoint) then
-							frontlinePoints[table.getn(frontlinePoints)+1] = Entity_GetPosition(entity)
+							frontlinePointCount = frontlinePointCount + 1
+							frontlinePoints[frontlinePointCount] = Entity_GetPosition(entity)
 						end
 					else
 						if is_friendly_entity(entity) then
@@ -220,7 +232,8 @@ function RankTargetsPrepass()
 			local distRatio = Military_GetMilitaryPointDistanceToBase(s_selfplayer, militaryPoint)/k_maxDist
 			if midMapMultiplier == 0 then
 				if Military_IsNextToSupply(s_selfplayer, militaryPoint) then
-					frontlinePoints[table.getn(frontlinePoints)+1] = Entity_GetPosition(entity)
+					frontlinePointCount = frontlinePointCount + 1
+					frontlinePoints[frontlinePointCount] = Entity_GetPosition(entity)
 				end
 			end
 			if Military_IsMilitaryPointBeingCapturedByEnemy(s_selfplayer, militaryPoint) then
@@ -245,16 +258,16 @@ function RankTargetsPrepass()
 	
 	if World_GetGameTime() < 100 then
 		if cache and cache.military_percent_value then militaryPercentValue = cache.military_percent_value end
-		militaryPercentValue = math.max(0.7, math.min(1.55, militaryPercentValue+s_personality.threat_aggressiveness))
+		militaryPercentValue = max(0.7, min(1.55, militaryPercentValue+s_personality.threat_aggressiveness))
 	else
 		militaryPercentValue = 1.1
 	end
 	
-	earlyGameTimeRule = math.max(0, 1 - math.min(1, World_GetGameTime()/260-0.35)) * math.min(1, 0.5 + k_longMapRatio*2)
+	earlyGameTimeRule = max(0, 1 - min(1, World_GetGameTime()/260-0.35)) * min(1, 0.5 + k_longMapRatio*2)
 	
 	earlyGameScore = 7*earlyGameTimeRule + k_longMapRatio*earlyGameTimeRule*20
-	earlyGameFrontlineMultiplier = (1 - earlyGameTimeRule) * math.min(1, (1+k_longMapRatio*2)*0.55+0.45)
-	earlyGameThreatMultiplier = math.max(-1, math.min(1, (0.55 - earlyGameTimeRule)/0.45))
+	earlyGameFrontlineMultiplier = (1 - earlyGameTimeRule) * min(1, (1+k_longMapRatio*2)*0.55+0.45)
+	earlyGameThreatMultiplier = max(-1, min(1, (0.55 - earlyGameTimeRule)/0.45))
 	
 	militaryPointRandomResetStep = militaryPointRandomResetStep + 1
 	if militaryPointRandomResetStep > 50 then
@@ -292,7 +305,7 @@ function RatePointsFromEnemyHQDistance(entityPos, enemyHQDistance) -- enemyHQDis
 		if closestDistToEnemyHQ < minRatingRing1 then
 			result = result - minRating
 		elseif closestDistToEnemyHQ < minRatingRing2 then
-			result = result - math.min(minRating, minRating*( 1 - (closestDistToEnemyHQ-minRatingRing1)/(minRatingRing2-minRatingRing1) ))
+			result = result - min(minRating, minRating*( 1 - (closestDistToEnemyHQ-minRatingRing1)/(minRatingRing2-minRatingRing1) ))
 		end
 		closestDistToEnemyHQ = closestDistToEnemyHQ/k_maxDist/furthestPoint
 		result = result - 10*(closestDistToEnemyHQ - 0.65)^2 + 3
@@ -364,38 +377,40 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 	else
 		distFromAllHQsCoefficient = 3*(distFromAllHQs - 0.35)
 	end
-	distFromAllHQsCoefficient = math.max(-0.1, distFromAllHQsCoefficient) * 12]]
+	distFromAllHQsCoefficient = max(-0.1, distFromAllHQsCoefficient) * 12]]
 	
-	local distRatio = math.max(
+	local distRatio = max(
 		0.1,
-		math.min(
+		min(
 			1,
-			((minDistFromFriendlyHQs*1.1)/k_maxDist/furthestPoint - 0.22*(midMapMultiplier/5)) * (1 + midMapMultiplier/4) + (1 - k_longMapRatio*1.75)
+			((minDistFromFriendlyHQs*1.1)/k_maxDist/furthestPoint - 0.22*(midMapMultiplier*0.2)) * (1 + midMapMultiplier*0.25) + (1 - k_longMapRatio*1.75)
 		)*1.1 - 0.1
 	)
 	if is_defend then
-		militaryPercentValue = math.min(1, militaryPercentValue) - 0.35
-		enemyHQDistances[1] = enemyHQDistances[1]/1.2
-		enemyHQDistances[2] = enemyHQDistances[2]/1.2
+		militaryPercentValue = min(1, militaryPercentValue) - 0.35
+		enemyHQDistances[1] = enemyHQDistances[1]*0.8
+		enemyHQDistances[2] = enemyHQDistances[2]*0.8
 		result = result - 0.225
 	end
 	
 	local frontlineDistRatio
 	
-	if midMapMultiplier == 0 then
+	if midMapMultiplier == 0 and frontlinePointCount > 0 then
 		local X = 0
 		local Y = 0
-		for i,v in pairs(frontlinePoints) do
+		for i=1,frontlinePointCount do
+			local v = frontlinePoints[i]
 			X = X + v.x
 			Y = Y + v.z
 		end
-		X = X / table.getn(frontlinePoints)
-		Y = Y / table.getn(frontlinePoints)
+		X = X / frontlinePointCount
+		Y = Y / frontlinePointCount
 		--(mapMid.x + furthestFriendlyPoint1.x + furthestFriendlyPoint2.x + closestEnemyPoint.x) / 4
 		
 		local m1 = 0
 		local m2 = 0
-		for i,v in pairs(frontlinePoints) do
+		for i=1,frontlinePointCount do
+			local v = frontlinePoints[i]
 			m1 = m1 + (v.x - X) * (v.z - Y)
 			m2 = m2 + (v.x - X)^2
 		end
@@ -410,45 +425,45 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 		local p1 = World_Pos(0, 0, yintercept)
 		local p2 = World_Pos(1, 0, m + yintercept)
 		
-		frontlineDistRatio = math.min(1,
+		frontlineDistRatio = min(1,
 			math.abs( (p1.x-p2.x)*(p2.z-entityPos.z)-(p1.x-entityPos.x)*(p1.z-p2.z) )
-				/ (math.sqrt((p1.x-p2.x)^2+(p2.z-p1.z)^2)*k_maxDist/furthestPoint)
+				/ (sqrt((p1.x-p2.x)^2+(p2.z-p1.z)^2)*k_maxDist/furthestPoint)
 				+ earlyGameTimeRule
 		)
 	else
-		local secondFrontlinePoint = World_Pos((closestEnemyPoint.x + mapMid.x)/2, (closestEnemyPoint.z + mapMid.z)/2, 0)
-		frontlineDistRatio = math.min(1,
+		local secondFrontlinePoint = World_Pos((closestEnemyPoint.x + mapMid.x)*0.5, (closestEnemyPoint.z + mapMid.z)*0.5, 0)
+		frontlineDistRatio = min(1,
 			math.abs( (furthestFriendlyPoint.x-secondFrontlinePoint.x)*(furthestFriendlyPoint.z-entityPos.z)-(furthestFriendlyPoint.x-entityPos.x)*(furthestFriendlyPoint.z-secondFrontlinePoint.z) )
-				/ (math.sqrt((furthestFriendlyPoint.x-secondFrontlinePoint.x)^2+(furthestFriendlyPoint.z-secondFrontlinePoint.z)^2)*k_maxDist/furthestPoint)
+				/ (sqrt((furthestFriendlyPoint.x-secondFrontlinePoint.x)^2+(furthestFriendlyPoint.z-secondFrontlinePoint.z)^2)*k_maxDist/furthestPoint)
 				+ earlyGameTimeRule
 		)
 	end
 	
 	if is_friendly then
-		result = result - 1 - math.min(1, 1.1-militaryPercentValue)
+		result = result - 1 - min(1, 1.1-militaryPercentValue)
 	end
 	
 	local threat = Military_GetCombinedThreatAtMilitaryPoint(s_selfplayer, militaryPoint, is_defend) -- pass in true to get history anti-class added to this threat
 	local threatScore = 0
 	local threatAtBaseScore = 0
 	if threat < 0 then
-		local maxFriendlyThreat = math.max(5, math.min(100, -Military_GetMinCombinedThreatAtMilitaryPoint(s_selfplayer)))
+		local maxFriendlyThreat = max(5, min(100, -Military_GetMinCombinedThreatAtMilitaryPoint(s_selfplayer)))
 		threatScore = 6.75*threat/maxFriendlyThreat -- attempt to unblob and spread out units by reducing priority for points that already have friendlies nearby
 		--logPrint(string.format("  negative threat score: %.2f", threatScore))
 	elseif threat >= 0 then
-		local maxThreat = math.max(5, math.min(130, Military_GetMaxCombinedThreatAtMilitaryPoint(s_selfplayer)))
+		local maxThreat = max(5, min(130, Military_GetMaxCombinedThreatAtMilitaryPoint(s_selfplayer)))
 		threatScore = -1.55*threat/maxThreat
 		if not is_defend and minDistFromFriendlyHQs / k_maxDist / furthestPoint < closeToBaseThreshold then -- we have to respond to threats near the HQ
 			threatAtBaseScore = 20 * threat/maxThreat * (closeToBaseThreshold-minDistFromFriendlyHQs / k_maxDist / furthestPoint)/closeToBaseThreshold
 		end
-		threatScore = threatScore - math.min(0.5, math.max(-1, 2*(1-militaryPercentValue)*threat/maxThreat)) -- if we have a larger army, we want to pursue threats instead of avoiding them. The result adjusted for that here
+		threatScore = threatScore - min(0.5, max(-1, 2*(1-militaryPercentValue)*threat/maxThreat)) -- if we have a larger army, we want to pursue threats instead of avoiding them. The result adjusted for that here
 	end
 	
-	local threatMultiplier = (enemyHQDistances[2]/k_maxDist/furthestPoint - 0.5)*(1.05 - math.max(0.75, math.min(1.75, (militaryPercentValue-1)/2+1))) + 0.5
+	local threatMultiplier = (enemyHQDistances[2]/k_maxDist/furthestPoint - 0.5)*(1.05 - max(0.75, min(1.75, (militaryPercentValue-1)*0.5+1))) + 0.5
 	
-	--if Military_IsMilitaryPointBeingCapturedByUs(s_selfplayer, militaryPoint) then importance = importance * math.min(1.5, math.max(1, World_GetGameTime()/700)) end
+	--if Military_IsMilitaryPointBeingCapturedByUs(s_selfplayer, militaryPoint) then importance = importance * min(1.5, max(1, World_GetGameTime()/700)) end
 	if is_friendly_entity(entity) then
-		importance = importance*math.max(0.1, distRatio-0.4)*2.2
+		importance = importance*max(0.1, distRatio-0.4)*2.2
 		if Military_IsMilitaryPointBeingCapturedByEnemy(s_selfplayer, militaryPoint) then importance = importance*15 end
 	elseif Military_IsNextToSupply(s_selfplayer, militaryPoint) then
 		--importance = importance*(0.55-distRatio)*2
@@ -482,16 +497,16 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 		frontlineMapConstant
 		+ earlyGameScore
 		+ 5*(0.55 - distRatio)*(1 - militaryPercentValue/0.95)
-		+ 25*math.max(-0.5, math.min(0.5, militaryPercentValue + percentagePointsCaptured - 1.35)*percentagePointsCaptured)*(0.65 - enemyHQDistances[2]/k_maxDist/furthestPoint)
-		+ 2 * math.min(1, mapMidDistRatio-0.4)*(midMapMultiplier*3-6)
-		+ 15 * (1 - math.min(1, frontlineDistRatio / k_frontlineCoefficient)) / (midMapMultiplier/3 + 1) * earlyGameFrontlineMultiplier
+		+ 25*max(-0.5, min(0.5, militaryPercentValue + percentagePointsCaptured - 1.35)*percentagePointsCaptured)*(0.65 - enemyHQDistances[2]/k_maxDist/furthestPoint)
+		+ 2 * min(1, mapMidDistRatio-0.4)*(midMapMultiplier*3-6)
+		+ 15 * (1 - min(1, frontlineDistRatio / k_frontlineCoefficient)) / (midMapMultiplier*(1/3) + 1) * earlyGameFrontlineMultiplier
 		+ 15 * (0.55 - 1.25 * enemyHQDistances[2]/k_maxDist/furthestPoint) * percentagePointsCaptured
-		+ RatePointsFromEnemyHQDistance(entityPos, enemyHQDistances[2]) * (1 - percentagePointsCaptured/1.5) / (midMapMultiplier/3 + 1)
+		+ RatePointsFromEnemyHQDistance(entityPos, enemyHQDistances[2]) * (1 - percentagePointsCaptured/1.5) / (midMapMultiplier*(1/3) + 1)
 		+ captureScore
 		+ importance
 		+ threatScore*earlyGameThreatMultiplier
-		+ (minDistFromAllHQs-0.25)*7*(1+midMapMultiplier/5)*math.max(-0.5, 3-k_longMapRatio*2.5)
-		+ 35*math.min(0, minDistFromAllHQs - 0.285 / (1 + midMapMultiplier / 5 + (1 - k_longMapRatio/2.5) * 2))
+		+ (minDistFromAllHQs-0.25)*7*(1+midMapMultiplier*0.2)*max(-0.5, 3-k_longMapRatio*2.5)
+		+ 35*min(0, minDistFromAllHQs - 0.285 / (1 + midMapMultiplier*0.2 + (1 - k_longMapRatio*0.4) * 2))
 		--+ (Military_GetMilitaryPointDiceRoll(s_selfplayer, militaryPoint)*20 - 10) -- this is quite bugged, screws up early game and works wrong in lategame
 	
 	result = result
@@ -499,11 +514,11 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 		+ threatAtBaseScore
 		+ 0.25*earlyGameTimeRule
 		+ frontlineScore
-			* math.max(0, (distRatio + (1-distRatio)*(0.45 - 1.325*earlyGameTimeRule)))
+			* max(0, (distRatio + (1-distRatio)*(0.45 - 1.325*earlyGameTimeRule)))
 			--* (mapMidDistRatio + (1-mapMidDistRatio)*0.5)
 			* (threatMultiplier + (1-threatMultiplier)*0.35)
-			* math.sqrt(minDistFromAllHQs/math.min(1, 0.5+(k_longMapRatio-0.5)/2)+0.2)
-			* math.max(0.2, math.min(1, distFromAllHQs/math.min(1, 0.5+(k_longMapRatio-0.5)/2)))
+			* sqrt(minDistFromAllHQs/min(1, 0.5+(k_longMapRatio-0.5)*0.5)+0.2)
+			* max(0.2, min(1, distFromAllHQs/min(1, 0.5+(k_longMapRatio-0.5)*0.5)))
 			* customMultiplier
 	
 	if not militaryPointRandom[entityID] then
@@ -512,7 +527,7 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 	
 	result = result + militaryPointRandom[entityID]
 	
-	return math.min(10, math.max(0, result*3))
+	return min(10, max(0, result*3))
 end
 
 function Target_CalcDefendPriority(militaryPoint, is_neutral)
@@ -575,7 +590,7 @@ function RankDefendTargets()
 	
 	-- debug
 	--[[CustomDebug.Clear()
-	table.sort(defend_point_ranking, function(a,b) return a.PriorityValue > b.PriorityValue end)
+	sort(defend_point_ranking, function(a,b) return a.PriorityValue > b.PriorityValue end)
 	if table.getn(defend_point_ranking) > 0 then
 		for idx,entry in pairs(defend_point_ranking) do
 			if entry.PriorityValue > 0 then
@@ -594,8 +609,8 @@ function RankDefendTargets()
 		
 		local wWidth = World_GetWidth()
 		local wHeight = World_GetLength()
-		local wHalfWidth = wWidth/2
-		local wHalfHeight = wHeight/2
+		local wHalfWidth = wWidth*0.5
+		local wHalfHeight = wHeight*0.5
 		
 		for idx,entry in pairs(defend_point_ranking) do
 			if entry and entry.Point then
@@ -608,14 +623,14 @@ function RankDefendTargets()
 							if entry.PriorityValue == 0 then
 								color = 0
 							else
-								color = math.min(255, math.max(0, math.ceil(255 * entry.PriorityValue/3 * 1.5)+120))
+								color = min(255, max(0, ceil(255 * entry.PriorityValue*(1/3) * 1.5)+120))
 							end
 							
 							dr_text2d("aicustomdebug2"..s_selfplayerid,
-								0.005 + 0.8*     (entityPos.x+wHalfWidth ) / (wWidth +1)  * math.max(0.333, 1-math.min(1, wHeight/wWidth)),
-								0.005 + 0.8*(1 - (entityPos.z+wHalfHeight) / (wHeight+1)) * math.max(0.333, 1-math.min(1, wWidth/wHeight)),
+								0.005 + 0.8*     (entityPos.x+wHalfWidth ) / (wWidth +1)  * max(0.333, 1-min(1, wHeight/wWidth)),
+								0.005 + 0.8*(1 - (entityPos.z+wHalfHeight) / (wHeight+1)) * max(0.333, 1-min(1, wWidth/wHeight)),
 								string.format("%.0f", entry.PriorityValue),
-								15+math.ceil(color/3), color, 15+math.ceil(color/3))
+								15+ceil(color*(1/3)), color, 15+ceil(color*(1/3)))
 						end
 					end
 				end
@@ -648,8 +663,9 @@ function RankAttackTargets()
 			PriorityValue = priority,
 			Neutral = true,
 		}
-		table.insert(attack_point_ranking, e)
-		if priority > 0.0 then
+		attack_point_ranking_c = attack_point_ranking_c + 1
+		attack_point_ranking[attack_point_ranking_c] = e
+		if priority > 0 then
 			Military_AddTarget(s_selfplayer, MTARGET_Attack, militaryPoint, 1+priority*2)
 			targetCount = targetCount + 1
 			if targetCount >= 7 then
@@ -672,8 +688,9 @@ function RankAttackTargets()
 					PriorityValue = priority,
 					Neutral = false,
 				}
-				table.insert(attack_point_ranking, e)
-				if priority > 0.0 then
+				attack_point_ranking_c = attack_point_ranking_c + 1
+				attack_point_ranking[attack_point_ranking_c] = e
+				if priority > 0 then
 					Military_AddTarget(s_selfplayer, MTARGET_Attack, militaryPoint, 1+priority*2)
 					targetCount = targetCount + 1
 					if targetCount >= 15 then
@@ -689,7 +706,7 @@ function RankAttackTargets()
 	--debug
 	
 	--[[CustomDebug.Clear()
-	table.sort(attack_point_ranking, function(a,b) return a.PriorityValue > b.PriorityValue end)
+	sort(attack_point_ranking, function(a,b) return a.PriorityValue > b.PriorityValue end)
 	if table.getn(attack_point_ranking) > 0 then
 		for idx,entry in pairs(attack_point_ranking) do
 			if entry.PriorityValue > 0 then
@@ -708,8 +725,8 @@ function RankAttackTargets()
 		
 		local wWidth = World_GetWidth()
 		local wHeight = World_GetLength()
-		local wHalfWidth = wWidth/2
-		local wHalfHeight = wHeight/2
+		local wHalfWidth = wWidth*0.5
+		local wHalfHeight = wHeight*0.5
 		
 		for idx,entry in pairs(attack_point_ranking) do
 			if entry and entry.Point and Military_IsMilitaryPointValid(entry.Point) then
@@ -721,14 +738,14 @@ function RankAttackTargets()
 						if entry.PriorityValue == 0 then
 							color = 0
 						else
-							color = math.min(255, math.max(0, math.ceil(255 * entry.PriorityValue/2 * 1.5)+120))
+							color = min(255, max(0, ceil(255 * entry.PriorityValue/2 * 1.5)+120))
 						end
 						
 						dr_text2d("aicustomdebug2"..s_selfplayerid,
-							0.005 + 0.8*     (entityPos.x+wHalfWidth ) / (wWidth +1)  * math.max(0.333, 1-math.min(1, wHeight/wWidth)),
-							0.005 + 0.8*(1 - (entityPos.z+wHalfHeight) / (wHeight+1)) * math.max(0.333, 1-math.min(1, wWidth/wHeight)),
+							0.005 + 0.8*     (entityPos.x+wHalfWidth ) / (wWidth +1)  * max(0.333, 1-min(1, wHeight/wWidth)),
+							0.005 + 0.8*(1 - (entityPos.z+wHalfHeight) / (wHeight+1)) * max(0.333, 1-min(1, wWidth/wHeight)),
 							string.format("%.0f", entry.PriorityValue),
-							color, 15+math.ceil(color/3), 15+math.ceil(color/3))
+							color, 15+ceil(color*(1/3)), 15+ceil(color*(1/3)))
 					end
 				end
 			end
@@ -780,18 +797,18 @@ function Target_CalcCapturePriority(capturePoint, vp_mult, fuel_mult, mt_mult)
 	
 	local dist = Capture_GetCapturePointDistanceToBase(s_selfplayer, capturePoint)
 	
-	local distScore = 1 + math.max(0, dist/k_maxDist/furthestPoint * 2)
+	local distScore = 1 + max(0, dist/k_maxDist/furthestPoint * 2)
 	local distMultiplier = 1
 	
 	-- Take enemy Bases into consideration (make AI setup proper frontline rather than only attacking in a circle around its HQ
 	local entityPos = Entity_GetPosition(entity)
-	distScore = distScore--[[ + RatePointsFromEnemyHQDistance(entityPos)/3.5]] + math.max(0, 2.5 - World_GetGameTime()/150) - 5.25
+	distScore = distScore--[[ + RatePointsFromEnemyHQDistance(entityPos)/3.5]] + max(0, 2.5 - World_GetGameTime()/150) - 5.25
 	
 	--distMultiplier = distMultiplier + (1 - distMultiplier)*k_capPercentageCoefficient
-	local priority = distMultiplier * (typeScore/2 + distScore)
+	local priority = distMultiplier * (typeScore*0.5 + distScore)
 	
 	if cache and cache.percentage_pts_captured and cache.percentage_pts_captured > 0.4 then
-		distScore = distScore * math.min(1, math.max(0.35, 1.45-1.225*math.min(0.9, cache.percentage_pts_captured)))
+		distScore = distScore * min(1, max(0.35, 1.45-1.225*min(0.9, cache.percentage_pts_captured)))
 	end
 	
 	--------------------------------------------------------------------------------
@@ -809,11 +826,11 @@ function Target_CalcCapturePriority(capturePoint, vp_mult, fuel_mult, mt_mult)
 			threat = 0
 		end
 		--if threat < 2 then
-		--	threat = (threat-2) / 20
-		--	maxThreat = math.max(5, math.min(40, -Military_GetMinCombinedThreatAtMilitaryPoint(s_selfplayer)))
+		--	threat = (threat-2) * 0.05
+		--	maxThreat = max(5, min(40, -Military_GetMinCombinedThreatAtMilitaryPoint(s_selfplayer)))
 			--CustomDebug.Print(string.format("  Negative threat: %.2f maxThreat: %.2f", threat, maxThreat))
 		--else
-			maxThreat = 1 -- math.max(5, math.min(40, Military_GetMaxCombinedThreatAtMilitaryPoint(s_selfplayer)))
+			maxThreat = 1 -- max(5, min(40, Military_GetMaxCombinedThreatAtMilitaryPoint(s_selfplayer)))
 			--CustomDebug.Print(string.format("  Positive threat: %.2f maxThreat: %.2f", threat, maxThreat))
 		--end
 	end
@@ -822,12 +839,12 @@ function Target_CalcCapturePriority(capturePoint, vp_mult, fuel_mult, mt_mult)
 	--CustomDebug.Print(string.format("  %2.1f threat: %2.2f  priority+threat: %2.2f", priority, threat, priorityWithThreat))
 	
 	if Capture_AlreadyCapturedByUs(s_selfplayer, capturePoint) or Capture_BeingCapturedByTeammate(s_selfplayer, capturePoint) then
-		return 0, math.max(0, priority - threat/maxThreat/3)
+		return 0, max(0, priority - threat/maxThreat*(1/3))
 	end
 	
 	if priorityWithThreat <= 0 then -- don't want to capture points that are dangerous
 		--CustomDebug.Print("  IGNORED")
-		return 0, math.max(0, priority - threat/maxThreat/2)
+		return 0, max(0, priority - threat/maxThreat*0.5)
 	else
 		local customMultiplier = customCaptureModifiers[AIResource_GetCapturePointName(capturePoint)]
 		if customMultiplier then priorityWithThreat = priorityWithThreat * customMultiplier end
@@ -839,7 +856,7 @@ function Target_CalcCapturePriority(capturePoint, vp_mult, fuel_mult, mt_mult)
 		--[[if capturePointType ~= CPT_VictoryPoint and not Capture_IsNextToSupply(s_selfplayer, capturePoint, true) then
 			-- want to consider this point as a neighbour so return non-zero for neighbour priority value
 			local result = priority*0.75 - threat/maxThreat*20
-			return math.max(0, result), priority
+			return max(0, result), priority
 		end]]
 		
 		--CustomDebug.Print(string.format("  Final result: %2.2f", priorityWithThreat + connectionScore))
@@ -951,7 +968,7 @@ function RankCapturePoints(vp_mult, vp_max, fuel_mult, mt_mult)
 	
 	-- debug
 	--[[CustomDebug.Clear()
-	table.sort(capture_point_ranking, function(a,b) return a.PriorityValue > b.PriorityValue end)
+	sort(capture_point_ranking, function(a,b) return a.PriorityValue > b.PriorityValue end)
 	if table.getn(capture_point_ranking) > 0 then
 		for idx,entry in pairs(capture_point_ranking) do
 			if entry.PriorityValue > 0 then
@@ -968,8 +985,8 @@ function RankCapturePoints(vp_mult, vp_max, fuel_mult, mt_mult)
 		
 		local wWidth = World_GetWidth()
 		local wHeight = World_GetLength()
-		local wHalfWidth = wWidth/2
-		local wHalfHeight = wHeight/2
+		local wHalfWidth = wWidth*0.5
+		local wHalfHeight = wHeight*0.5
 		
 		for idx,entry in pairs(capture_point_ranking) do
 			if entry and entry.Point then
@@ -982,14 +999,14 @@ function RankCapturePoints(vp_mult, vp_max, fuel_mult, mt_mult)
 						if entry.PriorityValue == 0 then
 							color = 0
 						else
-							color = math.min(255, math.max(0, math.ceil(255 * entry.PriorityValue/2 * 1.5)+120))
+							color = min(255, max(0, ceil(255 * entry.PriorityValue*0.5 * 1.5)+120))
 						end
 						
 						dr_text2d("aicustomdebug2"..s_selfplayerid,
-							0.005 + 0.8*     (entityPos.x+wHalfWidth ) / (wWidth +1)  * math.max(0.333, 1-math.min(1, wHeight/wWidth)),
-							0.005 + 0.8*(1 - (entityPos.z+wHalfHeight) / (wHeight+1)) * math.max(0.333, 1-math.min(1, wWidth/wHeight)),
+							0.005 + 0.8*     (entityPos.x+wHalfWidth ) / (wWidth +1)  * max(0.333, 1-min(1, wHeight/wWidth)),
+							0.005 + 0.8*(1 - (entityPos.z+wHalfHeight) / (wHeight+1)) * max(0.333, 1-min(1, wWidth/wHeight)),
 							string.format("%.0f", entry.PriorityValue),
-							15+math.ceil(color/3), color, 15+math.ceil(color/3))
+							15+ceil(color*(1/3)), color, 15+ceil(color*(1/3)))
 					end
 				end
 			end
