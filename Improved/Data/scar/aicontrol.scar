@@ -338,7 +338,7 @@ AIControl.Grid = {
 			AIControl_Grid.ResetData(false)
 			for i=1,Dimensions[1] do
 				for j=1,Dimensions[2] do
-					AIControl_Grid_AveragePosData[i][j] = {World_Pos(0, 0, 0), World_Pos(0, 0, 0)}
+					AIControl_Grid_t_AveragePosData[i][j] = {World_Pos(0, 0, 0), World_Pos(0, 0, 0)}
 					for team=1,2 do
 						if squadCounts[team] > 0 then
 							AIControl_Grid_DataHistory[i][j][team] = max(0,
@@ -470,17 +470,16 @@ AIControl.Grid = {
 				
 				if not retreated then
 					local raceStr = Player_GetRaceName(player)
-					local ucSetting = AIControl_MainControl_Settings_UnitControl.UnitSettings[sbpID]
+					local ucSetting = AIControl_MainControl_Settings_UnitControl.UnitSettings[bpID]
 					if ucSetting then -- unit control
-						SGroup_Add(AIControl_MainControl.UnitControls[team], s)
 						AIControl_MainControl.FUnitControl(s, ucSetting)
 					else
-						local exclude = AIControl_MainControl_Settings_VehicleControl.ExcludeFromControl[raceStr] and AIControl_MainControl_Settings_VehicleControl.ExcludeFromControl[raceStr][BP_GetID]
+						local exclude = AIControl_MainControl_Settings_VehicleControl.ExcludeFromControl[raceStr] and AIControl_MainControl_Settings_VehicleControl.ExcludeFromControl[raceStr][bpID]
 						if not exclude and AIControl_IsSquadVehicle(s) then -- vehicle control
 							AIControl_MainControl.FVehicleControl(s)
 						end
 					end
-					local bcSetting = AIControl_MainControl_Settings_BarrageControl.UnitSettings[sbpID]
+					local bcSetting = AIControl_MainControl_Settings_BarrageControl.UnitSettings[bpID]
 					if bcSetting then
 						AIControl_MainControl.FBarrageControl(s, bcSetting)
 					end
@@ -516,9 +515,9 @@ AIControl.Grid = {
 				AIControl_Grid_t_DataHistory[x][y][team] = AIControl_Grid_t_DataHistory[x][y][team] + squadWeight/max(squadCounts[team])*AIControl_Grid_Settings.HistoryGrowthModifier
 				AIControl_Grid_t_DataSquads[x][y][team][AIControl_Grid_t_DataCounts[x][y][team]] = s
 				
-				AIControl_Grid_t_AveragePosData[x][y][team].x = AIControl_Grid_t_AveragePosData[x][y][team].x+position.x
-				AIControl_Grid_t_AveragePosData[x][y][team].y = AIControl_Grid_t_AveragePosData[x][y][team].y+position.y
-				AIControl_Grid_t_AveragePosData[x][y][team].z = AIControl_Grid_t_AveragePosData[x][y][team].z+position.z
+				AIControl_Grid_t_AveragePosData[x][y][team].x = AIControl_Grid_t_AveragePosData[x][y][team].x + position.x
+				AIControl_Grid_t_AveragePosData[x][y][team].y = AIControl_Grid_t_AveragePosData[x][y][team].y + position.y
+				AIControl_Grid_t_AveragePosData[x][y][team].z = AIControl_Grid_t_AveragePosData[x][y][team].z + position.z
 			end
 		end
 		SGroup_Destroy(squads)
@@ -533,14 +532,12 @@ AIControl.Grid = {
 						AIControl_Grid_ArmorData[i][j][team] = AIControl_Grid_t_ArmorData[i][j][team]
 						AIControl_Grid_DataHistory[i][j][team] = AIControl_Grid_t_DataHistory[i][j][team]
 						if AIControl_Grid_DataCounts[i][j][team] > 0 then
-							AIControl_Grid_AveragePosData[i][j][team].x = AIControl_Grid_t_AveragePosData[i][j][team].x/AIControl_Grid_DataCounts[i][j][team]
-							AIControl_Grid_AveragePosData[i][j][team].y = AIControl_Grid_t_AveragePosData[i][j][team].y/AIControl_Grid_DataCounts[i][j][team]
-							AIControl_Grid_AveragePosData[i][j][team].z = AIControl_Grid_t_AveragePosData[i][j][team].z/AIControl_Grid_DataCounts[i][j][team]
+							AIControl_Grid_AveragePosData[i][j][team] = World_Pos(
+								AIControl_Grid_t_AveragePosData[i][j][team].x/AIControl_Grid_DataCounts[i][j][team],
+								AIControl_Grid_t_AveragePosData[i][j][team].y/AIControl_Grid_DataCounts[i][j][team],
+								AIControl_Grid_t_AveragePosData[i][j][team].z/AIControl_Grid_DataCounts[i][j][team])
 						else
-							AIControl_Grid_AveragePosData[i][j][team] = {
-								World_Pos(AIControl_Grid.ControlPoints[i][j].x, AIControl_Grid.ControlPoints[i][j].y, AIControl_Grid.ControlPoints[i][j].z),
-								World_Pos(AIControl_Grid.ControlPoints[i][j].x, AIControl_Grid.ControlPoints[i][j].y, AIControl_Grid.ControlPoints[i][j].z)
-							}
+							AIControl_Grid_AveragePosData[i][j][team] = World_Pos(AIControl_Grid.ControlPoints[i][j].x, AIControl_Grid.ControlPoints[i][j].y, AIControl_Grid.ControlPoints[i][j].z)
 						end
 					end
 				end
@@ -1561,11 +1558,11 @@ AIControl.MainControl = {
 		},
 		
 		AICheats = {
-			StartingResources = 1.3,
+			StartingResources = 1.45,
 			ExperienceReceived = 1.05,
 			CommandPointGainRate = 1.35,
 			ProductionRate = 1.5,
-			Upkeep = 0.9,
+			Upkeep = 0.85,
 			VehicleRepairRate = 1.2,
 			SightRadius = 1,
 			Popcap = 150,
@@ -1962,6 +1959,7 @@ AIControl.MainControl = {
 					local collectiveDanger = 0
 					local totalArmor = 0
 					for i=1,#surroundingSafety do
+						local v = surroundingSafety[i]
 						collectiveDanger = collectiveDanger + v[3] + v[4]*0.01 - v[5]*0.1 - v[6]*0.0025
 						totalArmor = totalArmor + v[7]
 					end

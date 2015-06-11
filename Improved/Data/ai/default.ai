@@ -103,7 +103,7 @@ TPRIORITY_BuildOrder 				= 100
 
 --
 ai_assert = false
-ai_frameTime = 8 -- AI full update cycle time
+ai_frameTime = 4 -- AI full update cycle time
 ai_targetsUpdateSpacing = 2 -- How many update cycles AI should wait before updating its targets (costly operation)
 
 -------------------------------------------------------------
