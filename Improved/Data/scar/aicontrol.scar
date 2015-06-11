@@ -15,10 +15,39 @@ end
 g_AIControl_Enable = true
 g_AIControl_Pause = false
 
+----------------------------------------------------
+-- Pointer optimization
+
+local AIControl_Grid
+local AIControl_Grid_Settings
+local Dimensions
+
+local AIControl_Grid_DataHistory
+local AIControl_Grid_t_DataHistory
+
+local AIControl_Grid_DataClump
+local AIControl_Grid_DataClumpFOW
+
+local AIControl_Grid_DataSquads
+local AIControl_Grid_t_DataSquads
+local AIControl_Grid_DataCounts
+local AIControl_Grid_t_DataCounts
+local AIControl_Grid_Data
+local AIControl_Grid_t_Data
+local AIControl_Grid_ArmorData
+local AIControl_Grid_t_ArmorData
+local AIControl_Grid_AveragePosData
+local AIControl_Grid_t_AveragePosData
+
+local min = math.min
+local max = math.max
+local ceil = math.ceil
+local floor = math.floor
+
 AIControl = {}
 
-AIControl.Players = {}
-AIControl.PlayerCount = 0
+AIControl_Players = {}
+AIControl_PlayerCount = 0
 
 AIControl.Grid = {
 	Settings = {
@@ -41,7 +70,7 @@ AIControl.Grid = {
 		AIMarkers_SkipGrids = 3, -- only spawn every (n-1)th time
 		AIMarker = EBP.STRAT_POINT.AI_LOW, -- should only be set to AI_LOW, AI_MEDIUM or AI_HIGH
 		
-		ReduceMarkerCount = 40, -- Automatically reduce marker count to this number of markers to be updated per player: N/math.max(1, AICount)*math.max(1, math.min(AICount, PlayerCount)).
+		ReduceMarkerCount = 40, -- Automatically reduce marker count to this number of markers to be updated per player: N/max(1, AICount)*max(1, min(AICount, PlayerCount)).
 		ExcludedUnits = {
 			[BP_GetID(SBP.CW.HQ)] = true,
 			[BP_GetID(SBP.CW.HQ_REINFORCEMENT)] = true,
@@ -80,99 +109,99 @@ AIControl.Grid = {
 	
 	SetDimensions = function(x, y, auto, SpawnAIMarkers, getSpawnableLocations, spawnableLocationEntity)
 		local worldWidth, worldLength = World_GetWidth(), World_GetLength()
-		if auto == nil then auto = AIControl.Grid.Settings.AutoDimensionsEnable end
-		if SpawnAIMarkers == nil then SpawnAIMarkers = AIControl.Grid.Settings.SpawnAIMarkers end
+		if auto == nil then auto = AIControl_Grid_Settings.AutoDimensionsEnable end
+		if SpawnAIMarkers == nil then SpawnAIMarkers = AIControl_Grid_Settings.SpawnAIMarkers end
 		if auto then
-			AIControl.Grid.Dimensions[1] = math.floor(worldWidth/x)
-			AIControl.Grid.Dimensions[2] = math.floor(worldLength/y)
+			Dimensions[1] = floor(worldWidth/x)
+			Dimensions[2] = floor(worldLength/y)
 		else
-			AIControl.Grid.Dimensions[1] = x
-			AIControl.Grid.Dimensions[2] = y
+			Dimensions[1] = x
+			Dimensions[2] = y
 		end
-		AIControl.Grid.Dimensions[3] = worldWidth/AIControl.Grid.Dimensions[1]
-		AIControl.Grid.Dimensions[4] = worldLength/AIControl.Grid.Dimensions[2]
-		--print("AIControl Grid Dimensions: "..AIControl.Grid.Dimensions[1].."*"..AIControl.Grid.Dimensions[3].." x "..AIControl.Grid.Dimensions[2].."*"..AIControl.Grid.Dimensions[4])
-		AIControl.Grid.SetupControlPoints(getSpawnableLocations, spawnableLocationEntity)
-		AIControl.Grid.ResetupAIMarkers(nil, SpawnAIMarkers)
-		AIControl.Grid.DataHistory = {}
-		AIControl.Grid.t_DataHistory = {}
-		AIControl.Grid.DataSquads = {}
-		AIControl.Grid.t_DataSquads = {}
-		for i=1,AIControl.Grid.Dimensions[1] do
-			AIControl.Grid.DataHistory[i] = {}
-			AIControl.Grid.t_DataHistory[i] = {}
-			AIControl.Grid.DataSquads[i] = {}
-			AIControl.Grid.t_DataSquads[i] = {}
-			for j=1,AIControl.Grid.Dimensions[2] do
-				AIControl.Grid.DataHistory[i][j] = {0, 0}
-				AIControl.Grid.t_DataHistory[i][j] = {0, 0}
-				AIControl.Grid.DataSquads[i][j] = {{}, {}}
-				AIControl.Grid.t_DataSquads[i][j] = {{}, {}}
+		Dimensions[3] = worldWidth/Dimensions[1]
+		Dimensions[4] = worldLength/Dimensions[2]
+		--print("AIControl Grid Dimensions: "..Dimensions[1].."*"..Dimensions[3].." x "..Dimensions[2].."*"..Dimensions[4])
+		AIControl_Grid.SetupControlPoints(getSpawnableLocations, spawnableLocationEntity)
+		AIControl_Grid.ResetupAIMarkers(nil, SpawnAIMarkers)
+		AIControl_Grid_DataHistory = {}
+		AIControl_Grid_t_DataHistory = {}
+		AIControl_Grid_DataSquads = {}
+		AIControl_Grid_t_DataSquads = {}
+		for i=1,Dimensions[1] do
+			AIControl_Grid_DataHistory[i] = {}
+			AIControl_Grid_t_DataHistory[i] = {}
+			AIControl_Grid_DataSquads[i] = {}
+			AIControl_Grid_t_DataSquads[i] = {}
+			for j=1,Dimensions[2] do
+				AIControl_Grid_DataHistory[i][j] = {0, 0}
+				AIControl_Grid_t_DataHistory[i][j] = {0, 0}
+				AIControl_Grid_DataSquads[i][j] = {{}, {}}
+				AIControl_Grid_t_DataSquads[i][j] = {{}, {}}
 			end
 		end
 	end,
 	SetupControlPoints = function(getSpawnableLocations, spawnableLocationEntity)
-		if getSpawnableLocations == nil then getSpawnableLocations = AIControl.Grid.Settings.GetSpawnableLocations end
-		if spawnableLocationEntity == nil then spawnableLocationEntity = AIControl.Grid.Settings.SpawnableLocationEntity end
+		if getSpawnableLocations == nil then getSpawnableLocations = AIControl_Grid_Settings.GetSpawnableLocations end
+		if spawnableLocationEntity == nil then spawnableLocationEntity = AIControl_Grid_Settings.SpawnableLocationEntity end
 		
 		local wHalfWidth = World_GetWidth()/2
 		local wHalfHeight = World_GetLength()/2
-		local halfWidth = AIControl.Grid.Dimensions[3]/2
-		local halfHeight = AIControl.Grid.Dimensions[4]/2
+		local halfWidth = Dimensions[3]/2
+		local halfHeight = Dimensions[4]/2
 		if getSpawnableLocations then
 			--local tempEntity = Entity_CreateENV(spawnableLocationEntity, World_Pos(0, 0, 0), World_Pos(1, 0, 0))
-			for i=1,AIControl.Grid.Dimensions[1] do
-				AIControl.Grid.ControlPoints[i] = {}
-				AIControl.Grid.DisabledLocations[i] = {}
-				for j=1, AIControl.Grid.Dimensions[2] do
-					AIControl.Grid.ControlPoints[i][j] = World_Pos(i*AIControl.Grid.Dimensions[3]-halfWidth-wHalfWidth, 0, j*AIControl.Grid.Dimensions[3]-halfHeight-wHalfHeight)
-					--World_GetSpawnablePosition(World_Pos(i*AIControl.Grid.Dimensions[3]-halfWidth-wHalfWidth, 0, j*AIControl.Grid.Dimensions[3]-halfHeight-wHalfHeight), tempEntity)
-					AIControl.Grid.DisabledLocations[i][j] = false
-					--Entity_CreateENV(spawnableLocationEntity, AIControl.Grid.ControlPoints[i][j], AIControl.Grid.ControlPoints[i][j]) -- to test placement
+			for i=1,Dimensions[1] do
+				AIControl_Grid.ControlPoints[i] = {}
+				AIControl_Grid.DisabledLocations[i] = {}
+				for j=1,Dimensions[2] do
+					AIControl_Grid.ControlPoints[i][j] = World_Pos(i*Dimensions[3]-halfWidth-wHalfWidth, 0, j*Dimensions[3]-halfHeight-wHalfHeight)
+					--World_GetSpawnablePosition(World_Pos(i*Dimensions[3]-halfWidth-wHalfWidth, 0, j*Dimensions[3]-halfHeight-wHalfHeight), tempEntity)
+					AIControl_Grid.DisabledLocations[i][j] = false
+					--Entity_CreateENV(spawnableLocationEntity, AIControl_Grid.ControlPoints[i][j], AIControl_Grid.ControlPoints[i][j]) -- to test placement
 				end
 			end
 			--Entity_Destroy(tempEntity)
 		else
-			for i=1,AIControl.Grid.Dimensions[1] do
-				AIControl.Grid.ControlPoints[i] = {}
-				AIControl.Grid.ControlPoints[i] = {}
-				for j=1,AIControl.Grid.Dimensions[2] do
-					AIControl.Grid.ControlPoints[i][j] = World_Pos(i*AIControl.Grid.Dimensions[3]-halfWidth-wHalfWidth, 0, j*AIControl.Grid.Dimensions[4]-halfHeight-wHalfHeight)
-					AIControl.Grid.DisabledLocations[i][j] = false
+			for i=1,Dimensions[1] do
+				AIControl_Grid.ControlPoints[i] = {}
+				AIControl_Grid.ControlPoints[i] = {}
+				for j=1,Dimensions[2] do
+					AIControl_Grid.ControlPoints[i][j] = World_Pos(i*Dimensions[3]-halfWidth-wHalfWidth, 0, j*Dimensions[4]-halfHeight-wHalfHeight)
+					AIControl_Grid.DisabledLocations[i][j] = false
 				end
 			end
 		end
 	end,
 	RemoveAIMarkers = function()
-		if AIControl.Grid.AIMarkers then
-			for i=1, AIControl.Grid.AIMarkerCount do
-				Entity_Destroy(AIControl.Grid.AIMarkers[i])
+		if AIControl_Grid.AIMarkers then
+			for i=1,AIControl_Grid.AIMarkerCount do
+				Entity_Destroy(AIControl_Grid.AIMarkers[i])
 			end
-			AIControl.Grid.AIMarkers = {}
+			AIControl_Grid.AIMarkers = {}
 		end
 	end,
 	ResetupAIMarkers = function(marker, spawn)
-		if marker == nil then marker = AIControl.Grid.Settings.AIMarker end
-		if spawn == nil then spawn = AIControl.Grid.Settings.SpawnAIMarkers end
-		AIControl.Grid.RemoveAIMarkers()
-		AIControl.Grid.AIMarkerCount = 0
-		AIControl.Grid.AIMarkers = {}
+		if marker == nil then marker = AIControl_Grid_Settings.AIMarker end
+		if spawn == nil then spawn = AIControl_Grid_Settings.SpawnAIMarkers end
+		AIControl_Grid.RemoveAIMarkers()
+		AIControl_Grid.AIMarkerCount = 0
+		AIControl_Grid.AIMarkers = {}
 		for i=0,World_GetNumEntities()-1 do
 			local e = World_GetEntity(i)
 			local bp = Entity_GetBlueprint(e)
 			if bp == EBP.STRAT_POINT.AI_LOW or bp == EBP.STRAT_POINT.AI_MEDIUM or bp == EBP.STRAT_POINT.AI_HIGH then
-				AIControl.Grid.AIMarkerCount = AIControl.Grid.AIMarkerCount + 1
-				AIControl.Grid.AIMarkers[AIControl.Grid.AIMarkerCount] = e
+				AIControl_Grid.AIMarkerCount = AIControl_Grid.AIMarkerCount + 1
+				AIControl_Grid.AIMarkers[AIControl_Grid.AIMarkerCount] = e
 			end
 		end
-		if spawn == 2 or (spawn == 1 and AIControl.Grid.AIMarkerCount < 5) then
+		if spawn == 2 or (spawn == 1 and AIControl_Grid.AIMarkerCount < 5) then
 			local skipped = 0
-			for i=1,AIControl.Grid.Dimensions[1] do
-				for j=1,AIControl.Grid.Dimensions[2] do
-					if skipped >= AIControl.Grid.Settings.AIMarkers_SkipGrids then
+			for i=1,Dimensions[1] do
+				for j=1,Dimensions[2] do
+					if skipped >= AIControl_Grid_Settings.AIMarkers_SkipGrids then
 						skipped = 0
-						AIControl.Grid.AIMarkerCount = AIControl.Grid.AIMarkerCount + 1
-						AIControl.Grid.AIMarkers[AIControl.Grid.AIMarkerCount] = Entity_CreateENV(marker, AIControl.Grid.ControlPoints[i][j], AIControl.Grid.ControlPoints[i][j])
+						AIControl_Grid.AIMarkerCount = AIControl_Grid.AIMarkerCount + 1
+						AIControl_Grid.AIMarkers[AIControl_Grid.AIMarkerCount] = Entity_CreateENV(marker, AIControl_Grid.ControlPoints[i][j], AIControl_Grid.ControlPoints[i][j])
 					else
 						skipped = skipped + 1
 					end
@@ -181,87 +210,87 @@ AIControl.Grid = {
 		end
 	end,
 	ReduceMarkerCount = function()
-		if AIControl.Grid.Settings.ReduceMarkerCount then
-			print("reducing marker count")
-			local wantedCount = AIControl.Grid.Settings.ReduceMarkerCount/math.max(1, AIControl.PlayerCount)*math.min(AIControl.PlayerCount, math.max(1, World_GetPlayerCount()-AIControl.PlayerCount))
-			print(" - initial count: "..AIControl.Grid.AIMarkerCount)
-			print(" - wanted count: "..wantedCount)
-			while AIControl.Grid.AIMarkerCount > wantedCount do
-				local remIndex = World_GetRand(1, AIControl.Grid.AIMarkerCount)
-				Entity_Destroy(AIControl.Grid.AIMarkers[remIndex])
-				for i=remIndex,AIControl.Grid.AIMarkerCount do
-					AIControl.Grid.AIMarkers[i] = AIControl.Grid.AIMarkers[i+1]
+		if AIControl_Grid_Settings.ReduceMarkerCount then
+			--print("reducing marker count")
+			local wantedCount = AIControl_Grid_Settings.ReduceMarkerCount/max(1, AIControl_PlayerCount)*min(AIControl_PlayerCount, max(1, World_GetPlayerCount()-AIControl_PlayerCount))
+			--print(" - initial count: "..AIControl_Grid.AIMarkerCount)
+			--print(" - wanted count: "..wantedCount)
+			while AIControl_Grid.AIMarkerCount > wantedCount do
+				local remIndex = World_GetRand(1, AIControl_Grid.AIMarkerCount)
+				Entity_Destroy(AIControl_Grid.AIMarkers[remIndex])
+				for i=remIndex,AIControl_Grid.AIMarkerCount do
+					AIControl_Grid.AIMarkers[i] = AIControl_Grid.AIMarkers[i+1]
 				end
-				AIControl.Grid.AIMarkerCount = AIControl.Grid.AIMarkerCount - 1
+				AIControl_Grid.AIMarkerCount = AIControl_Grid.AIMarkerCount - 1
 			end
-			print(" - result count: "..AIControl.Grid.AIMarkerCount)
+			--print(" - result count: "..AIControl_Grid.AIMarkerCount)
 		end
 	end,
 	ResetData = function(resetReal)
 		if resetReal == nil then resetReal = false end
-		for i=1,AIControl.Grid.Dimensions[1] do
-			AIControl.Grid.t_Data[i] = {}
-			AIControl.Grid.t_ArmorData[i] = {}
-			AIControl.Grid.t_DataCounts[i] = {}
-			AIControl.Grid.t_DataSquads[i] = {}
-			AIControl.Grid.t_AveragePosData[i] = {}
+		for i=1,Dimensions[1] do
+			AIControl_Grid_t_Data[i] = {}
+			AIControl_Grid_t_ArmorData[i] = {}
+			AIControl_Grid_t_DataCounts[i] = {}
+			AIControl_Grid_t_DataSquads[i] = {}
+			AIControl_Grid_t_AveragePosData[i] = {}
 			
-			AIControl.Grid.DataClump[i] = {}
-			AIControl.Grid.DataClumpFOW[i] = {}
+			AIControl_Grid_DataClump[i] = {}
+			AIControl_Grid_DataClumpFOW[i] = {}
 			
-			for j=1,AIControl.Grid.Dimensions[2] do
-				AIControl.Grid.t_Data[i][j] = {0, 0}
-				AIControl.Grid.t_ArmorData[i][j] = {0, 0}
-				AIControl.Grid.t_DataCounts[i][j] = {0, 0}
-				AIControl.Grid.t_DataSquads[i][j] = {{}, {}}
-				AIControl.Grid.t_AveragePosData[i][j] = {AIControl.Grid.ControlPoints[i][j], AIControl.Grid.ControlPoints[i][j]}
+			for j=1,Dimensions[2] do
+				AIControl_Grid_t_Data[i][j] = {0, 0}
+				AIControl_Grid_t_ArmorData[i][j] = {0, 0}
+				AIControl_Grid_t_DataCounts[i][j] = {0, 0}
+				AIControl_Grid_t_DataSquads[i][j] = {{}, {}}
+				AIControl_Grid_t_AveragePosData[i][j] = {AIControl_Grid.ControlPoints[i][j], AIControl_Grid.ControlPoints[i][j]}
 				
-				AIControl.Grid.DataClump[i][j] = {0, 0}
-				AIControl.Grid.DataClumpFOW[i][j] = {0, 0}
+				AIControl_Grid_DataClump[i][j] = {0, 0}
+				AIControl_Grid_DataClumpFOW[i][j] = {0, 0}
 			end
 		end
 		if resetReal then
-			for i=1,AIControl.Grid.Dimensions[1] do
-				AIControl.Grid.Data[i] = {}
-				AIControl.Grid.ArmorData[i] = {}
-				AIControl.Grid.DataCounts[i] = {}
-				AIControl.Grid.DataSquads[i] = {}
-				AIControl.Grid.AveragePosData[i] = {}
-				for j=1,AIControl.Grid.Dimensions[2] do
-					AIControl.Grid.Data[i][j] = {0, 0}
-					AIControl.Grid.ArmorData[i][j] = {0, 0}
-					AIControl.Grid.DataCounts[i][j] = {0, 0}
-					AIControl.Grid.DataSquads[i][j] = {{}, {}}
-					AIControl.Grid.AveragePosData[i][j] = {AIControl.Grid.ControlPoints[i][j], AIControl.Grid.ControlPoints[i][j]}
+			for i=1,Dimensions[1] do
+				AIControl_Grid_Data[i] = {}
+				AIControl_Grid_ArmorData[i] = {}
+				AIControl_Grid_DataCounts[i] = {}
+				AIControl_Grid_DataSquads[i] = {}
+				AIControl_Grid_AveragePosData[i] = {}
+				for j=1,Dimensions[2] do
+					AIControl_Grid_Data[i][j] = {0, 0}
+					AIControl_Grid_ArmorData[i][j] = {0, 0}
+					AIControl_Grid_DataCounts[i][j] = {0, 0}
+					AIControl_Grid_DataSquads[i][j] = {{}, {}}
+					AIControl_Grid_AveragePosData[i][j] = {AIControl_Grid.ControlPoints[i][j], AIControl_Grid.ControlPoints[i][j]}
 				end
 			end
 		end
 	end,
 	
 	GetXY = function(pos)
-		local x = math.floor((pos.x+World_GetWidth()/2)/AIControl.Grid.Dimensions[3])+1
-		local y = math.floor((pos.z+World_GetLength()/2)/AIControl.Grid.Dimensions[4])+1
+		local x = floor((pos.x+World_GetWidth()/2)/Dimensions[3])+1
+		local y = floor((pos.z+World_GetLength()/2)/Dimensions[4])+1
 		if x < 1 then
 			x = 1
-		elseif x > AIControl.Grid.Dimensions[1] then
-			x = AIControl.Grid.Dimensions[1]
+		elseif x > Dimensions[1] then
+			x = Dimensions[1]
 		end
 		if y < 1 then
 			y = 1
-		elseif y > AIControl.Grid.Dimensions[2] then
-			y = AIControl.Grid.Dimensions[2]
+		elseif y > Dimensions[2] then
+			y = Dimensions[2]
 		end
 		return x, y
 	end,
 	UpdateAIPlayers = function() -- returns squad counts
-		AIControl.PlayerCount = 0
-		AIControl.Players = {}
+		AIControl_PlayerCount = 0
+		AIControl_Players = {}
 		local squadCounts = {0, 0}
 		for i=1,World_GetPlayerCount() do
 			local player = World_GetPlayerAt(i)
 			if not Player_IsHuman(player) then
-				AIControl.PlayerCount = AIControl.PlayerCount + 1
-				AIControl.Players[AIControl.PlayerCount] = i
+				AIControl_PlayerCount = AIControl_PlayerCount + 1
+				AIControl_Players[AIControl_PlayerCount] = i
 			end
 			local team = Player_GetTeam(player)+1
 			if team == 1 or team == 2 then
@@ -273,29 +302,29 @@ AIControl.Grid = {
 	Update = function()
 		if g_AIControl_Pause then return end
 		
-		local squadCounts = AIControl.Grid.UpdateAIPlayers()
-		if not AIControl.Grid.Settings.SplitUpdates or AIControl.Grid.SplitUpdateStep == 0 then
+		local squadCounts = AIControl_Grid.UpdateAIPlayers()
+		if not AIControl_Grid_Settings.SplitUpdates or AIControl_Grid.SplitUpdateStep == 0 then
 			--dr_clear('aicontrol_maincontrol')
 			--dr_clear("aicontrol_grid")
-			AIControl.Grid.ResetData(false)
-			for i=1,AIControl.Grid.Dimensions[1] do
-				for j=1,AIControl.Grid.Dimensions[2] do
-					AIControl.Grid.AveragePosData[i][j] = {World_Pos(0, 0, 0), World_Pos(0, 0, 0)}
+			AIControl_Grid.ResetData(false)
+			for i=1,Dimensions[1] do
+				for j=1,Dimensions[2] do
+					AIControl_Grid_AveragePosData[i][j] = {World_Pos(0, 0, 0), World_Pos(0, 0, 0)}
 					for team=1,2 do
 						if squadCounts[team] > 0 then
-							AIControl.Grid.DataHistory[i][j][team] = math.max(0,
-								AIControl.Grid.DataHistory[i][j][team]
-								- math.max(0, AIControl.Grid.Settings.HistoryDecrementPerTick)
-								- (math.max(1, AIControl.Grid.DataHistory[i][j][team]/20)^2)/math.max(1, squadCounts[team])
+							AIControl_Grid_DataHistory[i][j][team] = max(0,
+								AIControl_Grid_DataHistory[i][j][team]
+								- max(0, AIControl_Grid_Settings.HistoryDecrementPerTick)
+								- (max(1, AIControl_Grid_DataHistory[i][j][team]/20)^2)/max(1, squadCounts[team])
 								)
-							AIControl.Grid.t_DataHistory[i][j][team] = AIControl.Grid.DataHistory[i][j][team]
+							AIControl_Grid_t_DataHistory[i][j][team] = AIControl_Grid_DataHistory[i][j][team]
 						end
 					end
 				end
 			end
 			
-			if AIControl.Grid.SplitUpdateStep == 0 then
-				AIControl.Grid.SplitUpdateSquads = {}
+			if AIControl_Grid.SplitUpdateStep == 0 then
+				AIControl_Grid.SplitUpdateSquads = {}
 				
 				local allSquads = {}
 				local sqCount = 0
@@ -311,16 +340,16 @@ AIControl.Grid = {
 					end
 				end
 				
-				AIControl.Grid.SplitUpdateCount = math.max(1, math.ceil(sqCount / AIControl.Grid.Settings.SplitUpdateIncreasePerSquadCount))
+				AIControl_Grid.SplitUpdateCount = max(1, ceil(sqCount / AIControl_Grid_Settings.SplitUpdateIncreasePerSquadCount))
 				
-				local sqPerStep = AIControl.Grid.Settings.SplitUpdateIncreasePerSquadCount
-				for i=1,AIControl.Grid.SplitUpdateCount do
-					AIControl.Grid.SplitUpdateSquads[i] = SGroup_CreateIfNotFound("sg_aicontrol_splitupdatesquads_"..i)
-					SGroup_Clear(AIControl.Grid.SplitUpdateSquads[i])
-					if sqCount >= AIControl.Grid.SplitUpdateCount or i <= sqCount then
-						for j=(i-1)*sqPerStep+1,math.min(sqCount, i*sqPerStep) do
+				local sqPerStep = AIControl_Grid_Settings.SplitUpdateIncreasePerSquadCount
+				for i=1,AIControl_Grid.SplitUpdateCount do
+					AIControl_Grid.SplitUpdateSquads[i] = SGroup_CreateIfNotFound("sg_aicontrol_splitupdatesquads_"..i)
+					SGroup_Clear(AIControl_Grid.SplitUpdateSquads[i])
+					if sqCount >= AIControl_Grid.SplitUpdateCount or i <= sqCount then
+						for j=(i-1)*sqPerStep+1,min(sqCount, i*sqPerStep) do
 							if allSquads[j] then
-								SGroup_Add(AIControl.Grid.SplitUpdateSquads[i], allSquads[j])
+								SGroup_Add(AIControl_Grid.SplitUpdateSquads[i], allSquads[j])
 							end
 						end
 					end
@@ -329,11 +358,11 @@ AIControl.Grid = {
 		end
 		
 		local squads
-		if AIControl.Grid.Settings.SplitUpdates then
-			AIControl.Grid.SplitUpdateStep = AIControl.Grid.SplitUpdateStep + 1
-			squads = AIControl.Grid.SplitUpdateSquads[AIControl.Grid.SplitUpdateStep]
-			if AIControl.Grid.SplitUpdateStep >= AIControl.Grid.SplitUpdateCount then
-				AIControl.Grid.SplitUpdateStep = 0
+		if AIControl_Grid_Settings.SplitUpdates then
+			AIControl_Grid.SplitUpdateStep = AIControl_Grid.SplitUpdateStep + 1
+			squads = AIControl_Grid.SplitUpdateSquads[AIControl_Grid.SplitUpdateStep]
+			if AIControl_Grid.SplitUpdateStep >= AIControl_Grid.SplitUpdateCount then
+				AIControl_Grid.SplitUpdateStep = 0
 			end
 		else
 			squads = SGroup_CreateIfNotFound("sg_temp_aicontrol_squads")
@@ -361,7 +390,7 @@ AIControl.Grid = {
 				enemyTeam = 1
 			end
 			local position = Squad_GetPosition(s)
-			local x,y = AIControl.Grid.GetXY(position)
+			local x,y = AIControl_Grid.GetXY(position)
 			
 			local retreated = false
 			if not Player_IsHuman(player) then
@@ -392,7 +421,7 @@ AIControl.Grid = {
 							SGroup_Add(retreatSG, s)
 							if Squad_IsInHoldEntity(s) then -- eject squads in entity hold
 								local holdEntity = Squad_GetHoldEntity(s)
-								SGroup_Eject(retreatSG, AIControl.MainControl.HQPositions[AIControl.Players[i]])
+								SGroup_Eject(retreatSG, AIControl.MainControl.HQPositions[AIControl_Players[i]])
 								Cmd_Retreat(retreatSG, nil, nil, true) -- queued retreat
 							elseif Squad_IsInHoldSquad(s) then -- eject squads in s hold
 								local holdSquad = Squad_GetHoldSquad(s)
@@ -429,7 +458,7 @@ AIControl.Grid = {
 				end
 			end
 			
-			if not AIControl.Grid.Settings.ExcludedUnits[bpID] then
+			if not AIControl_Grid_Settings.ExcludedUnits[bpID] then
 				local squadWeight = 1
 				local squadHealthMax = Squad_GetHealthMax(s)
 				local squadHealth = Squad_GetHealth(s)
@@ -452,36 +481,36 @@ AIControl.Grid = {
 					squadWeight = squadWeight / 4
 				end
 				
-				AIControl.Grid.t_Data[x][y][team] = AIControl.Grid.t_Data[x][y][team] + squadWeight
-				AIControl.Grid.t_DataCounts[x][y][team] = AIControl.Grid.t_DataCounts[x][y][team] + 1
-				AIControl.Grid.t_ArmorData[x][y][team] = AIControl.Grid.t_ArmorData[x][y][team] + armorValue
-				AIControl.Grid.t_DataHistory[x][y][team] = AIControl.Grid.t_DataHistory[x][y][team] + squadWeight/math.max(squadCounts[team])*AIControl.Grid.Settings.HistoryGrowthModifier
-				AIControl.Grid.t_DataSquads[x][y][team][table.getn(AIControl.Grid.t_DataSquads[x][y][team])+1] = s
+				AIControl_Grid_t_Data[x][y][team] = AIControl_Grid_t_Data[x][y][team] + squadWeight
+				AIControl_Grid_t_DataCounts[x][y][team] = AIControl_Grid_t_DataCounts[x][y][team] + 1
+				AIControl_Grid_t_ArmorData[x][y][team] = AIControl_Grid_t_ArmorData[x][y][team] + armorValue
+				AIControl_Grid_t_DataHistory[x][y][team] = AIControl_Grid_t_DataHistory[x][y][team] + squadWeight/max(squadCounts[team])*AIControl_Grid_Settings.HistoryGrowthModifier
+				AIControl_Grid_t_DataSquads[x][y][team][table.getn(AIControl_Grid_t_DataSquads[x][y][team])+1] = s
 				
-				AIControl.Grid.t_AveragePosData[x][y][team].x = AIControl.Grid.t_AveragePosData[x][y][team].x+position.x
-				AIControl.Grid.t_AveragePosData[x][y][team].y = AIControl.Grid.t_AveragePosData[x][y][team].y+position.y
-				AIControl.Grid.t_AveragePosData[x][y][team].z = AIControl.Grid.t_AveragePosData[x][y][team].z+position.z
+				AIControl_Grid_t_AveragePosData[x][y][team].x = AIControl_Grid_t_AveragePosData[x][y][team].x+position.x
+				AIControl_Grid_t_AveragePosData[x][y][team].y = AIControl_Grid_t_AveragePosData[x][y][team].y+position.y
+				AIControl_Grid_t_AveragePosData[x][y][team].z = AIControl_Grid_t_AveragePosData[x][y][team].z+position.z
 			end
 		end
 		SGroup_Destroy(squads)
 		
-		if not AIControl.Grid.Settings.SplitUpdates or AIControl.Grid.SplitUpdateStep == 0 then
+		if not AIControl_Grid_Settings.SplitUpdates or AIControl_Grid.SplitUpdateStep == 0 then
 			local wHalfWidth = World_GetWidth()/2
 			local wHalfHeight = World_GetLength()/2
-			for i=1,AIControl.Grid.Dimensions[1] do
-				for j=1,AIControl.Grid.Dimensions[2] do
+			for i=1,Dimensions[1] do
+				for j=1,Dimensions[2] do
 					for team=1,2 do
-						AIControl.Grid.DataCounts[i][j][team] = AIControl.Grid.t_DataCounts[i][j][team]
-						AIControl.Grid.DataSquads[i][j][team] = AIControl.Grid.t_DataSquads[i][j][team]
-						AIControl.Grid.Data[i][j][team] = AIControl.Grid.t_Data[i][j][team]
-						AIControl.Grid.ArmorData[i][j][team] = AIControl.Grid.t_ArmorData[i][j][team]
-						AIControl.Grid.DataHistory[i][j][team] = AIControl.Grid.t_DataHistory[i][j][team]
-						if AIControl.Grid.DataCounts[i][j][team] > 0 then
-							AIControl.Grid.AveragePosData[i][j][team].x = AIControl.Grid.t_AveragePosData[i][j][team].x/AIControl.Grid.DataCounts[i][j][team]
-							AIControl.Grid.AveragePosData[i][j][team].y = AIControl.Grid.t_AveragePosData[i][j][team].y/AIControl.Grid.DataCounts[i][j][team]
-							AIControl.Grid.AveragePosData[i][j][team].z = AIControl.Grid.t_AveragePosData[i][j][team].z/AIControl.Grid.DataCounts[i][j][team]
+						AIControl_Grid_DataCounts[i][j][team] = AIControl_Grid_t_DataCounts[i][j][team]
+						AIControl_Grid_DataSquads[i][j][team] = AIControl_Grid_t_DataSquads[i][j][team]
+						AIControl_Grid_Data[i][j][team] = AIControl_Grid_t_Data[i][j][team]
+						AIControl_Grid_ArmorData[i][j][team] = AIControl_Grid_t_ArmorData[i][j][team]
+						AIControl_Grid_DataHistory[i][j][team] = AIControl_Grid_t_DataHistory[i][j][team]
+						if AIControl_Grid_DataCounts[i][j][team] > 0 then
+							AIControl_Grid_AveragePosData[i][j][team].x = AIControl_Grid_t_AveragePosData[i][j][team].x/AIControl_Grid_DataCounts[i][j][team]
+							AIControl_Grid_AveragePosData[i][j][team].y = AIControl_Grid_t_AveragePosData[i][j][team].y/AIControl_Grid_DataCounts[i][j][team]
+							AIControl_Grid_AveragePosData[i][j][team].z = AIControl_Grid_t_AveragePosData[i][j][team].z/AIControl_Grid_DataCounts[i][j][team]
 						else
-							AIControl.Grid.AveragePosData[i][j][team] = {AIControl.Grid.ControlPoints[i][j], AIControl.Grid.ControlPoints[i][j]}
+							AIControl_Grid_AveragePosData[i][j][team] = {AIControl_Grid.ControlPoints[i][j], AIControl_Grid.ControlPoints[i][j]}
 						end
 					end
 				end
@@ -502,14 +531,15 @@ AIControl.Grid = {
 						break
 					end
 				end
-				for i=1,AIControl.Grid.Dimensions[1] do
-					for j=1,AIControl.Grid.Dimensions[2] do
-						if AIControl.Grid.Data[i][j][enemyTeam] > 0 then
-							local canSee = Player_CanSeePosition(player, AIControl.Grid.AveragePosData[i][j][enemyTeam])
+				for i=1,Dimensions[1] do
+					for j=1,Dimensions[2] do
+						if AIControl_Grid_Data[i][j][enemyTeam] > 0 then
+							local canSee = Player_CanSeePosition(player, AIControl_Grid_AveragePosData[i][j][enemyTeam])
 							local surroundingSafety = AIControl.MainControl.GetSurroundingSafety({i, j}, 0, 1, team)
 							local danger = 0
 							local dangerFOW = 0
-							for i,v in pairs(surroundingSafety) do
+							for k=1,#surroundingSafety do
+								local v = surroundingSafety[k]
 								danger = danger + v[3] + v[4]*0.015 - v[5]*0.35
 								dangerFOW = dangerFOW - v[5]*0.35
 								if canSee then
@@ -518,29 +548,29 @@ AIControl.Grid = {
 									dangerFOW = dangerFOW + v[3]*0.275 + v[4]*0.125
 								end
 							end
-							AIControl.Grid.DataClumpFOW[i][j][enemyTeam] = dangerFOW
+							AIControl_Grid_DataClumpFOW[i][j][enemyTeam] = dangerFOW
 							if dangerFOW > highestDangerFOW[team] then
 								highestDangerFOW[team] = dangerFOW
 								highestPosFOW[team] = {i, j}
 							end
 							if canSee then
-								AIControl.Grid.DataClump[i][j][enemyTeam] = danger
+								AIControl_Grid_DataClump[i][j][enemyTeam] = danger
 								if danger > highestDanger[team] then
 									highestDanger[team] = danger
 									highestPos[team] = {i, j}
 								end
 							else
-								AIControl.Grid.DataClump[i][j][enemyTeam] = 0
+								AIControl_Grid_DataClump[i][j][enemyTeam] = 0
 							end
 						else
-							AIControl.Grid.DataClump[i][j][enemyTeam] = 0
-							AIControl.Grid.DataClumpFOW[i][j][enemyTeam] = 0
+							AIControl_Grid_DataClump[i][j][enemyTeam] = 0
+							AIControl_Grid_DataClumpFOW[i][j][enemyTeam] = 0
 						end
 					end
 				end
 			end
-			for p=1,AIControl.PlayerCount do
-				local player = World_GetPlayerAt(AIControl.Players[p])
+			for p=1,AIControl_PlayerCount do
+				local player = World_GetPlayerAt(AIControl_Players[p])
 				if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
 					local team = Player_GetTeam(player)+1
 					local enemyTeam
@@ -550,19 +580,19 @@ AIControl.Grid = {
 					if highestDangerFOW[team] < 2 then
 						AI_DoString(player, "AIControlArtyPosFOW=nil")
 					else
-						pos = AIControl.Grid.AveragePosData[ highestPosFOW[team][1] ][ highestPosFOW[team][2] ][enemyTeam]
+						pos = AIControl_Grid_AveragePosData[ highestPosFOW[team][1] ][ highestPosFOW[team][2] ][enemyTeam]
 						AI_DoString(player, string.format("AIControlArtyPosFOW=World_Pos(%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z))
 					end
 					if highestDanger[team] < 2 then
 						AI_DoString(player, "AIControlArtyPos=nil")
 					else
-						pos = AIControl.Grid.AveragePosData[ highestPos[team][1] ][ highestPos[team][2] ][enemyTeam]
+						pos = AIControl_Grid_AveragePosData[ highestPos[team][1] ][ highestPos[team][2] ][enemyTeam]
 						AI_DoString(player, string.format("AIControlArtyPos=World_Pos(%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z))
 					end
 				end
 			end
 			
-			--AIControl.Grid.DebugOutput()
+			--AIControl_Grid.DebugOutput()
 			
 			AIControl.MainControl.Update()
 		end
@@ -571,13 +601,13 @@ AIControl.Grid = {
 		local wHalfWidth = World_GetWidth()/2
 		local wHalfHeight = World_GetLength()/2
 		local function pr(i, j, val1, val2)
-			local x = i*AIControl.Grid.Dimensions[3]-wHalfWidth-AIControl.Grid.Dimensions[3]/2
-			local y = j*AIControl.Grid.Dimensions[4]-wHalfHeight-AIControl.Grid.Dimensions[4]/2
+			local x = i*Dimensions[3]-wHalfWidth-Dimensions[3]/2
+			local y = j*Dimensions[4]-wHalfHeight-Dimensions[4]/2
 			--dr_text3d('aicontrol_grid', x, World_GetHeightAt(x, y)+0.35, y, string.format('%.1f / %.1f', val1, val2), 0, 255, 0)
 		end
-		for i=1,AIControl.Grid.Dimensions[1] do
-			for j=1,AIControl.Grid.Dimensions[2] do
-				pr(i, j, AIControl.Grid.DataClumpFOW[i][j][1], AIControl.Grid.DataClumpFOW[i][j][2])
+		for i=1,Dimensions[1] do
+			for j=1,Dimensions[2] do
+				pr(i, j, AIControl_Grid_DataClumpFOW[i][j][1], AIControl_Grid_DataClumpFOW[i][j][2])
 			end
 		end
 	end
@@ -1036,8 +1066,8 @@ AIControl.Pathfinding = { -- currently unused
 			directionMultiplier = 0
 		end
 		local direction = {math.cos(angle), math.sin(angle)}
-		local startx = math.max(2, math.min(AIControl.Pathfinding.StepsTotal[1]-1, startx))
-		local starty = math.max(2, math.min(AIControl.Pathfinding.StepsTotal[2]-1, starty))
+		local startx = max(2, min(AIControl.Pathfinding.StepsTotal[1]-1, startx))
+		local starty = max(2, min(AIControl.Pathfinding.StepsTotal[2]-1, starty))
 		local curx = startx
 		local cury = starty
 		local radius = 2
@@ -1047,8 +1077,8 @@ AIControl.Pathfinding = { -- currently unused
 		while radius < 4 do
 			curx = curx + direction[1]*directionMultiplier
 			cury = cury + direction[2]*directionMultiplier
-			local curxv = math.floor(curx+0.5)
-			local curyv = math.floor(cury+0.5)
+			local curxv = floor(curx+0.5)
+			local curyv = floor(cury+0.5)
 			if not (curxv >= 1 and curxv <= AIControl.Pathfinding.StepsTotal[1] and curyv >= 1 and curyv <= AIControl.Pathfinding.StepsTotal[2]) then
 				break
 			end
@@ -1072,8 +1102,8 @@ AIControl.Pathfinding = { -- currently unused
 	end,
 	
 	Reset = function()
-		AIControl.Pathfinding.StepsTotal[1] = math.floor(World_GetWidth()/AIControl.Pathfinding.Settings.Precision)+1
-		AIControl.Pathfinding.StepsTotal[2] = math.floor(World_GetLength()/AIControl.Pathfinding.Settings.Precision)+1
+		AIControl.Pathfinding.StepsTotal[1] = floor(World_GetWidth()/AIControl.Pathfinding.Settings.Precision)+1
+		AIControl.Pathfinding.StepsTotal[2] = floor(World_GetLength()/AIControl.Pathfinding.Settings.Precision)+1
 		AIControl.Pathfinding.Data = {}
 		for x=1,AIControl.Pathfinding.StepsTotal[1] do
 			AIControl.Pathfinding.Data[x] = {}
@@ -1098,8 +1128,8 @@ AIControl.Pathfinding = { -- currently unused
 						0,
 						AIControl.Pathfinding.CurrentYStep*AIControl.Pathfinding.Settings.Precision-halfWidth-wHalfHeight
 					), AIControl.Pathfinding.Entity)
-					local posx = math.floor((pos.x + wHalfWidth) / AIControl.Pathfinding.Settings.Precision)+1
-					local posy = math.floor((pos.z + wHalfHeight) / AIControl.Pathfinding.Settings.Precision)+1
+					local posx = floor((pos.x + wHalfWidth) / AIControl.Pathfinding.Settings.Precision)+1
+					local posy = floor((pos.z + wHalfHeight) / AIControl.Pathfinding.Settings.Precision)+1
 					AIControl.Pathfinding.Data[posx][posy] = true
 				end
 			end
@@ -1123,8 +1153,8 @@ AIControl.Pathfinding = { -- currently unused
 					0,
 					y*AIControl.Pathfinding.Settings.Precision-halfWidth-wHalfHeight
 				), AIControl.Pathfinding.Entity)
-				local posx = math.floor((pos.x + wHalfWidth) / AIControl.Pathfinding.Settings.Precision)+1
-				local posy = math.floor((pos.z + wHalfHeight) / AIControl.Pathfinding.Settings.Precision)+1
+				local posx = floor((pos.x + wHalfWidth) / AIControl.Pathfinding.Settings.Precision)+1
+				local posy = floor((pos.z + wHalfHeight) / AIControl.Pathfinding.Settings.Precision)+1
 				AIControl.Pathfinding.Data[posx][posy] = true
 			end
 		end
@@ -1569,7 +1599,7 @@ AIControl.MainControl = {
 		else
 			enemyTeam = 1
 		end
-		local x,y = AIControl.Grid.GetXY(pos)
+		local x,y = AIControl_Grid.GetXY(pos)
 		local retreatDirection = Util_ScarPos(
 			directionToHq.x*hqMultiplier,
 			directionToHq.z*hqMultiplier
@@ -1578,58 +1608,60 @@ AIControl.MainControl = {
 		local highestSafety = 15
 		local highestArmorDanger = 15
 		local highestArmorSafety = 15
-		for i=1,table.getn(surroundingSafety) do
-			if surroundingSafety[i][3] > highestDanger then
-				highestDanger = surroundingSafety[i][3]
+		for i=1,#surroundingSafety do
+			local safety = surroundingSafety[i]
+			if safety[3] > highestDanger then
+				highestDanger = safety[3]
 			end
-			if surroundingSafety[i][5] > highestSafety then
-				highestSafety = surroundingSafety[i][5]
+			if safety[5] > highestSafety then
+				highestSafety = safety[5]
 			end
-			if surroundingSafety[i][7] > highestArmorDanger then
-				highestArmorDanger = surroundingSafety[i][7]
+			if safety[7] > highestArmorDanger then
+				highestArmorDanger = safety[7]
 			end
-			if surroundingSafety[i][8] > highestArmorSafety then
-				highestArmorSafety = surroundingSafety[i][8]
+			if safety[8] > highestArmorSafety then
+				highestArmorSafety = safety[8]
 			end
 		end
-		for i=1,table.getn(surroundingSafety) do
-			local dangerPos = AIControl.Grid.AveragePosData[ surroundingSafety[i][1] ][ surroundingSafety[i][2] ][enemyTeam]
+		for i=1,#surroundingSafety do
+			local safety = surroundingSafety[i]
+			local dangerPos = AIControl_Grid_AveragePosData[ safety[1] ][ safety[2] ][enemyTeam]
 			if dangerPos.x ~= pos.x or dangerPos.z ~= pos.z then
 				local dangerDir = normalizeVector(Util_ScarPos(
 					dangerPos.x - pos.x,
 					dangerPos.z - pos.z
 				))
 				retreatDirection.x = retreatDirection.x - (
-						dangerDir.x * surroundingSafety[i][3] +
-						dangerDir.x * surroundingSafety[i][4] * historyMultiplier
+						dangerDir.x * safety[3] +
+						dangerDir.x * safety[4] * historyMultiplier
 					) * dangerMultiplier / highestDanger - (
-						dangerDir.x * surroundingSafety[i][7]
+						dangerDir.x * safety[7]
 					) * armorDangerMultiplier / highestArmorDanger
 				retreatDirection.z = retreatDirection.z - (
-						dangerDir.z * surroundingSafety[i][3] +
-						dangerDir.z * surroundingSafety[i][4] * historyMultiplier
+						dangerDir.z * safety[3] +
+						dangerDir.z * safety[4] * historyMultiplier
 					) * dangerMultiplier / highestDanger - (
-						dangerDir.z * surroundingSafety[i][7]
+						dangerDir.z * safety[7]
 					) * armorDangerMultiplier / highestArmorDanger
 			end
-			if surroundingSafety[i][1] ~= x or surroundingSafety[i][2] ~= y then
-				local safetyPos = AIControl.Grid.AveragePosData[ surroundingSafety[i][1] ][ surroundingSafety[i][2] ][team]
+			if safety[1] ~= x or safety[2] ~= y then
+				local safetyPos = AIControl_Grid_AveragePosData[ safety[1] ][ safety[2] ][team]
 				if safetyPos.x ~= pos.x or safetyPos.z ~= pos.z then
 					local safetyDir = normalizeVector(Util_ScarPos(
 						safetyPos.x - pos.x,
 						safetyPos.z - pos.z
 					))
 					retreatDirection.x = retreatDirection.x + (
-							safetyDir.x * surroundingSafety[i][5] +
-							safetyDir.x * surroundingSafety[i][6] * historyMultiplier
+							safetyDir.x * safety[5] +
+							safetyDir.x * safety[6] * historyMultiplier
 						) * safetyMultiplier / highestSafety - (
-							safetyDir.x * surroundingSafety[i][8]
+							safetyDir.x * safety[8]
 						) * armorSafetyMultiplier / highestArmorSafety
 					retreatDirection.z = retreatDirection.z + (
-							safetyDir.z * surroundingSafety[i][5] +
-							safetyDir.z * surroundingSafety[i][6] * historyMultiplier
+							safetyDir.z * safety[5] +
+							safetyDir.z * safety[6] * historyMultiplier
 						) * safetyMultiplier / highestSafety - (
-							safetyDir.z * surroundingSafety[i][8]
+							safetyDir.z * safety[8]
 						) * armorSafetyMultiplier / highestArmorSafety
 				end
 			end
@@ -1666,22 +1698,22 @@ AIControl.MainControl = {
 		local maxDanger = 0
 		local maxDangerPos = nil
 		local radiusSquared = radius^2
-		for i = math.max(1, math.floor(x-radius)),math.min(AIControl.Grid.Dimensions[1], math.ceil(x+radius)) do
+		for i = max(1, floor(x-radius)),min(Dimensions[1], ceil(x+radius)) do
 			local aSquared = (i-x)^2
-			for j = math.max(1, math.floor(y-radius)),math.min(AIControl.Grid.Dimensions[2], math.ceil(y+radius)) do
+			for j = max(1, floor(y-radius)),min(Dimensions[2], ceil(y+radius)) do
 				local bSquared = (j-y)^2
 				if aSquared + bSquared <= radiusSquared then
 					if noFOW then
-						if AIControl.Grid.DataClump[i][j][team] then
-							if AIControl.Grid.DataClump[i][j][team] > maxDanger then
-								maxDanger = AIControl.Grid.DataClump[i][j][team]
+						if AIControl_Grid_DataClump[i][j][team] then
+							if AIControl_Grid_DataClump[i][j][team] > maxDanger then
+								maxDanger = AIControl_Grid_DataClump[i][j][team]
 								maxDangerPos = {i,j}
 							end
 						end
 					else
-						if AIControl.Grid.DataClumpFOW[i][j][team] then
-							if AIControl.Grid.DataClumpFOW[i][j][team] > maxDanger then
-								maxDanger = AIControl.Grid.DataClumpFOW[i][j][team]
+						if AIControl_Grid_DataClumpFOW[i][j][team] then
+							if AIControl_Grid_DataClumpFOW[i][j][team] > maxDanger then
+								maxDanger = AIControl_Grid_DataClumpFOW[i][j][team]
 								maxDangerPos = {i,j}
 							end
 						end
@@ -1700,14 +1732,14 @@ AIControl.MainControl = {
 			enemyTeam = 1
 		end
 		
-		if x >= 1 and x <= AIControl.Grid.Dimensions[1] and y >= 1 and y <= AIControl.Grid.Dimensions[2] then
+		if x >= 1 and x <= Dimensions[1] and y >= 1 and y <= Dimensions[2] then
 			return {
-				AIControl.Grid.Data[x][y][enemyTeam], -- 1
-				AIControl.Grid.DataHistory[x][y][enemyTeam], -- 2
-				AIControl.Grid.Data[x][y][team], -- 3
-				AIControl.Grid.DataHistory[x][y][team], -- 4
-				AIControl.Grid.ArmorData[x][y][enemyTeam], -- 5
-				AIControl.Grid.ArmorData[x][y][team], -- 6
+				AIControl_Grid_Data[x][y][enemyTeam], -- 1
+				AIControl_Grid_DataHistory[x][y][enemyTeam], -- 2
+				AIControl_Grid_Data[x][y][team], -- 3
+				AIControl_Grid_DataHistory[x][y][team], -- 4
+				AIControl_Grid_ArmorData[x][y][enemyTeam], -- 5
+				AIControl_Grid_ArmorData[x][y][team], -- 6
 			}
 		else
 			return {0,0,0,0,0,0,0,0}
@@ -1715,7 +1747,7 @@ AIControl.MainControl = {
 	end,
 	GetSurroundingSafetyData = function(gridPos, team, distance, maxDistance)
 		local safetyData = AIControl.MainControl.GetSafetyData(gridPos[1], gridPos[2], team)
-		local distanceMultiplier = math.min(1, 1.1 - distance/maxDistance)
+		local distanceMultiplier = min(1, 1.1 - distance/maxDistance)
 		return {
 			gridPos[1], -- 1
 			gridPos[2], -- 2
@@ -1734,8 +1766,8 @@ AIControl.MainControl = {
 		local wHalfHeight = World_GetLength()/2
 		
 		--[[local gridPos = {
-			math.floor((pos.x+wHalfWidth)/AIControl.Grid.Dimensions[3])+1,
-			math.floor((pos.z+wHalfHeight)/AIControl.Grid.Dimensions[4])+1
+			floor((pos.x+wHalfWidth)/Dimensions[3])+1,
+			floor((pos.z+wHalfHeight)/Dimensions[4])+1
 		}]]
 		
 		local maxPointDistance
@@ -1751,13 +1783,13 @@ AIControl.MainControl = {
 		for x = 0,dist+steps do
 			local curx
 			curx = pos[1]+x
-			if curx <= AIControl.Grid.Dimensions[1] then
+			if curx <= Dimensions[1] then
 				for y=0,dist+steps do
 					if x > dist or y > dist then
 						local pointDistance = math.sqrt(x^2 + y^2)
 						local cury
 						cury = pos[2]+y
-						if cury <= AIControl.Grid.Dimensions[2] then
+						if cury <= Dimensions[2] then
 							resultCount = resultCount + 1
 							result[resultCount] = AIControl.MainControl.GetSurroundingSafetyData({curx, cury}, team, pointDistance, maxPointDistance)
 						end
@@ -1776,7 +1808,7 @@ AIControl.MainControl = {
 						local pointDistance = math.sqrt(x^2 + y^2)
 						local cury
 						cury = pos[2]+y
-						if cury <= AIControl.Grid.Dimensions[2] then
+						if cury <= Dimensions[2] then
 							resultCount = resultCount + 1
 							result[resultCount] = AIControl.MainControl.GetSurroundingSafetyData({curx, cury}, team, pointDistance, maxPointDistance)
 						end
@@ -1810,7 +1842,7 @@ AIControl.MainControl = {
 		--local maxHealth = Squad_GetHealthMax(squad)
 		local healthLeft = Squad_GetHealth(squad)
 		local healthLeftPercentage = Squad_GetHealthPercentage(squad)
-		result = result + 10*math.max(0, 0.35 - healthLeftPercentage)
+		result = result + 10*max(0, 0.35 - healthLeftPercentage)
 		
 		if Squad_IsInHoldEntity(squad) then
 			result = result - 1.5
@@ -1820,7 +1852,7 @@ AIControl.MainControl = {
 				if healthLeftPercentage < 0.275 or healthLeft < 70 then
 					result = result + 5
 				end
-				result = result + math.max(0, math.min((90-healthLeft)/11, 5))
+				result = result + max(0, min((90-healthLeft)/11, 5))
 			end
 			if Squad_IsAttacking(squad, 5) then
 				result = result - 1.5
@@ -1832,7 +1864,7 @@ AIControl.MainControl = {
 				if healthLeftPercentage < 0.275 or healthLeft < 80 then
 					result = result + 5
 				end
-				result = result + math.max(0, math.min((90-healthLeft)/11, 5))
+				result = result + max(0, min((90-healthLeft)/11, 5))
 			end
 			if Squad_IsAttacking(squad, 5) then result = result - 0.35 end
 		end
@@ -1873,9 +1905,9 @@ AIControl.MainControl = {
 		SGroup_Destroy(squadsNearSG_enemy)
 		SGroup_Destroy(squadsNearSG_allied)
 		
-		result = result + enemyValue/7 - math.min(friendlyValue, enemyValue)/8.5
+		result = result + enemyValue/7 - min(friendlyValue, enemyValue)/8.5
 		
-		return math.max(0, result)
+		return max(0, result)
 	end,
 	
 	FUnitControl = function(squad, setting)
@@ -1889,7 +1921,7 @@ AIControl.MainControl = {
 		local playerIndex = World_GetPlayerIndex(player)
 		if not AIControl.MainControl.LockedSquads[team][squadGameID] or AIControl.MainControl.LockedSquads[team][squadGameID] == 1 then
 			local pos = Squad_GetPosition(squad)
-			local x,y = AIControl.Grid.GetXY(pos)
+			local x,y = AIControl_Grid.GetXY(pos)
 			
 			--print("["..BP_GetName(Squad_GetBlueprint(squad)).."] --- "..team.." "..World_GetPlayerIndex(player))
 			
@@ -1902,7 +1934,7 @@ AIControl.MainControl = {
 				local inProximityOfEnemy = false
 				for i=1,World_GetPlayerCount() do
 					local p2 = World_GetPlayerAt(i)
-					if Player_GetRelationship(player, p2) == R_ENEMY and Prox_PlayerSquadsInProximityOfSquads(p2, sg, (stepsTotal+1)*(AIControl.Grid.Dimensions[3]+AIControl.Grid.Dimensions[4])/2, false, nil) then
+					if Player_GetRelationship(player, p2) == R_ENEMY and Prox_PlayerSquadsInProximityOfSquads(p2, sg, (stepsTotal+1)*(Dimensions[3]+Dimensions[4])/2, false, nil) then
 						inProximityOfEnemy = true
 						break
 					end
@@ -1915,7 +1947,7 @@ AIControl.MainControl = {
 					
 					local collectiveDanger = 0
 					local totalArmor = 0
-					for i,v in pairs(surroundingSafety) do
+					for i=1,#surroundingSafety do
 						collectiveDanger = collectiveDanger + v[3] + v[4]*0.01 - v[5]*0.1 - v[6]*0.0025
 						totalArmor = totalArmor + v[7]
 					end
@@ -1928,7 +1960,7 @@ AIControl.MainControl = {
 					local moveBackDanger = setting['move_back_danger']
 					local retreatDanger = setting['retreat_danger']
 					if setting['targets_armor'] then
-						local dangerDecrease = math.min(setting['armor_danger_decrease_reduction_threshold'], totalArmor)*setting['armor_danger_decrease']
+						local dangerDecrease = min(setting['armor_danger_decrease_reduction_threshold'], totalArmor)*setting['armor_danger_decrease']
 						
 						moveBackDanger = moveBackDanger + dangerDecrease
 						if retreatDanger >= 0 then
@@ -1962,10 +1994,10 @@ AIControl.MainControl = {
 								hqMult = hqMult + yBorderDistRatio*2
 							end
 							local retreatDirection = AIControl.MainControl.GetRetreatDirection(surroundingSafety, pos, team, 1.5, 1.1, directionToHq, hqMult, 0.025, 0.5, 0)
-							local retreatDistance = 5+math.min(30, math.max(0, 3*(collectiveDanger-2)))
+							local retreatDistance = 5+min(30, max(0, 3*(collectiveDanger-2)))
 							local retreatLocation = AIControl.MainControl.GetRetreatLocation(pos, retreatDirection, retreatDistance)
 							
-							local x2,y2 = AIControl.Grid.GetXY(retreatLocation)
+							local x2,y2 = AIControl_Grid.GetXY(retreatLocation)
 							local retreatLocation2 = AIControl.MainControl.GetRetreatLocation(
 								retreatLocation,
 								AIControl.MainControl.GetRetreatDirection(
@@ -2108,8 +2140,9 @@ AIControl.MainControl = {
 		if not AIControl.MainControl.LockedSquads[team][squadGameID] or AIControl.MainControl.LockedSquads[team][squadGameID] == 2 then
 			local raceStr = Player_GetRaceName(player)
 			local hasDisableCritical = false
-			for j,v in pairs(AIControl.MainControl.Settings.VehicleControl.DisableCriticals) do
-				if Squad_HasCritical(squad, v) then
+			for j=1,#AIControl.MainControl.Settings.VehicleControl.DisableCriticals do
+				local critical = AIControl.MainControl.Settings.VehicleControl.DisableCriticals[j]
+				if Squad_HasCritical(squad, critical) then
 					hasDisableCritical = true
 					break
 				end
@@ -2122,8 +2155,9 @@ AIControl.MainControl = {
 				
 				-- Retreat on low health
 				local hasDamageCritical = false
-				for j,v in pairs(AIControl.MainControl.Settings.VehicleControl.DamageCriticals) do
-					if Squad_HasCritical(squad, v) then
+				for j=1,#AIControl.MainControl.Settings.VehicleControl.DamageCriticals do
+					local critical = AIControl.MainControl.Settings.VehicleControl.DamageCriticals[j]
+					if Squad_HasCritical(squad, critical) then
 						hasDamageCritical = true
 						break
 					end
@@ -2152,14 +2186,14 @@ AIControl.MainControl = {
 					local inProximityOfEnemy = false
 					for i=1,World_GetPlayerCount() do
 						local p2 = World_GetPlayerAt(i)
-						if Player_GetRelationship(player, p2) == R_ENEMY and Prox_PlayerSquadsInProximityOfSquads(p2, sg, (maxDist+1)*(AIControl.Grid.Dimensions[3]+AIControl.Grid.Dimensions[4])/2, false, nil) then
+						if Player_GetRelationship(player, p2) == R_ENEMY and Prox_PlayerSquadsInProximityOfSquads(p2, sg, (maxDist+1)*(Dimensions[3]+Dimensions[4])/2, false, nil) then
 							inProximityOfEnemy = true
 							break
 						end
 					end
 					if inProximityOfEnemy then
 						
-						local x,y = AIControl.Grid.GetXY(pos)
+						local x,y = AIControl_Grid.GetXY(pos)
 						local playerHQPosition = AIControl.MainControl.HQPositions[playerIndex]
 						local directionToHq = normalizeVector(Util_ScarPos(playerHQPosition.x - pos.x, playerHQPosition.z - pos.z))
 						
@@ -2168,7 +2202,8 @@ AIControl.MainControl = {
 						
 						local collectiveDanger = 0
 						local friendlyArmor = 0
-						for j,v in pairs(surroundingSafety) do
+						for j=1,#surroundingSafety do
+							local v = surroundingSafety[j]
 							collectiveDanger = collectiveDanger + v[3] + v[4]*0.01 - v[5]*0.04 - v[6]*0.00125
 							friendlyArmor = friendlyArmor + v[8]
 						end
@@ -2199,16 +2234,16 @@ AIControl.MainControl = {
 								dangerRequirementDecreaseWithFriendlyArmor = customSettings[3]
 							end
 						end
-						local dangerRequiredToRetreat = baseDangerRequirement - dangerRequirementDecreaseWithHealth*math.min(1, math.max(0, 1-(healthPercentage-0.25)/0.75)) + dangerRequirementDecreaseWithFriendlyArmor*friendlyArmor
+						local dangerRequiredToRetreat = baseDangerRequirement - dangerRequirementDecreaseWithHealth*min(1, max(0, 1-(healthPercentage-0.25)/0.75)) + dangerRequirementDecreaseWithFriendlyArmor*friendlyArmor
 						if not customSettings then
 							local maxHealth = Squad_GetHealthMax(squad)
 							if maxHealth < 850 then
-								dangerRequiredToRetreat = dangerRequiredToRetreat - math.min(1, math.max(0, 1-(maxHealth-150)/(850-150))) * AIControl.MainControl.Settings.VehicleControl.DangerRequiredToRetreatDecreaseForLightVehicles
+								dangerRequiredToRetreat = dangerRequiredToRetreat - min(1, max(0, 1-(maxHealth-150)/(850-150))) * AIControl.MainControl.Settings.VehicleControl.DangerRequiredToRetreatDecreaseForLightVehicles
 							end
 						end
 						local distToHq = World_DistancePointToPoint(pos, playerHQPosition)
 						if distToHq < 75 then
-							dangerRequiredToRetreat = dangerRequiredToRetreat + AIControl.MainControl.Settings.VehicleControl.DangerRequiredToRetreatIncreaseNearHQ*math.max(0, 1-(distToHq-25)/50)
+							dangerRequiredToRetreat = dangerRequiredToRetreat + AIControl.MainControl.Settings.VehicleControl.DangerRequiredToRetreatIncreaseNearHQ*max(0, 1-(distToHq-25)/50)
 						end
 						
 						local retreatDistance = 20
@@ -2216,7 +2251,7 @@ AIControl.MainControl = {
 						if lowHealth then
 							retreatThreshold = 15
 						else
-							retreatThreshold = math.max(0, math.min(25, 100*(collectiveDanger-math.max(0, dangerRequiredToRetreat))/math.max(1, dangerRequiredToRetreat)))
+							retreatThreshold = max(0, min(25, 100*(collectiveDanger-max(0, dangerRequiredToRetreat))/max(1, dangerRequiredToRetreat)))
 						end
 						
 						local retreatLocation = AIControl.MainControl.GetRetreatLocation(pos, retreatDirection, retreatDistance)
@@ -2252,11 +2287,11 @@ AIControl.MainControl = {
 									
 									for j=1,5 do
 										hqMult = hqMult + 0.35
-										local x2,y2 = AIControl.Grid.GetXY(retreatLocation)
+										local x2,y2 = AIControl_Grid.GetXY(retreatLocation)
 										local retreatLocation2 = AIControl.MainControl.GetRetreatLocation(
 											retreatLocation,
 											AIControl.MainControl.GetRetreatDirection(
-												AIControl.MainControl.GetSurroundingSafety({x2, y2}, math.max(0, stepsTotal-j), stepsTotal, team),
+												AIControl.MainControl.GetSurroundingSafety({x2, y2}, max(0, stepsTotal-j), stepsTotal, team),
 												retreatLocation,
 												team, 1.25, 1.45, directionToHq, hqMult, 0.035, 0.5),
 											retreatDistance)
@@ -2366,7 +2401,7 @@ AIControl.MainControl = {
 				then
 			local bpID = BP_GetID(Squad_GetBlueprint(squad))
 			local curMunitions = Player_GetResource(player, RT_Munition)
-			local desiredSaveUpAmount = math.min(AIControl.MainControl.Settings.BarrageControl.SaveUpAmount, AIControl.MainControl.Settings.BarrageControl.SaveUpAmountGrowthWithTime*World_GetGameTime())
+			local desiredSaveUpAmount = min(AIControl.MainControl.Settings.BarrageControl.SaveUpAmount, AIControl.MainControl.Settings.BarrageControl.SaveUpAmountGrowthWithTime*World_GetGameTime())
 			
 			local shouldCast = true
 			if curMunitions < desiredSaveUpAmount then -- are we saving up?
@@ -2375,7 +2410,7 @@ AIControl.MainControl = {
 			
 			if shouldCast then
 				local pos = Squad_GetPosition(squad)
-				local x,y = AIControl.Grid.GetXY(pos)
+				local x,y = AIControl_Grid.GetXY(pos)
 				local totalAbilityWeight = 0
 				for j,v in pairs(setting) do
 					totalAbilityWeight = totalAbilityWeight + v.weight
@@ -2401,11 +2436,11 @@ AIControl.MainControl = {
 								end
 							end
 							if inProximityOfEnemy then
-								local clumpSearchRadius = v.searchrange/((AIControl.Grid.Dimensions[3]+AIControl.Grid.Dimensions[4])/2)
-								--dr_drawCircle('aicontrol_maincontrol', pos.x, pos.y+10, pos.z, clumpSearchRadius*((AIControl.Grid.Dimensions[1]+AIControl.Grid.Dimensions[2])/2), 255, 255, 255)
+								local clumpSearchRadius = v.searchrange/((Dimensions[3]+Dimensions[4])/2)
+								--dr_drawCircle('aicontrol_maincontrol', pos.x, pos.y+10, pos.z, clumpSearchRadius*((Dimensions[1]+Dimensions[2])/2), 255, 255, 255)
 								local bestClump, bestClumpThreat = AIControl.MainControl.GetBestClumpForRadius(enemyTeam, x, y, clumpSearchRadius, false)
 								if bestClump and bestClumpThreat >= v.minThreatToCast then
-									castPosition = AIControl.Grid.AveragePosData[bestClump[1]][bestClump[2]][enemyTeam]
+									castPosition = AIControl_Grid_AveragePosData[bestClump[1]][bestClump[2]][enemyTeam]
 								end
 							end
 						else
@@ -2473,13 +2508,14 @@ AIControl.MainControl = {
 			end
 			shuffleTable(AIControl.MainControl.TerritorySectors[sectorID].GridCells)
 			local gridCellsCount = table.getn(AIControl.MainControl.TerritorySectors[sectorID].GridCells)
-			for i=1,math.min(6, gridCellsCount) do
+			for i=1,min(6, gridCellsCount) do
 				local x, y = AIControl.MainControl.TerritorySectors[sectorID].GridCells[i][1], AIControl.MainControl.TerritorySectors[sectorID].GridCells[i][2]
-				if not AIControl.Grid.DisabledLocations[x][y] then
+				if not AIControl_Grid.DisabledLocations[x][y] then
 					local surroundingSafety = AIControl.MainControl.GetSurroundingSafety({x, y}, 0, 9, team)
 					local collectiveDanger = 0
 					local collectiveHistoryDanger = 0
-					for i,v in pairs(surroundingSafety) do
+					for j=1,#surroundingSafety do
+						local v = surroundingSafety[j]
 						collectiveDanger = collectiveDanger + v[3]
 						collectiveHistoryDanger = collectiveHistoryDanger + v[4]
 					end
@@ -2525,7 +2561,7 @@ AIControl.MainControl = {
 			local spPos = Entity_GetPosition(AIControl.MainControl.TerritorySectors[sectorID].Entity)
 			local xDist, yDist = pos.x - spPos.x, pos.z - spPos.z
 			return AIControl.MainControl.TerritorySectors[sectorID].Importance -
-				math.min(
+				min(
 					AIControl.MainControl.Settings.HQControl.MaxImportanceDecreaseOverDistance,
 					math.sqrt(xDist^2 + yDist^2)*AIControl.MainControl.Settings.HQControl.ImportanceByDistanceModifier
 				)
@@ -2540,16 +2576,16 @@ AIControl.MainControl = {
 			for SID in pairs(AIControl.MainControl.TerritorySectors) do -- Determine which sectors are being captured
 				AIControl.MainControl.TerritorySectors[SID].BeingCaptured = false
 				local sectorPos = Entity_GetPosition(AIControl.MainControl.TerritorySectors[SID].Entity)
-				local x, y = math.floor((sectorPos.x+wHalfWidth)/AIControl.Grid.Dimensions[3])+1, math.floor((sectorPos.z+wHalfHeight)/AIControl.Grid.Dimensions[4])+1
+				local x, y = floor((sectorPos.x+wHalfWidth)/Dimensions[3])+1, floor((sectorPos.z+wHalfHeight)/Dimensions[4])+1
 				if World_OwnsEntity(AIControl.MainControl.TerritorySectors[SID].Entity) then
 					for team=1,2 do
 						for i=-1,1 do
 							for j=-1,1 do
 								local curx, cury = x+i, y+j
-								if curx>0 and curx <= AIControl.Grid.Dimensions[1] and cury>0 and cury<=AIControl.Grid.Dimensions[2] then
-									local count = table.getn(AIControl.Grid.DataSquads[x+i][y+j][team])
+								if curx>0 and curx <= Dimensions[1] and cury>0 and cury<=Dimensions[2] then
+									local count = table.getn(AIControl_Grid_DataSquads[x+i][y+j][team])
 									for k=1,count do
-										local squad = AIControl.Grid.DataSquads[x+i][y+j][team][k]
+										local squad = AIControl_Grid_DataSquads[x+i][y+j][team][k]
 										if Squad_HasActiveCommand(squad) and Squad_GetActiveCommand(squad) == SQUADSTATEID_Capture then
 											AIControl.MainControl.TerritorySectors[SID].BeingCaptured = true
 											break
@@ -2567,9 +2603,9 @@ AIControl.MainControl = {
 					local entityEnemyTeam
 					if entityTeam == 1 then entityEnemyTeam = 2
 					else entityEnemyTeam = 1 end
-					local count = table.getn(AIControl.Grid.DataSquads[x][y][entityEnemyTeam])
+					local count = table.getn(AIControl_Grid_DataSquads[x][y][entityEnemyTeam])
 					for i=1,count do
-						local squad = AIControl.Grid.DataSquads[x][y][entityEnemyTeam][i]
+						local squad = AIControl_Grid_DataSquads[x][y][entityEnemyTeam][i]
 						if Squad_HasActiveCommand(squad) and Squad_GetActiveCommand(squad) == SQUADSTATEID_Capture then
 							AIControl.MainControl.TerritorySectors[SID].BeingCaptured = true
 							break
@@ -2620,7 +2656,7 @@ AIControl.MainControl = {
 						local hqOwner = Squad_GetPlayerOwner(hq)
 						local hqBlueprint = Squad_GetBlueprint(hq)
 						local pos = Squad_GetPosition(hq)
-						local x, y = math.floor((pos.x+wHalfWidth)/AIControl.Grid.Dimensions[3])+1, math.floor((pos.z+wHalfHeight)/AIControl.Grid.Dimensions[4])+1
+						local x, y = floor((pos.x+wHalfWidth)/Dimensions[3])+1, floor((pos.z+wHalfHeight)/Dimensions[4])+1
 						
 						local setupPoint
 						local hqSectorID
@@ -2641,7 +2677,7 @@ AIControl.MainControl = {
 								local validTarget = true
 								if World_OwnsEntity(AIControl.MainControl.TerritorySectors[hqSectorID].Entity)
 										or AIControl.MainControl.TerritorySectors[hqSectorID].BeingCaptured
-										or AIControl.Grid.DisabledLocations[ setupPoint[1] ][ setupPoint[2] ] then
+										or AIControl_Grid.DisabledLocations[ setupPoint[1] ][ setupPoint[2] ] then
 									validTarget = false
 								else
 									local owner = Entity_GetPlayerOwner(AIControl.MainControl.TerritorySectors[hqSectorID].Entity)
@@ -2668,13 +2704,14 @@ AIControl.MainControl = {
 							end
 							local surroundingSafety = AIControl.MainControl.GetSurroundingSafety({setupPoint[1], setupPoint[2]}, 0, 9, team)
 							local collectiveDanger = 0
-							for i,v in pairs(surroundingSafety) do
+							for i=1,#surroundingSafety do
+								local v = surroundingSafety[i]
 								collectiveDanger = collectiveDanger + v[3] + v[4]*AIControl.MainControl.Settings.HQControl.HistoryDangerMultiplier
 							end
 							if collectiveDanger >= AIControl.MainControl.Settings.HQControl.DangerOnEnemyValue then 
 								currentImportance = currentImportance - AIControl.MainControl.Settings.HQControl.ImportanceDecreaseIfNotSafe
 							end
-							currentImportance = currentImportance - math.min(AIControl.MainControl.Settings.HQControl.MaxImportanceDecreaseWithDanger,
+							currentImportance = currentImportance - min(AIControl.MainControl.Settings.HQControl.MaxImportanceDecreaseWithDanger,
 								collectiveDanger*AIControl.MainControl.Settings.HQControl.ImportanceDecreaseWithDanger
 								*(1+(1-Squad_GetHealthPercentage(hq))*AIControl.MainControl.Settings.HQControl.DangerMultiplierWithHealth))
 							if not World_OwnsEntity(AIControl.MainControl.TerritorySectors[hqSectorID].Entity) then
@@ -2704,7 +2741,7 @@ AIControl.MainControl = {
 											if not result then -- if not safe
 												sectorImportance = sectorImportance - AIControl.MainControl.Settings.HQControl.ImportanceDecreaseIfNotSafe
 											end
-											sectorImportance = sectorImportance - math.min(AIControl.MainControl.Settings.HQControl.MaxImportanceDecreaseWithDanger,
+											sectorImportance = sectorImportance - min(AIControl.MainControl.Settings.HQControl.MaxImportanceDecreaseWithDanger,
 												(danger+historyDanger*AIControl.MainControl.Settings.HQControl.HistoryDangerMultiplier)*AIControl.MainControl.Settings.HQControl.ImportanceDecreaseWithDanger
 												*(1+(1-Squad_GetHealthPercentage(hq))*AIControl.MainControl.Settings.HQControl.DangerMultiplierWithHealth))
 											--print("- SID="..SID.." importance="..sectorImportance)
@@ -2785,9 +2822,9 @@ AIControl.MainControl = {
 					
 					local setupPointX = AIControl.MainControl.TerritorySectors[ HQPosImportanceLists[i].TerritoryImportance[moveSector][1] ].GridCells[ HQPosImportanceLists[i].TerritoryImportance[moveSector][3] ][1]
 					local setupPointY = AIControl.MainControl.TerritorySectors[ HQPosImportanceLists[i].TerritoryImportance[moveSector][1] ].GridCells[ HQPosImportanceLists[i].TerritoryImportance[moveSector][3] ][2]
-					local setupPoint = AIControl.Grid.ControlPoints[setupPointX][setupPointY]
+					local setupPoint = AIControl_Grid.ControlPoints[setupPointX][setupPointY]
 					
-					--[[local tempEntity = Entity_CreateENV(AIControl.Grid.Settings.Init_SpawnableLocationEntity, World_Pos(0, 0, 0), World_Pos(1, 0, 0))
+					--[[local tempEntity = Entity_CreateENV(AIControl_Grid_Settings.Init_SpawnableLocationEntity, World_Pos(0, 0, 0), World_Pos(1, 0, 0))
 					setupPoint = World_GetSpawnablePosition(setupPoint, tempEntity)
 					Entity_Destroy(tempEntity)]]
 					
@@ -2799,7 +2836,7 @@ AIControl.MainControl = {
 						if not AIControl.MainControl.SettingUpHQs[team][hqGameID] then
 							AIControl.MainControl.SettingUpHQs[team][hqGameID] = {setupPointX, setupPointY, World_GetGameTime()}
 						elseif AIControl.MainControl.SettingUpHQs[team][hqGameID][3] > AIControl.MainControl.Settings.HQControl.MaxSetupWaitTime then
-							AIControl.Grid.DisabledLocations[setupPointX][setupPointY] = true
+							AIControl_Grid.DisabledLocations[setupPointX][setupPointY] = true
 						end
 					else
 						--print("Moving unsetup HQ")
@@ -2846,8 +2883,8 @@ AIControl.MainControl = {
 		end
 		if AIControl.MainControl.InitUpdateComplete == false then
 			if AIControl.MainControl.Settings.AICheats.StartingResources ~= 1 then
-				for i=1,AIControl.PlayerCount do
-					local player = World_GetPlayerAt(AIControl.Players[i])
+				for i=1,AIControl_PlayerCount do
+					local player = World_GetPlayerAt(AIControl_Players[i])
 					Player_SetResource(player, RT_Manpower, Player_GetResource(player, RT_Manpower)*AIControl.MainControl.Settings.AICheats.StartingResources)
 					Player_SetResource(player, RT_Fuel, Player_GetResource(player, RT_Fuel)*AIControl.MainControl.Settings.AICheats.StartingResources)
 					
@@ -2869,8 +2906,8 @@ AIControl.MainControl = {
 			AIControl.MainControl.InitUpdateComplete = true
 		end
 		AIControl.MainControl.AICheatModifiers = {}
-		for i=1,AIControl.PlayerCount do
-			local player = World_GetPlayerAt(AIControl.Players[i])
+		for i=1,AIControl_PlayerCount do
+			local player = World_GetPlayerAt(AIControl_Players[i])
 			
 			if AIControl.MainControl.Settings.AICheats.ExperienceReceived ~= 1 then
 				AIControl.MainControl.AICheatModifiers[table.getn(AIControl.MainControl.AICheatModifiers)+1] = Modify_PlayerExperienceReceived(player, AIControl.MainControl.Settings.AICheats.ExperienceReceived)
@@ -2908,10 +2945,10 @@ AIControl.MainControl = {
 		local targets = {{}, {}}
 		SGroup_Clear(AIControl.MainControl.HQs[1])
 		SGroup_Clear(AIControl.MainControl.HQs[2])
-		for i=1,AIControl.PlayerCount do
-			local player = World_GetPlayerAt(AIControl.Players[i])
+		for i=1,AIControl_PlayerCount do
+			local player = World_GetPlayerAt(AIControl_Players[i])
 			local team = Player_GetTeam(player)+1
-			AIControl.MainControl.HQPositions[AIControl.Players[i]] = Player_GetStartingPosition(player)
+			AIControl.MainControl.HQPositions[AIControl_Players[i]] = Player_GetStartingPosition(player)
 			
 			local squads = Player_GetSquads(player)
 			for j=1,SGroup_CountSpawned(squads) do
@@ -2920,7 +2957,7 @@ AIControl.MainControl = {
 				
 				if AIControl.MainControl.Settings.HQControl.Blueprints[sbpID] then -- hq control
 					if sbpID == BP_GetID(SBP.CW.HQ) or sbpID == BP_GetID(SBP.CW.HQ_REINFORCEMENT) then -- mobile HQ retreat position update
-						AIControl.MainControl.HQPositions[AIControl.Players[i]] = Squad_GetPosition(s)
+						AIControl.MainControl.HQPositions[AIControl_Players[i]] = Squad_GetPosition(s)
 					end
 					local sectorID
 					if Squad_HasUpgrade(s, UPG.CW.MOBILEHQ) then
@@ -2955,7 +2992,7 @@ AIControl.MainControl = {
 				local sectorID = World_GetTerritorySectorID(Entity_GetPosition(e))
 				local blueprint = Entity_GetBlueprint(e)
 				local importance
-				for j=1, table.getn(AIControl.MainControl.Settings.HQControl.StrategicPoints) do
+				for j=1,table.getn(AIControl.MainControl.Settings.HQControl.StrategicPoints) do
 					if AIControl.MainControl.Settings.HQControl.StrategicPoints[j][1] == blueprint then
 						importance = AIControl.MainControl.Settings.HQControl.StrategicPoints[j][2]
 						break
@@ -2964,9 +3001,9 @@ AIControl.MainControl = {
 				if not importance then importance = AIControl.MainControl.Settings.HQControl.UnrecognizedStrategicPointImportance end
 				--print("SP :: ID="..sectorID.." BP="..BP_GetName(blueprint).." Importance="..importance)
 				local gridCells, n = {}, 0
-				for x=1, AIControl.Grid.Dimensions[1] do
-					for y=1, AIControl.Grid.Dimensions[2] do
-						if World_GetTerritorySectorID(AIControl.Grid.ControlPoints[x][y]) == sectorID then
+				for x=1,Dimensions[1] do
+					for y=1,Dimensions[2] do
+						if World_GetTerritorySectorID(AIControl_Grid.ControlPoints[x][y]) == sectorID then
 							n = n + 1
 							gridCells[n] = {x, y}
 						end
@@ -2996,39 +3033,13 @@ AIControl.MainControl = {
 
 --------------------------------------------------------------------------------------------------------------------
 
-AIControl.CurEnabledAI = 1
-AIControl.AIDisabling = function()
-	if not g_AIControl_Pause then
-		if AIControl.CurEnabledAI > 0 then
-			for i=1,AIControl.PlayerCount do
-				local p = World_GetPlayerAt(AIControl.Players[i])
-				if not Player_IsHuman(p) then
-					AI_Enable(p, i == AIControl.CurEnabledAI)
-				end
-			end
-			if AIControl.CurEnabledAI > AIControl.PlayerCount then
-				AIControl.CurEnabledAI = 0
-			end
-		else
-			AI_EnableAll(false)
-		end
-		AIControl.CurEnabledAI = AIControl.CurEnabledAI + 1
-	end
-end
-
---------------------------------------------------------------------------------------------------------------------
-
-AIControl.__Init3 = function() -- currently disabled
-	Rule_AddInterval(AIControl.AIDisabling, 0.25)
-end
 AIControl.__Init2 = function()
-	AIControl.Grid.ResetData(true)
-	AIControl.Grid.Update()
+	AIControl_Grid.ResetData(true)
+	AIControl_Grid.Update()
 	AIControl.MainControl.Init()
 	
-	--Rule_AddInterval(AIControl.Grid.Update, 0.25)
+	--Rule_AddInterval(AIControl_Grid.Update, 0.25)
 	Rule_Add(AIControl.Grid.Update)
-	--Rule_AddOneShot(AIControl.__Init3, 5)
 end
 AIControl.__Init = function()
 	if g_AIControl_Enable then
@@ -3038,10 +3049,31 @@ AIControl.__Init = function()
 		--dr_setdisplay("aicontrol_grid", true)
 		--dr_setautoclear("aicontrol_grid", false)
 		--dr_clear("aicontrol_grid")
+	
+		AIControl_Grid = AIControl.Grid
+		AIControl_Grid_Settings = AIControl_Grid.Settings
+		Dimensions = AIControl_Grid.Dimensions
 		
-		AIControl.Grid.SetDimensions(AIControl.Grid.Settings.Init_Dimensions[1], AIControl.Grid.Settings.Init_Dimensions[2])
-		AIControl.Grid.UpdateAIPlayers()
-		AIControl.Grid.ReduceMarkerCount()
+		AIControl_Grid_DataHistory = AIControl_Grid.DataHistory
+		AIControl_Grid_t_DataHistory = AIControl_Grid.t_DataHistory
+		
+		AIControl_Grid_DataClump = AIControl_Grid.DataClump
+		AIControl_Grid_DataClumpFOW = AIControl_Grid.DataClumpFOW
+		
+		AIControl_Grid_DataSquads = AIControl_Grid.DataSquads
+		AIControl_Grid_t_DataSquads = AIControl_Grid.t_DataSquads
+		AIControl_Grid_DataCounts = AIControl_Grid.DataCounts
+		AIControl_Grid_t_DataCounts = AIControl_Grid.t_DataCounts
+		AIControl_Grid_Data = AIControl_Grid.Data
+		AIControl_Grid_t_Data = AIControl_Grid.t_Data
+		AIControl_Grid_ArmorData = AIControl_Grid.ArmorData
+		AIControl_Grid_t_ArmorData = AIControl_Grid.t_ArmorData
+		AIControl_Grid_AveragePosData = AIControl_Grid.AveragePosData
+		AIControl_Grid_t_AveragePosData = AIControl_Grid.t_AveragePosData
+		
+		AIControl_Grid.SetDimensions(AIControl_Grid_Settings.Init_Dimensions[1], AIControl_Grid_Settings.Init_Dimensions[2])
+		AIControl_Grid.UpdateAIPlayers()
+		AIControl_Grid.ReduceMarkerCount()
 		--AIControl.Pathfinding.Init()
 		
 		Rule_AddOneShot(AIControl.__Init2, 0.125)
@@ -3049,12 +3081,31 @@ AIControl.__Init = function()
 end
 
 AIControl_Init = function()
-	Rule_Remove(AIControl.AIDisabling)
 	Rule_Remove(AIControl.__Init)
 	Rule_Remove(AIControl.__Init2)
-	Rule_Remove(AIControl.__Init3)
 	Rule_Remove(AIControl.Grid.Update)
 	Rule_AddOneShot(AIControl.__Init, 1)
 end
+
+AIControl_Grid = AIControl.Grid
+AIControl_Grid_Settings = AIControl_Grid.Settings
+Dimensions = AIControl_Grid.Dimensions
+
+AIControl_Grid_DataHistory = AIControl_Grid.DataHistory
+AIControl_Grid_t_DataHistory = AIControl_Grid.t_DataHistory
+
+AIControl_Grid_DataClump = AIControl_Grid.DataClump
+AIControl_Grid_DataClumpFOW = AIControl_Grid.DataClumpFOW
+
+AIControl_Grid_DataSquads = AIControl_Grid.DataSquads
+AIControl_Grid_t_DataSquads = AIControl_Grid.t_DataSquads
+AIControl_Grid_DataCounts = AIControl_Grid.DataCounts
+AIControl_Grid_t_DataCounts = AIControl_Grid.t_DataCounts
+AIControl_Grid_Data = AIControl_Grid.Data
+AIControl_Grid_t_Data = AIControl_Grid.t_Data
+AIControl_Grid_ArmorData = AIControl_Grid.ArmorData
+AIControl_Grid_t_ArmorData = AIControl_Grid.t_ArmorData
+AIControl_Grid_AveragePosData = AIControl_Grid.AveragePosData
+AIControl_Grid_t_AveragePosData = AIControl_Grid.t_AveragePosData
 
 Scar_AddInit(AIControl_Init)
