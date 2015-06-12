@@ -485,7 +485,8 @@ function AIUpdateStep()
 end
 
 function InitializeAI_Delayed2()
-	TimeRule_AddInterval(AIUpdateStep, 0.125*AICount, 0)
+	--TimeRule_AddInterval(AIUpdateStep, 0.125*AICount, 0)
+	TimeRule_Add(AIUpdateStep, 0)
 end
 function InitializeAI_Delayed1()
 	for i=1,World_GetPlayerCount() do

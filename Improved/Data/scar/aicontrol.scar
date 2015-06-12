@@ -1349,7 +1349,7 @@ AIControl.MainControl = {
 		SecondaryUpdateTicks = 12, -- every n updates we'll check for new controlled units
 		
 		RetreatTactic_BattleRadius = 55,
-		RetreatTactic_BaseSafety = 0.695, -- Higher value means higher danger is required for a squad to retreat
+		RetreatTactic_BaseSafety = 0.75, -- Higher value means higher danger is required for a squad to retreat
 		
 		UnitControl = {
 			UnitSettings = {
@@ -1883,7 +1883,7 @@ AIControl.MainControl = {
 		--local maxHealth = Squad_GetHealthMax(squad)
 		local healthLeft = Squad_GetHealth(squad)
 		local healthLeftPercentage = Squad_GetHealthPercentage(squad)
-		result = result + 10*max(0, 0.35 - healthLeftPercentage)
+		result = result + 14*max(0, 0.35 - healthLeftPercentage)
 		
 		if Squad_IsInHoldEntity(squad) then
 			result = result - 1.5
