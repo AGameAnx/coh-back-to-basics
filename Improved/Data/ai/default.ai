@@ -106,8 +106,6 @@ ai_assert = false
 
 local AICount = 0
 local ai_playerIndex = 0
---local ai_frameTime = 0.125
---local ai_targetsUpdateSpacing = 2 -- How many update cycles AI should wait before updating its targets (costly operation)
 
 -------------------------------------------------------------
 -- Budget Information
@@ -118,7 +116,7 @@ MUNITION_BUDGET_TYPE = 2
 s_budget_info = {}
 s_budget_info[ REGULAR_BUDGET_TYPE ] = {
 	last_purchase_time = -1,
-	purchase_interval = 3,
+	purchase_interval = 1,
 	defs = {
 		{"BUDGET_Units", 	TGROUP_BuildUnits},
 		{"BUDGET_Tech", 	TGROUP_Tech},
@@ -262,7 +260,6 @@ AI_Analyze_Budget = function()
 end
 
 AI_Analyze_Targets_Capture = function()
-	strategy_military.calculate_military_priorities_prepass()
 	CalcCapturePriorities()
 end
 AI_Analyze_Targets_Attack = function()
@@ -476,35 +473,19 @@ function AIUpdateStep()
 	elseif curAIStep == 5 then
 		AI_Think_Military()
 	elseif curAIStep == 6 then
-		AI_Analyze_Targets_Capture()
+		strategy_military.calculate_military_priorities_prepass()
 	elseif curAIStep == 7 then
-		AI_Analyze_Targets_Attack()
+		AI_Analyze_Targets_Capture()
 	elseif curAIStep == 8 then
+		AI_Analyze_Targets_Attack()
+	elseif curAIStep == 9 then
 		AI_Analyze_Targets_Defend()
 		curAIStep = 0
 	end
 end
 
---[[function InitializeAI_Delayed4()
-	TimeRule_AddInterval(AI_Analyze_Targets_Defend, ai_frameTime*ai_targetsUpdateSpacing, 0)
-end
-function InitializeAI_Delayed3()
-	TimeRule_AddInterval(AI_Analyze_Targets_Attack, ai_frameTime*ai_targetsUpdateSpacing, 0)
-	
-	TimeRule_AddOneShot(InitializeAI_Delayed4, ai_frameTime/3*ai_targetsUpdateSpacing, 0)
-end]]
 function InitializeAI_Delayed2()
 	TimeRule_AddInterval(AIUpdateStep, 0.125*AICount, 0)
-	-- add AI_Think and AI_Analyse rules
-	--[[TimeRule_AddInterval(AI_Think_Start, 0.125*AICount, 0)
-	TimeRule_AddInterval(AI_Analyze_State, 0.125*AICount, 0)
-	TimeRule_AddInterval(AI_Analyze_Budget, 0.125*AICount, 0)
-	TimeRule_AddInterval(AI_Think_Purchases, 0.125*AICount, 0)
-	TimeRule_AddInterval(AI_Think_Military, 0.125*AICount, 0)
-	--TimeRule_AddInterval(AI_DebugDisplay, 0.125*AICount, 0)
-	
-	TimeRule_AddInterval(AI_Analyze_Targets_Capture, 0.125*ai_targetsUpdateSpacing, 0)
-	TimeRule_AddOneShot(InitializeAI_Delayed3, 0.125*ai_targetsUpdateSpacing, 0)]]
 end
 function InitializeAI_Delayed1()
 	for i=1,World_GetPlayerCount() do
@@ -516,11 +497,7 @@ function InitializeAI_Delayed1()
 			AICount = AICount + 1
 		end
 	end
-	if ai_playerIndex == 0 then
-		InitializeAI_Delayed2()
-	else
-		TimeRule_AddOneShot(InitializeAI_Delayed2, 0.125*AICount/(ai_playerIndex+1), 0)
-	end
+	TimeRule_AddOneShot(InitializeAI_Delayed2, 0.125*AICount/(ai_playerIndex+1), 0)
 	
 	AI_Think_Start()
 	AI_Analyze_State()
@@ -529,6 +506,7 @@ function InitializeAI_Delayed1()
 	AI_Think_Military()
 	AI_DebugDisplay()
 	
+	strategy_military.calculate_military_priorities_prepass()
 	AI_Analyze_Targets_Capture()
 	AI_Analyze_Targets_Attack()
 	AI_Analyze_Targets_Defend()

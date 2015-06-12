@@ -65,6 +65,7 @@ local AIControl_MainControl_Settings_UnitControl
 local AIControl_MainControl_Settings_VehicleControl
 local AIControl_MainControl_Settings_BarrageControl
 local AIControl_MainControl_Settings_HQControl
+local AIControl_MainControl_LockedSquads
 
 local wHalfWidth = World_GetWidth()*0.5
 local wHalfHeight = World_GetLength()*0.5
@@ -407,23 +408,6 @@ AIControl.Grid = {
 				end
 			end
 		end
-		--[[for i=1,World_GetPlayerCount() do
-			local player = World_GetPlayerAt(i)
-			if not Player_IsHuman(player) and AI_IsAIPlayer(player) and AI_IsEnabled(player) then
-				local team = Player_GetTeam(player)+1
-				if team == 1 or team == 2 then
-					local pSquads = Player_GetSquads(player)
-					for j=1,SGroup_CountSpawned(pSquads) do
-						local s = SGroup_GetSpawnedSquadAt(pSquads, j)
-						local squadGameID = Squad_GetGameID(s)
-						if AIControl_MainControl.LockedSquads[team][squadGameID] == -1 then
-							AI_UnlockSquad(player, s)
-							AIControl_MainControl.LockedSquads[team][squadGameID] = nil
-						end
-					end
-				end
-			end
-		end]]
 		for i=1,SGroup_CountSpawned(squads) do
 			local s = SGroup_GetSpawnedSquadAt(squads, i)
 			local squadGameID = Squad_GetGameID(s)
@@ -436,14 +420,6 @@ AIControl.Grid = {
 			
 			local retreated = false
 			if not Player_IsHuman(player) then
-				
-				--[[if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
-					if not AIControl_MainControl.LockedSquads[team][squadGameID] or AIControl_MainControl.LockedSquads[team][squadGameID] == -1 then
-						--dr_text3d('aicontrol_grid', position.x, position.y+0.35, position.z, '+', 0, 255, 0)
-						AI_LockSquad(player, s)
-						AIControl_MainControl.LockedSquads[team][squadGameID] = -1
-					end
-				end]]
 				
 				-- reinforcing
 				local tmpSG = SGroup_CreateIfNotFound("tempsg")
@@ -510,20 +486,20 @@ AIControl.Grid = {
 					end
 					if not ucSetting and not vcUnit and not bcSetting and not isVehicle then
 						local squadGameID = Squad_GetGameID(s)
-						if not AIControl_MainControl.LockedSquads[team][squadGameID] or AIControl_MainControl.LockedSquads[team][squadGameID] == -1 or AIControl_MainControl.LockedSquads[team][squadGameID] == 4 then
+						if not AIControl_MainControl_LockedSquads[team][squadGameID] or AIControl_MainControl_LockedSquads[team][squadGameID] == -1 or AIControl_MainControl_LockedSquads[team][squadGameID] == 4 then
 							local inCombat = Squad_IsAttacking(s, 5) or Squad_IsUnderAttack(s, 5)
-							if AIControl_MainControl.LockedSquads[team][squadGameID] == 4 or inCombat then
+							if AIControl_MainControl_LockedSquads[team][squadGameID] == 4 or inCombat then
 								AIControl_MainControl.FCombatUnitControl(s, inCombat)
 							else -- endless capture/move order bug fix
 								if Squad_HasActiveCommand(s) and Squad_GetActiveCommand(s) == SQUADSTATEID_Capture then
-									if not AIControl_MainControl.LockedSquads[team][squadGameID] then
+									if not AIControl_MainControl_LockedSquads[team][squadGameID] then
 										AI_LockSquad(player, s)
-										AIControl_MainControl.LockedSquads[team][squadGameID] = -1
+										AIControl_MainControl_LockedSquads[team][squadGameID] = -1
 									end
 								else
-									if AIControl_MainControl.LockedSquads[team][squadGameID] == -1 then
+									if AIControl_MainControl_LockedSquads[team][squadGameID] == -1 then
 										AI_UnlockSquad(player, s)
-										AIControl_MainControl.LockedSquads[team][squadGameID] = nil
+										AIControl_MainControl_LockedSquads[team][squadGameID] = nil
 									end
 								end
 							end
@@ -1981,7 +1957,7 @@ AIControl.MainControl = {
 		local team = Player_GetTeam(player)+1
 		local enemyTeam = Team_GetEnemyTeam(team-1)+1
 		local playerIndex = World_GetPlayerIndex(player)
-		if not AIControl_MainControl.LockedSquads[team][squadGameID] or AIControl_MainControl.LockedSquads[team][squadGameID] == 1 or AIControl_MainControl.LockedSquads[team][squadGameID] == -1 then
+		if not AIControl_MainControl_LockedSquads[team][squadGameID] or AIControl_MainControl_LockedSquads[team][squadGameID] == 1 or AIControl_MainControl_LockedSquads[team][squadGameID] == -1 then
 			local pos = Squad_GetPosition(squad)
 			local x,y = AIControl_Grid.GetXY(pos)
 			
@@ -2153,8 +2129,8 @@ AIControl.MainControl = {
 					end
 				end
 				if lockSquad then
-					if not AIControl_MainControl.LockedSquads[team][squadGameID] then
-						AIControl_MainControl.LockedSquads[team][squadGameID] = 1
+					if not AIControl_MainControl_LockedSquads[team][squadGameID] then
+						AIControl_MainControl_LockedSquads[team][squadGameID] = 1
 						if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
 							AI_LockSquad(player, squad)
 						end
@@ -2166,20 +2142,20 @@ AIControl.MainControl = {
 					elseif AIControl_MainControl.UnitControlUnlockTimers[team][squadGameID] then
 						AIControl_MainControl.UnitControlUnlockTimers[team][squadGameID] = AIControl_MainControl.UnitControlUnlockTimers[team][squadGameID] + 1
 						if AIControl_MainControl.UnitControlUnlockTimers[team][squadGameID] > 7/AIControl_MainControl.SplitUpdates then
-							if AIControl_MainControl.LockedSquads[team][squadGameID] then
+							if AIControl_MainControl_LockedSquads[team][squadGameID] then
 								if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
 									AI_UnlockSquad(player, squad)
 								end
 							end
-							AIControl_MainControl.LockedSquads[team][squadGameID] = nil
+							AIControl_MainControl_LockedSquads[team][squadGameID] = nil
 							AIControl_MainControl.UnitControlUnlockTimers[team][squadGameID] = nil
 						end
 					else
-						if AIControl_MainControl.LockedSquads[team][squadGameID] then
+						if AIControl_MainControl_LockedSquads[team][squadGameID] then
 							if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
 								AI_UnlockSquad(player, squad)
 							end
-							AIControl_MainControl.LockedSquads[team][squadGameID] = nil
+							AIControl_MainControl_LockedSquads[team][squadGameID] = nil
 						end
 					end
 				end
@@ -2195,7 +2171,7 @@ AIControl.MainControl = {
 		local team = Player_GetTeam(player)+1
 		local enemyTeam = Team_GetEnemyTeam(team-1)+1
 		local playerIndex = World_GetPlayerIndex(player)
-		if not AIControl_MainControl.LockedSquads[team][squadGameID] or AIControl_MainControl.LockedSquads[team][squadGameID] == 2 or AIControl_MainControl.LockedSquads[team][squadGameID] == -1 then
+		if not AIControl_MainControl_LockedSquads[team][squadGameID] or AIControl_MainControl_LockedSquads[team][squadGameID] == 2 or AIControl_MainControl_LockedSquads[team][squadGameID] == -1 then
 			local raceStr = Player_GetRaceName(player)
 			local hasDisableCritical = false
 			for j=1,#AIControl_MainControl_Settings_VehicleControl.DisableCriticals do
@@ -2426,14 +2402,14 @@ AIControl.MainControl = {
 			end
 			
 			if lockSquad then
-				if not AIControl_MainControl.LockedSquads[team][squadGameID] then
-					AIControl_MainControl.LockedSquads[team][squadGameID] = 2
+				if not AIControl_MainControl_LockedSquads[team][squadGameID] then
+					AIControl_MainControl_LockedSquads[team][squadGameID] = 2
 					if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
 						AI_LockSquad(player, squad)
 					end
 				end
-			elseif AIControl_MainControl.LockedSquads[team][squadGameID] then
-				AIControl_MainControl.LockedSquads[team][squadGameID] = nil
+			elseif AIControl_MainControl_LockedSquads[team][squadGameID] then
+				AIControl_MainControl_LockedSquads[team][squadGameID] = nil
 				if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
 					AI_UnlockSquad(player, squad)
 				end
@@ -2449,10 +2425,10 @@ AIControl.MainControl = {
 		local team = Player_GetTeam(player)+1
 		local enemyTeam = Team_GetEnemyTeam(team-1)+1
 		local lockSquad = false
-		if not AIControl_MainControl.LockedSquads[team][squadGameID]
-				or AIControl_MainControl.LockedSquads[team][squadGameID] == -1
+		if not AIControl_MainControl_LockedSquads[team][squadGameID]
+				or AIControl_MainControl_LockedSquads[team][squadGameID] == -1
 				or ( -- also want to barrage with any 'setup' unit control squads
-					AIControl_MainControl.LockedSquads[team][squadGameID] == 1 -- Unit control
+					AIControl_MainControl_LockedSquads[team][squadGameID] == 1 -- Unit control
 					and AIControl_MainControl.UnitControlTargets[team][squadGameID] -- Has target
 					and not AIControl_MainControl.UnitControlTargets[team][squadGameID][1] -- Target is not a move back target
 					)
@@ -2518,8 +2494,8 @@ AIControl.MainControl = {
 			end
 		end
 		if lockSquad then
-			if not AIControl_MainControl.LockedSquads[team][squadGameID] then
-				AIControl_MainControl.LockedSquads[team][squadGameID] = 3
+			if not AIControl_MainControl_LockedSquads[team][squadGameID] then
+				AIControl_MainControl_LockedSquads[team][squadGameID] = 3
 				if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
 					AI_LockSquad(player, squad)
 				end
@@ -2528,13 +2504,13 @@ AIControl.MainControl = {
 			if AIControl_MainControl.BarrageControlLockTimers[squadGameID] then
 				AIControl_MainControl.BarrageControlLockTimers[squadGameID] = AIControl_MainControl.BarrageControlLockTimers[squadGameID] - 1
 				if AIControl_MainControl.BarrageControlLockTimers[squadGameID] <= 0 then
-					if AIControl_MainControl.LockedSquads[team][squadGameID] then
+					if AIControl_MainControl_LockedSquads[team][squadGameID] then
 						if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
 							AI_UnlockSquad(player, squad)
 						end
 					end
 					AIControl_MainControl.BarrageControlLockTimers[squadGameID] = nil
-					AIControl_MainControl.LockedSquads[team][squadGameID] = nil
+					AIControl_MainControl_LockedSquads[team][squadGameID] = nil
 				end
 			end
 		end
@@ -2547,7 +2523,7 @@ AIControl.MainControl = {
 		local player = Squad_GetPlayerOwner(squad)
 		local team = Player_GetTeam(player)+1
 		local enemyTeam = Team_GetEnemyTeam(team-1)+1
-		if not AIControl_MainControl.LockedSquads[team][squadGameID] or AIControl_MainControl.LockedSquads[team][squadGameID] == 4 or AIControl_MainControl.LockedSquads[team][squadGameID] == -1 then
+		if not AIControl_MainControl_LockedSquads[team][squadGameID] or AIControl_MainControl_LockedSquads[team][squadGameID] == 4 or AIControl_MainControl_LockedSquads[team][squadGameID] == -1 then
 			local lockSquad = inCombat and World_GetRand(0, 100) < 15
 			
 			if inCombat then
@@ -2571,19 +2547,19 @@ AIControl.MainControl = {
 			end
 			
 			if lockSquad then
-				if not AIControl_MainControl.LockedSquads[team][squadGameID] then
-					AIControl_MainControl.LockedSquads[team][squadGameID] = 4
+				if not AIControl_MainControl_LockedSquads[team][squadGameID] then
+					AIControl_MainControl_LockedSquads[team][squadGameID] = 4
 					if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
 						AI_LockSquad(player, squad)
 					end
 				end
 			else
-				if AIControl_MainControl.LockedSquads[team][squadGameID] then
+				if AIControl_MainControl_LockedSquads[team][squadGameID] then
 					if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
 						AI_UnlockSquad(player, squad)
 					end
 				end
-				AIControl_MainControl.LockedSquads[team][squadGameID] = nil
+				AIControl_MainControl_LockedSquads[team][squadGameID] = nil
 			end
 		end
 		SGroup_Destroy(sg)
@@ -3201,6 +3177,7 @@ AIControl.__Init = function()
 		AIControl_MainControl_Settings_VehicleControl = AIControl_MainControl_Settings.VehicleControl
 		AIControl_MainControl_Settings_BarrageControl = AIControl_MainControl_Settings.BarrageControl
 		AIControl_MainControl_Settings_HQControl = AIControl_MainControl_Settings.HQControl
+		AIControl_MainControl_LockedSquads = AIControl_MainControl.LockedSquads
 		
 		AIControl_Grid.SetDimensions(AIControl_Grid_Settings.Init_Dimensions[1], AIControl_Grid_Settings.Init_Dimensions[2])
 		AIControl_Grid.UpdateAIPlayers()
@@ -3245,5 +3222,6 @@ AIControl_MainControl_Settings_UnitControl = AIControl_MainControl_Settings.Unit
 AIControl_MainControl_Settings_VehicleControl = AIControl_MainControl_Settings.VehicleControl
 AIControl_MainControl_Settings_BarrageControl = AIControl_MainControl_Settings.BarrageControl
 AIControl_MainControl_Settings_HQControl = AIControl_MainControl_Settings.HQControl
+AIControl_MainControl_LockedSquads = AIControl_MainControl.LockedSquads
 
 Scar_AddInit(AIControl_Init)
