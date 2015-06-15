@@ -447,16 +447,19 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 	local threatScore = 0
 	local threatAtBaseScore = 0
 	if threat < 0 then
-		local maxFriendlyThreat = max(5, min(100, -Military_GetMinCombinedThreatAtMilitaryPoint(s_selfplayer)))
-		threatScore = 6.75*threat/maxFriendlyThreat -- attempt to unblob and spread out units by reducing priority for points that already have friendlies nearby
+		--local maxFriendlyThreat = max(5, min(100, -Military_GetMinCombinedThreatAtMilitaryPoint(s_selfplayer)))
+		--threatScore = 6.75*threat/maxFriendlyThreat -- attempt to unblob and spread out units by reducing priority for points that already have friendlies nearby
 		--logPrint(string.format("  negative threat score: %.2f", threatScore))
 	elseif threat >= 0 then
 		local maxThreat = max(5, min(130, Military_GetMaxCombinedThreatAtMilitaryPoint(s_selfplayer)))
-		threatScore = -1.55*threat/maxThreat
-		if not is_defend and minDistFromFriendlyHQs / k_maxDist / furthestPoint < closeToBaseThreshold then -- we have to respond to threats near the HQ
-			threatAtBaseScore = 20 * threat/maxThreat * (closeToBaseThreshold-minDistFromFriendlyHQs / k_maxDist / furthestPoint)/closeToBaseThreshold
+		if is_defend then
+			threatScore = -10*threat/maxThreat
+		else
+			threatScore = 0.5*threat/maxThreat - min(0.5, max(-1, 2*(1-militaryPercentValue)*threat/maxThreat))
+			if minDistFromFriendlyHQs / k_maxDist / furthestPoint < closeToBaseThreshold then -- we have to respond to threats near the HQ
+				threatAtBaseScore = 23 * threat/maxThreat * (closeToBaseThreshold-minDistFromFriendlyHQs / k_maxDist / furthestPoint)/closeToBaseThreshold
+			end
 		end
-		threatScore = threatScore - min(0.5, max(-1, 2*(1-militaryPercentValue)*threat/maxThreat)) -- if we have a larger army, we want to pursue threats instead of avoiding them. The result adjusted for that here
 	end
 	
 	local threatMultiplier = (enemyHQDistances[2]/k_maxDist/furthestPoint - 0.5)*(1.05 - max(0.75, min(1.75, (militaryPercentValue-1)*0.5+1))) + 0.5
@@ -559,7 +562,7 @@ function RankDefendTargets()
 					table.insert(defend_point_ranking, e)
 					Military_AddTarget(s_selfplayer, MTARGET_Defend, militaryPoint, 1+priority*2)
 					targetCount = targetCount + 1
-					if targetCount >= 10 then
+					if targetCount >= 6 then
 						break
 					end
 				end

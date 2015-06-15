@@ -36,7 +36,7 @@ g_AIControl_Enable = true
 g_AIControl_Pause = false
 
 ----------------------------------------------------
--- Pointer optimization
+-- Table direct access locals optimization
 
 local AIControl_Grid
 local AIControl_Grid_Settings
@@ -78,7 +78,7 @@ local AIControl_PlayerCount = 0
 AIControl.Grid = {
 	Settings = {
 		SplitUpdates = true, -- If true, the update will be split to be performed over the course of UpdateInterval rather than once per UpdateInterval
-		SplitUpdateIncreasePerSquadCount = 10,
+		SplitUpdateIncreasePerSquadCount = 8,
 		
 		-- These settings will only be used on game start, changing them later on will not affect the actual values
 		Init_Dimensions = {11, 11}, -- Initial dimensions table
@@ -370,7 +370,7 @@ AIControl.Grid = {
 					end
 				end
 				
-				AIControl_Grid.SplitUpdateCount = max(5, ceil(sqCount / AIControl_Grid_Settings.SplitUpdateIncreasePerSquadCount))
+				AIControl_Grid.SplitUpdateCount = max(8, ceil(sqCount / AIControl_Grid_Settings.SplitUpdateIncreasePerSquadCount))
 				
 				local sqPerStep = AIControl_Grid_Settings.SplitUpdateIncreasePerSquadCount
 				for i=1,AIControl_Grid.SplitUpdateCount do
@@ -599,7 +599,7 @@ AIControl.Grid = {
 								if canSee then
 									dangerFOW = dangerFOW + v[3] + v[4]*0.015
 								else
-									dangerFOW = dangerFOW + v[3]*0.275 + v[4]*0.125
+									dangerFOW = dangerFOW + v[3]*0.275 + v[4]*0.175
 								end
 							end
 							AIControl_Grid_DataClumpFOW[i][j][enemyTeam] = dangerFOW
@@ -1769,12 +1769,7 @@ AIControl.MainControl = {
 	end,
 	
 	GetSafetyData = function(x, y, team) -- returns danger (float), history_danger (float)
-		local enemyTeam
-		if team == 1 then
-			enemyTeam = 2
-		else
-			enemyTeam = 1
-		end
+		local enemyTeam = Team_GetEnemyTeam(team-1)+1
 		
 		if x >= 1 and x <= Dimensions[1] and y >= 1 and y <= Dimensions[2] then
 			return {
@@ -2517,6 +2512,38 @@ AIControl.MainControl = {
 		SGroup_Destroy(sg)
 	end,
 	
+	GetSquadCoverPosition = function(squad)
+		local pos = Squad_GetPosition(squad)
+		
+		local targetSG = SGroup_Create('aicontrol_cuc_target_tempsg')
+		Squad_GetAttackTargets(squad, targetSG)
+		local targetSquad = nil
+		if SGroup_CountSpawned(targetSG) > 0 then
+			targetSquad = SGroup_GetSpawnedSquadAt(targetSG, 1)
+		end
+		SGroup_Destroy(targetSG)
+		
+		local targetSquadPos = false
+		if targetSquad then
+			targetSquadPos = Squad_GetPosition(targetSquad)
+			local posDiff = World_Pos(targetSquadPos.x - pos.x, 0, targetSquadPos.z - pos.z)
+			local posDiffLength = math.sqrt(posDiff.x^2 + posDiff.z^2)
+			if posDiffLength > 0 then
+				posDiff.x = posDiff.x/posDiffLength
+				posDiff.z = posDiff.z/posDiffLength
+				
+				pos.x = pos.x + posDiff.x*5
+				pos.z = pos.z + posDiff.z*5
+			end
+		end
+		
+		-- get the cover pos, this function returns the anchor pos if it couldn't find cover
+		local posCover = Squad_FindCoverCompareCurrent(squad, pos, 12, 15, true)
+		if World_DistanceSquaredPointToPoint(pos, posCover) > 8 then	
+			return posCover, targetSquadPos
+		end
+		return false
+	end,
 	FCombatUnitControl = function(squad, inCombat)
 		local sg = SGroup_Create("aicontrol_cuc_tempsg")
 		local squadGameID = Squad_GetGameID(squad)
@@ -2524,24 +2551,16 @@ AIControl.MainControl = {
 		local team = Player_GetTeam(player)+1
 		local enemyTeam = Team_GetEnemyTeam(team-1)+1
 		if not AIControl_MainControl_LockedSquads[team][squadGameID] or AIControl_MainControl_LockedSquads[team][squadGameID] == 4 or AIControl_MainControl_LockedSquads[team][squadGameID] == -1 then
-			local lockSquad = inCombat and World_GetRand(0, 100) < 15
+			local lockSquad = inCombat and World_GetRand(0, 100) < 45
 			
-			if inCombat then
-				local pos = Squad_GetPosition(squad)
-				
-				local targetSG = SGroup_Create('aicontrol_cuc_target_tempsg')
-				Squad_GetAttackTargets(squad, targetSG)
-				local target = nil
-				if SGroup_CountSpawned(targetSG) > 0 then
-					target = SGroup_GetSpawnedSquadAt(targetSG, 1)
-				end
-				SGroup_Destroy(targetSG)
-				
-				if target then
-					local coverPos = Squad_FindCover(squad, pos, 15)
-					if World_DistancePointToPoint(pos, coverPos) > 5 then
-						SGroup_Single(sg, squad)
-						Command_SquadPosFacing(player, sg, SCMD_Move, coverPos, Squad_GetPosition(target), false)
+			if lockSquad then
+				local coverPos, targetSquadPos = AIControl_MainControl.GetSquadCoverPosition(squad)
+				if coverPos then
+					SGroup_Single(sg, squad)
+					if targetSquadPos then
+						Command_SquadPosFacing(player, sg, SCMD_Move, coverPos, targetSquadPos, false)
+					else
+						Command_SquadPos(player, sg, SCMD_Move, coverPos, false)
 					end
 				end
 			end
