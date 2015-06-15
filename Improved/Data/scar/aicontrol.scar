@@ -493,12 +493,16 @@ AIControl.Grid = {
 							else -- endless capture/move order bug fix
 								if Squad_HasActiveCommand(s) and Squad_GetActiveCommand(s) == SQUADSTATEID_Capture then
 									if not AIControl_MainControl_LockedSquads[team][squadGameID] then
-										AI_LockSquad(player, s)
+										if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
+											AI_LockSquad(player, s)
+										end
 										AIControl_MainControl_LockedSquads[team][squadGameID] = -1
 									end
 								else
 									if AIControl_MainControl_LockedSquads[team][squadGameID] == -1 then
-										AI_UnlockSquad(player, s)
+										if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
+											AI_UnlockSquad(player, s)
+										end
 										AIControl_MainControl_LockedSquads[team][squadGameID] = nil
 									end
 								end
