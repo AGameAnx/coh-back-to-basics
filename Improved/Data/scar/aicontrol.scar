@@ -65,6 +65,7 @@ local AIControl_MainControl_Settings_UnitControl
 local AIControl_MainControl_Settings_VehicleControl
 local AIControl_MainControl_Settings_BarrageControl
 local AIControl_MainControl_Settings_HQControl
+local AIControl_MainControl_Settings_CombatUnitControl
 local AIControl_MainControl_LockedSquads
 
 local wHalfWidth = World_GetWidth()*0.5
@@ -258,9 +259,6 @@ AIControl.Grid = {
 			AIControl_Grid_t_DataCounts[i] = {}
 			AIControl_Grid_t_AveragePosData[i] = {}
 			
-			AIControl_Grid_DataClump[i] = {}
-			AIControl_Grid_DataClumpFOW[i] = {}
-			
 			for j=1,Dimensions[2] do
 				AIControl_Grid_t_Data[i][j] = {0, 0}
 				AIControl_Grid_t_ArmorData[i][j] = {0, 0}
@@ -272,8 +270,6 @@ AIControl.Grid = {
 					World_Pos(AIControl_Grid.ControlPoints[i][j].x, AIControl_Grid.ControlPoints[i][j].y, AIControl_Grid.ControlPoints[i][j].z)
 				}
 				
-				AIControl_Grid_DataClump[i][j] = {0, 0}
-				AIControl_Grid_DataClumpFOW[i][j] = {0, 0}
 			end
 		end
 		if resetReal then
@@ -282,6 +278,9 @@ AIControl.Grid = {
 				AIControl_Grid_ArmorData[i] = {}
 				AIControl_Grid_DataCounts[i] = {}
 				AIControl_Grid_AveragePosData[i] = {}
+			
+				AIControl_Grid_DataClump[i] = {}
+				AIControl_Grid_DataClumpFOW[i] = {}
 				for j=1,Dimensions[2] do
 					AIControl_Grid_Data[i][j] = {0, 0}
 					AIControl_Grid_ArmorData[i][j] = {0, 0}
@@ -292,6 +291,9 @@ AIControl.Grid = {
 						World_Pos(AIControl_Grid.ControlPoints[i][j].x, AIControl_Grid.ControlPoints[i][j].y, AIControl_Grid.ControlPoints[i][j].z),
 						World_Pos(AIControl_Grid.ControlPoints[i][j].x, AIControl_Grid.ControlPoints[i][j].y, AIControl_Grid.ControlPoints[i][j].z)
 					}
+					
+					AIControl_Grid_DataClump[i][j] = {0, 0}
+					AIControl_Grid_DataClumpFOW[i][j] = {0, 0}
 				end
 			end
 		end
@@ -418,21 +420,8 @@ AIControl.Grid = {
 			local position = Squad_GetPosition(s)
 			local x,y = AIControl_Grid.GetXY(position)
 			
-			local retreated = false
-			if not Player_IsHuman(player) then
-				
-				-- reinforcing
-				local tmpSG = SGroup_CreateIfNotFound("tempsg")
-				SGroup_Single(tmpSG, s)
-				if Squad_CanInstantReinforceNow(s) and Squad_HasActiveCommand(s) and Squad_GetActiveCommand(s) ~= SQUADSTATEID_Idle then
-					if not Squad_IsReinforcing(s) or Squad_GetProductionQueueSize(s) < 2 then
-						Cmd_ReinforceUnit(tmpSG, 1)
-					end
-				end
-				if Squad_IsReinforcing(s) and (not Squad_CanInstantReinforceNow(s) or Squad_Count(s) == Squad_GetMax(s)) then -- Fix for reinforce bug
-					Command_Squad(player, tmpSG, SCMD_CancelProduction, false)
-				end
-				SGroup_Destroy(tmpSG)
+			local retreated = Squad_IsRetreating(s)
+			if not retreated and not Player_IsHuman(player) then
 				
 				-- retreating
 				if Squad_IsUnderAttack(s, 2) and not Squad_IsRetreating(s) and not AIControl_IsSquadVehicle(s) then
@@ -466,6 +455,20 @@ AIControl.Grid = {
 				end
 				
 				if not retreated then
+					
+					-- reinforcing
+					local tmpSG = SGroup_CreateIfNotFound("tempsg")
+					SGroup_Single(tmpSG, s)
+					if Squad_CanInstantReinforceNow(s) and Squad_HasActiveCommand(s) and Squad_GetActiveCommand(s) ~= SQUADSTATEID_Idle then
+						if not Squad_IsReinforcing(s) or Squad_GetProductionQueueSize(s) < 2 then
+							Cmd_ReinforceUnit(tmpSG, 1)
+						end
+					end
+					if Squad_IsReinforcing(s) and (not Squad_CanInstantReinforceNow(s) or Squad_Count(s) == Squad_GetMax(s)) then -- Fix for reinforce bug
+						Command_Squad(player, tmpSG, SCMD_CancelProduction, false)
+					end
+					SGroup_Destroy(tmpSG)
+					
 					local raceStr = Player_GetRaceName(player)
 					local ucSetting = AIControl_MainControl_Settings_UnitControl.UnitSettings[bpID]
 					local vcUnit = false
@@ -486,11 +489,17 @@ AIControl.Grid = {
 					end
 					if not ucSetting and not vcUnit and not bcSetting and not isVehicle then
 						local squadGameID = Squad_GetGameID(s)
-						if not AIControl_MainControl_LockedSquads[team][squadGameID] or AIControl_MainControl_LockedSquads[team][squadGameID] == -1 or AIControl_MainControl_LockedSquads[team][squadGameID] == 4 then
+						if not AIControl_MainControl_LockedSquads[team][squadGameID]
+								or AIControl_MainControl_LockedSquads[team][squadGameID] == -1
+								or AIControl_MainControl_LockedSquads[team][squadGameID] == 4
+								or AIControl_MainControl_LockedSquads[team][squadGameID] == 5 then
 							local inCombat = Squad_IsAttacking(s, 5) or Squad_IsUnderAttack(s, 5)
-							if AIControl_MainControl_LockedSquads[team][squadGameID] == 4 or inCombat then
+							if inCombat
+									or AIControl_MainControl_LockedSquads[team][squadGameID] == 4
+									or AIControl_MainControl_LockedSquads[team][squadGameID] == 5 then
 								AIControl_MainControl.FCombatUnitControl(s, inCombat)
-							else -- endless capture/move order bug fix
+							else
+								-- endless capture/move order bug fix
 								if Squad_HasActiveCommand(s) and Squad_GetActiveCommand(s) == SQUADSTATEID_Capture then
 									if not AIControl_MainControl_LockedSquads[team][squadGameID] then
 										if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
@@ -1245,13 +1254,13 @@ AIControl.Pathfinding = { -- currently unused
 
 --------------------------------------------------------------------------------------------------------------------
 
-UNIT_CONTROL_CONST = {
+local UNIT_CONTROL_CONST = {
 	DEFAULT_SETUP_TARGET_DANGER = 2.3,
 	DEFAULT_SAFETY_SEARCH_RADIUS_STEPS = 3,
 	DEFAULT_MOVE_BACK_DANGER = 8.5,
 	DEFAULT_RETREAT_DANGER = 19,
 }
-UNIT_CONTROL_PRESET = {
+local UNIT_CONTROL_PRESET = {
 	SNIPER = {
 		['attack_move_forward'] = true,
 		['safety_radius_steps'] = 3,
@@ -1264,11 +1273,11 @@ UNIT_CONTROL_PRESET = {
 	},
 	MORTAR = {
 		['safety_radius_steps'] = 5,
-		['setup_target_danger'] = 1,
+		['setup_target_danger'] = 0.5,
 		['move_back_danger'] = 1.35,
-		['retreat_danger'] = 10,
+		['retreat_danger'] = 11,
 		['init_step'] = 2,
-		['step_count'] = 5,
+		['step_count'] = 6,
 		['target_angle_threshold'] = -1
 	},
 	NEBELWERFER = {
@@ -1276,8 +1285,8 @@ UNIT_CONTROL_PRESET = {
 		['setup_target_danger'] = 0.5, -- shouldn't ever setup (get locked while not barraging)
 		['move_back_danger'] = 0.55,
 		['retreat_danger'] = -1,
-		['init_step'] = 4,
-		['step_count'] = 4,
+		['init_step'] = 3,
+		['step_count'] = 2,
 		['target_angle_threshold'] = -1
 	},
 	AT_GUN = {
@@ -1295,6 +1304,7 @@ UNIT_CONTROL_PRESET = {
 	}
 }
 
+local BARRAGE_CONTROL_POSITION
 BARRAGE_CONTROL_POSITION = {
 	SMOKE_BARRAGE = function(squad, setting)
 		local HMGBlueprintIDs = {
@@ -1345,6 +1355,98 @@ BARRAGE_CONTROL_POSITION = {
 		end
 		SGroup_Destroy(sg)
 		return false
+	end,
+}
+
+local CUCONTROL_TACTIC
+local CUCONTROL_ABILITY_PRESET
+local CUCONTROL_BEHAVIORS
+
+CUCONTROL_TACTIC = {
+	FILTER = {
+		--GRENADE = function(squad) return true end
+	},
+	RANGE = {
+		GRENADE = function(squad)
+		
+		end
+	},
+	POSITION_FILTER = {
+		GRENADE = function(squad, custom_range, custom_starting_position)
+			local range = custom_range or 30
+			local selfPos = custom_starting_position or Squad_GetPosition(squad)
+			local sg = SGroup_CreateIfNotFound('tactics_grenadepos')
+			SGroup_Clear(sg)
+			World_GetSquadsNearPoint(Squad_GetPlayerOwner(squad), sg, selfPos, range, OT_Enemy)
+			local closestDist = range+5
+			local closestSquad = nil
+			for i=1,SGroup_CountSpawned(sg) do
+				local s = SGroup_GetSpawnedSquadAt(sg, i)
+				local isVehicle = false
+				for j=0,Squad_Count(s)-1 do
+					local entity = Squad_EntityAt(s, j)
+					if Entity_IsVehicle(entity) then
+						isVehicle = true
+						break
+					end
+				end
+				if not isVehicle and not Squad_IsMoving(s) then
+					local pos = Squad_GetPosition(s)
+					local dist = World_DistancePointToPoint(selfPos, pos)
+					if dist < closestDist then
+						closestDist = dist
+						closestSquad = s
+					end
+				end
+			end
+			SGroup_Destroy(sg)
+			if closestSquad then
+				return Squad_GetPosition(closestSquad)
+			else
+				return false
+			end
+		end,
+	},
+	SQUAD_FILTER = {
+		STICKY_BOMB = function(squad, custom_range)
+			
+		end,
+	},
+	POSITION_VERIFY = {
+		GRENADE = function(squad, position1, position2)
+			local pos = CUCONTROL_TACTIC.POSITION_FILTER.GRENADE(squad, 5, position1)
+			return pos and World_DistancePointToPoint(position1, pos) < 7
+		end,
+	}
+}
+
+CUCONTROL_ABILITY_PRESET = {
+	GRENADE = {
+		blueprint = BP_GetAbilityBlueprint('abilities/ally_throw_grenade.lua'),
+		lockDuration = 15,
+		verifyPosition = true,
+		weight = 10,
+		queued = false,
+		type = 'targeted',
+		--filter = CUCONTROL_TACTIC.FILTER.TRIVIAL_ACCEPT,
+		position = CUCONTROL_TACTIC.POSITION_FILTER.GRENADE,
+		positionVerify = CUCONTROL_TACTIC.POSITION_VERIFY.GRENADE
+	},
+	FIRE_UP = {
+		blueprint = BP_GetAbilityBlueprint('abilities/ally_fireup_ability.lua'),
+		lockDuration = 0,
+		verifyPosition = false,
+		weight = 10,
+		queued = false,
+		type = 'default',
+		filter = CUCONTROL_TACTIC.FILTER.TRIVIAL_ACCEPT,
+	}
+}
+
+CUCONTROL_BEHAVIORS = {
+	FIRE_UP = function(squad, callback)
+		Cmd_Ability(sg, BP_GetAbilityBlueprint('abilities/ally_fireup_ability.lua'), nil, nil, false, false)
+		callback()
 	end,
 }
 
@@ -1524,24 +1626,199 @@ AIControl.MainControl = {
 		BarrageControl = { -- Normal ai tactic functionality should be used for most barrages. These barrages are included here mostly to fix the units locked due to other aicontrol functionality
 			SaveUpAmountGrowthWithTime = 150/700, -- Munitions saved starts at 0 and grows throughout the game
 			SaveUpAmount = 150, -- We'll try to save up to this amount of munitions in the lategame
-			ChangeToCastBelowsavedMunitionsThreshold = 5, -- A percentage chance to cast the abilities even if we're currently saving up our munitions
+			ChanceToCastBelowsavedMunitionsThreshold = 5, -- A percentage chance (0 to 100) to cast the abilities even if we're currently saving up our munitions
 			UnitSettings = {
 				[BP_GetID(SBP.ALLIES.MORTAR)] = {
-					{weight=4, searchrange=90, cost=20, minThreatToCast=1.75, lockDuration=8, blueprint=BP_GetAbilityBlueprint('abilities/ally_sync_mortar_barrage.lua')},
-					{weight=2, searchrange=100, cost=15, positionFunc=BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/ally_mortar_smoke_barrage.lua')},
-					{weight=2, searchrange=100, cost=15, positionFunc=BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_mortar_smoke_barrage.lua')},
+					{weight=4, searchrange=90, cost=20, minThreatToCast=1.75, lockDuration=48, blueprint=BP_GetAbilityBlueprint('abilities/ally_sync_mortar_barrage.lua')},
+					{weight=2, searchrange=100, cost=15, positionFunc=BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE, lockDuration=30, blueprint=BP_GetAbilityBlueprint('abilities/ally_mortar_smoke_barrage.lua')},
+					{weight=2, searchrange=100, cost=15, positionFunc=BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE, lockDuration=30, blueprint=BP_GetAbilityBlueprint('abilities/axis_mortar_smoke_barrage.lua')},
 				},
 				[BP_GetID(SBP.AXIS.MORTAR)] = {
-					{weight=4, searchrange=90, cost=20, minThreatToCast=1.75, lockDuration=8, blueprint=BP_GetAbilityBlueprint('abilities/axis_sync_mortar_barrage.lua')},
-					{weight=2, searchrange=100, cost=15, positionFunc=BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/ally_mortar_smoke_barrage.lua')},
-					{weight=2, searchrange=100, cost=15, positionFunc=BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_mortar_smoke_barrage.lua')},
+					{weight=4, searchrange=90, cost=20, minThreatToCast=1.75, lockDuration=48, blueprint=BP_GetAbilityBlueprint('abilities/axis_sync_mortar_barrage.lua')},
+					{weight=2, searchrange=100, cost=15, positionFunc=BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE, lockDuration=30, blueprint=BP_GetAbilityBlueprint('abilities/ally_mortar_smoke_barrage.lua')},
+					{weight=2, searchrange=100, cost=15, positionFunc=BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE, lockDuration=30, blueprint=BP_GetAbilityBlueprint('abilities/axis_mortar_smoke_barrage.lua')},
 				},
 				[BP_GetID(SBP.AXIS.NEBELWERFER)] = {
-					{weight=1, searchrange=245, cost=35, minThreatToCast=2.15, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_nebelwerfer_barrage.lua')},
+					{weight=1, searchrange=245, cost=35, minThreatToCast=2.55, lockDuration=48, blueprint=BP_GetAbilityBlueprint('abilities/axis_nebelwerfer_barrage.lua')},
 				},
 				[BP_GetID(SBP.AXIS.HALFTRACK)] = {
-					{weight=1, searchrange=200, cost=50, minThreatToCast=2.75, lockDuration=10, blueprint=BP_GetAbilityBlueprint('abilities/axis_stuka_zu_fuss_rocket_halftrack.lua')},
+					{weight=1, searchrange=200, cost=50, minThreatToCast=2.75, lockDuration=48, blueprint=BP_GetAbilityBlueprint('abilities/axis_stuka_zu_fuss_rocket_halftrack.lua')},
 				},
+				[BP_GetID(SBP.ELITE.MORTAR)] = {
+					{weight=3, searchrange=100, cost=20, minThreatToCast=1.75, lockDuration=48, blueprint=BP_GetAbilityBlueprint('abilities/axis_sync_mortar_barrage.lua')},
+					{weight=3, searchrange=100, cost=35, minThreatToCast=2.25, lockDuration=30, blueprint=BP_GetAbilityBlueprint('abilities/panzer_elite_incendiary_mortar_barrage.lua')},
+					{weight=2, searchrange=100, cost=15, positionFunc=BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE, lockDuration=30, blueprint=BP_GetAbilityBlueprint('abilities/panzer_elite_mortar_smoke_barrage.lua')},
+				},
+			},
+		},
+		
+		CombatUnitControl = {
+			BaseLockChance = 45,
+			UnitSettings = {
+				-- USF
+				[BP_GetID(SBP.ALLIES.ENGINEER)] = {
+					assault_troops = true,
+					lock_chance = 100,
+					ability_chance = 40,
+					abilities = {
+						-- todo: add demo charges
+						{
+							preset = CUCONTROL_ABILITY_PRESET.GRENADE,
+							overrides = {
+								blueprint = BP_GetAbilityBlueprint('abilities/ally_throw_grenade_engineer.lua')
+							}
+						},
+					},
+				},
+				[BP_GetID(SBP.ALLIES.LOGISTICS_ENGINEER)] = {
+					assault_troops = true,
+					lock_chance = 100,
+					ability_chance = 40,
+					abilities = {
+						{
+							preset = CUCONTROL_ABILITY_PRESET.GRENADE
+						},
+					},
+				},
+				[BP_GetID(SBP.ALLIES.RIFLEMEN)] = {
+					assault_troops = false,
+					lock_chance = 100,
+					ability_chance = 75,
+					abilities = {
+						-- todo: add sticky bombs
+						CUCONTROL_ABILITY_PRESET.GRENADE,
+						{
+							blueprint = BP_GetAbilityBlueprint('abilities/ally_suppression_ability_rifle_squad_infantry.lua'),
+							type = 'default',
+							lockDuration = 5,
+							verifyPosition = false,
+							weight = 10,
+							queued = false,
+						}
+					}
+				},
+				[BP_GetID(SBP.ALLIES.PARATROOPER)] = {
+					assault_troops = false,
+					lock_chance = 100,
+					ability_chance = 50,
+					abilities = {
+						-- todo: add satchel charges
+						{
+							preset = CUCONTROL_ABILITY_PRESET.GRENADE,
+							overrides = {
+								behavior = CUCONTROL_BEHAVIORS.FIRE_UP
+							}
+						},
+					}
+				},
+				[BP_GetID(SBP.ALLIES.RANGER)] = {
+					assault_troops = function(squad) return Squad_HasUpgrade(squad, BP_GetUpgradeBlueprint('upgrade/allies/items/allies_rifle_squad_anti_infantry_package.lua')) end,
+					lock_chance = 100,
+					ability_chance = 75,
+					abilities = {
+						{
+							preset = CUCONTROL_ABILITY_PRESET.GRENADE,
+							overrides = {
+								behavior = CUCONTROL_BEHAVIORS.FIRE_UP
+							}
+						},
+					}
+				},
+				
+				-- Wehrmacht
+				[BP_GetID(SBP.AXIS.PIONEER)] = {
+					assault_troops = true,
+					lock_chance = 100,
+					ability_chance = 20,
+					abilities = {},
+				},
+				[BP_GetID(SBP.AXIS.VOLKSGRENADIER)] = {
+					assault_troops = function(squad) return Squad_HasUpgrade(squad, BP_GetUpgradeBlueprint('upgrade/axis/items/axis_squad_item_volksgrenadier_smg.lua')) end,
+					lock_chance = 100,
+					ability_chance = 20,
+					abilities = {
+						{
+							preset = CUCONTROL_ABILITY_PRESET.GRENADE,
+							overrides = {
+								blueprint = BP_GetAbilityBlueprint('abilities/axis_throw_grenade.lua')
+							}
+						},
+					},
+				},
+				[BP_GetID(SBP.AXIS.GRENADIER)] = {
+					assault_troops = false,
+					lock_chance = 100,
+					ability_chance = 20,
+					abilities = {
+						{
+							preset = CUCONTROL_ABILITY_PRESET.GRENADE,
+							overrides = {
+								blueprint = BP_GetAbilityBlueprint('abilities/axis_throw_grenade.lua')
+							}
+						},
+					},
+				},
+				[BP_GetID(SBP.AXIS.STORMTROOPER)] = {
+					assault_troops = function(squad) return Squad_HasUpgrade(squad, BP_GetUpgradeBlueprint('upgrade/axis/items/axis_squad_item_mp44.lua')) end,
+					lock_chance = 100,
+					ability_chance = 20,
+					abilities = {
+						{
+							preset = CUCONTROL_ABILITY_PRESET.GRENADE,
+							overrides = {
+								blueprint = BP_GetAbilityBlueprint('abilities/axis_throw_grenade_improved.lua')
+							}
+						},
+					},
+				},
+				[BP_GetID(SBP.AXIS.STURMPIONEER)] = {
+					assault_troops = function(squad) return Squad_HasUpgrade(squad, BP_GetUpgradeBlueprint('upgrade/axis/items/axis_squad_item_mp44_sturmpioneer.lua')) end,
+					lock_chance = 100,
+					ability_chance = 20,
+					abilities = {
+						{
+							preset = CUCONTROL_ABILITY_PRESET.GRENADE,
+							overrides = {
+								blueprint = BP_GetAbilityBlueprint('abilities/axis_throw_grenade_improved.lua')
+							}
+						},
+					},
+				},
+				[BP_GetID(SBP.AXIS.WAFFENSS)] = {
+					assault_troops = false,
+					lock_chance = 100,
+					ability_chance = 20,
+					abilities = {
+						{
+							preset = CUCONTROL_ABILITY_PRESET.GRENADE,
+							overrides = {
+								blueprint = BP_GetAbilityBlueprint('abilities/axis_throw_grenade_improved.lua')
+							}
+						},
+					},
+				},
+				
+				-- Commonwealth
+				--[[[BP_GetID(SBP.CW.COMMANDOS)] = {
+					assault_troops = true,
+					lock_chance = 100,
+					ability_chance = 20,
+					abilities = {
+						{
+							preset = CUCONTROL_ABILITY_PRESET.GRENADE,
+							overrides = {
+								blueprint = BP_GetAbilityBlueprint('abilities/.lua')
+							}
+						},
+						{
+							preset = CUCONTROL_ABILITY_PRESET.FIRE_UP,
+							overrides = {
+								blueprint = BP_GetAbilityBlueprint('abilities/.lua')
+							}
+						},
+					},
+				},]]
+				
 			},
 		},
 		
@@ -1602,11 +1879,7 @@ AIControl.MainControl = {
 	
 	AIMarkers = {},
 	
-	SplitUpdateStep = 0,
-	SplitUpdates = 1,
-	
 	HQPositions = {},
-	
 	HQUpdateWait = 0,
 	
 	InitUpdateComplete = false,
@@ -1632,6 +1905,8 @@ AIControl.MainControl = {
 	},
 	
 	BarrageControlLockTimers = {},
+	
+	CombatUnitControlAbilityLockTimers = {},
 	
 	Init = function()
 		AIControl_MainControl.HQs = {SGroup_CreateIfNotFound("AIControl.MainControl.HQT1"), SGroup_CreateIfNotFound("AIControl.MainControl.HQT2")}
@@ -1745,7 +2020,7 @@ AIControl.MainControl = {
 		if noFOW == nil then noFOW = false end
 		local maxDanger = 0
 		local maxDangerPos = nil
-		local radiusSquared = radius^2
+		local radiusSquared = radius*radius
 		for i = max(1, floor(x-radius)),min(Dimensions[1], ceil(x+radius)) do
 			local aSquared = (i-x)^2
 			for j = max(1, floor(y-radius)),min(Dimensions[2], ceil(y+radius)) do
@@ -1755,14 +2030,14 @@ AIControl.MainControl = {
 						if AIControl_Grid_DataClump[i][j][team] then
 							if AIControl_Grid_DataClump[i][j][team] > maxDanger then
 								maxDanger = AIControl_Grid_DataClump[i][j][team]
-								maxDangerPos = {i,j}
+								maxDangerPos = {i, j}
 							end
 						end
 					else
 						if AIControl_Grid_DataClumpFOW[i][j][team] then
 							if AIControl_Grid_DataClumpFOW[i][j][team] > maxDanger then
 								maxDanger = AIControl_Grid_DataClumpFOW[i][j][team]
-								maxDangerPos = {i,j}
+								maxDangerPos = {i, j}
 							end
 						end
 					end
@@ -2031,7 +2306,7 @@ AIControl.MainControl = {
 								hqMult = hqMult + yBorderDistRatio*2
 							end
 							local retreatDirection = AIControl_MainControl.GetRetreatDirection(surroundingSafety, pos, team, 1.5, 1.1, directionToHq, hqMult, 0.025, 0.5, 0)
-							local retreatDistance = 5+min(30, max(0, 3*(collectiveDanger-2)))
+							local retreatDistance = 25
 							local retreatLocation = AIControl_MainControl.GetRetreatLocation(pos, retreatDirection, retreatDistance)
 							
 							local x2,y2 = AIControl_Grid.GetXY(retreatLocation)
@@ -2140,7 +2415,7 @@ AIControl.MainControl = {
 						AIControl_MainControl.UnitControlUnlockTimers[team][squadGameID] = 0
 					elseif AIControl_MainControl.UnitControlUnlockTimers[team][squadGameID] then
 						AIControl_MainControl.UnitControlUnlockTimers[team][squadGameID] = AIControl_MainControl.UnitControlUnlockTimers[team][squadGameID] + 1
-						if AIControl_MainControl.UnitControlUnlockTimers[team][squadGameID] > 7/AIControl_MainControl.SplitUpdates then
+						if AIControl_MainControl.UnitControlUnlockTimers[team][squadGameID] > 56/AIControl_Grid.SplitUpdateCount then
 							if AIControl_MainControl_LockedSquads[team][squadGameID] then
 								if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
 									AI_UnlockSquad(player, squad)
@@ -2377,14 +2652,14 @@ AIControl.MainControl = {
 							if angle > angleThreshold then
 								lockSquad = true
 								
-								if not AIControl_MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] or AIControl_MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] > 6/AIControl_MainControl.SplitUpdates then
+								if not AIControl_MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] or AIControl_MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] > 48/AIControl_Grid.SplitUpdateCount then
 									AIControl_MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = 0
 									Command_SquadPosFacing(player, sg, SCMD_Move, pos, Util_ScarPos(pos.x + facingDirection.x*10, pos.z + facingDirection.z*10), false)
 								else
 									AIControl_MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = AIControl_MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] + 1
 								end
 							else
-								if AIControl_MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] and AIControl_MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] <= 4/AIControl_MainControl.SplitUpdates then
+								if AIControl_MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] and AIControl_MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] <= 32/AIControl_Grid.SplitUpdateCount then
 									AIControl_MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = AIControl_MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] + 1
 								else
 									AIControl_MainControl.VehicleControl.FacingCmdTimers[team][squadGameID] = nil
@@ -2436,23 +2711,24 @@ AIControl.MainControl = {
 			local curMunitions = Player_GetResource(player, RT_Munition)
 			local desiredSaveUpAmount = min(AIControl_MainControl_Settings_BarrageControl.SaveUpAmount, AIControl_MainControl_Settings_BarrageControl.SaveUpAmountGrowthWithTime*World_GetGameTime())
 			
-			local shouldCast = true
-			if curMunitions < desiredSaveUpAmount then -- are we saving up?
-				shouldCast = World_GetRand(0,100) < AIControl_MainControl_Settings_BarrageControl.ChangeToCastBelowsavedMunitionsThreshold
+			local shouldCast = curMunitions > desiredSaveUpAmount
+			if not shouldCast then -- are we saving up?
+				shouldCast = World_GetRand(0,100) < AIControl_MainControl_Settings_BarrageControl.ChanceToCastBelowsavedMunitionsThreshold
 			end
 			
 			if shouldCast then
 				local pos = Squad_GetPosition(squad)
 				local x,y = AIControl_Grid.GetXY(pos)
+				
 				local totalAbilityWeight = 0
-				for j=1,#setting do
-					totalAbilityWeight = totalAbilityWeight + setting[j].weight
+				for i=1,#setting do
+					totalAbilityWeight = totalAbilityWeight + setting[i].weight
 				end
 				
 				local weightRand = World_GetRand(0, totalAbilityWeight)
 				local curWeight = 0
-				for j=1,#setting do
-					local v = setting[j]
+				for i=1,#setting do
+					local v = setting[i]
 					curWeight = curWeight + v.weight
 					if curWeight >= weightRand then
 						
@@ -2473,8 +2749,10 @@ AIControl.MainControl = {
 								local clumpSearchRadius = v.searchrange/((Dimensions[3]+Dimensions[4])*0.5)
 								--d r_drawCircle('aicontrol_maincontrol', pos.x, pos.y+10, pos.z, clumpSearchRadius*((Dimensions[1]+Dimensions[2])*0.5), 255, 255, 255)
 								local bestClump, bestClumpThreat = AIControl_MainControl.GetBestClumpForRadius(enemyTeam, x, y, clumpSearchRadius, false)
+								
 								if bestClump and bestClumpThreat >= v.minThreatToCast then
 									castPosition = AIControl_Grid_AveragePosData[bestClump[1]][bestClump[2]][enemyTeam]
+									--dr_drawline(World_Pos(pos.x, pos.y+2, pos.z), World_Pos(castPosition.x, castPosition.y+2, castPosition.z), 255, 125, 125, 'aicontrol_maincontrol')
 								end
 							end
 						else
@@ -2483,7 +2761,7 @@ AIControl.MainControl = {
 						
 						if castPosition then
 							Cmd_Ability(sg, v.blueprint, castPosition, World_Pos(0,0,0), false, false)
-							AIControl_MainControl.BarrageControlLockTimers[squadGameID] = v.lockDuration/AIControl_MainControl.SplitUpdates
+							AIControl_MainControl.BarrageControlLockTimers[squadGameID] = v.lockDuration/AIControl_Grid.SplitUpdateCount
 							lockSquad = true
 						end
 						
@@ -2516,25 +2794,16 @@ AIControl.MainControl = {
 		SGroup_Destroy(sg)
 	end,
 	
-	GetSquadCoverPosition = function(squad)
+	GetSquadCoverPosition = function(squad, targetSquadPos)
 		local pos = Squad_GetPosition(squad)
 		
-		local targetSG = SGroup_Create('aicontrol_cuc_target_tempsg')
-		Squad_GetAttackTargets(squad, targetSG)
-		local targetSquad = nil
-		if SGroup_CountSpawned(targetSG) > 0 then
-			targetSquad = SGroup_GetSpawnedSquadAt(targetSG, 1)
-		end
-		SGroup_Destroy(targetSG)
-		
-		local targetSquadPos = false
-		if targetSquad then
-			targetSquadPos = Squad_GetPosition(targetSquad)
+		if targetSquadPos then
 			local posDiff = World_Pos(targetSquadPos.x - pos.x, 0, targetSquadPos.z - pos.z)
-			local posDiffLength = math.sqrt(posDiff.x^2 + posDiff.z^2)
+			local posDiffLength = sqrt(posDiff.x*posDiff.x + posDiff.z*posDiff.z)
 			if posDiffLength > 0 then
-				posDiff.x = posDiff.x/posDiffLength
-				posDiff.z = posDiff.z/posDiffLength
+				local posDiffLengthM = 1/posDiffLength
+				posDiff.x = posDiff.x*posDiffLengthM
+				posDiff.z = posDiff.z*posDiffLengthM
 				
 				pos.x = pos.x + posDiff.x*5
 				pos.z = pos.z + posDiff.z*5
@@ -2543,35 +2812,196 @@ AIControl.MainControl = {
 		
 		-- get the cover pos, this function returns the anchor pos if it couldn't find cover
 		local posCover = Squad_FindCoverCompareCurrent(squad, pos, 12, 15, true)
-		if World_DistanceSquaredPointToPoint(pos, posCover) > 8 then	
-			return posCover, targetSquadPos
+		if World_DistanceSquaredPointToPoint(pos, posCover) > 16 then
+			return posCover
 		end
 		return false
 	end,
+	ExecuteCombatUnitAbility = function(sg, squad, ability)
+		if ability.type == 'targeted' then
+			local castPosition, castPosition2 = ability.position(squad)
+			if castPosition then
+				local secondPosition = castPosition2 or World_Pos(0,0,0)
+				Cmd_Ability(sg, ability.blueprint, castPosition, secondPosition, false, ability.queued)
+				return true, castPosition, secondPosition
+			end
+		elseif ability.type == 'default' then
+			Cmd_Ability(sg, ability.blueprint, nil, nil, false, ability.queued)
+			return true, nil, nil
+		end
+		return false, nil, nil
+	end,
 	FCombatUnitControl = function(squad, inCombat)
 		local sg = SGroup_Create("aicontrol_cuc_tempsg")
+		SGroup_Single(sg, squad)
 		local squadGameID = Squad_GetGameID(squad)
 		local player = Squad_GetPlayerOwner(squad)
 		local team = Player_GetTeam(player)+1
 		local enemyTeam = Team_GetEnemyTeam(team-1)+1
-		if not AIControl_MainControl_LockedSquads[team][squadGameID] or AIControl_MainControl_LockedSquads[team][squadGameID] == 4 or AIControl_MainControl_LockedSquads[team][squadGameID] == -1 then
-			local lockSquad = inCombat and World_GetRand(0, 100) < 45
+		local pos = Squad_GetPosition(squad)
+		if not AIControl_MainControl_LockedSquads[team][squadGameID]
+				or AIControl_MainControl_LockedSquads[team][squadGameID] == 4
+				or AIControl_MainControl_LockedSquads[team][squadGameID] == 5
+				or AIControl_MainControl_LockedSquads[team][squadGameID] == -1 then
 			
-			if lockSquad then
-				local coverPos, targetSquadPos = AIControl_MainControl.GetSquadCoverPosition(squad)
-				if coverPos then
-					SGroup_Single(sg, squad)
-					if targetSquadPos then
-						Command_SquadPosFacing(player, sg, SCMD_Move, coverPos, targetSquadPos, false)
-					else
-						Command_SquadPos(player, sg, SCMD_Move, coverPos, false)
+			local bpID = BP_GetID(Squad_GetBlueprint(squad))
+			local setting = AIControl_MainControl_Settings_CombatUnitControl.UnitSettings[bpID]
+			if setting then
+				if setting.preset and setting.overrides then
+					local finalSetting = {}
+					for i,v in pairs(setting.preset) do
+						if setting.overrides[i] then
+							finalSetting[i] = setting.overrides[i]
+						else
+							finalSetting[i] = v
+						end
+					end
+					setting = finalSetting
+				end
+			end
+			
+			local lockType = 4
+			local lockSquad = true
+			if AIControl_MainControl_LockedSquads[team][squadGameID] == 5 then
+				local timerData = AIControl_MainControl.CombatUnitControlAbilityLockTimers[squadGameID]
+				if timerData then
+					timerData.timer = timerData.timer - 1
+					if timerData.timer <= 0 or (timerData.ability.verifyPosition and not timerData.ability.positionVerify(squad, timerData.position1, timerData.position2)) then
+						AIControl_MainControl.CombatUnitControlAbilityLockTimers[squadGameID] = nil
+						lockSquad = false
+					end
+				else
+					lockSquad = false
+				end
+			else
+				local lockChance = AIControl_MainControl_Settings_CombatUnitControl.BaseLockChance
+				if setting and setting.lock_chance ~= nil then
+					lockChance = setting.lock_chance
+				end
+				lockSquad = inCombat and World_GetRand(0, 100) < lockChance
+				
+				if lockSquad then
+					local doingSomething = false
+					
+					local tryCastAnAbility = setting and World_GetRand(0, 100) < setting.ability_chance
+					if tryCastAnAbility then
+						local abilities = {}
+						
+						local totalAbilityWeight = 0
+						for i=1,#setting.abilities do
+							local ability = setting.abilities[i]
+							if ability.preset and ability.overrides then
+								local finalAbility = {}
+								for j,v in pairs(ability.preset) do
+									if ability.overrides[j] then
+										finalAbility[j] = ability.overrides[j]
+									else
+										finalAbility[j] = v
+									end
+								end
+								ability = finalAbility
+							end
+							abilities[i] = ability
+							totalAbilityWeight = totalAbilityWeight + ability.weight
+						end
+						
+						local weightRand = World_GetRand(0, totalAbilityWeight)
+						local curWeight = 0
+						for i=1,#abilities do
+							local ability = abilities[i]
+							curWeight = curWeight + ability.weight
+							if curWeight >= weightRand then
+								local shouldCast = true
+								if ability.filter then
+									shouldCast = ability.filter(squad)
+								end
+								if shouldCast then
+									local position1, position2
+									if ability.behavior then
+										ability.behavior(squad, function()
+											doingSomething, position1, position2 = AIControl_MainControl.ExecuteCombatUnitAbility(sg, squad, ability)
+										end)
+									else
+										doingSomething, position1, position2 = AIControl_MainControl.ExecuteCombatUnitAbility(sg, squad, ability)
+									end
+									
+									if doingSomething then
+										lockType = 5
+										AIControl_MainControl.CombatUnitControlAbilityLockTimers[squadGameID] = {
+											timer = ability.lockDuration/AIControl_Grid.SplitUpdateCount,
+											ability = ability,
+											position1 = position1,
+											position2 = position2
+										}
+									end
+								end
+								
+								break
+							end
+						end
+					end
+					
+					-- TODO: Add assault behavior here
+					if not doingSomething then
+						local targetSquadPos = false
+						local targetSG = SGroup_Create('aicontrol_cuc_target_tempsg')
+						Squad_GetAttackTargets(squad, targetSG)
+						local targetSquad = nil
+						if SGroup_CountSpawned(targetSG) > 0 then
+							targetSquad = SGroup_GetSpawnedSquadAt(targetSG, 1)
+						end
+						SGroup_Destroy(targetSG)
+						if targetSquad then
+							targetSquadPos = Squad_GetPosition(targetSquad)
+						end
+						
+						local shouldAssault = targetSquadPos and setting
+						if shouldAssault and setting.assault_troops ~= nil then
+							if type(setting.assault_troops) == 'function' then
+								shouldAssault = setting.assault_troops(squad)
+							else
+								shouldAssault = setting.assault_troops
+							end
+						end
+						if shouldAssault then
+							local closeInDistance = setting.close_in_distance or 15
+							local posDiff = World_Pos(pos.x - targetSquadPos.x, 0, pos.z - targetSquadPos.z)
+							local posDiffLength = sqrt(posDiff.x*posDiff.x + posDiff.z*posDiff.z)
+							shouldAssault = posDiffLength > closeInDistance
+							if shouldAssault then
+								local posDiffLengthM = 1/posDiffLength
+								posDiff.x = posDiff.x*posDiffLengthM
+								posDiff.z = posDiff.z*posDiffLengthM
+								
+								local targetPos = World_Pos(
+									targetSquadPos.x + posDiff.x*closeInDistance,
+									0,
+									targetSquadPos.z + posDiff.z*closeInDistance)
+								
+								local coverPos = Squad_FindCoverCompareCurrent(squad, targetPos, 3, closeInDistance*1.25, false)
+								if World_DistanceSquaredPointToPoint(pos, coverPos) > 16 then
+									Command_SquadPosFacing(player, sg, SCMD_Move, coverPos, targetSquadPos, false)
+									--dr_drawline(World_Pos(pos.x, pos.y+1, pos.z), World_Pos(coverPos.x, coverPos.y+1, coverPos.z), 255, 0, 0, 'aicontrol_maincontrol')
+								end
+							end
+						end
+						if not shouldAssault then
+							local coverPos = AIControl_MainControl.GetSquadCoverPosition(squad, targetSquadPos)
+							if coverPos then
+								if targetSquadPos then
+									Command_SquadPosFacing(player, sg, SCMD_Move, coverPos, targetSquadPos, false)
+								else
+									Command_SquadPos(player, sg, SCMD_Move, coverPos, false)
+								end
+							end
+						end
 					end
 				end
 			end
 			
 			if lockSquad then
 				if not AIControl_MainControl_LockedSquads[team][squadGameID] then
-					AIControl_MainControl_LockedSquads[team][squadGameID] = 4
+					AIControl_MainControl_LockedSquads[team][squadGameID] = lockType
 					if AI_IsAIPlayer(player) and AI_IsEnabled(player) then
 						AI_LockSquad(player, squad)
 					end
@@ -2591,12 +3021,10 @@ AIControl.MainControl = {
 	Update = function()
 		if g_AIControl_Pause then return end
 		
-		if AIControl_MainControl.SplitUpdateStep == 0 then
-			AIControl_MainControl.SecondaryUpdateTicks = AIControl_MainControl.SecondaryUpdateTicks + 1
-			if AIControl_MainControl.SecondaryUpdateTicks >= AIControl_MainControl_Settings.SecondaryUpdateTicks then
-				AIControl_MainControl.SecondaryUpdate()
-				AIControl_MainControl.SecondaryUpdateTicks = 0
-			end
+		AIControl_MainControl.SecondaryUpdateTicks = AIControl_MainControl.SecondaryUpdateTicks + 1
+		if AIControl_MainControl.SecondaryUpdateTicks >= AIControl_MainControl_Settings.SecondaryUpdateTicks then
+			AIControl_MainControl.SecondaryUpdate()
+			AIControl_MainControl.SecondaryUpdateTicks = 0
 		end
 		
 		local function GetBestTerritoryPoint(sectorID, team)
@@ -2808,8 +3236,8 @@ AIControl.MainControl = {
 							end
 							local surroundingSafety = AIControl_MainControl.GetSurroundingSafety({setupPoint[1], setupPoint[2]}, 0, 9, team)
 							local collectiveDanger = 0
-							for i=1,#surroundingSafety do
-								local v = surroundingSafety[i]
+							for j=1,#surroundingSafety do
+								local v = surroundingSafety[j]
 								collectiveDanger = collectiveDanger + v[3] + v[4]*AIControl_MainControl_Settings_HQControl.HistoryDangerMultiplier
 							end
 							if collectiveDanger >= AIControl_MainControl_Settings_HQControl.DangerOnEnemyValue then 
@@ -3200,6 +3628,7 @@ AIControl.__Init = function()
 		AIControl_MainControl_Settings_VehicleControl = AIControl_MainControl_Settings.VehicleControl
 		AIControl_MainControl_Settings_BarrageControl = AIControl_MainControl_Settings.BarrageControl
 		AIControl_MainControl_Settings_HQControl = AIControl_MainControl_Settings.HQControl
+		AIControl_MainControl_Settings_CombatUnitControl = AIControl_MainControl_Settings.CombatUnitControl
 		AIControl_MainControl_LockedSquads = AIControl_MainControl.LockedSquads
 		
 		AIControl_Grid.SetDimensions(AIControl_Grid_Settings.Init_Dimensions[1], AIControl_Grid_Settings.Init_Dimensions[2])
@@ -3245,6 +3674,7 @@ AIControl_MainControl_Settings_UnitControl = AIControl_MainControl_Settings.Unit
 AIControl_MainControl_Settings_VehicleControl = AIControl_MainControl_Settings.VehicleControl
 AIControl_MainControl_Settings_BarrageControl = AIControl_MainControl_Settings.BarrageControl
 AIControl_MainControl_Settings_HQControl = AIControl_MainControl_Settings.HQControl
+AIControl_MainControl_Settings_CombatUnitControl = AIControl_MainControl_Settings.CombatUnitControl
 AIControl_MainControl_LockedSquads = AIControl_MainControl.LockedSquads
 
 Scar_AddInit(AIControl_Init)
