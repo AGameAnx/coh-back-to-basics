@@ -808,7 +808,7 @@ function Target_CalcCapturePriority(capturePoint, vp_mult, fuel_mult, mt_mult)
 	distScore = distScore--[[ + RatePointsFromEnemyHQDistance(entityPos)/3.5]] + max(0, 2.5 - World_GetGameTime()/150) - 5.25
 	
 	--distMultiplier = distMultiplier + (1 - distMultiplier)*k_capPercentageCoefficient
-	local priority = distMultiplier * (typeScore*0.5 + distScore)
+	local priority = distMultiplier * (typeScore*0.5 + distScore) + 0.15
 	
 	if cache and cache.percentage_pts_captured and cache.percentage_pts_captured > 0.4 then
 		distScore = distScore * min(1, max(0.35, 1.45-1.225*min(0.9, cache.percentage_pts_captured)))

@@ -1,0 +1,123 @@
+
+-- This script is used to spawn some extra effects in locations of heavy combat
+
+local BtB_EffectsList = {
+	--'fx_ambient\\dust_layers\\generic_warm_ground_dust_wind_00',
+	'fx_ambient\\lingering_smoke_warm_soft_combo_01',
+	--'fx_ambient\\rolling_fog_combo_00_6p_closerivercmbt_slow',
+	--'fx_ambient\\rolling_fog_combo_00_6p_closerivercmbt_slow_02_light',
+	--'fx_ambient\\rolling_fog_combo_00_blue',
+}
+
+local BtB_ProjectileLandHeatmapDimensions = {1, 1, 15, 15}
+local BtB_ProjectileLandHeatmap = {}
+
+local BtB_Projectiles = {}
+local BtB_ProjectileData = {}
+
+local BtB_Ballistics_Entities = {}
+local BtB_Ballistics_NextPlayerToScan = 1
+
+local wHalfWidth = World_GetWidth()*0.5
+local wHalfLength = World_GetLength()*0.5
+
+local function BtB_GetProjectileLandXY(pos)
+	return
+		math.max(1, math.min(BtB_ProjectileLandHeatmapDimensions[1], math.ceil((pos.x+wHalfWidth)/BtB_ProjectileLandHeatmapDimensions[3]))),
+		math.max(1, math.min(BtB_ProjectileLandHeatmapDimensions[2], math.ceil((pos.z+wHalfLength)/BtB_ProjectileLandHeatmapDimensions[4])))
+end
+local function BtB_GetCellMiddlePosition(i,j)
+	return
+		-wHalfWidth  + i*BtB_ProjectileLandHeatmapDimensions[3] - BtB_ProjectileLandHeatmapDimensions[3]/2,
+		-wHalfLength + j*BtB_ProjectileLandHeatmapDimensions[4] - BtB_ProjectileLandHeatmapDimensions[4]/2
+end
+local function BtB_ProjectileLanded(projectileData)
+	local x,y = BtB_GetProjectileLandXY(projectileData.position)
+	BtB_ProjectileLandHeatmap[x][y] = BtB_ProjectileLandHeatmap[x][y] + 1
+	if BtB_ProjectileLandHeatmap[x][y] == 3 or BtB_ProjectileLandHeatmap[x][y] == 15 then
+		local x,y = BtB_GetCellMiddlePosition(x, y)
+		Misc_SpawnEffect(BtB_EffectsList[World_GetRand(1, #BtB_EffectsList)],
+			x-BtB_ProjectileLandHeatmapDimensions[3]/2+World_GetRand(0, BtB_ProjectileLandHeatmapDimensions[3]*5)/10,
+			World_GetHeightAt(x, y)+0.5,
+			y-BtB_ProjectileLandHeatmapDimensions[4]/2+World_GetRand(0, BtB_ProjectileLandHeatmapDimensions[4]*5)/10)
+	end
+end
+
+function BtB_ProjectileLandListen()
+	dr_clear("ballistics")
+	for i=1,BtB_ProjectileLandHeatmapDimensions[1] do
+		for j=1,BtB_ProjectileLandHeatmapDimensions[2] do
+			local x,y = BtB_GetCellMiddlePosition(i, j)
+			dr_text3d('ballistics', x, World_GetHeightAt(x, y)+1, y, BtB_ProjectileLandHeatmap[i][j], 0, 255, 255)
+		end
+	end
+	for projectileGameID,projectileData in pairs(BtB_ProjectileData) do
+		if Entity_IsValid(projectileGameID) and Entity_IsAlive(projectileData.entity) and not Entity_IsAttacking(projectileData.entity, 2) and Entity_IsMoving(projectileData.entity) then
+			projectileData.position = Entity_GetPosition(projectileData.entity)
+			--projectileData.heading = Entity_GetHeading(projectileData.entity)
+		else
+			BtB_ProjectileLanded(projectileData)
+			BtB_ProjectileData[projectileGameID] = nil
+		end
+	end
+end
+function BtB_ProjectileFired(projectile, shootingEntity)
+	if projectile then
+		local projectileGameID = Entity_GetGameID(projectile)
+		BtB_Projectiles[projectileGameID] = projectile
+		BtB_ProjectileData[projectileGameID] = {
+			entity = projectile,
+			position = Entity_GetPosition(projectile),
+			--heading = Entity_GetHeading(projectile),
+			--shootingEntity = shootingEntity
+		}
+	end
+end
+
+local function BtB_Ballistics_ScanPlayer(player)
+	local playerIndex = World_GetPlayerIndex(player)
+	local playerSquads = Player_GetSquads(player)
+	for i=1,SGroup_CountSpawned(playerSquads) do
+		local squad = SGroup_GetSpawnedSquadAt(playerSquads, i)
+		--if Squad_GetMax(squad) == 1 then
+		for j=0,Squad_Count(squad)-1 do
+			local entity = Squad_EntityAt(squad, j)
+			--local entity = Squad_EntityAt(squad, 0)
+			if entity then
+				local entityGameID = Entity_GetGameID(entity)
+				if not BtB_Ballistics_Entities[playerIndex][entityGameID] then
+					BtB_Ballistics_Entities[playerIndex][entityGameID] = true
+					if Entity_IsAlive(entity) and not Entity_IsCasualty(entity) and Entity_GetWeaponHardpointCount(entity) > 0 and (
+							(Entity_IsVehicle(entity) and not Entity_IsSyncWeapon(entity))
+							or Entity_IsSoldier(entity)
+						) then
+						Rule_AddEntityEvent(BtB_ProjectileFired, entity, GE_ProjectileFired)
+					end
+				end
+			end
+		end
+	end
+end
+function BtB_Ballistics_Event_BuildItemComplete(player, blueprint)
+	BtB_Ballistics_ScanPlayer(player)
+end
+
+function BtB_Ballistics_Init()
+	dr_setdisplay("ballistics", true)
+	dr_setautoclear("ballistics", false)
+	dr_clear("ballistics")
+	BtB_ProjectileLandHeatmapDimensions[1] = World_GetWidth() / BtB_ProjectileLandHeatmapDimensions[3]
+	BtB_ProjectileLandHeatmapDimensions[2] = World_GetLength() / BtB_ProjectileLandHeatmapDimensions[4]
+	for i=1,BtB_ProjectileLandHeatmapDimensions[1] do
+		BtB_ProjectileLandHeatmap[i] = {}
+		for j=1,BtB_ProjectileLandHeatmapDimensions[2] do
+			BtB_ProjectileLandHeatmap[i][j] = 0
+		end
+	end
+	for i=1,World_GetPlayerCount() do
+		BtB_Ballistics_Entities[i] = {}
+		Rule_AddPlayerEvent(BtB_Ballistics_Event_BuildItemComplete, World_GetPlayerAt(i), GE_BuildItemComplete)
+	end
+	Rule_Add(BtB_ProjectileLandListen)
+end
+Scar_AddInit(BtB_Ballistics_Init)

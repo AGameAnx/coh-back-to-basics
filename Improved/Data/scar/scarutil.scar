@@ -34,6 +34,7 @@ import("StateMachine.scar")
 import("NIS.scar")
 import("Debugger.scar")
 import("GarrisonBuilding.scar")
+import("ballistics.scar")
 import("aicontrol.scar")
 import("atc.scar")
 --import("markerOutput.scar")
@@ -1687,7 +1688,7 @@ function Util_GetPosition(variable)
 	elseif type == ST_SQUAD then
 		return Squad_GetPosition(variable)
 	else
-		error("Util_GetPosition: unsupported type " .. scartype_tostring(variable))
+		error("Util_GetPosition: unsupported type " .. scarvar_getinfo(variable))
 	end
 end
 
