@@ -44,11 +44,11 @@ local function BtB_ProjectileLanded(projectileData)
 end
 
 function BtB_ProjectileLandListen()
-	dr_clear("ballistics")
+	--dr_clear("ballistics")
 	for i=1,BtB_ProjectileLandHeatmapDimensions[1] do
 		for j=1,BtB_ProjectileLandHeatmapDimensions[2] do
 			local x,y = BtB_GetCellMiddlePosition(i, j)
-			dr_text3d('ballistics', x, World_GetHeightAt(x, y)+1, y, BtB_ProjectileLandHeatmap[i][j], 0, 255, 255)
+			--dr_text3d('ballistics', x, World_GetHeightAt(x, y)+1, y, BtB_ProjectileLandHeatmap[i][j], 0, 255, 255)
 		end
 	end
 	for projectileGameID,projectileData in pairs(BtB_ProjectileData) do
@@ -103,9 +103,9 @@ function BtB_Ballistics_Event_BuildItemComplete(player, blueprint)
 end
 
 function BtB_Ballistics_Init()
-	dr_setdisplay("ballistics", true)
-	dr_setautoclear("ballistics", false)
-	dr_clear("ballistics")
+	--dr_setdisplay("ballistics", true)
+	--dr_setautoclear("ballistics", false)
+	--dr_clear("ballistics")
 	BtB_ProjectileLandHeatmapDimensions[1] = World_GetWidth() / BtB_ProjectileLandHeatmapDimensions[3]
 	BtB_ProjectileLandHeatmapDimensions[2] = World_GetLength() / BtB_ProjectileLandHeatmapDimensions[4]
 	for i=1,BtB_ProjectileLandHeatmapDimensions[1] do
