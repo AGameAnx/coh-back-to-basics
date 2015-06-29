@@ -103,8 +103,8 @@ s_personality =
 	min_military_value_increment_per_minute = 0,-- this is the amount the allowed military_value the AI will increase by every minute (starts at start_attack_time)
 	glue_military_percentage = 0,               -- [0,1] if the AI is this much better than the enemy it will stop producing military units
 	unit_purchase_selection_range = 5,          -- [1,n] randomly pick a unit from the top N of the sorted unit demand list, 1 means pick the best one all the time
-	secure_structure_demand = 1,                -- Flat secure structure (observation post) demand
-	secure_structure_demand_rand = 3,           -- Randomization for secure structure demand
+	secure_structure_demand = -3.5,             -- Flat secure structure (observation post) demand
+	secure_structure_demand_rand = 4,           -- Randomization for secure structure demand
 	
 	-- budget ratings
 	-- budget levels for each tech level. [5] being in the beginning [1] being highest tech level

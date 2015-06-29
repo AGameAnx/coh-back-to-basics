@@ -11,6 +11,7 @@ local k_maxDist = sqrt(World_GetWidth()*World_GetWidth() + World_GetLength()*Wor
 local k_capPercentageCoefficient = 0.6-min(0.6, k_maxDist/700-0.3)
 local k_longMapRatio = max(0, min(1, math.abs(World_GetWidth() - World_GetLength())/k_maxDist))
 local k_frontlineCoefficient = 0.275 * (1 + k_longMapRatio*0.35)
+local k_frontlineCoefficient_Defend = k_frontlineCoefficient + 0.4
 
 -- should we consider targets owned by a certain mod player
 function Target_ShouldDefendPlayer(player)
@@ -120,8 +121,8 @@ function RankTargetsPrepass()
 	if not firstPassDone then
 		firstPassDone = true
 		
-		dr_setautoclear("aicustomdebug3"..s_selfplayerid, false)
-		dr_setdisplay("aicustomdebug3"..s_selfplayerid, true)
+		dr_setautoclear("aicustomdebug2"..s_selfplayerid, false)
+		dr_setdisplay("aicustomdebug2"..s_selfplayerid, true)
 		
 		local hqMid = World_Pos(0,0,0)
 		local enemyHQMid = World_Pos(0,0,0)
@@ -321,6 +322,7 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 	if not Military_IsMilitaryPointValid(militaryPoint) then return 0.0 end
 	
 	local result = 0
+	local militaryPercentValue_local = militaryPercentValue
 	
 	local entity = Military_GetMilitaryPointEntity(militaryPoint)
 	local entityID = Entity_GetGameID(entity)
@@ -387,10 +389,13 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 		)*1.1 - 0.1
 	)
 	if is_defend then
-		militaryPercentValue = min(1, militaryPercentValue) - 0.35
-		enemyHQDistances[1] = enemyHQDistances[1]*0.8
-		enemyHQDistances[2] = enemyHQDistances[2]*0.8
-		result = result - 0.225
+		militaryPercentValue_local = 0.5
+		enemyHQDistances[1] = enemyHQDistances[1]*0.6
+		enemyHQDistances[2] = enemyHQDistances[2]*0.6
+		result = result + 0.5
+		distRatio = min(1, distRatio+0.3)
+		distFromAllHQs = distFromAllHQs * 0.8
+		minDistFromAllHQs = minDistFromAllHQs * 0.75
 	end
 	
 	local frontlineDistRatio
@@ -440,7 +445,7 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 	end
 	
 	if is_friendly then
-		result = result - 1 - min(1, 1.1-militaryPercentValue)
+		result = result - 1 - min(1, 1.1-militaryPercentValue_local)
 	end
 	
 	local threat = Military_GetCombinedThreatAtMilitaryPoint(s_selfplayer, militaryPoint, is_defend) -- pass in true to get history anti-class added to this threat
@@ -455,14 +460,14 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 		if is_defend then
 			threatScore = -10*threat/maxThreat
 		else
-			threatScore = 0.5*threat/maxThreat - min(0.5, max(-1, 2*(1-militaryPercentValue)*threat/maxThreat))
+			threatScore = 0.5*threat/maxThreat - min(0.5, max(-1, 2*(1-militaryPercentValue_local)*threat/maxThreat))
 			if minDistFromFriendlyHQs / k_maxDist / furthestPoint < closeToBaseThreshold then -- we have to respond to threats near the HQ
 				threatAtBaseScore = 23 * threat/maxThreat * (closeToBaseThreshold-minDistFromFriendlyHQs / k_maxDist / furthestPoint)/closeToBaseThreshold
 			end
 		end
 	end
 	
-	local threatMultiplier = (enemyHQDistances[2]/k_maxDist/furthestPoint - 0.5)*(1.05 - max(0.75, min(1.75, (militaryPercentValue-1)*0.5+1))) + 0.5
+	local threatMultiplier = (enemyHQDistances[2]/k_maxDist/furthestPoint - 0.5)*(1.05 - max(0.75, min(1.75, (militaryPercentValue_local-1)*0.5+1))) + 0.5
 	
 	--if Military_IsMilitaryPointBeingCapturedByUs(s_selfplayer, militaryPoint) then importance = importance * min(1.5, max(1, World_GetGameTime()/700)) end
 	if is_friendly_entity(entity) then
@@ -496,13 +501,20 @@ function Target_CalcMilitaryPointPriority(militaryPoint, is_neutral, is_defend, 
 	end
 	if not customMultiplier then customMultiplier = 1 end
 	
+	local frontlineCoefficient
+	if is_defend then
+		frontlineCoefficient = k_frontlineCoefficient_Defend
+	else
+		frontlineCoefficient = k_frontlineCoefficient
+	end
+	
 	local frontlineScore =
 		frontlineMapConstant
 		+ earlyGameScore
-		+ 5*(0.55 - distRatio)*(1 - militaryPercentValue/0.95)
-		+ 25*max(-0.5, min(0.5, militaryPercentValue + percentagePointsCaptured - 1.35)*percentagePointsCaptured)*(0.65 - enemyHQDistances[2]/k_maxDist/furthestPoint)
+		+ 5*(0.55 - distRatio)*(1 - militaryPercentValue_local/0.95)
+		+ 25*max(-0.5, min(0.5, militaryPercentValue_local + percentagePointsCaptured - 1.35)*percentagePointsCaptured)*(0.65 - enemyHQDistances[2]/k_maxDist/furthestPoint)
 		+ 2 * min(1, mapMidDistRatio-0.4)*(midMapMultiplier*3-6)
-		+ 15 * (1 - min(1, frontlineDistRatio / k_frontlineCoefficient)) / (midMapMultiplier*(1/3) + 1) * earlyGameFrontlineMultiplier
+		+ 15 * (1 - min(1, frontlineDistRatio / frontlineCoefficient)) / (midMapMultiplier*(1/3) + 1) * earlyGameFrontlineMultiplier
 		+ 15 * (0.55 - 1.25 * enemyHQDistances[2]/k_maxDist/furthestPoint) * percentagePointsCaptured
 		+ RatePointsFromEnemyHQDistance(entityPos, enemyHQDistances[2]) * (1 - percentagePointsCaptured/1.5) / (midMapMultiplier*(1/3) + 1)
 		+ captureScore
@@ -607,7 +619,7 @@ function RankDefendTargets()
 		end
 	end]]
 	
-	--[[if s_selfplayerid-999 == 2 then
+	if s_selfplayerid-999 == 2 then
 		dr_clear("aicustomdebug2"..s_selfplayerid)
 		
 		local wWidth = World_GetWidth()
@@ -639,7 +651,7 @@ function RankDefendTargets()
 				end
 			end
 		end
-	end]]
+	end
 end
 
 function Target_CalcAttackPriority(militaryPoint, is_neutral, is_friendly)
