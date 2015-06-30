@@ -377,6 +377,10 @@ AIControl.Grid = {
 					end
 				end
 				
+				sort(allSquads, function(a, b)
+					return Squad_GetGameID(a) > Squad_GetGameID(b)
+				end)
+				
 				AIControl_Grid.SplitUpdateCount = max(8, ceil(sqCount / AIControl_Grid_Settings.SplitUpdateIncreasePerSquadCount))
 				
 				local sqPerStep = AIControl_Grid_Settings.SplitUpdateIncreasePerSquadCount
@@ -1556,6 +1560,10 @@ CUCONTROL_TACTIC = {
 }
 
 CUCONTROL_BEHAVIORS = {
+	SPRINT_USF = function(squad, callback)
+		Cmd_Ability(sg, BP_GetAbilityBlueprint('abilities/ally_sprint_ability.lua'), nil, nil, false, false)
+		callback()
+	end,
 	FIRE_UP = function(squad, callback)
 		Cmd_Ability(sg, BP_GetAbilityBlueprint('abilities/ally_fireup_ability.lua'), nil, nil, false, false)
 		callback()
@@ -1863,7 +1871,16 @@ AIControl.MainControl = {
 					ability_chance = 40,
 					abilities = {
 						{
-							preset = CUCONTROL_ABILITY_PRESET.GRENADE
+							preset = CUCONTROL_ABILITY_PRESET.GRENADE,
+							overrides = {
+								behavior = CUCONTROL_BEHAVIORS.SPRINT_USF,
+							}
+						},
+						{
+							preset = CUCONTROL_ABILITY_PRESET.FIRST_VEHICLE,
+							overrides = {
+								behavior = CUCONTROL_BEHAVIORS.SPRINT_USF,
+							}
 						},
 					},
 				},
@@ -1874,6 +1891,7 @@ AIControl.MainControl = {
 					ability_chance = 75,
 					abilities = {
 						CUCONTROL_ABILITY_PRESET.GRENADE,
+						CUCONTROL_ABILITY_PRESET.FIRST_VEHICLE,
 						{
 							blueprint = BP_GetAbilityBlueprint('abilities/ally_suppression_ability_rifle_squad_infantry.lua'),
 							type = 'default',
@@ -1882,7 +1900,6 @@ AIControl.MainControl = {
 							weight = 10,
 							queued = false,
 						},
-						CUCONTROL_ABILITY_PRESET.FIRST_VEHICLE
 					}
 				},
 				[BP_GetID(SBP.ALLIES.PARATROOPER)] = {
@@ -2081,7 +2098,7 @@ AIControl.MainControl = {
 				
 				-- Panzer Elite
 				[BP_GetID(SBP.ELITE.PANZERGRENADIER)] = {
-					assault_troops = function(squad) Squad_HasUpgrade(squad, BP_GetUpgradeBlueprint('upgrade/axis_pe/items/panzer_elite_squad_mp44_package.lua')) end,
+					assault_troops = function(squad) return Squad_HasUpgrade(squad, BP_GetUpgradeBlueprint('upgrade/axis_pe/items/panzer_elite_squad_mp44_package.lua')) end,
 					close_in_distance = 26,
 					lock_chance = 100,
 					ability_chance = 20,
