@@ -1350,7 +1350,8 @@ local HMGBlueprintIDs = {
 
 local BARRAGE_CONTROL_POSITION
 BARRAGE_CONTROL_POSITION = {
-	SMOKE_BARRAGE = function(squad, setting)
+	SMOKE_BARRAGE = function(squad, setting, distance_in_front)
+		local distanceInFront = distance_in_front or 40
 		local player = Squad_GetPlayerOwner(squad)
 		local selfPos = Squad_GetPosition(squad)
 		local sg = SGroup_CreateIfNotFound('tactics_infrontofmgpos')
@@ -1375,7 +1376,7 @@ BARRAGE_CONTROL_POSITION = {
 				end
 				local sg2 = SGroup_CreateIfNotFound('tactics_infrontofmgpos2')
 				local squadPos = Squad_GetPosition(s)
-				local dropPos = World_Pos(squadPos.x+heading.x*40, squadPos.y+heading.y*40, squadPos.z+heading.z*40)
+				local dropPos = World_Pos(squadPos.x+heading.x*distanceInFront, squadPos.y+heading.y*distanceInFront, squadPos.z+heading.z*distanceInFront)
 				World_GetSquadsNearPoint(player, sg2, dropPos, 45, OT_Ally)
 				if SGroup_CountSpawned(sg2) > 0 then
 					SGroup_Destroy(sg2)
@@ -1431,7 +1432,7 @@ CUCONTROL_TACTIC = {
 			end
 		end,
 		SMOKE_GRENADE = function(squad, custom_range)
-			return BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE(squad, {searchrange=40})
+			return BARRAGE_CONTROL_POSITION.SMOKE_BARRAGE(squad, {searchrange=40}, 30) -- TODO: Improve this
 		end,
 		SATCHEL_CHARGE = function(squad, custom_range)
 			local range = custom_range or 30
@@ -1595,7 +1596,7 @@ CUCONTROL_ABILITY_PRESET = {
 		weight = 10,
 		queued = false,
 		type = 'position',
-		position = CUCONTROL_TACTIC.POSITION_FILTER.GRENADE,
+		position = CUCONTROL_TACTIC.POSITION_FILTER.SMOKE_GRENADE,
 	},
 	FIRST_VEHICLE = {
 		blueprint = BP_GetAbilityBlueprint('abilities/ally_throw_sticky_bombs.lua'),
@@ -3163,7 +3164,9 @@ AIControl.MainControl = {
 	GetSquadCoverPosition = function(squad, targetSquadPos)
 		local pos = Squad_GetPosition(squad)
 		
-		--[[if targetSquadPos then
+		local coverpos = Squad_FindCoverCompareCurrent(squad, pos, 18, 23, true)
+		
+		if targetSquadPos then
 			local posDiff = World_Pos(targetSquadPos.x - pos.x, 0, targetSquadPos.z - pos.z)
 			local posDiffLength = sqrt(posDiff.x*posDiff.x + posDiff.z*posDiff.z)
 			if posDiffLength > 0 then
@@ -3171,12 +3174,14 @@ AIControl.MainControl = {
 				posDiff.x = posDiff.x*posDiffLengthM
 				posDiff.z = posDiff.z*posDiffLengthM
 				
-				pos.x = pos.x + posDiff.x*7
-				pos.z = pos.z + posDiff.z*7
+				pos.x = coverpos.x - posDiff.x*3
+				pos.z = coverpos.z - posDiff.z*3
+				
+				coverpos = Squad_FindCoverCompareCurrent(squad, pos, 4, 25, true)
 			end
-		end]]
+		end
 		
-		return Squad_FindCoverCompareCurrent(squad, pos, 12, 15, true)
+		return coverpos
 	end,
 	ExecuteCombatUnitAbility = function(sg, squad, ability)
 		if ability.type == 'position' then
@@ -3470,8 +3475,8 @@ AIControl.MainControl = {
 									0,
 									closestSquadPos.z + posDiff.z*closeInDistance)
 								
-								local coverPos = Squad_FindCover(squad, targetPos, 5)
-								if World_DistanceSquaredPointToPoint(pos, coverPos) > 60 then
+								local coverPos = Squad_FindCover(squad, targetPos, 7)
+								if World_DistancePointToPoint(pos, coverPos) > 10 then
 									Command_SquadPosFacing(player, sg, SCMD_Move, coverPos, closestSquadPos, false)
 									--dr_drawline(World_Pos(pos.x, pos.y+1, pos.z), World_Pos(coverPos.x, coverPos.y+1, coverPos.z), 255, 0, 0, 'aicontrol_maincontrol')
 								else
@@ -3482,14 +3487,14 @@ AIControl.MainControl = {
 						if not shouldAssault then
 							local coverPos = AIControl_MainControl.GetSquadCoverPosition(squad, closestSquadPos)
 							if coverPos then
-								if World_DistanceSquaredPointToPoint(pos, coverPos) > 12 then
+								if World_DistancePointToPoint(pos, coverPos) > 6 then
 									if closestSquadPos then
 										Command_SquadPosFacing(player, sg, SCMD_Move, coverPos, closestSquadPos, false)
 									else
 										Command_SquadPos(player, sg, SCMD_Move, coverPos, false)
 									end
-								else
-									Cmd_Stop(sg)
+								--else
+								--	Cmd_Stop(sg)
 								end
 							end
 						end
