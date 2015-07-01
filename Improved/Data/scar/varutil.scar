@@ -136,12 +136,10 @@ function scarvar_getinfo(var)
 	end
 end
 
--- dumps all the variable information to the console (don't supply level, unless you know what you're doing)
+-- dumps all the variable information to the console
 function Dump(t, return_result, level)
+	if level == nil then level = 0 end
 	local result = ""
-	if level == nil then
-		level = 0
-	end
 	local l = level
 	local sp = ""
 	local j
@@ -165,12 +163,11 @@ function Dump(t, return_result, level)
 			if scartype(v) == ST_TABLE then
 				if return_result then
 					result = result.."\t["..ind.."]\n"
-					result = result..Dump(v, true, level+2)
+					result = result..Dump(v, true, level+1)
 					result = result..sp.."\t}\n"
 				else
 					print(sp.."\t["..ind.."]")
-					Dump(v, false, level+2)
-					print(sp.."\t}")
+					Dump(v, false, level+1)
 				end
 			else
 				if return_result then
