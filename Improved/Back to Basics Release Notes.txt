@@ -655,23 +655,29 @@ AI:
 - Difficulty settings adjusted and the resource bonuses have been reworked.
 - AI can now use reward units.
 - Significant improvements made to aicontrol script:
- * Significantly improved late game script performance.
- * Added many more types of units to aicontrol such as AT guns, mobile artillery, snipers.
- * Redone much of the script to improve its usability and performance.
+ * Significantly improved script performance. The script will automatically slow down based on the number of units present in the game. Overall load that script produces should pretty much stay the same throughout the game. The updates, however, are massively sped up in general, while performance impact is decreased across the board. Reduced stutter, increased variable memory access speed by moving a lot of variables from global to local scope, from tables to singular variables.
+ * Added many more types of units to unit control such as AT guns, mobile artillery, snipers.
  * Mobile artillery and mortars will now be forced to keep their distance from the enemy.
  * Team weapons will now move back properly if they think they're in danger.
  * Team weapons will now quickly retreat if the threat of the enemy close by is high enough.
  * Team weapons will now rotate to fire at the enemy if they see a better target than they're facing at more often. This also fixes MGs facing at wrong direction and not trying to rotate.
  * Across the board improvements in the different settings for all the team weapons.
  * Redone most of the British HQ setup logic, improving performance and reducing bugs.
- * Retreat is now handled through this file, retreat rules updated significantly.
+ * Retreat is now handled through this file, retreat rules updated significantly, added retreat from buildings.
  * AT guns now have a completely different way to set up, only staying in the fight if they're fighting vehicles and retreating from infantry.
  * Added a new behavior for units which makes them attack move towards the enemy at opportune moments rather than just seek cover and set up towards them. This is used for making snipers as deadly as possible.
  * The way units seek retreat and setup direction is redone completely, taking friendly units into account and choosing setup direction more intelligently.
- * Team weapons should no longer needlessly resetup right when the enemy enters their vicinity.
- * The script will now slow down based on the number of units it needs to operate on. This significantly improves lategame performance.
+ * Team weapons should no longer needlessly resetup as often right when the enemy enters their vicinity.
  * Significantly improved the way AI chooses artillery clump targets.
  * Bypassed a weird scar error which would occur after certain campaign missions.
+- Added a brand new combat unit control script:
+ * (Almost) all infantry is now controlled manually by the script when they enter combat.
+ * This script actually increases overall game performance as well. Vanilla AI executes tactics much more often and less efficiently, this script slows down together with the rest of the features making lategame utilize less CPU per unit.
+ * Units will take cover more intelligently. The script utilizes facing command and uses a double cover search to find positions behind cover rather than simply in any cover as AI would do before.
+ * Improved a lot of ability usage tactics.
+ * Added 'help' behavior, making squads seek friendly AI units around them when engaged and making them attack the enemy. This massively increases AI aggressiveness and adds wave-like battles.
+ * Added assault behavior. Assault troops will now close the distance, squads such as riflemen will try to get to mid range engagements. Different squads use different optimal close in distances. The AI will also intelligently seek cover at their assault location.
+ * Assault behavior may be triggered on all units if AI thinks it has overwhelming numbers in an area and may not be triggered at all if the numbers are overwhelming in enemy favor.
 - Added a brand new vehicle control script:
  * Vehicles will now be forced to face the enemy properly.
  * Vehicles will now retreat from danger properly.

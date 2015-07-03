@@ -1855,7 +1855,7 @@ AIControl.MainControl = {
 		
 		CombatUnitControl = {
 			BaseLockChance = 45,
-			HelpRadius = 85,
+			HelpRadius = 70,
 			UnitSettings = {
 				-- USF
 				[BP_GetID(SBP.ALLIES.ENGINEER)] = {
@@ -3269,12 +3269,13 @@ AIControl.MainControl = {
 				targetSquadPos = Squad_GetPosition(targetSquad)
 			end
 			
+			local sgNearby = SGroup_Create('aicontrol_cuc_tmpsurrounding')
+			World_GetSquadsNearPoint(player, sgNearby, pos, AIControl_MainControl_Settings_CombatUnitControl.HelpRadius, OT_Ally)
+			local friendlyCount = SGroup_CountSpawned(sgNearby)
+			
 			-- ask for support from surrounding squads
 			if inCombat and targetSquadPos then
-				local sgNearby = SGroup_Create('aicontrol_cuc_tmpsurrounding')
-				
-				World_GetSquadsNearPoint(player, sgNearby, pos, AIControl_MainControl_Settings_CombatUnitControl.HelpRadius, OT_Ally)
-				for i=1,SGroup_CountSpawned(sgNearby) do
+				for i=1,friendlyCount do
 					local nearbySquad = SGroup_GetSpawnedSquadAt(sgNearby, i)
 					if
 							not AIControl_IsSquadVehicle(nearbySquad)
@@ -3355,9 +3356,9 @@ AIControl.MainControl = {
 						end
 					end
 				end
-				
-				SGroup_Destroy(sgNearby)
 			end
+			
+			SGroup_Destroy(sgNearby)
 			
 			local lockType = 4
 			local lockSquad = false
@@ -3459,11 +3460,13 @@ AIControl.MainControl = {
 						if targetSquadPos then
 							closestSquadDist = World_DistancePointToPoint(pos, targetSquadPos)
 						else
-							closestSquadDist = 45
+							closestSquadDist = AIControl_MainControl_Settings_CombatUnitControl.HelpRadius
 						end
+						
 						local sgNearby = SGroup_Create('aicontrol_cuc_tmpsurrounding')
-						World_GetSquadsNearPoint(player, sgNearby, pos, closestSquadDist-10, OT_Enemy)
-						for i=1,SGroup_CountSpawned(sgNearby) do
+						World_GetSquadsNearPoint(player, sgNearby, pos, AIControl_MainControl_Settings_CombatUnitControl.HelpRadius, OT_Enemy)
+						local enemyCount = SGroup_CountSpawned(sgNearby)
+						for i=1,enemyCount do
 							local s = SGroup_GetSpawnedSquadAt(sgNearby, i)
 							if not AIControl_IsSquadVehicle(s) then
 								local sPos = Squad_GetPosition(s)
@@ -3476,35 +3479,43 @@ AIControl.MainControl = {
 						end
 						SGroup_Destroy(sgNearby)
 						
-						local shouldAssault = closestSquadPos and setting
-						if shouldAssault and setting.assault_troops ~= nil then
-							if type(setting.assault_troops) == 'function' then
-								shouldAssault = setting.assault_troops(squad)
-							else
-								shouldAssault = setting.assault_troops
-							end
-						end
-						if shouldAssault then
-							local closeInDistance = setting.close_in_distance or 25
-							local posDiff = World_Pos(pos.x - closestSquadPos.x, 0, pos.z - closestSquadPos.z)
-							local posDiffLength = sqrt(posDiff.x*posDiff.x + posDiff.z*posDiff.z)
-							shouldAssault = posDiffLength > closeInDistance
+						local shouldAssault = false
+						if closestSquadPos then
+							shouldAssault = setting and setting.assault_troops ~= nil
 							if shouldAssault then
-								local posDiffLengthM = 1/posDiffLength
-								posDiff.x = posDiff.x*posDiffLengthM
-								posDiff.z = posDiff.z*posDiffLengthM
-								
-								local targetPos = World_Pos(
-									closestSquadPos.x + posDiff.x*closeInDistance,
-									0,
-									closestSquadPos.z + posDiff.z*closeInDistance)
-								
-								local coverPos = Squad_FindCover(squad, targetPos, 7)
-								if World_DistancePointToPoint(pos, coverPos) > 10 then
-									Command_SquadPosFacing(player, sg, SCMD_Move, coverPos, closestSquadPos, false)
-									--dr_drawline(World_Pos(pos.x, pos.y+1, pos.z), World_Pos(coverPos.x, coverPos.y+1, coverPos.z), 255, 0, 0, 'aicontrol_maincontrol')
+								if type(setting.assault_troops) == 'function' then
+									shouldAssault = setting.assault_troops(squad, friendlyCount, enemyCount)
 								else
-									Cmd_Stop(sg)
+									shouldAssault = setting.assault_troops
+								end
+								if shouldAssault then
+									shouldAssault = friendlyCount / enemyCount > 0.65
+								end
+							else
+								shouldAssault = friendlyCount / enemyCount > 1.75
+							end
+							if shouldAssault then
+								local closeInDistance = setting.close_in_distance or 22
+								local posDiff = World_Pos(pos.x - closestSquadPos.x, 0, pos.z - closestSquadPos.z)
+								local posDiffLength = sqrt(posDiff.x*posDiff.x + posDiff.z*posDiff.z)
+								shouldAssault = posDiffLength > closeInDistance
+								if shouldAssault then
+									local posDiffLengthM = 1/posDiffLength
+									posDiff.x = posDiff.x*posDiffLengthM
+									posDiff.z = posDiff.z*posDiffLengthM
+									
+									local targetPos = World_Pos(
+										closestSquadPos.x + posDiff.x*closeInDistance,
+										0,
+										closestSquadPos.z + posDiff.z*closeInDistance)
+									
+									local coverPos = Squad_FindCover(squad, targetPos, 7)
+									if World_DistancePointToPoint(pos, coverPos) > 10 then
+										Command_SquadPosFacing(player, sg, SCMD_Move, coverPos, closestSquadPos, false)
+										--dr_drawline(World_Pos(pos.x, pos.y+1, pos.z), World_Pos(coverPos.x, coverPos.y+1, coverPos.z), 255, 0, 0, 'aicontrol_maincontrol')
+									else
+										Cmd_Stop(sg)
+									end
 								end
 							end
 						end
@@ -4205,13 +4216,6 @@ AIControl.__Init = function()
 end
 
 AIControl_Init = function()
-	for i=1,World_GetPlayerCount() do
-		local player = World_GetPlayerAt(i)
-		Player_SetResource(player, RT_Manpower, 5000)
-		Player_SetResource(player, RT_Munition, 3000)
-		Player_SetResource(player, RT_Fuel, 300)
-		Player_SetResource(player, RT_Action, 200)
-	end
 	Rule_Remove(AIControl.__Init)
 	Rule_Remove(AIControl.__Init2)
 	Rule_Remove(AIControl.Grid.Update)
